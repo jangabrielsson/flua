@@ -1,0 +1,79 @@
+"""Virtual-clock-driven cooperative timers (setTimeout semantics).
+
+Timers are a deadline queue over the engine's :class:`~flua.clock.VirtualClock`
+— no asyncio tasks. The pump ticks the clock and calls ``fire_due()`` every
+iteration; a timer fires when virtual time reaches its deadline. In instant
+mode the manager jumps virtual time to each deadline as it fires, which is
+what makes "wait days, execute now" work.
+
+Timers never touch Lua. A timer that fires invokes an injected
+``on_fire(timer_id)`` callback; the engine uses it to enqueue a
+``timerExpired`` message that the pump delivers to Lua. Timer IDs are plain
+integers and double as Lua callback IDs.
+"""
+
+import heapq
+import logging
+from collections.abc import Callable
+
+from .clock import VirtualClock
+
+logger = logging.getLogger(__name__)
+
+
+class TimerManager:
+    """Schedules one-shot virtual-time timers and reports fires via a callback."""
+
+    def __init__(self, clock: VirtualClock, on_fire: Callable[[int], None]) -> None:
+        self._clock = clock
+        self._on_fire = on_fire
+        self._heap: list[tuple[float, int]] = []  # (deadline, timer_id)
+        self._deadlines: dict[int, float] = {}
+
+    def set_timeout(self, timer_id: int, delay_ms: int) -> None:
+        """Schedule a one-shot timer; re-using an existing ID replaces it."""
+        self.clear_timeout(timer_id)
+        deadline = self._clock.time + max(int(delay_ms), 0) / 1000.0
+        self._deadlines[timer_id] = deadline
+        heapq.heappush(self._heap, (deadline, timer_id))
+        logger.debug("timeout %d scheduled for vtime %.3f", timer_id, deadline)
+
+    def clear_timeout(self, timer_id: int) -> bool:
+        """Cancel a pending timer. Returns True if one was pending."""
+        if timer_id in self._deadlines:
+            del self._deadlines[timer_id]
+            return True
+        return False
+
+    def active_count(self) -> int:
+        return len(self._deadlines)
+
+    def fire_due(self) -> int:
+        """Fire every timer whose deadline has passed. Returns the count.
+
+        In instant mode virtual time stands still between timers, so the
+        manager advances it to each deadline as the timer fires — the
+        "waiting period" is added to virtual time.
+        """
+        fired = 0
+        while self._heap:
+            deadline, timer_id = self._heap[0]
+            if self._deadlines.get(timer_id) != deadline:
+                heapq.heappop(self._heap)  # stale entry (cancelled/rescheduled)
+                continue
+            if not self._clock.instant and deadline > self._clock.time:
+                break  # realtime/speed modes: only fire what is due
+            heapq.heappop(self._heap)
+            del self._deadlines[timer_id]
+            if self._clock.time < deadline:
+                self._clock.time = deadline  # instant mode: add the wait to V
+            try:
+                self._on_fire(timer_id)
+            except Exception:
+                logger.exception("on_fire failed for timer %d", timer_id)
+            fired += 1
+        return fired
+
+    def stop(self) -> None:
+        self._deadlines.clear()
+        self._heap.clear()

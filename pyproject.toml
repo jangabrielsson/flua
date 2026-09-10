@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flua"
+version = "0.1.0"
+description = "Minimal Lua engine on lupa + asyncio with a message-passing bridge and cooperative timers"
+authors = [{name = "Jan Gabrielsson", email = "jan@gabrielsson.com"}]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "lupa>=2.4",            # 2.4+ bundles Lua 5.4 and supports Python 3.13
+]
+
+[project.scripts]
+flua = "flua.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.6.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+flua = ["lua/*.lua"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

@@ -1,0 +1,5 @@
+{
+  "Lua.diagnostics.enable": true,
+  "Lua.runtime.version": "Lua 5.4",
+  "Lua.workspace.checkThirdParty": false
+}

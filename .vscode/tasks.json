@@ -1,0 +1,64 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Plua, upload current file as QA to HC3-",
+      "type": "shell",
+      "command": "./run.sh",
+      "args": [
+        "--tool",
+        "uploadQA",
+        "${relativeFile}"
+      ],
+      "group": "build"
+    },
+    {
+      "label": "Plua, update single file (part of .project)",
+      "type": "shell",
+      "command": "plua",
+      "args": [
+        "--tool",
+        "updateFile",
+        "${relativeFile}"
+      ],
+      "group": "build"
+    },
+    {
+      "label": "Plua, update QA (defined in .project)",
+      "type": "shell",
+      "command": "plua",
+      "args": [
+        "--tool",
+        "updateQA",
+        "${relativeFile}"
+      ],
+      "group": "build"
+    },
+    {
+      "label": "Plua, Download and unpack from HC3",
+      "type": "shell",
+      "command": "plua",
+      "args": [
+        "--tool",
+        "downloadQA",
+        "${input:QA_id}",
+        "${input:path_id}",
+      ],
+      "group": "build"
+    }
+  ],
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "QA_id",
+      "description": "deviceId of QA from HC3 you want to download?",
+      "default": "-"
+    },
+    {
+      "type": "promptString",
+      "id": "path_id",
+      "description": "path where to store the QA",
+      "default": "dev"
+    }
+  ]
+}
