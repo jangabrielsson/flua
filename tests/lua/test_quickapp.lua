@@ -6,7 +6,7 @@ local t = dofile(script_dir .. "/helpers.lua")
 t.expect(type(QuickApp) == "table", "QuickApp class loaded")
 t.expect(type(QuickAppBase) == "table", "QuickAppBase class loaded")
 t.expect(type(fibaro) == "table", "fibaro loaded")
-t.expect(fibaro.plua ~= nil, "fibaro.plua stub present")
+t.expect(type(__fibaro_add_debug_message) == "function", "HC3 global __fibaro_add_debug_message present")
 
 local dev = {
   name = "TestQA",

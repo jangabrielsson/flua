@@ -29,12 +29,18 @@ class TimerManager:
         self._on_fire = on_fire
         self._heap: list[tuple[float, int]] = []  # (deadline, timer_id)
         self._deadlines: dict[int, float] = {}
+        self._timer_qa: dict[int, int] = {}  # timer_id -> qa_id attribution
 
-    def set_timeout(self, timer_id: int, delay_ms: int) -> None:
-        """Schedule a one-shot timer; re-using an existing ID replaces it."""
+    def set_timeout(self, timer_id: int, delay_ms: int, qa_id: int | None = None) -> None:
+        """Schedule a one-shot timer; re-using an existing ID replaces it.
+
+        ``qa_id`` attributes the timer to a QA; None means untracked.
+        """
         self.clear_timeout(timer_id)
         deadline = self._clock.time + max(int(delay_ms), 0) / 1000.0
         self._deadlines[timer_id] = deadline
+        if qa_id is not None:
+            self._timer_qa[timer_id] = qa_id
         heapq.heappush(self._heap, (deadline, timer_id))
         logger.debug("timeout %d scheduled for vtime %.3f", timer_id, deadline)
 
@@ -42,11 +48,16 @@ class TimerManager:
         """Cancel a pending timer. Returns True if one was pending."""
         if timer_id in self._deadlines:
             del self._deadlines[timer_id]
+            self._timer_qa.pop(timer_id, None)
             return True
         return False
 
     def active_count(self) -> int:
         return len(self._deadlines)
+
+    def qa_timer_count(self, qa_id: int) -> int:
+        """Active timers attributed to a QA."""
+        return sum(1 for t in self._timer_qa.values() if t == qa_id)
 
     def fire_due(self) -> int:
         """Fire every timer whose deadline has passed. Returns the count.
@@ -65,6 +76,7 @@ class TimerManager:
                 break  # realtime/speed modes: only fire what is due
             heapq.heappop(self._heap)
             del self._deadlines[timer_id]
+            self._timer_qa.pop(timer_id, None)
             if self._clock.time < deadline:
                 self._clock.time = deadline  # instant mode: add the wait to V
             try:
@@ -76,4 +88,5 @@ class TimerManager:
 
     def stop(self) -> None:
         self._deadlines.clear()
+        self._timer_qa.clear()
         self._heap.clear()

@@ -67,10 +67,11 @@ local function traceback(err)
 end
 
 -- ------------------------------------------------------------------- timers
-function _FLUA.setTimeout(fn, ms)
+function _FLUA.setTimeout(fn, ms, qa)
   ms = ms or 0
   local id = register(fn)
-  _PY.post{ type = "setTimeout", id = id, delay = ms }
+  -- qa attributes the timer to a QA; nil = runtime/untracked
+  _PY.post{ type = "setTimeout", id = id, delay = ms, qa = qa }
   return id
 end
 setTimeout = _FLUA.setTimeout
@@ -86,17 +87,17 @@ clearTimeout = _FLUA.clearTimeout
 -- setInterval is built on setTimeout chaining (cooperative, like JS).
 local intervals = {} -- id -> timeout id currently scheduled
 
-function _FLUA.setInterval(fn, ms)
+function _FLUA.setInterval(fn, ms, qa)
   nextId = nextId + 1
   local id = nextId
   local function tick()
     if not intervals[id] then return end
     xpcall(fn, traceback)
     if intervals[id] then
-      intervals[id] = setTimeout(tick, ms)
+      intervals[id] = _FLUA.setTimeout(tick, ms, qa)
     end
   end
-  intervals[id] = setTimeout(tick, ms)
+  intervals[id] = _FLUA.setTimeout(tick, ms, qa)
   return id
 end
 setInterval = _FLUA.setInterval
@@ -178,14 +179,17 @@ end
 -- Every Lua file is a QuickApp. Each QA runs in its own environment: same
 -- Lua state, but global writes land in a per-QA table (__newindex), while
 -- reads fall through to the shared runtime globals (__index). Each QA also
--- gets its own setTimeout/setInterval wrappers that track which timers
--- belong to which QA.
+-- gets its own setTimeout/setInterval wrappers that attribute their timers
+-- to the QA (tracked engine-side, one source of truth).
 --
--- Before the QA code loads, the runtime libraries class.lua, quickapp.lua
--- and fibaro.lua are loaded into the QA's environment (class -> quickapp ->
--- fibaro), together with a minimal fibaro.plua stub. This gives QA code
--- QuickApp, QuickAppBase, fibaro, plugin, hub and the fibaro print behavior
--- without leaking any of it into other QAs.
+-- Before the QA code loads, the runtime libraries quickapp.lua and
+-- fibaro.lua are loaded into the QA's environment (quickapp -> fibaro),
+-- together with the HC3-style globals (__fibaro_add_debug_message,
+-- printErr) and a minimal api stub. This gives QA code QuickApp,
+-- QuickAppBase, fibaro, plugin, hub and the fibaro print behavior without
+-- leaking any of it into other QAs. (quickapp.lua defines its own class
+-- function per QA; plua needed a separate class.lua for its global
+-- emulator code, flua does not.)
 
 -- plua-compatible table helpers used by quickapp.lua
 table.copy = function(t)
@@ -200,9 +204,7 @@ table.member = function(name, list)
   return false
 end
 
-local qaTimers = {}     -- qaId -> { timerId -> true }
-local qaIntervals = {}  -- qaId -> { intervalId -> true }
-local qaInstances = {}  -- qaId -> QuickApp instance (via fibaro.plua:registerQAGlobally)
+local qaInstances = {}  -- qaId -> QuickApp instance (registered by the bootstrap)
 
 -- HC3-style log lines for fibaro.debug/trace/warning/error, colored like
 -- plua: gray date and tag, level in its color (DEBUG=green, TRACE=cyan,
@@ -231,22 +233,15 @@ local function formatLogLine(tag, level, msg)
   return string.format("%s[%-7s][%s]: %s", date, tostring(level), tostring(tag), tostring(msg))
 end
 
-local function installPluaStub(env)
-  -- Minimal fibaro.plua until the full emulator lands. Enough for prints,
-  -- QuickApp construction, and error reporting.
-  local stub = { formatOutput = tostring, lib = {} }
-  -- plua-compat: quickapp.lua calls this from QuickAppBase:__init, but the
-  -- engine's bootstrap registers the instance itself (qaInstances) — the
-  -- Python side owns the QA directory.
-  function stub.registerQAGlobally() end
-  function stub.lib.__fibaro_add_debug_message(tag, msg, level)
+local function installQaGlobals(env)
+  -- HC3-style globals for QA code. On the real HC3 the runtime provides
+  -- these as Lua globals; flua installs them into each QA's environment.
+  function env.__fibaro_add_debug_message(tag, msg, level)
     -- post directly with the real level (the global print always logs as
     -- "info"), so the engine's log handler can colorize by level
     _PY.post{ type = "log", level = level, text = formatLogLine(tag, level, msg) }
   end
   env.printErr = function(e) print("Error: " .. tostring(e)) end
-  env.fibaro = env.fibaro or {}
-  env.fibaro.plua = stub
 
   -- Minimal HC3 REST API until the real client lands. Returns empty data
   -- and warns, so QuickApp construction works (child lookup etc.).
@@ -262,10 +257,10 @@ local function installPluaStub(env)
   }
 end
 
-local qaRuntimeLibs = { "class.lua", "quickapp.lua", "fibaro.lua" }
+local qaRuntimeLibs = { "quickapp.lua", "fibaro.lua" }
 
 local function installQaLibs(env)
-  installPluaStub(env)
+  installQaGlobals(env)
   local dir = package.path:match("^([^;]+)/%?%.lua")
   for _, name in ipairs(qaRuntimeLibs) do
     local chunk, err = loadfile(dir .. "/" .. name, "bt", env)
@@ -298,35 +293,14 @@ end
 function _FLUA.makeQaEnv(qaId)
   local env = {}
   env.setTimeout = function(fn, ms)
-    local id
-    id = setTimeout(function()
-      qaUntrack(qaTimers, qaId, id)
-      fn()
-    end, ms)
-    qaTrack(qaTimers, qaId, id)
-    return id
+    return _FLUA.setTimeout(fn, ms, qaId)
   end
-  env.clearTimeout = function(id)
-    clearTimeout(id)
-    qaUntrack(qaTimers, qaId, id)
-  end
+  env.clearTimeout = _FLUA.clearTimeout
   env.setInterval = function(fn, ms)
-    local id = setInterval(fn, ms)
-    qaTrack(qaIntervals, qaId, id)
-    return id
+    return _FLUA.setInterval(fn, ms, qaId)
   end
-  env.clearInterval = function(id)
-    clearInterval(id)
-    qaUntrack(qaIntervals, qaId, id)
-  end
+  env.clearInterval = _FLUA.clearInterval
   return env
-end
-
-function _FLUA.qaTimerCount(qaId)
-  local count = 0
-  for _ in pairs(qaTimers[qaId] or {}) do count = count + 1 end
-  for _ in pairs(qaIntervals[qaId] or {}) do count = count + 1 end
-  return count
 end
 
 local function qaEnvFor(qaId, config, args)

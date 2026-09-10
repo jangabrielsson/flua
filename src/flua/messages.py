@@ -14,7 +14,7 @@ from typing import Any
 
 # --- Lua -> Python (inbound, posted by _PY.post) -----------------------------
 
-SET_TIMEOUT = "setTimeout"      # {"id": int, "delay": int}      delay in ms
+SET_TIMEOUT = "setTimeout"      # {"id": int, "delay": int, "qa": int?}  ms + QA attribution
 CLEAR_TIMEOUT = "clearTimeout"  # {"id": int}
 LOG = "log"                     # {"level": "info|warning|error", "text": str}
 EXIT = "exit"                   # {"code": int}
@@ -25,9 +25,15 @@ QA_LOADED = "qaLoaded"          # {"id": int}  a QA finished loading its code
 TIMER_EXPIRED = "timerExpired"  # {"id": int}  run registered callback id
 
 
-def set_timeout(timer_id: int, delay_ms: int) -> dict[str, Any]:
-    """Build a setTimeout request. ``timer_id`` doubles as the Lua callback id."""
-    return {"type": SET_TIMEOUT, "id": timer_id, "delay": delay_ms}
+def set_timeout(timer_id: int, delay_ms: int, qa: int | None = None) -> dict[str, Any]:
+    """Build a setTimeout request. ``timer_id`` doubles as the Lua callback id.
+
+    ``qa`` attributes the timer to a QA (nil = runtime/untracked).
+    """
+    msg: dict[str, Any] = {"type": SET_TIMEOUT, "id": timer_id, "delay": delay_ms}
+    if qa is not None:
+        msg["qa"] = qa
+    return msg
 
 
 def clear_timeout(timer_id: int) -> dict[str, Any]:

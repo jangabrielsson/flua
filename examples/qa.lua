@@ -1,4 +1,4 @@
---%%name:My QA
+--%%name:Test
 --%%type:com.fibaro.binarySwitch
 
 function QuickApp:onInit()
@@ -10,4 +10,7 @@ function QuickApp:onInit()
     self:trace("TRACE")
     self:warning("WARNING")
     self:error("ERROR")
+
+    local iv = setInterval(function() print("OK") end, 1000)
+    setTimeout(function() print("Timeout reached") clearInterval(iv)  end, 5000)
 end

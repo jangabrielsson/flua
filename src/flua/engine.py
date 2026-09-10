@@ -163,6 +163,10 @@ class LuaEngine:
         """The QA's QuickApp instance (a lupa table proxy), or None."""
         return self._lua.globals()["_FLUA"]["qa"](qa_id)
 
+    def qa_timer_count(self, qa_id: int) -> int:
+        """Active timers attributed to a QA (engine-side, single source of truth)."""
+        return self._timers.qa_timer_count(qa_id)
+
     # -- lifecycle --------------------------------------------------------------
 
     async def start(self) -> None:
@@ -243,7 +247,7 @@ class LuaEngine:
     # -- handlers (Lua -> Python message types) -----------------------------------
 
     def _handle_set_timeout(self, msg: dict[str, Any]) -> None:
-        self._timers.set_timeout(int(msg["id"]), int(msg["delay"]))
+        self._timers.set_timeout(int(msg["id"]), int(msg["delay"]), msg.get("qa"))
 
     def _handle_clear_timeout(self, msg: dict[str, Any]) -> None:
         self._timers.clear_timeout(int(msg["id"]))

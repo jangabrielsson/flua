@@ -55,21 +55,24 @@ simply a file with its own environment:
   QAs can define a global `x` without clashing.
 - **Per-QA timers.** Each QA gets its own `setTimeout`/`clearTimeout`/
   `setInterval`/`clearInterval` wrappers that delegate to the runtime
-  timers but track which timers belong to which QA (`_FLUA.qaTimerCount(id)`).
-  Fired timers untrack themselves.
+  timers with QA attribution in the `setTimeout` message — the engine
+  tracks which timers belong to which QA (`engine.qa_timer_count(id)`,
+  one source of truth). Fired timers untrack themselves.
 - **Config.** The CLI builds a global config (CLI flags + global `--%%`
   annotations) and copies it into each QA as `config`, merged with the QA's
   local `--%%` annotations — so `--%%name:qa1` appears as `config.name`.
   When a QA loads, its config is also merged into the shared `_FLUA.config`
   table (the last loaded QA wins there), so `_FLUA.config.name` works too.
   `config` stays the stable per-QA copy for deferred reads.
-- **Runtime libraries.** Before the QA code runs, `class.lua`,
-  `quickapp.lua` and `fibaro.lua` are loaded into the QA's environment (in
-  that order), so `QuickApp`, `QuickAppBase`, `fibaro`, `plugin`, `hub` and
-  friends are available — each QA gets its own copies. A minimal
-  `fibaro.plua` stub and an `api` stub (HC3 REST, returns empty data with a
-  warning until the real client lands) keep prints and QuickApp
-  construction working.
+- **Runtime libraries.** Before the QA code runs, `quickapp.lua` and
+  `fibaro.lua` are loaded into the QA's environment (in that order), so
+  `QuickApp`, `QuickAppBase`, `fibaro`, `plugin`, `hub` and friends are
+  available — each QA gets its own copies (quickapp.lua defines its own
+  `class` per QA). The HC3-style
+  `__fibaro_add_debug_message` global (a Lua global on the real HC3, used by
+  `fibaro.debug/trace/warning/error`) and an `api` stub (HC3 REST, returns
+  empty data with a warning until the real client lands) keep prints and
+  QuickApp construction working.
 - **Bootstrap.** After the QA code has loaded, the engine constructs the
   QA's QuickApp instance from its config and registers it as
   `_FLUA.qa(qaId)` (Lua side). IDs are always assigned by the engine —
@@ -84,7 +87,7 @@ simply a file with its own environment:
   and `engine.qa_instance(id)` (the QuickApp as a lupa proxy). It is
   filled at start and updated via the `qaLoaded` message when the QA
   finishes loading. The old plua-style `registerQAGlobally` callback is
-  gone (a no-op stub remains for quickapp.lua compatibility).
+  gone — the bootstrap registers the instance directly.
 - **_FLUA vs _PY.** The engine's Lua-side API (timers, `async`, `exit`, QA
   support, `config`) lives in the `_FLUA` table; the bare globals
   (`setTimeout`, `async`, ...) are aliases for it. `_PY` is the pure Python

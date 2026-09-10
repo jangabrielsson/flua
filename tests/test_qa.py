@@ -26,7 +26,7 @@ async def wait_until(predicate, timeout: float = 3.0) -> None:
 
 
 def qa_timer_count(engine: LuaEngine, qa_id: int) -> int:
-    return engine.lua_runtime().globals()["_FLUA"]["qaTimerCount"](qa_id)
+    return engine.qa_timer_count(qa_id)
 
 
 @pytest.mark.asyncio

@@ -75,7 +75,7 @@ function QuickAppBase:__init(dev)
   self.interfaces = dev.interfaces
   self.properties = table.copy(dev.properties)
   self.uiCallbacks = {}
-  fibaro.plua:registerQAGlobally(self) -- Register this QuickApp globally
+  -- (the engine's bootstrap registers the instance; see _FLUA.qa)
 end
 
 -- Logs a debug message with the device tag
@@ -122,7 +122,6 @@ QuickAppBase.registerUICallbacks = QuickAppBase.setupUICallbacks
 function QuickAppBase:callAction(name, ...)
   --if name == "" then return end
   local args = {...}
-  --local stat,res = fibaro.plua.lib.prettyCall(function()
   local stat,res = xpcall(function()
     if (type(self[name]) == 'function') then return self[name](self, table.unpack(args))
     else print(fmt("[WARNING] Class does not have '%s' function defined - action ignored",tostring(name))) end
