@@ -104,7 +104,8 @@ def install_bindings(engine: "LuaEngine") -> None:
     py["now"] = lambda: engine.clock.time
     py["vtime"] = lambda: engine.clock.time
     py["vclock"] = lambda: engine.clock.elapsed()
-    py["note_debugger_pause"] = engine.clock.note_pause
+    py["note_debugger_pause"] = engine.note_debugger_pause
+    py["log"] = engine.log_line
     py["version"] = lambda: __version__
     py["color_enabled"] = engine.color_enabled
 
@@ -119,8 +120,51 @@ def install_bindings(engine: "LuaEngine") -> None:
             text = text.decode("utf-8")
         return lua.table_from(json.loads(text), recursive=True)
 
+    # HC3 REST bridge: api.get/post/put/delete -> (data, status). Synchronous
+    # like the real HC3 builtins; offline it dispatches to the simulated HC3
+    # (running QAs + seeded state), online mode will route to the real HC3.
+    def api_call(method: str, url: str, body: object) -> tuple[object, int]:
+        data, status = engine.api.dispatch(method, url, lua_to_python(body))
+        if data is None:
+            return None, status
+        return lua.table_from(data, recursive=True), status
+
+    # Enriched device for a QA (type skeleton + config, registered by the
+    # engine at start_qa). The Lua bootstrap builds the QuickApp instance
+    # from it, so the instance matches what the API serves.
+    def device_for(qa_id: int) -> object:
+        device = engine.api.state.devices.get(int(qa_id))
+        if device is None:
+            return None
+        return lua.table_from(device, recursive=True)
+
+    # Dynamic QA loading (dev/test convenience): install and run another QA
+    # from a file (its --%% annotations are parsed) or from inline code.
+    # File loading returns (qa_id, nil) or (nil, error message).
+    def load_qa_file(path: str) -> tuple[object, object]:
+        qa_id, err = engine.load_qa_file(path)
+        return qa_id, err
+
+    def qa_temp_file(code: str) -> str:
+        return engine.qa_temp_file(code)
+
+    # net.UDPSocket: the constructor binds an ephemeral UDP socket
+    # synchronously (bind is instant, no network I/O); send/receive go
+    # through the message pump like the other net classes.
+    def udp_open(broadcast: bool, timeout: float | None) -> tuple[object, object, object]:
+        ok, conn, port = engine.qa_udp.open(0, bool(broadcast), timeout)
+        if ok:
+            return True, conn, port
+        return False, conn, None
+
     py["to_json"] = to_json
     py["parse_json"] = parse_json
+    py["api"] = api_call
+    py["device_for"] = device_for
+    py["load_qa_file"] = load_qa_file
+    py["qa_temp_file"] = qa_temp_file
+    py["udp_open"] = udp_open
+    py["udp_close"] = engine.qa_udp.close
 
     # Blocking LuaSocket-compatible TCP calls for mobdebug. These may block
     # the asyncio loop (documented exception — a debugger pause freezes time).

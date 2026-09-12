@@ -11,6 +11,7 @@ _PY = _PY or {}
 _FLUA = _FLUA or {}
 
 local fmt = string.format
+local printErr = function(e) print("Error: " .. tostring(e)) end
 
 function class(name)
   local cls = setmetatable({__USERDATA=true}, {

@@ -81,7 +81,7 @@ def test_config_exposed_to_lua(tmp_path) -> None:
     script.write_text(
         "--%%speed:7\n"        # global param: copied up to the global config
         "--%%myparam:hello\n"  # local param: visible on the QA's config
-        "print('CFG', config.speed, config.myparam)\n"
+        "print('CFG', _FLUA.config.speed, _FLUA.config.myparam)\n"
         "exit(0)\n"
     )
     result = _run_flua(str(script))

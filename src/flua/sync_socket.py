@@ -13,6 +13,7 @@ version, which carries a threading lock it never actually needs).
 
 import logging
 import socket
+import threading
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -23,21 +24,29 @@ def _decode_or_none(data: bytes) -> str | None:
 
 
 class SyncTCPSockets:
-    """Blocking, LuaSocket-compatible TCP sockets (the subset mobdebug uses)."""
+    """Blocking, LuaSocket-compatible TCP sockets (the subset mobdebug uses).
+
+    Single-threaded by design for the debugger, but a lock guards the
+    registry so a second instance can serve net.TCPSocket operations from
+    worker threads without racing (the debugger's instance never contends).
+    """
 
     def __init__(self) -> None:
+        self._lock = threading.Lock()
         self._sockets: dict[int, socket.socket] = {}
         self._counter = 0
 
     # -- bookkeeping ----------------------------------------------------------
 
     def _register(self, sock: socket.socket) -> int:
-        self._counter += 1
-        self._sockets[self._counter] = sock
-        return self._counter
+        with self._lock:
+            self._counter += 1
+            self._sockets[self._counter] = sock
+            return self._counter
 
     def _get(self, conn_id: int) -> socket.socket:
-        sock = self._sockets.get(conn_id)
+        with self._lock:
+            sock = self._sockets.get(conn_id)
         if sock is None:
             raise ValueError(f"invalid connection id: {conn_id}")
         return sock
@@ -126,6 +135,43 @@ class SyncTCPSockets:
                 return True, b"".join(parts).decode("utf-8", errors="replace")
             parts.append(chunk)
 
+    def read_chunk(self, conn_id: int, n: int = 4096) -> tuple:
+        """One recv() — the next available data package, like the HC3's
+        TCPSocket:read. (True, data) | (False, "timeout"|"closed", None)."""
+        try:
+            sock = self._get(conn_id)
+            data = sock.recv(int(n))
+        except (BlockingIOError, TimeoutError):
+            return False, "timeout", None
+        except ConnectionResetError:
+            return False, "closed", None
+        except OSError as exc:
+            return False, f"read: {exc}", None
+        if not data:
+            return False, "closed", None
+        return True, data.decode("utf-8", errors="replace"), None
+
+    def read_until(self, conn_id: int, delimiter: str) -> tuple:
+        """Read until ``delimiter`` appears (excluded from the result), like
+        the HC3's TCPSocket:readUntil. (True, data) | (False, err, partial)."""
+        sock = self._get(conn_id)
+        data = b""
+        needle = delimiter.encode("utf-8")
+        while True:
+            try:
+                byte = sock.recv(1)
+            except (BlockingIOError, TimeoutError):
+                return False, "timeout", _decode_or_none(data)
+            except ConnectionResetError:
+                return False, "closed", _decode_or_none(data)
+            except OSError as exc:
+                return False, f"read: {exc}", _decode_or_none(data)
+            if not byte:
+                return False, "closed", _decode_or_none(data)
+            data += byte
+            if data.endswith(needle):
+                return True, data[: -len(needle)].decode("utf-8", errors="replace"), None
+
     def set_timeout(self, conn_id: int, timeout: float | None) -> tuple:
         """None = blocking, 0 = non-blocking, t > 0 = timeout in seconds."""
         try:
@@ -136,7 +182,8 @@ class SyncTCPSockets:
             return False, f"settimeout: {exc}"
 
     def close(self, conn_id: int) -> tuple:
-        sock = self._sockets.pop(conn_id, None)
+        with self._lock:
+            sock = self._sockets.pop(conn_id, None)
         if sock is None:
             return False, "invalid connection id"
         try:
@@ -177,12 +224,90 @@ class SyncTCPSockets:
             return False, f"accept: {exc}"
 
     def close_all(self) -> None:
-        for sock in list(self._sockets.values()):
+        with self._lock:
+            socks = list(self._sockets.values())
+            self._sockets.clear()
+        for sock in socks:
             try:
                 sock.close()
             except OSError:
                 pass
-        self._sockets.clear()
 
     def connection_count(self) -> int:
         return len(self._sockets)
+
+
+class SyncUDPSockets:
+    """Blocking UDP datagram sockets for net.UDPSocket (worker threads)."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._sockets: dict[int, socket.socket] = {}
+        self._counter = 0
+
+    def _register(self, sock: socket.socket) -> int:
+        with self._lock:
+            self._counter += 1
+            self._sockets[self._counter] = sock
+            return self._counter
+
+    def _get(self, conn_id: int) -> socket.socket:
+        with self._lock:
+            sock = self._sockets.get(conn_id)
+        if sock is None:
+            raise ValueError(f"invalid connection id: {conn_id}")
+        return sock
+
+    def open(self, port: int = 0, broadcast: bool = False, timeout: float | None = None) -> tuple:
+        """(True, conn_id, bound_port) | (False, error_message, None)."""
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            sock.bind(("", int(port)))
+            if broadcast:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            if timeout is not None:
+                sock.settimeout(timeout)
+            return True, self._register(sock), sock.getsockname()[1]
+        except OSError as exc:
+            sock.close()
+            return False, f"bind: {exc}", None
+
+    def send_to(self, conn_id: int, data: str, ip: str, port: int) -> tuple:
+        """(True, bytes_sent) | (False, error_message)."""
+        try:
+            sock = self._get(conn_id)
+            return True, sock.sendto(data.encode("utf-8"), (str(ip), int(port)))
+        except OSError as exc:
+            return False, f"sendto: {exc}"
+
+    def receive(self, conn_id: int) -> tuple:
+        """(True, data) | (False, "timeout"|err, None). One datagram."""
+        try:
+            sock = self._get(conn_id)
+            data, _addr = sock.recvfrom(65535)
+        except (BlockingIOError, TimeoutError):
+            return False, "timeout", None
+        except OSError as exc:
+            return False, f"receive: {exc}", None
+        return True, data.decode("utf-8", errors="replace"), None
+
+    def close(self, conn_id: int) -> tuple:
+        with self._lock:
+            sock = self._sockets.pop(conn_id, None)
+        if sock is None:
+            return False, "invalid connection id"
+        try:
+            sock.close()
+        except OSError:
+            pass
+        return True, ""
+
+    def close_all(self) -> None:
+        with self._lock:
+            socks = list(self._sockets.values())
+            self._sockets.clear()
+        for sock in socks:
+            try:
+                sock.close()
+            except OSError:
+                pass

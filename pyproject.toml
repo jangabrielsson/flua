@@ -28,7 +28,7 @@ dev = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-flua = ["lua/*.lua"]
+flua = ["lua/*.lua", "devices/*.json"]
 
 [tool.ruff]
 line-length = 100

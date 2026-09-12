@@ -59,6 +59,13 @@ class TimerManager:
         """Active timers attributed to a QA."""
         return sum(1 for t in self._timer_qa.values() if t == qa_id)
 
+    def cancel_qa(self, qa_id: int) -> int:
+        """Cancel all timers attributed to a QA. Returns the number cancelled."""
+        ids = [t for t, q in self._timer_qa.items() if q == qa_id]
+        for timer_id in ids:
+            self.clear_timeout(timer_id)
+        return len(ids)
+
     def fire_due(self) -> int:
         """Fire every timer whose deadline has passed. Returns the count.
 

@@ -2,8 +2,7 @@
 -- Example QA pair: run with
 --   .venv/bin/flua examples/qa1.lua examples/qa2.lua
 -- Each QA runs in its own environment and prints its own number.
--- The QA's config is merged into _FLUA.config at load, so the name is
--- visible engine-wide; capture it for stable per-QA use in callbacks.
+-- Each QA's _FLUA.config holds that QA's own config (--%%name:qa-two).
 local name = _FLUA.config.name
 print(_FLUA.config.name .. ": 100")
 setTimeout(function()

@@ -16,6 +16,7 @@ last file that sets one wins.
 import argparse
 import asyncio
 import contextlib
+import json
 import logging
 import os
 import sys
@@ -89,6 +90,18 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=["auto", "always", "never"],
         default="always",
         help="ANSI colors on QA log lines: always (default), auto (terminal only), never",
+    )
+    parser.add_argument(
+        "--api",
+        choices=["local", "remote"],
+        default="local",
+        help="REST API backend: local = simulated HC3 in flua (default); "
+        "remote = the real HC3 (not implemented yet)",
+    )
+    parser.add_argument(
+        "--seed",
+        metavar="FILE",
+        help="JSON file seeding the simulated HC3: devices, rooms, scenes, globalVariables",
     )
     parser.add_argument(
         "--nogreet",
@@ -202,7 +215,25 @@ def _keep_running(
 async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     global_config, qa_specs = _load_qas(parser, args)
     speed, max_hours = _resolve_runtime(parser, args, global_config)
-    engine = LuaEngine(speed=speed, config=global_config, color=args.color)
+    if args.api != "local":
+        parser.error("--api remote: not implemented yet (offline sim only)")
+    seed: dict[str, Any] | None = None
+    if args.seed:
+        try:
+            seed = json.loads(Path(args.seed).read_text(encoding="utf-8"))
+        except OSError as exc:
+            parser.error(f"cannot read seed file: {exc}")
+        except ValueError as exc:
+            parser.error(f"invalid seed JSON: {exc}")
+        if not isinstance(seed, dict):
+            parser.error("seed file must contain a JSON object")
+    engine = LuaEngine(
+        speed=speed,
+        config=global_config,
+        color=args.color,
+        api_mode=args.api,
+        seed=seed,
+    )
     await engine.start()
     if not args.nogreet:
         # route the greeting through the message queue so it shares the

@@ -30,7 +30,7 @@ async def test_instant_mode_advances_virtual_time(capsys) -> None:
             "local t0 = os.time()\n"
             "setTimeout(function()\n"
             "  print('DT', os.time() - t0)\n"
-            "  exit(0)\n"
+            "  _FLUA.exit(0)\n"
             "end, 3600000)"  # one simulated hour
         )
         start = time.monotonic()
@@ -49,7 +49,7 @@ async def test_instant_mode_preserves_deadline_order(capsys) -> None:
         engine.execute(
             "setTimeout(function() print('B') end, 2000)\n"
             "setTimeout(function() print('A') end, 1000)\n"
-            "setTimeout(function() print('done'); exit(0) end, 3000)"
+            "setTimeout(function() print('done'); _FLUA.exit(0) end, 3000)"
         )
         await wait_until(lambda: not engine.is_running())
         out = capsys.readouterr().out
@@ -69,7 +69,7 @@ async def test_accelerated_mode_fires_early_but_keeps_virtual_time(capsys) -> No
             "setTimeout(function()\n"
             "  print('FAST')\n"
             "  print('DT2', string.format('%.3f', os.time() - t0))\n"
-            "  exit(0)\n"
+            "  _FLUA.exit(0)\n"
             "end, 500)"
         )
         await wait_until(lambda: not engine.is_running(), timeout=2)

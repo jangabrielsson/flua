@@ -19,8 +19,11 @@ Flow::
 """
 
 import asyncio
+import contextlib
 import logging
+import os
 import sys
+import tempfile
 import time
 from collections import deque
 from collections.abc import Callable
@@ -30,9 +33,12 @@ from typing import Any
 import lupa
 
 from . import messages
+from .api import Api
 from .bindings import install_bindings
 from .clock import VirtualClock
-from .sync_socket import SyncTCPSockets
+from .config import parse_annotations, split_annotations
+from .http import http_call
+from .sync_socket import SyncTCPSockets, SyncUDPSockets
 from .timers import TimerManager
 
 logger = logging.getLogger(__name__)
@@ -50,6 +56,8 @@ class LuaEngine:
         speed: float = 1.0,
         config: dict[str, Any] | None = None,
         color: str = "auto",
+        api_mode: str = "local",
+        seed: dict[str, Any] | None = None,
     ) -> None:
         self._lua = lupa.LuaRuntime(unpack_returned_tuples=True, encoding="UTF-8")
         self._inbound: deque[dict[str, Any]] = deque()
@@ -65,8 +73,19 @@ class LuaEngine:
         # Blocking LuaSocket-compatible sockets for mobdebug (main-thread,
         # loop-freezing by design — see sync_socket.py).
         self.sync_sockets = SyncTCPSockets()
+        # HC3 REST API: offline sim (running QAs + seeded state) today, the
+        # remote HC3 later. Dispatch never blocks the pump.
+        if api_mode != "local":
+            raise ValueError(f"unsupported api mode {api_mode!r}: only 'local' is implemented")
+        self.api = Api(self, seed)
         self._handlers: dict[str, Callable[[dict[str, Any]], Any]] = {
             messages.SET_TIMEOUT: self._handle_set_timeout,
+            messages.HTTP_REQUEST: self._handle_http_request,
+            messages.TCP_CONNECT: self._handle_tcp_connect,
+            messages.TCP_SEND: self._handle_tcp_send,
+            messages.TCP_READ: self._handle_tcp_read,
+            messages.UDP_SEND: self._handle_udp_send,
+            messages.UDP_RECEIVE: self._handle_udp_receive,
             messages.CLEAR_TIMEOUT: self._handle_clear_timeout,
             messages.LOG: self._handle_log,
             messages.EXIT: self._handle_exit,
@@ -77,6 +96,15 @@ class LuaEngine:
         self._pump_task: asyncio.Task[None] | None = None
         self._next_qa_id = 5000  # engine-assigned QA ids start at 5000
         self._qas: dict[int, dict[str, Any]] = {}  # QA directory (engine-owned)
+        # temp files backing loadQAfromString QAs; deleted once the QA loads
+        self._temp_qa_paths: set[str] = set()
+        # in-flight net.HTTPClient tasks: they count as pending work, so the
+        # CLI keeps running until responses are delivered
+        self._http_tasks: set[asyncio.Task[None]] = set()
+        # net.TCPSocket ops run in worker threads over their own pool (the
+        # debugger's sockets stay single-threaded on the main thread)
+        self.qa_sockets = SyncTCPSockets()
+        self.qa_udp = SyncUDPSockets()
         install_bindings(self)
 
     # -- bridge surface (used by bindings.py) ---------------------------------
@@ -84,6 +112,12 @@ class LuaEngine:
     def post(self, msg: dict[str, Any]) -> None:
         """Append a Lua -> Python message. Never blocks, never calls Lua."""
         self._inbound.append(msg)
+
+    def log_line(self, level: str, text: str) -> None:
+        """Print a QA log line directly (safe at any call depth: only stdout
+        and logging, never Lua state — so it works inside debugger-stepped
+        code, where the pump is frozen)."""
+        self._handle_log({"type": messages.LOG, "level": level, "text": text})
 
     def enqueue_outbound(self, msg: dict[str, Any]) -> None:
         """Queue a Python -> Lua message for the pump to deliver."""
@@ -123,6 +157,25 @@ class LuaEngine:
         Returns the QA id assigned by the engine — unique within this run,
         starting at 5000 and incrementing per QA.
         """
+        qa_id = self._prepare_qa(path, code, qa_config, arg0)
+        cfg = self._lua.table_from(self._qas[qa_id]["config"], recursive=True)
+        arg = self._lua.table()
+        arg[0] = arg0
+        flua = self._lua.globals()["_FLUA"]
+        if path is not None:
+            flua["startQaFile"](qa_id, path, cfg, arg)
+        else:
+            flua["startQaCode"](qa_id, code, cfg, arg)
+        return qa_id
+
+    def _prepare_qa(
+        self,
+        path: str | None,
+        code: str | None,
+        qa_config: dict[str, Any],
+        arg0: str,
+    ) -> int:
+        """Assign a QA id, resolve its name, register it in the sim directory."""
         qa_id = self._next_qa_id
         self._next_qa_id += 1
         qa_config = dict(qa_config)
@@ -137,17 +190,55 @@ class LuaEngine:
             "path": path,
             "code": code,
             "loaded": False,
+            "type": qa_config.get("type"),
+            "properties": qa_config.get("properties") or {},
+            "config": qa_config,  # resolved copy (name/type/properties filled in)
         }
-        lua = self._lua
-        cfg = lua.table_from(qa_config, recursive=True)
-        arg = lua.table()
-        arg[0] = arg0
-        flua = lua.globals()["_FLUA"]
-        if path is not None:
-            flua["startQaFile"](qa_id, path, cfg, arg)
-        else:
-            flua["startQaCode"](qa_id, code, cfg, arg)
+        # Register the QA as a device before its code runs: on the HC3 the
+        # plugin device exists before onInit executes, and onInit's own api
+        # calls (internalStorage, updateProperty) must find it.
+        self.api.register_qa(qa_id, name, qa_config.get("type"), qa_config.get("properties") or {})
         return qa_id
+
+    # -- dynamic loading (loadQAfromFile / loadQAfromString) ----------------------
+
+    def load_qa_file(self, path: str) -> tuple[int | None, str | None]:
+        """Install and run a QA from a file — callable from running QA code.
+
+        Reads the file's ``--%%`` annotations like the CLI (they win over the
+        engine config; global params stay local to the loaded QA — a test QA
+        must not change the running engine's clock). The bootstrap is queued
+        as a ``startQA`` message so the pump runs it with no Lua on the
+        stack, and it boots eagerly so follow-up calls from the same callback
+        already reach the new QA. Returns (qa_id, None) or (None, error).
+        """
+        path = str(Path(path))
+        try:
+            source = Path(path).read_text(encoding="utf-8")
+            global_params, local_params = split_annotations(parse_annotations(source))
+        except Exception as exc:  # missing file, bad encoding, ...
+            return None, str(exc)
+        config = dict(self.config)
+        config.update(global_params)
+        config.update(local_params)
+        qa_id = self._prepare_qa(path, None, config, path)
+        self.enqueue_outbound(messages.start_qa_msg(qa_id, path, config, path))
+        return qa_id, None
+
+    def qa_temp_file(self, code: str) -> str:
+        """Write inline QA code to a temp file (deleted once the QA loads)."""
+        directory = tempfile.mkdtemp(prefix="flua-qa-")
+        path = os.path.join(directory, "qa.lua")
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(code)
+        self._temp_qa_paths.add(path)
+        return path
+
+    def _cleanup_temp_qa(self, path: str) -> None:
+        self._temp_qa_paths.discard(path)
+        with contextlib.suppress(OSError):
+            Path(path).unlink()
+            Path(path).parent.rmdir()
 
     # -- QA directory -----------------------------------------------------------
 
@@ -186,6 +277,10 @@ class LuaEngine:
             except asyncio.CancelledError:
                 pass
             self._pump_task = None
+        for path in list(self._temp_qa_paths):
+            self._cleanup_temp_qa(path)
+        for task in list(self._http_tasks):
+            task.cancel()
 
     def is_running(self) -> bool:
         return self._running
@@ -196,11 +291,12 @@ class LuaEngine:
         return self._exit_code
 
     def has_pending_work(self) -> bool:
-        """True while timers are active or either message queue is non-empty."""
+        """True while timers, message queues, or in-flight worker tasks exist."""
         return (
             self._timers.active_count() > 0
             or bool(self._inbound)
             or not self._outbound.empty()
+            or bool(self._http_tasks)
         )
 
     # -- pump --------------------------------------------------------------------
@@ -249,6 +345,125 @@ class LuaEngine:
     def _handle_set_timeout(self, msg: dict[str, Any]) -> None:
         self._timers.set_timeout(int(msg["id"]), int(msg["delay"]), msg.get("qa"))
 
+    def _handle_http_request(self, msg: dict[str, Any]) -> None:
+        """Run a net.HTTPClient request in a worker thread (never blocks the pump)."""
+        logger.debug("http request id=%s %s %s", msg["id"], msg.get("method"), msg["url"])
+        task = asyncio.create_task(self._run_http_request(msg), name="flua-http")
+        self._http_tasks.add(task)
+        task.add_done_callback(self._http_tasks.discard)
+
+    # -- net.TCPSocket (worker threads over the dedicated qa_sockets pool) ------
+
+    def _spawn_tcp(self, msg: dict[str, Any], kind: str, func: Any, *args: Any) -> None:
+        logger.debug("tcp %s id=%s", msg["type"], msg["id"])
+        task = asyncio.create_task(self._run_tcp_op(msg, kind, func, *args), name="flua-tcp")
+        self._http_tasks.add(task)
+        task.add_done_callback(self._http_tasks.discard)
+
+    def _handle_tcp_connect(self, msg: dict[str, Any]) -> None:
+        self._spawn_tcp(
+            msg,
+            "connect",
+            self.qa_sockets.connect,
+            str(msg["host"]),
+            int(msg["port"]),
+            float(msg.get("timeout") or 1.0),
+        )
+
+    def _handle_tcp_send(self, msg: dict[str, Any]) -> None:
+        self._spawn_tcp(
+            msg, "send", self.qa_sockets.write, int(msg["conn"]), str(msg.get("data") or "")
+        )
+
+    def _handle_tcp_read(self, msg: dict[str, Any]) -> None:
+        conn = int(msg["conn"])
+        if msg.get("delimiter") is not None:
+            self._spawn_tcp(msg, "read", self.qa_sockets.read_until, conn, str(msg["delimiter"]))
+        elif msg.get("pattern") == "*l":
+            self._spawn_tcp(msg, "read", self.qa_sockets.read, conn, "*l")
+        elif msg.get("pattern") == "*a":
+            self._spawn_tcp(msg, "read", self.qa_sockets.read, conn, "*a")
+        else:
+            # HC3's read() returns the next available data package: one recv
+            self._spawn_tcp(msg, "read", self.qa_sockets.read_chunk, conn)
+
+    async def _run_tcp_op(self, msg: dict[str, Any], kind: str, func: Any, *args: Any) -> None:
+        try:
+            result = await asyncio.to_thread(func, *args)
+        except Exception as exc:
+            result = (False, f"tcp: {exc}")
+        ok = bool(result[0])
+        value = result[1] if len(result) > 1 else None
+        if kind == "connect":
+            out = messages.tcp_result(
+                msg["id"], msg.get("qa"), ok, conn=value if ok else None, err=None if ok else value
+            )
+        elif kind == "send":
+            out = messages.tcp_result(msg["id"], msg.get("qa"), ok, err=None if ok else value)
+        else:
+            out = messages.tcp_result(
+                msg["id"], msg.get("qa"), ok, data=value if ok else None, err=None if ok else value
+            )
+        self.enqueue_outbound(out)
+
+    # -- net.UDPSocket (worker threads over the dedicated qa_udp pool) ---------
+
+    def _handle_udp_send(self, msg: dict[str, Any]) -> None:
+        logger.debug("udp %s id=%s", msg["type"], msg["id"])
+        task = asyncio.create_task(
+            self._run_udp_op(
+                msg,
+                self.qa_udp.send_to,
+                int(msg["conn"]),
+                str(msg.get("data") or ""),
+                str(msg["ip"]),
+                int(msg["port"]),
+            ),
+            name="flua-udp",
+        )
+        self._http_tasks.add(task)
+        task.add_done_callback(self._http_tasks.discard)
+
+    def _handle_udp_receive(self, msg: dict[str, Any]) -> None:
+        logger.debug("udp %s id=%s", msg["type"], msg["id"])
+        task = asyncio.create_task(
+            self._run_udp_op(msg, self.qa_udp.receive, int(msg["conn"])),
+            name="flua-udp",
+        )
+        self._http_tasks.add(task)
+        task.add_done_callback(self._http_tasks.discard)
+
+    async def _run_udp_op(self, msg: dict[str, Any], func: Any, *args: Any) -> None:
+        try:
+            result = await asyncio.to_thread(func, *args)
+        except Exception as exc:
+            result = (False, f"udp: {exc}")
+        ok = bool(result[0])
+        value = result[1] if len(result) > 1 else None
+        out = messages.udp_result(
+            msg["id"], msg.get("qa"), ok, data=value if ok else None, err=None if ok else value
+        )
+        self.enqueue_outbound(out)
+
+    async def _run_http_request(self, msg: dict[str, Any]) -> None:
+        result: dict[str, Any]
+        try:
+            status, data, headers = await asyncio.to_thread(
+                http_call,
+                str(msg.get("method") or "GET"),
+                str(msg["url"]),
+                {str(k): str(v) for k, v in (msg.get("headers") or {}).items()},
+                msg.get("data"),
+                float(msg.get("timeout") or 30.0),
+            )
+            result = messages.http_result(msg["id"], msg.get("qa"), status, data, headers)
+        except Exception as exc:
+            result = messages.http_result(msg["id"], msg.get("qa"), error=str(exc))
+        logger.debug(
+            "http result id=%s %s", msg["id"], result.get("status", result.get("error"))
+        )
+        self.enqueue_outbound(result)
+
     def _handle_clear_timeout(self, msg: dict[str, Any]) -> None:
         self._timers.clear_timeout(int(msg["id"]))
 
@@ -271,7 +486,23 @@ class LuaEngine:
         return sys.stdout.isatty()
 
     def _handle_exit(self, msg: dict[str, Any]) -> None:
-        self._exit_code = int(msg.get("code", 0))
+        code = int(msg.get("code", 0))
+        if "qa" in msg:
+            # HC3 semantics: exit() terminates the QA that called it (each QA
+            # is its own process on the HC3; flua runs them cooperatively).
+            # Cancel the QA's timers, record its exit, and keep the engine
+            # running for the other QAs — the run loop stops it once no work
+            # is left.
+            qa_id = int(msg["qa"])
+            self._timers.cancel_qa(qa_id)
+            info = self._qas.get(qa_id)
+            if info is not None:
+                info["exited"] = code
+                logger.debug("QA %d (%s) exited with code %d", qa_id, info["name"], code)
+            if code != 0:
+                self._exit_code = code  # last failing QA wins
+            return
+        self._exit_code = code
         self._running = False
 
     def _handle_qa_loaded(self, msg: dict[str, Any]) -> None:
@@ -280,6 +511,9 @@ class LuaEngine:
         if info is not None:
             info["loaded"] = True
             logger.debug("QA %d (%s) loaded", qa_id, info["name"])
+            if info.get("path") in self._temp_qa_paths:
+                # the temp file backing loadQAfromString was consumed
+                self._cleanup_temp_qa(info["path"])
 
     # -- timer bridge ---------------------------------------------------------------
 

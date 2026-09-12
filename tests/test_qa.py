@@ -1,5 +1,6 @@
 """QuickApp model: isolated environments, per-QA timers, config copy."""
 
+import asyncio
 import re
 import subprocess
 import sys
@@ -85,7 +86,7 @@ async def test_qa_timers_are_tracked(tmp_path) -> None:
 @pytest.mark.asyncio
 async def test_qa_config_copy(tmp_path, capsys) -> None:
     a = tmp_path / "a.lua"
-    a.write_text("print('CFG', config.name, config.speed)\n")
+    a.write_text("print('CFG', _FLUA.config.name, _FLUA.config.speed)\n")
     engine = LuaEngine(speed=2.0, config={"speed": 2.0})
     await engine.start()
     try:
@@ -102,14 +103,14 @@ def test_cli_runs_multiple_qas_isolated(tmp_path) -> None:
     a.write_text(
         "--%%name:qa-a\n"
         "x = 'a'\n"
-        "setTimeout(function() print('A', x, config.name) end, 20)\n"
+        "setTimeout(function() print('A', x, _FLUA.config.name) end, 20)\n"
     )
     b = tmp_path / "b.lua"
     b.write_text(
         "--%%name:qa-b\n"
         "--%%instant:true\n"  # global param: copied up, last file wins
         "x = 'b'\n"
-        "setTimeout(function() print('B', x, config.name); exit(0) end, 3600000)\n"
+        "setTimeout(function() print('B', x, _FLUA.config.name); exit(0) end, 3600000)\n"
     )
     result = subprocess.run(
         [sys.executable, "-m", "flua", str(a), str(b)],
@@ -121,6 +122,153 @@ def test_cli_runs_multiple_qas_isolated(tmp_path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     assert "A a qa-a" in result.stdout
     assert "B b qa-b" in result.stdout
+
+
+def test_examples_qa_pair_calls_each_other() -> None:
+    # examples/qa3.lua + qa4.lua: QAs find each other by name and drive each
+    # other through fibaro.call (device actions via the pump).
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "examples/qa3.lua", "examples/qa4.lua"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "qa4: turning qa-three on" in result.stdout
+    assert "qa3: turned on" in result.stdout
+    assert "qa4: got qa3 is on" in result.stdout
+    assert "qa4: turning qa-three off" in result.stdout
+    assert "qa3: turned off" in result.stdout
+
+
+# -- dynamic loading (loadQAfromFile / loadQAfromString) ------------------------
+
+
+@pytest.mark.asyncio
+async def test_dynamic_load_from_file(tmp_path, capsys) -> None:
+    target = tmp_path / "loaded.lua"
+    target.write_text(
+        "--%%name:loaded-qa\n"
+        "--%%type:com.fibaro.remoteColorController\n"
+        "function QuickApp:turnOn() print('LOADED ON', self.id) end\n"
+    )
+    loader = tmp_path / "loader.lua"
+    loader.write_text(
+        "setTimeout(function()\n"
+        "  local id, err = _FLUA.loadQAfromFile('" + str(target) + "')\n"
+        "  print('GOT', id, err)\n"
+        "  if id then\n"
+        "    fibaro.call(id, 'turnOn') -- same callback: must reach the new QA\n"
+        "    local dev = api.get('/devices/'..id)\n"
+        "    print('DEV', dev.name, dev.type, dev.roomID)\n"
+        "  end\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(loader), None, {}, str(loader))
+        await asyncio.sleep(0.4)
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "GOT 5001" in out
+    assert "LOADED ON 5001" in out
+    # --%% annotations from the loaded file drive name/type; the type
+    # skeleton supplies the default room
+    assert "DEV loaded-qa com.fibaro.remoteColorController 219" in out
+
+
+@pytest.mark.asyncio
+async def test_dynamic_load_from_string(tmp_path, capsys) -> None:
+    loader = tmp_path / "loader.lua"
+    loader.write_text(
+        "setTimeout(function()\n"
+        "  local id, err = _FLUA.loadQAfromString([[\n"
+        "function QuickApp:setValue(v) print('STR QA', v) end\n"
+        "]])\n"
+        "  print('STRID', id, err)\n"
+        "  fibaro.call(id, 'setValue', 42)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(loader), None, {}, str(loader))
+        await asyncio.sleep(0.4)
+        assert engine._temp_qa_paths == set()  # temp file consumed and removed
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "STRID 5001" in out
+    assert "STR QA 42" in out
+
+
+@pytest.mark.asyncio
+async def test_inline_qa_directives_do_not_leak(tmp_path, capsys) -> None:
+    # --%% lines inside an inline QA string must not bleed into the outer
+    # QA's config; the EOH comment ends the outer header (plua convention).
+    loader = tmp_path / "loader.lua"
+    loader.write_text(
+        "--%%name:outer\n"
+        "-- --------------- EOH ---------------\n"
+        "setTimeout(function()\n"
+        "  print('OUTER', _FLUA.config.name)\n"
+        "  local id = _FLUA.loadQAfromString([[\n"
+        "--%%name:inner\n"
+        "function QuickApp:onInit() print('INNER', _FLUA.config.name) end\n"
+        "]])\n"
+        "  local dev = api.get('/devices/'..id)\n"
+        "  print('INNERDEV', dev.name)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.load_qa_file(str(loader))  # parses the --%% header (EOH-aware)
+        await asyncio.sleep(0.4)
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "OUTER outer" in out  # not overwritten by the inner --%%name
+    assert "INNER inner" in out  # the inner QA parsed its own header
+    assert "INNERDEV inner" in out
+
+
+@pytest.mark.asyncio
+async def test_dynamic_load_missing_file(tmp_path, capsys) -> None:
+    loader = tmp_path / "loader.lua"
+    loader.write_text(
+        "setTimeout(function()\n"
+        "  local id, err = _FLUA.loadQAfromFile('/no/such/file.lua')\n"
+        "  print('ERR', id == nil, err ~= nil)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(loader), None, {}, str(loader))
+        await asyncio.sleep(0.3)
+    finally:
+        await engine.stop()
+    assert "ERR true true" in capsys.readouterr().out
+
+
+def test_example_dynamic_loading() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "examples/dynamic.lua"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "file load: 5001" in result.stdout
+    assert "string load: 5002" in result.stdout
+    assert "qa3: turned on" in result.stdout
+    assert "string QA: pong" in result.stdout
+    assert "inline name: inline-qa" in result.stdout
 
 
 def test_fibaro_log_lines_are_hc3_styled(tmp_path) -> None:
@@ -164,6 +312,24 @@ def test_fibaro_log_lines_are_hc3_styled(tmp_path) -> None:
     )
     assert plain.returncode == 0
     assert "\x1b[" not in plain.stdout
+
+
+def test_print_binary_string_does_not_crash(tmp_path) -> None:
+    # utf8.charpattern is a binary pattern (raw bytes, not valid UTF-8).
+    # Printing it must not take the process down: the message bridge
+    # hex-escapes invalid UTF-8 instead of raising during lupa's strict
+    # decode (regression: UnicodeDecodeError -> exit code 1).
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "-e", "print(utf8.charpattern)"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    plain_text = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
+    assert r"[\x00-\x7F\xC2-\xFD][\x80-\xBF]*" in plain_text
+    assert "stack traceback" not in plain_text
 
 
 def test_startup_greeting(tmp_path) -> None:
@@ -212,3 +378,76 @@ def test_example_qa_pair_runs_together() -> None:
     assert "qa-two: 100" in result.stdout
     assert "qa-one: 2" in result.stdout
     assert "qa-two: 200" in result.stdout
+
+
+def test_exit_terminates_only_the_calling_qa(tmp_path) -> None:
+    # HC3 semantics: exit() terminates the QA that called it (each QA is its
+    # own process on the HC3; flua runs them cooperatively). Its timers are
+    # cancelled; the other QAs keep running.
+    a = tmp_path / "a.lua"
+    a.write_text(
+        "print('A_START')\n"
+        "setTimeout(function() print('A_LATE') end, 100)\n"  # cancelled on exit
+        "setTimeout(function() print('A_EXIT'); exit(0) end, 10)\n"
+    )
+    b = tmp_path / "b.lua"
+    b.write_text(
+        "setTimeout(function() print('B_DONE'); exit(0) end, 200)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", str(a), str(b)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "A_START" in result.stdout
+    assert "A_EXIT" in result.stdout
+    assert "A_LATE" not in result.stdout  # the QA's timers died with it
+    assert "B_DONE" in result.stdout  # the other QA kept running
+
+
+def test_exit_code_from_failing_qa_becomes_engine_exit_code(tmp_path) -> None:
+    # a QA exiting nonzero marks the run failed (last failing QA wins)
+    script = tmp_path / "failing.lua"
+    script.write_text("setTimeout(function() exit(7) end, 10)\n")
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", str(script)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 7, result.stdout + result.stderr
+
+
+def test_flua_table_is_per_qa(tmp_path) -> None:
+    # each QA has its own _FLUA: qaId/config/arg are stable per QA even in
+    # deferred reads, while the API itself is the shared engine table
+    a = tmp_path / "a.lua"
+    a.write_text(
+        "--%%name:qa-a\n"
+        "setTimeout(function()\n"
+        "  print('A', _FLUA.qaId, _FLUA.config.name)\n"
+        "  exit(0)\n"
+        "end, 30)\n"
+    )
+    b = tmp_path / "b.lua"
+    b.write_text(
+        "--%%name:qa-b\n"
+        "setTimeout(function()\n"
+        "  print('B', _FLUA.qaId, _FLUA.config.name)\n"
+        "  exit(0)\n"
+        "end, 30)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", str(a), str(b)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "A 5000 qa-a" in result.stdout
+    assert "B 5001 qa-b" in result.stdout

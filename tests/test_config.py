@@ -55,3 +55,32 @@ def test_headers_anywhere_in_file() -> None:
         'print("end")\n'
     )
     assert parse_annotations(source) == {"maxhours": 24}
+
+
+def test_eoh_stops_parsing() -> None:
+    source = (
+        "--%%name:outer\n"
+        "-- --------------- EOH ---------------\n"
+        "--%%name:inner\n"
+    )
+    assert parse_annotations(source) == {"name": "outer"}
+
+
+def test_eoh_requires_dashed_comment() -> None:
+    # a bare comment that merely mentions EOH does not end the header
+    source = (
+        "--%%name:outer\n"
+        "-- just a comment about EOH\n"
+        "--%%speed:3\n"
+    )
+    assert parse_annotations(source) == {"name": "outer", "speed": 3}
+
+
+def test_eoh_must_be_a_comment_line() -> None:
+    # the marker inside a Lua string (not a comment) does not end the header
+    source = (
+        "--%%name:outer\n"
+        'print("--- EOH ---")\n'
+        "--%%speed:3\n"
+    )
+    assert parse_annotations(source) == {"name": "outer", "speed": 3}

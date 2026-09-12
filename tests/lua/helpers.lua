@@ -2,13 +2,13 @@
 --
 -- Usage from a test script:
 --
---   local script_dir = (arg[0] or "."):match("^(.*)[/\\]") or "."
+--   local script_dir = (_FLUA.arg[0] or "."):match("^(.*)[/\\]") or "."
 --   local t = dofile(script_dir .. "/helpers.lua")
 --   ...
 --   t.done()
 --
 -- A test passes when it calls t.done() with zero failures (exit 0); any
--- failure makes t.done() exit(1). The Python runner (tests/test_lua.py)
+-- failure makes t.done() _FLUA.exit(1). The Python runner (tests/test_lua.py)
 -- asserts on the exit code and the "all passed" marker.
 
 local M = {}
@@ -46,11 +46,11 @@ end
 function M.done()
   if M.failures > 0 then
     print(string.format("%d check(s), %d failure(s)", M.checks, M.failures))
-    exit(1)
+    _FLUA.exit(1)
     return
   end
   print(string.format("%d check(s), all passed", M.checks))
-  exit(0)
+  _FLUA.exit(0)
 end
 
 return M

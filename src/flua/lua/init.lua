@@ -29,13 +29,57 @@ local function register(fn)
   return nextId
 end
 
+-- ------------------------------------------------------- message sanitation
+-- Lua strings are byte strings; the Python bridge decodes them strictly as
+-- UTF-8 (lupa runtime encoding), so any message field carrying invalid UTF-8
+-- would raise inside _PY.post and take the whole process down. Messages are
+-- JSON-compatible by contract, so enforce that here: strings that are not
+-- valid UTF-8 are hex-escaped (\xNN for non-ASCII bytes, NUL and DEL) instead
+-- of crossing the bridge raw. Rebuilds tables so keys are covered too.
+local function sanitizeMsg(v)
+  local tv = type(v)
+  if tv == "string" then
+    local ok, n = pcall(utf8.len, v, 1, -1, false)
+    if ok and n then
+      return v
+    end
+    local out, m = {}, 0
+    for i = 1, #v do
+      local b = string.byte(v, i)
+      if b >= 0x80 or b == 0x00 or b == 0x7F then
+        m = m + 1
+        out[m] = string.format("\\x%02X", b)
+      else
+        m = m + 1
+        out[m] = string.char(b)
+      end
+    end
+    return table.concat(out)
+  elseif tv == "table" then
+    local t = {}
+    for k, val in pairs(v) do
+      t[sanitizeMsg(k)] = sanitizeMsg(val)
+    end
+    return t
+  end
+  return v
+end
+
+local _PY_post = _PY.post
+_PY.post = function(msg) _PY_post(sanitizeMsg(msg)) end
+
 -- ------------------------------------------------------------------ logging
+-- Log lines print directly from Python (_PY.log): writing to stdout never
+-- touches Lua state, so it is safe at any call depth — including inside
+-- debugger-stepped code, where the message pump is frozen — and output is
+-- always immediate instead of queueing behind the pump. The text is
+-- sanitized first (see above): it crosses the bridge as a plain string.
 local function postLog(level, ...)
   local parts = {}
   for i = 1, select("#", ...) do
     parts[i] = tostring(select(i, ...))
   end
-  _PY.post{ type = "log", level = level, text = table.concat(parts, "\t") }
+  _PY.log(level, sanitizeMsg(table.concat(parts, "\t")))
 end
 
 print = function(...) postLog("info", ...) end
@@ -112,10 +156,13 @@ end
 clearInterval = _FLUA.clearInterval
 
 -- --------------------------------------------------------------------- exit
-function _FLUA.exit(code)
-  _PY.post{ type = "exit", code = code or 0 }
+-- HC3 semantics: exit() terminates the QA that called it (each QA is its own
+-- process on the HC3; flua runs them cooperatively, so the engine cancels
+-- that QA's timers and keeps the others running). With no qaId the call came
+-- from runtime code and stops the engine itself.
+function _FLUA.exit(code, qaId)
+  _PY.post{ type = "exit", code = code or 0, qa = qaId }
 end
-exit = _FLUA.exit
 
 -- --------------------------------------------------------------------- json
 -- HC3-compatible json, global like on the HC3: json.encode/json.decode plus
@@ -200,7 +247,6 @@ end
 -- like timer callback errors).
 
 _FLUA.async = {}
-async = _FLUA.async  -- global alias
 local A = _FLUA.async -- internal handle for the definitions below
 
 function A.await(worker)
@@ -258,8 +304,9 @@ end
 
 -- plua-compatible table helpers used by quickapp.lua
 table.copy = function(t)
+  if type(t) ~= "table" then return t end
   local r = {}
-  for k, v in pairs(t or {}) do r[k] = v end
+  for k, v in pairs(t) do r[k] = v end
   return r
 end
 table.member = function(name, list)
@@ -270,6 +317,8 @@ table.member = function(name, list)
 end
 
 local qaInstances = {}  -- qaId -> QuickApp instance (registered by the bootstrap)
+-- net.HTTPClient response routing: net.lua registers one handler per QA.
+_FLUA.netHandlers = {}
 
 -- HC3-style log lines for fibaro.debug/trace/warning/error, colored like
 -- plua: gray date and tag, level in its color (DEBUG=green, TRACE=cyan,
@@ -302,27 +351,34 @@ local function installQaGlobals(env)
   -- HC3-style globals for QA code. On the real HC3 the runtime provides
   -- these as Lua globals; flua installs them into each QA's environment.
   function env.__fibaro_add_debug_message(tag, msg, level)
-    -- post directly with the real level (the global print always logs as
+    -- print directly with the real level (the global print always logs as
     -- "info"), so the engine's log handler can colorize by level
-    _PY.post{ type = "log", level = level, text = formatLogLine(tag, level, msg) }
+    _PY.log(level, sanitizeMsg(formatLogLine(tag, level, msg)))
   end
-  env.printErr = function(e) print("Error: " .. tostring(e)) end
 
-  -- Minimal HC3 REST API until the real client lands. Returns empty data
-  -- and warns, so QuickApp construction works (child lookup etc.).
-  local function apiStub(method, url)
-    print(string.format("[FLUA][WARNING] api.%s('%s') not implemented yet", method, tostring(url)))
-    return {}
+  -- HC3 REST API. Offline, _PY.api dispatches to the simulated HC3
+  -- (running QAs plus seeded state); online mode will route to the real
+  -- HC3. Contract: (data, status) — data is nil on errors.
+  local function apiCall(method)
+    return function(url, body) return _PY.api(method, url, body) end
   end
   env.api = {
-    get = function(url) return apiStub("get", url) end,
-    post = function(url) return apiStub("post", url) end,
-    put = function(url) return apiStub("put", url) end,
-    delete = function(url) return apiStub("delete", url) end,
+    get = apiCall("GET"),
+    post = apiCall("POST"),
+    put = apiCall("PUT"),
+    delete = apiCall("DELETE"),
+  }
+  -- api.hc3: the direct-HC3 namespace (fibaro.callhc3). Offline it is the
+  -- same simulated HC3 as api.
+  env.api.hc3 = {
+    get = apiCall("GET"),
+    post = apiCall("POST"),
+    put = apiCall("PUT"),
+    delete = apiCall("DELETE"),
   }
 end
 
-local qaRuntimeLibs = { "quickapp.lua", "fibaro.lua" }
+local qaRuntimeLibs = { "quickapp.lua", "fibaro.lua", "net.lua" }
 
 local function installQaLibs(env)
   installQaGlobals(env)
@@ -334,14 +390,14 @@ local function installQaLibs(env)
     local chunk, err = loadfile(dir .. "/" .. name, "bt", env)
     if not chunk then
       print("Error loading " .. name .. ": " .. tostring(err))
-      exit(1)
+      _FLUA.exit(1)
       return
     end
     local ok, err2 = pcall(chunk)
     if not ok then
       print("Error running " .. name .. ": " .. tostring(err2))
       print(debug.traceback(nil, 2))
-      exit(1)
+      _FLUA.exit(1)
       return
     end
   end
@@ -368,14 +424,14 @@ function _FLUA.makeQaEnv(qaId)
     return _FLUA.setInterval(fn, ms, qaId)
   end
   env.clearInterval = _FLUA.clearInterval
+  env.exit = function(code)  -- HC3: terminates this QA
+    return _FLUA.exit(code, qaId)
+  end
   return env
 end
 
-local function qaEnvFor(qaId, config, args)
+local function qaEnvFor(qaId)
   local env = _FLUA.makeQaEnv(qaId)
-  env.qaId = qaId
-  env.config = config or {}
-  env.arg = args
   setmetatable(env, {
     __index = _G,
     __newindex = function(t, k, v) rawset(t, k, v) end,
@@ -383,16 +439,7 @@ local function qaEnvFor(qaId, config, args)
   return env
 end
 
--- Merge the QA's config into the shared _FLUA.config table, so values like
--- --%%name: are visible engine-wide (the last loaded QA wins). The QA's own
--- `config` remains its stable per-QA copy.
-local function mergeConfig(config)
-  for k, v in pairs(config or {}) do
-    _FLUA.config[k] = v
-  end
-end
-
-local function bootstrapQa(env)
+local function bootstrapQa(env, qaId, config)
   -- The QA code is loaded: construct its QuickApp instance from the QA's
   -- config. Construction runs QuickApp:onInit (quickapp.lua does that in
   -- __init, like the HC3 at startup). The instance is registered here (the
@@ -400,65 +447,96 @@ local function bootstrapQa(env)
   -- Names are not required to be unique; ids are always assigned by the
   -- engine (unique, starting at 5000) — like the real HC3, user code can
   -- not pick its own id.
-  local cfg = env.config
-  local dev = {
-    id = env.qaId,
-    name = cfg.name or ("QA" .. tostring(env.qaId)),
+  local cfg = config or {}
+  -- The Python side registered this QA as a device already (type skeleton
+  -- from the device catalog plus config); build the instance from that, so
+  -- the Lua side sees the same device the API serves. Fallback covers
+  -- bootstrap without a registration (should not happen in practice).
+  local dev = _PY.device_for(qaId) or {
+    id = qaId,
+    name = cfg.name or ("QA" .. tostring(qaId)),
     type = cfg.type or "com.fibaro.binarySwitch",
     properties = cfg.properties or {},
   }
   local qa = env.QuickApp(dev)
-  qaInstances[env.qaId] = qa
+  qaInstances[qaId] = qa
   return qa
 end
 
-local function runQa(env, config, loader, sourceName)
+-- Shared QA bootstrap: own _FLUA (qaId/config/arg) + runtime libs + load +
+-- run the chunk + construct the QuickApp instance. Used by both the CLI
+-- start path (timer-wrapped) and dynamic loading (eager, via startQA).
+local function startQaInEnv(env, qaId, config, args, loader, sourceName)
+  -- each QA gets its own _FLUA: qaId, config and arg are per-QA (stable in
+  -- deferred reads); the rest of the API (timers, async, json, qa(...),
+  -- exit, ...) is the shared engine table, found through __index
+  env._FLUA = setmetatable({
+    qaId = qaId,
+    config = config or {},
+    arg = args,
+  }, { __index = _FLUA })
+  installQaLibs(env)  -- class/quickapp/fibaro into this QA, before its code
+  local chunk, err = loader()
+  if not chunk then
+    print("Error loading " .. tostring(sourceName) .. ": " .. tostring(err))
+    _FLUA.exit(1)
+    return
+  end
+  local ok, err2 = pcall(chunk)
+  if not ok then
+    print("Error:", err2)
+    print(debug.traceback(nil, 2))
+    _FLUA.exit(1)
+    return
+  end
+  -- QA code loaded: construct the QuickApp instance (calls onInit)
+  local bok, berr = pcall(bootstrapQa, env, qaId, config)
+  if not bok then
+    print("Error in bootstrap:", berr)
+    print(debug.traceback(nil, 2))
+    _FLUA.exit(1)
+    return
+  end
+  _PY.post{ type = "qaLoaded", id = qaId }
+end
+
+local function runQa(env, qaId, config, args, loader, sourceName)
   -- run inside the QA's own (tracked) 0 ms timer, so it starts through the
   -- pump like everything else
   env.setTimeout(function()
-    mergeConfig(config) -- the QA's config becomes visible engine-wide now
-    installQaLibs(env)  -- class/quickapp/fibaro into this QA, before its code
-    local chunk, err = loader()
-    if not chunk then
-      print("Error loading " .. tostring(sourceName) .. ": " .. tostring(err))
-      exit(1)
-      return
-    end
-    local ok, err2 = pcall(chunk)
-    if not ok then
-      print("Error:", err2)
-      print(debug.traceback(nil, 2))
-      exit(1)
-      return
-    end
-    -- QA code loaded: construct the QuickApp instance (calls onInit)
-    local bok, berr = pcall(bootstrapQa, env)
-    if not bok then
-      print("Error in bootstrap:", berr)
-      print(debug.traceback(nil, 2))
-      exit(1)
-      return
-    end
-    _PY.post{ type = "qaLoaded", id = env.qaId }
+    startQaInEnv(env, qaId, config, args, loader, sourceName)
   end, 0)
 end
 
 function _FLUA.startQaFile(qaId, path, config, args)
-  local env = qaEnvFor(qaId, config, args)
-  runQa(env, config, function()
+  local env = qaEnvFor(qaId)
+  runQa(env, qaId, config, args, function()
     return loadfile(path, "bt", env)
   end, path)
 end
 
 function _FLUA.startQaCode(qaId, code, config, args)
-  local env = qaEnvFor(qaId, config, args)
-  runQa(env, config, function()
+  local env = qaEnvFor(qaId)
+  runQa(env, qaId, config, args, function()
     return load(code, "=(command line)", "t", env)
   end, "=(command line)")
 end
 
 function _FLUA.qa(qaId)
   return qaInstances[qaId]
+end
+
+-- Dynamic QA loading (dev/test convenience): install and run another QA
+-- from a file (its --%% annotations are parsed Python-side) or from inline
+-- code (written to a temp file first, then the file pipeline). Returns
+-- (qaId, nil) or (nil, error message).
+function _FLUA.loadQAfromFile(path)
+  return _PY.load_qa_file(path)
+end
+
+function _FLUA.loadQAfromString(code)
+  local path = _PY.qa_temp_file(code)
+  return _FLUA.loadQAfromFile(path)
 end
 
 -- ----------------------------------------------------------------- dispatch
@@ -475,8 +553,67 @@ handlers.timerExpired = function(msg)
   end
 end
 
--- Future message types register here, e.g.:
---   handlers.httpResult = function(msg) ... end
+-- Device actions arrive through the pump (never synchronously from Python):
+-- the api handler enqueues, the pump delivers, and the QA's own callAction
+-- does method lookup + error containment (quickapp.lua).
+local function qaForDevice(id)
+  local qa = qaInstances[id]
+  if qa then return qa end
+  for _, main in pairs(qaInstances) do
+    local child = main.childDevices and main.childDevices[id]
+    if child then return child end
+  end
+  return nil
+end
+
+handlers.deviceAction = function(msg)
+  local qa = qaForDevice(msg.id)
+  if qa and type(qa.callAction) == "function" then
+    qa:callAction(msg.action, table.unpack(msg.args or {}))
+  elseif qa == nil then
+    postLog("warning", "deviceAction for unknown device " .. tostring(msg.id))
+  end
+end
+
+handlers.customEvent = function(msg)
+  for _, qa in pairs(qaInstances) do
+    local fn = qa.onCustomEvent
+    if type(fn) == "function" then
+      xpcall(function() fn(qa, msg.name) end, traceback)
+    end
+  end
+end
+
+-- Dynamically loaded QAs (loadQAfromFile/loadQAfromString) boot eagerly,
+-- so a fibaro.call in the same callback that loaded them already reaches
+-- the new instance.
+handlers.startQA = function(msg)
+  local env = qaEnvFor(msg.id)
+  startQaInEnv(env, msg.id, msg.config or {}, msg.arg0, function()
+    return loadfile(msg.path, "bt", env)
+  end, msg.path)
+end
+
+handlers.httpResult = function(msg)
+  local h = _FLUA.netHandlers[msg.qa]
+  if h then
+    xpcall(function() h(msg) end, traceback)
+  end
+end
+
+handlers.tcpResult = function(msg)
+  local h = _FLUA.netHandlers[msg.qa]
+  if h then
+    xpcall(function() h(msg) end, traceback)
+  end
+end
+
+handlers.udpResult = function(msg)
+  local h = _FLUA.netHandlers[msg.qa]
+  if h then
+    xpcall(function() h(msg) end, traceback)
+  end
+end
 
 function _FLUA.dispatch(batch)
   for i = 1, #batch do

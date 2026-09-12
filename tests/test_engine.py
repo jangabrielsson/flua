@@ -8,6 +8,7 @@ import pytest
 
 pytest.importorskip("lupa")
 
+from flua import messages  # noqa: E402
 from flua.engine import LuaEngine  # noqa: E402
 
 
@@ -62,7 +63,7 @@ async def test_interval_then_clear_and_exit(capsys) -> None:
         "iv = setInterval(function()\n"
         "  n = n + 1\n"
         "  print('tick', n)\n"
-        "  if n >= 3 then clearInterval(iv); exit(0) end\n"
+        "  if n >= 3 then clearInterval(iv); _FLUA.exit(0) end\n"
         "end, 20)"
     )
     await wait_until(lambda: not engine.is_running())
@@ -75,7 +76,7 @@ async def test_interval_then_clear_and_exit(capsys) -> None:
 async def test_exit_message_sets_exit_code() -> None:
     engine = LuaEngine()
     await engine.start()
-    engine.execute("exit(7)")
+    engine.execute("_FLUA.exit(7)")
     await wait_until(lambda: not engine.is_running())
     await engine.stop()
     assert engine.exit_code == 7
@@ -112,3 +113,21 @@ async def test_zero_delay_main_style_bootstrap(capsys) -> None:
     assert "main ran" in out
     assert "child ran" in out
     await engine.stop()
+
+
+def test_log_line_prints_immediately_without_pump(capsys) -> None:
+    # QA logs call _PY.log directly (no message queue): output is immediate
+    # even when the pump is not running at all — which is exactly what makes
+    # prints visible while the VS Code debugger holds the main thread.
+    engine = LuaEngine()
+    engine.log_line("info", "IMMEDIATE")
+    assert "IMMEDIATE" in capsys.readouterr().out
+    assert not engine._inbound  # never queued
+
+
+def test_log_message_from_engine_still_queues(capsys) -> None:
+    # engine-side messages.log still rides the pump (e.g. greeting ordering)
+    engine = LuaEngine()
+    engine.post(messages.log("info", "QUEUED"))
+    assert "QUEUED" not in capsys.readouterr().out
+    assert len(engine._inbound) == 1

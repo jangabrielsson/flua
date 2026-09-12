@@ -5,13 +5,33 @@ Format (valid Lua comments, so the file still runs anywhere):
     --%%name:value
     --%%name:sub1=val1,sub2=val2,...
 
+Directives form a header at the top of the file. Parsing stops at the
+end-of-header comment (the plua convention), so ``--%%`` lines that appear
+later in the file — e.g. inside inline QA code passed to
+``_FLUA.loadQAfromString`` — are not picked up:
+
+    --%%name:outer
+    -- --------------- EOH ---------------
+    local inner = [[ --%%name:inner ]]
+
 Values may be booleans (true/false), numbers, nil, quoted strings, or bare
 strings. Parsed here in Python (unlike plua, which parses in Lua); the result
 drives the engine's runtime settings and is also exposed to Lua as
 ``_PY.config``.
 """
 
+import re
 from typing import Any
+
+_EOH_RE = re.compile(r"-+\s*EOH\s*-+")
+
+
+def _is_eoh(line: str) -> bool:
+    """End-of-header comment: ``-- --------------- EOH ---------------``."""
+    stripped = line.strip()
+    if not stripped.startswith("--"):
+        return False
+    return bool(_EOH_RE.fullmatch(stripped[2:].strip()))
 
 
 def parse_scalar(text: str) -> Any:
@@ -42,6 +62,8 @@ def parse_annotations(source: str) -> dict[str, Any]:
     config: dict[str, Any] = {}
     for line in source.splitlines():
         stripped = line.strip()
+        if _is_eoh(stripped):
+            break  # end of the --%% header (plua EOH convention)
         if not stripped.startswith("--%%"):
             continue
         body = stripped[4:].strip()

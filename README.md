@@ -34,6 +34,9 @@ Requires Python 3.11+. `lupa` is the only runtime dependency.
 # ANSI colors on QA log lines (debug=green, trace=cyan, warning=orange,
 # error=red — plua style): always (default), auto, never
 .venv/bin/flua --color always script.lua
+
+# simulated HC3 (offline): seed the REST API with a house
+.venv/bin/flua --seed house.json script.lua
 ```
 
 With no `--run-for`, flua exits gracefully when no timers or messages are
@@ -58,20 +61,25 @@ simply a file with its own environment:
   timers with QA attribution in the `setTimeout` message — the engine
   tracks which timers belong to which QA (`engine.qa_timer_count(id)`,
   one source of truth). Fired timers untrack themselves.
-- **Config.** The CLI builds a global config (CLI flags + global `--%%`
-  annotations) and copies it into each QA as `config`, merged with the QA's
-  local `--%%` annotations — so `--%%name:qa1` appears as `config.name`.
-  When a QA loads, its config is also merged into the shared `_FLUA.config`
-  table (the last loaded QA wins there), so `_FLUA.config.name` works too.
-  `config` stays the stable per-QA copy for deferred reads.
-- **Runtime libraries.** Before the QA code runs, `quickapp.lua` and
-  `fibaro.lua` are loaded into the QA's environment (in that order), so
-  `QuickApp`, `QuickAppBase`, `fibaro`, `plugin`, `hub` and friends are
+- **Config.** The CLI builds the config for each QA (CLI flags + global
+  `--%%` annotations plus the QA's local `--%%` annotations) and exposes it
+  on that QA's own `_FLUA.config` — so `--%%name:qa1` appears as
+  `_FLUA.config.name` for that QA only, stable even in deferred reads.
+  Directives form a header; parsing stops at the end-of-header comment
+  `-- --------------- EOH ---------------` (plua convention), so `--%%`
+  lines later in the file (e.g. inside inline QA code) are ignored.
+- **Runtime libraries.** Before the QA code runs, `quickapp.lua`,
+  `fibaro.lua` and `net.lua` are loaded into the QA's environment (in that
+  order), so `QuickApp`, `QuickAppBase`, `fibaro`, `plugin`, `hub`,
+  `net.HTTPClient` (async HTTP via the message pump; stdlib urllib in a
+  worker thread), `net.TCPSocket` and `net.UDPSocket` (async TCP/UDP with
+  HC3-style callbacks; worker threads, pump-delivered results)
+  and friends are
   available — each QA gets its own copies (quickapp.lua defines its own
   `class` per QA). The HC3-style
   `__fibaro_add_debug_message` global (a Lua global on the real HC3, used by
-  `fibaro.debug/trace/warning/error`) and an `api` stub (HC3 REST, returns
-  empty data with a warning until the real client lands) keep prints and
+  `fibaro.debug/trace/warning/error`) and a working `api` table (HC3 REST,
+  offline-simulated: the running QAs plus `--seed` state) keep prints and
   QuickApp construction working.
 - **Bootstrap.** After the QA code has loaded, the engine constructs the
   QA's QuickApp instance from its config and registers it as
@@ -82,17 +90,26 @@ simply a file with its own environment:
   `--%%type` and `--%%properties` feed the device table. Construction runs
   `QuickApp:onInit` — like the HC3 at startup — inside the QA's tracked
   timer, so timers scheduled by `onInit` belong to that QA.
+- **Dynamic loading.** A QA can install and run another QA at runtime —
+  handy from VS Code, where you only launch one QA:
+  `_FLUA.loadQAfromFile(path)` (the file's `--%%` annotations are parsed)
+  and `_FLUA.loadQAfromString(code)` (written to a temp file first, then
+  the same file pipeline). Both return the new QA id, or `(nil, error)`,
+  and the new QA is immediately reachable through `fibaro.call` — see
+  `examples/dynamic.lua`.
 - **Directory.** The engine keeps a Python-side QA directory:
   `engine.qa_ids()`, `engine.qa_info(id)` (name, path/code, loaded flag)
   and `engine.qa_instance(id)` (the QuickApp as a lupa proxy). It is
   filled at start and updated via the `qaLoaded` message when the QA
   finishes loading. The old plua-style `registerQAGlobally` callback is
   gone — the bootstrap registers the instance directly.
-- **_FLUA vs _PY.** The engine's Lua-side API (timers, `async`, `exit`, QA
-  support, `config`) lives in the `_FLUA` table; the bare globals
-  (`setTimeout`, `async`, ...) are aliases for it. `_PY` is the pure Python
-  bridge (`post`, `now`, `vtime`, `tcp_*`, ...) — user code should not touch
-  it.
+- **_FLUA vs _PY.** Each QA's environment has its own `_FLUA`: `qaId`,
+  `config` and `arg` are that QA's own values; everything else (timers,
+  `async`, `json`, `qa(...)`, ...) delegates to the shared engine table. QA
+  code can detect flua with `if _FLUA then ... end`. The bare globals
+  (`setTimeout`, `print`, `exit`, `QuickApp`, `fibaro`, `json`, ...) are the
+  HC3 environment. `_PY` is the pure Python bridge (`post`, `now`, `vtime`,
+  `tcp_*`, ...) — user code should not touch it.
 
 ## Timer API (Lua side)
 
@@ -102,7 +119,10 @@ simply a file with its own environment:
   setTimeout chaining, so it is cooperative — a callback that runs long delays
   the next tick)
 - `clearInterval(id)` — stop an interval
-- `exit(code)` — stop the engine with the given exit code
+- `exit(code)` — terminate the QA that called it (HC3 semantics: QAs are
+  separate processes there; flua runs them cooperatively, so the engine just
+  cancels that QA's timers and keeps the others running)
+- `_FLUA.exit(code)` — stop the engine itself (flua-specific, hence on `_FLUA`)
 - `print(...)` — routed through the message queue to stdout
 - `_PY.now()` — engine time in seconds (the virtual clock — direct, pure)
 
@@ -121,12 +141,12 @@ iv = setInterval(function() clearInterval(iv) end, 1000)
 
 ### Async / await (Lua coroutines)
 
-`async.run(fn, onError?)` runs a coroutine that can await asynchronous results
-without blocking the pump:
+`_FLUA.async.run(fn, onError?)` runs a coroutine that can await asynchronous
+results without blocking the pump (flua-specific, hence on `_FLUA`):
 
 ```lua
-async.run(function()
-  local v = async.await(function(finish)
+_FLUA.async.run(function()
+  local v = _FLUA.async.await(function(finish)
     setTimeout(function() finish(42) end, 50)
   end)
   print(v)  -- 42, after the timer fires

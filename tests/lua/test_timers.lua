@@ -1,5 +1,5 @@
 -- cooperative timers: one-shot, delay ordering, clearing
-local script_dir = (arg[0] or "."):match("^(.*)[/\\]") or "."
+local script_dir = (_FLUA.arg[0] or "."):match("^(.*)[/\\]") or "."
 local t = dofile(script_dir .. "/helpers.lua")
 
 local order = {}
