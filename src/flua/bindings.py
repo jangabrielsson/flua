@@ -11,6 +11,7 @@ Two kinds of functions live here:
 the timer globals, the ``print`` override, and ``_PY.dispatch``.
 """
 
+import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -55,6 +56,40 @@ def lua_to_python(value: object) -> object:
     return value
 
 
+def _json_to_python(value: object, lua: object) -> object:
+    """lupa value -> JSON-compatible Python, honoring json.util.InitArray.
+
+    Like lua_to_python, but a table marked with json.util.InitArray (a
+    metatable with __isArray = true) encodes as an array even when empty —
+    the one case the 1..n key heuristic cannot decide ({} vs []). Reads the
+    metatable through Lua's C builtin getmetatable, which lupa allows from
+    Python callbacks.
+    """
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    if _is_lua_table(value):
+        items = list(value.items())
+        keys = [key for key, _ in items]
+        mt = lua.globals().getmetatable(value)
+        marked = mt is not None and bool(getattr(mt, "__isArray", False))
+        if marked:
+            int_keys = sorted(key for key in keys if isinstance(key, int) and key >= 1)
+            return [_json_to_python(value[key], lua) for key in int_keys]
+        if keys and all(isinstance(key, int) and key >= 1 for key in keys) and sorted(
+            keys
+        ) == list(range(1, len(keys) + 1)):
+            # array-shaped table -> list
+            return [_json_to_python(val, lua) for _, val in sorted(items)]
+        result = {}
+        for key, val in items:
+            python_key = key.decode("utf-8") if isinstance(key, bytes) else key
+            result[python_key] = _json_to_python(val, lua)
+        return result
+    if isinstance(value, (list, tuple)):
+        return [_json_to_python(item, lua) for item in value]
+    return value
+
+
 def install_bindings(engine: "LuaEngine") -> None:
     """Install the _PY table into the engine's Lua globals and run init.lua."""
     lua = engine.lua_runtime()
@@ -72,6 +107,20 @@ def install_bindings(engine: "LuaEngine") -> None:
     py["note_debugger_pause"] = engine.clock.note_pause
     py["version"] = lambda: __version__
     py["color_enabled"] = engine.color_enabled
+
+    # JSON for QA code and mobdebug's VSCODE protocol (json.lua delegates
+    # here). _json_to_python honors json.util.InitArray; lua_to_python (the
+    # message path) stays heuristic-only on purpose.
+    def to_json(value: object) -> str:
+        return json.dumps(_json_to_python(value, lua))
+
+    def parse_json(text: str | bytes) -> object:
+        if isinstance(text, bytes):
+            text = text.decode("utf-8")
+        return lua.table_from(json.loads(text), recursive=True)
+
+    py["to_json"] = to_json
+    py["parse_json"] = parse_json
 
     # Blocking LuaSocket-compatible TCP calls for mobdebug. These may block
     # the asyncio loop (documented exception — a debugger pause freezes time).
@@ -92,6 +141,10 @@ def install_bindings(engine: "LuaEngine") -> None:
     if not runtime_dir.exists():
         raise FileNotFoundError(f"flua runtime missing: {runtime_dir}")
     lua.execute(f"package.path = {_lua_quote(str(runtime_dir))} .. '/?.lua;' .. package.path")
+    # The Lua side needs the runtime dir as an absolute fact: QAs may rewrite
+    # package.path (the VS Code mobdebug extension's injected bootstrap
+    # prepends its own dir), so init.lua must not derive it from package.path.
+    py["runtime_dir"] = str(runtime_dir)
 
     init_path = runtime_dir / "init.lua"
     lua.execute(f"loadfile({_lua_quote(str(init_path))})()")

@@ -1528,7 +1528,6 @@ end
 local vscode_debugger = {} do
 
 local json = prequire'json'
---local json = prequire'plua.json'
 
 local vscode_message_size = nil
 local vscode_thread_id    = 0

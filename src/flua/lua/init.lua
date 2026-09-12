@@ -117,6 +117,71 @@ function _FLUA.exit(code)
 end
 exit = _FLUA.exit
 
+-- --------------------------------------------------------------------- json
+-- HC3-compatible json, global like on the HC3: json.encode/json.decode plus
+-- json.util.InitArray (array marking, see lua/json.lua). Backed by Python's
+-- stdlib json through _PY.
+json = require("json")
+_FLUA.json = json
+
+-- --------------------------------------------------------------- debugger
+-- The VS Code mobdebug extension (alexeymelnichuk.lua-mobdebug) launches the
+-- interpreter with `-l package -e "<bootstrap>"` where the bootstrap prepends
+-- the extension's lua dir to package.path and calls
+-- `require'vscode-mobdebug'.start(...)`. The extension's bundled mobdebug.lua
+-- is incompatible with Lua 5.5 (it predates const variables), so pin both
+-- module names to flua's own copy, loaded by absolute path: preload wins over
+-- package.path, so the injected dir can never shadow it.
+local function loadRuntimeMobdebug()
+  local chunk = loadfile(_PY.runtime_dir .. "/mobdebug.lua")
+  return chunk and chunk() or nil
+end
+package.preload["mobdebug"] = loadRuntimeMobdebug
+package.preload["vscode-mobdebug"] = loadRuntimeMobdebug
+
+-- mobdebug startup, plua-style: opt-in from the CLI (--debugger PORT or
+-- MOBDEBUG_PORT), started before the QAs run so a listening IDE (the VS Code
+-- mobdebug extension) can attach. Failures are non-fatal: without an IDE the
+-- program just runs.
+function _FLUA.startDebugger(host, port)
+  local ok, mobdebug = pcall(require, "mobdebug")
+  if not ok then
+    print("Warning: mobdebug failed: " .. tostring(mobdebug))
+    return
+  end
+  mobdebug.yieldtimeout = 0.5  -- 500ms timeout for yield operations
+
+  -- Freeze virtual time while the debugger blocks waiting for commands:
+  -- wrap mobdebug.connect so the raw socket's blocking receives notify the
+  -- engine clock first. While paused at a breakpoint the asyncio pump stops,
+  -- so Lua timers stop too -- time stands still until the debugger resumes.
+  local real_connect = mobdebug.connect
+  mobdebug.connect = function(dhost, dport)
+    local sock, serr = real_connect(dhost, dport)
+    if sock then
+      local real_receive = sock.receive
+      sock.receive = function(self, pattern, ...)
+        if self._timeout ~= 0 then  -- blocking wait, not a probe
+          _PY.note_debugger_pause()
+        end
+        return real_receive(self, pattern, ...)
+      end
+    end
+    return sock, serr
+  end
+
+  local ok2, err = pcall(function()
+    mobdebug.start(host or "localhost", port or 8172)
+    mobdebug.on()
+    mobdebug.coro()
+  end)
+  if ok2 then
+    _FLUA.mobdebug = mobdebug
+  else
+    print("Warning: mobdebug failed: " .. tostring(err))
+  end
+end
+
 -- -------------------------------------------------------------------- async
 -- Coroutine-based async/await over the message model.
 --
@@ -261,7 +326,10 @@ local qaRuntimeLibs = { "quickapp.lua", "fibaro.lua" }
 
 local function installQaLibs(env)
   installQaGlobals(env)
-  local dir = package.path:match("^([^;]+)/%?%.lua")
+  -- the runtime dir is an absolute fact from Python, not the first
+  -- package.path entry: QA code may rewrite package.path (the VS Code
+  -- mobdebug extension's -e bootstrap prepends its own lua dir)
+  local dir = _PY.runtime_dir
   for _, name in ipairs(qaRuntimeLibs) do
     local chunk, err = loadfile(dir .. "/" .. name, "bt", env)
     if not chunk then

@@ -208,6 +208,7 @@ src/flua/config.py   --%% annotation parsing + global/local split
 src/flua/bindings.py  the _PY table (post + pure helpers + tcp_*)
 src/flua/sync_socket.py blocking LuaSocket-compatible TCP (mobdebug)
 src/flua/lua/init.lua Lua runtime: registry, timers, async/await, print, dispatch
+src/flua/lua/json.lua  HC3-compatible json (encode/decode + util.InitArray)
 src/flua/lua/socket.lua LuaSocket-compatible subset over sync_socket.py
 src/flua/lua/mobdebug.lua vendored remote debugger (Paul Kulchenko, MIT)
 src/flua/cli.py       CLI: 0 ms bootstrap, arg table, --run-for, --debugger
@@ -310,6 +311,16 @@ can debug flua scripts remotely:
 .venv/bin/flua --debugger script.lua       # port 8172 (default)
 .venv/bin/flua --debugger 8173 script.lua  # custom port
 ```
+
+In VS Code, use the **Flua: Debug Current File (mobdebug)** launch config
+(requires the Lua MobDebug extension, `alexeymelnichuk.lua-mobdebug`). The
+extension launches flua as `flua -l package -e "<bootstrap>" script.lua`,
+where the bootstrap prepends the extension's lua dir to `package.path` and
+calls `require'vscode-mobdebug'.start(...)`. flua accepts `-l` (ignored, Lua
+CLI compatibility), runs `-e` code before the script like the Lua CLI, and
+resolves `vscode-mobdebug` to its own mobdebug (the extension's bundled copy
+is incompatible with Lua 5.5). `MOBDEBUG_PORT` in the environment is honored
+like the `--debugger` flag.
 
 - The debugger attaches before the script runs; script files are loaded via
   `loadfile` with their real path, so breakpoints match file locations

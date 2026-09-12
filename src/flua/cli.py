@@ -39,7 +39,16 @@ def _build_parser() -> argparse.ArgumentParser:
         "scripts", nargs="*", help="Lua QuickApp files to run (each isolated)"
     )
     parser.add_argument(
-        "-e", "--execute", dest="code", help="execute Lua code instead of a script file"
+        "-e",
+        "--execute",
+        dest="code",
+        help="execute Lua code first (then any scripts), like the Lua CLI",
+    )
+    parser.add_argument(
+        "-l",
+        metavar="L",
+        help="ignored, for Lua CLI compatibility (the VS Code mobdebug "
+        "extension launches interpreters with '-l package')",
     )
     parser.add_argument(
         "--run-for",
@@ -99,8 +108,11 @@ def _load_qas(
     """Return (global_config, qa_specs).
 
     Each QA spec is (path, code, local_params); path is the resolved file
-    path (loadfile, so breakpoints match) or None for -e code. Global params
-    from every QA are copied up in file order — the last file wins.
+    path (loadfile, so breakpoints match) or None for -e code. Like the Lua
+    CLI, -e code runs before any scripts — the VS Code mobdebug extension
+    launches interpreters with -l package -e "<debugger bootstrap>" plus the
+    script. Global params from every QA are copied up in file order — the
+    last file wins.
     """
     global_config: dict[str, Any] = {}
     specs: list[tuple[str | None, str | None, dict[str, Any]]] = []
@@ -108,17 +120,16 @@ def _load_qas(
         global_params, local_params = split_annotations(parse_annotations(args.code))
         global_config.update(global_params)
         specs.append((None, args.code, local_params))
-    else:
-        if not args.scripts:
-            parser.error("no script or -e code given")
-        for script in args.scripts:
-            path = Path(script)
-            if not path.exists():
-                parser.error(f"cannot open {script}: no such file")
-            source = path.read_text(encoding="utf-8")
-            global_params, local_params = split_annotations(parse_annotations(source))
-            global_config.update(global_params)  # last file wins
-            specs.append((str(path.resolve()), None, local_params))
+    for script in args.scripts:
+        path = Path(script)
+        if not path.exists():
+            parser.error(f"cannot open {script}: no such file")
+        source = path.read_text(encoding="utf-8")
+        global_params, local_params = split_annotations(parse_annotations(source))
+        global_config.update(global_params)  # last file wins
+        specs.append((str(path.resolve()), None, local_params))
+    if not specs:
+        parser.error("no script or -e code given")
     return global_config, specs
 
 
@@ -160,36 +171,12 @@ def _resolve_runtime(
 def _start_debugger(engine: LuaEngine, port: int) -> None:
     """Attach mobdebug before the QAs run. Failures are non-fatal.
 
-    While the debugger is paused at a breakpoint, its blocking socket receive
-    freezes the asyncio loop, so Lua timers stop — time stands still until
-    the debugger resumes the program.
+    The Lua-side pattern lives in lua/init.lua (`_FLUA.startDebugger`,
+    plua-style). While the debugger is paused at a breakpoint, its blocking
+    socket receive freezes the asyncio loop, so Lua timers stop — time stands
+    still until the debugger resumes the program.
     """
-    engine.execute(
-        "local ok, err = pcall(function()\n"
-        "  local m = require('mobdebug')\n"
-        "  -- freeze virtual time while the debugger blocks waiting for\n"
-        "  -- commands: wrap mobdebug.connect so the raw socket's blocking\n"
-        "  -- receives notify the engine clock first\n"
-        "  local real_connect = m.connect\n"
-        "  m.connect = function(host, port)\n"
-        "    local sock, serr = real_connect(host, port)\n"
-        "    if sock then\n"
-        "      local real_receive = sock.receive\n"
-        "      sock.receive = function(self, pattern, ...)\n"
-        "        if self._timeout ~= 0 then  -- blocking wait, not a probe\n"
-        "          _PY.note_debugger_pause()\n"
-        "        end\n"
-        "        return real_receive(self, pattern, ...)\n"
-        "      end\n"
-        "    end\n"
-        "    return sock, serr\n"
-        "  end\n"
-        "  m.start('localhost', " + str(port) + ")\n"
-        "  m.on()\n"
-        "  m.coro()\n"
-        "end)\n"
-        "if not ok then print('Warning: mobdebug failed: ' .. tostring(err)) end\n"
-    )
+    engine.execute(f"_FLUA.startDebugger('localhost', {int(port)})")
 
 
 def _keep_running(
@@ -258,9 +245,39 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
     return engine.exit_code
 
 
+def _normalize_debugger_argv(argv: list[str]) -> list[str]:
+    """Let ``--debugger script.lua`` mean the default port (8172).
+
+    ``--debugger`` takes an optional port, but argparse's optional-value
+    arguments only use their default when the next token looks like an
+    option — so ``flua --debugger script.lua`` would parse the script as the
+    port and fail with "invalid int value". When ``--debugger`` is followed
+    by a non-option, non-integer token, move the bare flag to the end so the
+    script stays a positional and the flag takes its const. An explicit
+    ``--debugger PORT script.lua`` (or ``--debugger=PORT``) is untouched.
+    """
+    out: list[str] = []
+    moved: list[str] = []
+    i = 0
+    while i < len(argv):
+        nxt = argv[i + 1] if i + 1 < len(argv) else None
+        if (
+            argv[i] == "--debugger"
+            and nxt is not None
+            and not nxt.startswith("-")
+            and not nxt.isdigit()
+        ):
+            moved.append(argv[i])
+        else:
+            out.append(argv[i])
+        i += 1
+    return out + moved
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
-    args = parser.parse_args(argv)
+    raw = sys.argv[1:] if argv is None else argv
+    args = parser.parse_args(_normalize_debugger_argv(raw))
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(levelname)s %(name)s: %(message)s",
