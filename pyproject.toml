@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fibaro-flua"
-version = "0.1.0"
+version = "0.1.1"
 description = "Develop Fibaro Home Center 3 QuickApps offline: the HC3 Lua runtime (QuickApp, fibaro, api, net, mqtt) with a simulated HC3, virtual time, and a real debugger"
 authors = [{name = "Jan Gabrielsson", email = "jan@gabrielsson.com"}]
 license = {file = "LICENSE"}
