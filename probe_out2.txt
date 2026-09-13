@@ -1,11 +1,2 @@
---- NY (exit=0) ---
-flua 0.1.0, Lua 5.5, Python 3.14.3
-[37m[31.12.2027][23:59:50][32m[DEBUG  ][37m[FLUA]: T0 2027/12/31 23:59:50[0m
-[37m[01.01.2028][00:00:10][32m[DEBUG  ][37m[ny5000]: T1 2028/01/01 00:00:10[0m
-
---- BARE (exit=0) ---
-flua 0.1.0, Lua 5.5, Python 3.14.3
-[37m[06.10.2027][12:00:20][32m[DEBUG  ][37m[FLUA]: WHEN 2027/10/06 12:00:20[0m
-
---- BARE stderr ---
-
+license entries: ['fibaro_flua-0.1.0.dist-info/licenses/LICENSE']
+all dist-info entries: ['fibaro_flua-0.1.0.dist-info/licenses/LICENSE', 'fibaro_flua-0.1.0.dist-info/METADATA', 'fibaro_flua-0.1.0.dist-info/WHEEL', 'fibaro_flua-0.1.0.dist-info/entry_points.txt', 'fibaro_flua-0.1.0.dist-info/top_level.txt', 'fibaro_flua-0.1.0.dist-info/RECORD']

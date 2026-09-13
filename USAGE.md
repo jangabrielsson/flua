@@ -26,14 +26,19 @@ when it works.
 
 ## Install
 
-Python 3.11+ only. lupa (which bundles Lua) is the only dependency.
+Python 3.11+. lupa (which bundles Lua) is the only runtime dependency.
 
 ```bash
-git clone <your flua checkout>
+pip install fibaro-flua        # from PyPI — installs the flua command
+```
+
+From a checkout (development):
+
+```bash
 cd flua
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
-.venv/bin/flua --version
+flua --version
 ```
 
 ## Your first QuickApp
