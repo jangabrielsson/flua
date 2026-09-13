@@ -96,6 +96,19 @@ def parse_annotations(source: str) -> dict[str, Any]:
                 if key:
                     sub[key] = val.strip()
             config["var"] = sub
+        elif name == "property":
+            # --%%property:name=value — raw device property initializers
+            # (e.g. value=true). Values parse as scalars; repeated
+            # directives merge, and several may share one line.
+            sub = config.get("property")
+            if not isinstance(sub, dict):
+                sub = {}
+            for part in value.split(","):
+                key, _, val = part.partition("=")
+                key = key.strip()
+                if key:
+                    sub[key] = parse_scalar(val)
+            config["property"] = sub
         elif "=" in value:
             sub: dict[str, Any] = {}
             for part in value.split(","):

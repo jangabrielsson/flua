@@ -141,15 +141,63 @@ async def test_quickapp_export(tmp_path, capsys) -> None:
         await asyncio.sleep(0.2)
         exported, status = engine.api.dispatch("GET", "/quickApp/export/5000")
         assert status == 200
-        assert exported["type"] == "QuickApp"
+        assert exported["type"] == "com.fibaro.binarySwitch"  # device type, not "QuickApp"
         assert exported["name"] == "export-me"
+        assert exported["apiVersion"] == "1.3"
+        # the device's interfaces travel, minus the system-managed quickApp
+        assert "light" in exported["initialInterfaces"]
+        assert "quickApp" not in exported["initialInterfaces"]
+        # dynamic properties (value, state, ...) never travel in the package
+        props = exported["initialProperties"]
+        assert "value" not in props and "deviceControlType" not in props
+        assert "model" in props  # whitelisted (plua's verified list)
+        assert isinstance(props["quickAppVariables"], list)
         files = exported["files"]
         assert [f["name"] for f in files] == ["main", "lib"]
         assert files[0]["isMain"] is True and files[1]["isMain"] is False
+        assert files[0]["isOpen"] is False and files[0]["type"] == "lua"
         assert files[1]["content"] == "LIB = 1\n"
         # export must round-trip through JSON (it is the .fqa body)
         json.loads(json.dumps(exported))
         assert engine.api.dispatch("GET", "/quickApp/export/9999") == (None, 404)
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_quickapp_export_filters_and_arrayifies(tmp_path, capsys) -> None:
+    main = tmp_path / "main.lua"
+    main.write_text("print('x')\n")
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(
+            str(main),
+            None,
+            {
+                "properties": {
+                    "value": True,  # dynamic — must not travel
+                    "model": "v2",  # whitelisted — travels
+                    "uiCallbacks": [{"name": "__private"}, {"name": "btn1"}],
+                }
+            },
+            str(main),
+        )
+        await asyncio.sleep(0.2)
+        exported, status = engine.api.dispatch("GET", "/quickApp/export/5000")
+        assert status == 200
+        props = exported["initialProperties"]
+        assert "value" not in props
+        assert props["model"] == "v2"
+        assert props["uiCallbacks"] == [{"name": "btn1"}]  # __-prefixed stripped
+        for key in ("quickAppVariables", "uiView", "supportedDeviceRoles"):
+            assert isinstance(props[key], list)
+        # the package must round-trip through import and keep the properties
+        qa_id, status = engine.api.dispatch("POST", "/quickApp/import", exported)
+        assert status == 201
+        imported_device = engine.api.state.devices[qa_id]
+        assert imported_device["properties"]["model"] == "v2"
+        assert imported_device["properties"]["uiCallbacks"] == [{"name": "btn1"}]
     finally:
         await engine.stop()
 
@@ -207,6 +255,42 @@ async def test_quickapp_import_runs_the_qa(tmp_path, capsys) -> None:
         assert status == 200
         assert [f["name"] for f in files] == ["main", "util"]
         assert engine.qa_timer_count(qa_id) == 0
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_named_property_directives(tmp_path, capsys) -> None:
+    main = tmp_path / "main.lua"
+    main.write_text(
+        "--%%uid:qa-uuid-123\n"
+        "--%%description:my little QA\n"
+        "--%%model:model-x\n"
+        "--%%build:7\n"
+        "--%%manufacturer:fibaro\n"
+        "--%%property:value=true\n"
+        "-- --------------- EOH ---------------\n"
+        "setTimeout(function()\n"
+        "  local props = api.get('/devices/'.._FLUA.qaId).properties\n"
+        "  print('PROPS', props.quickAppUuid, props.userDescription, props.model)\n"
+        "  print('MORE', props.buildNumber, props.manufacturer, props.value)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.load_qa_file(str(main))
+        await asyncio.sleep(0.3)
+        out = capsys.readouterr().out
+        assert "PROPS qa-uuid-123 my little QA model-x" in out
+        assert "MORE 7 fibaro true" in out
+        device = engine.api.state.devices[5000]
+        assert device["properties"]["quickAppUuid"] == "qa-uuid-123"
+        assert device["properties"]["userDescription"] == "my little QA"
+        assert device["properties"]["model"] == "model-x"
+        assert device["properties"]["buildNumber"] == 7  # a number, not "7"
+        assert device["properties"]["manufacturer"] == "fibaro"
+        assert device["properties"]["value"] is True
     finally:
         await engine.stop()
 

@@ -70,6 +70,15 @@ def test_var_directives_merge_with_string_values() -> None:
     assert parse_annotations(source) == {"var": {"x": "1", "y": "hello", "z": "1", "w": "2"}}
 
 
+def test_property_directives_merge_with_scalar_values() -> None:
+    # --%%property:name=value — raw device properties, values parse as
+    # scalars, repeated directives merge
+    source = "--%%property:value=true\n--%%property:delay=30\n--%%property:x=1,y=2\n"
+    assert parse_annotations(source) == {
+        "property": {"value": True, "delay": 30, "x": 1, "y": 2}
+    }
+
+
 def test_eoh_stops_parsing() -> None:
     source = (
         "--%%name:outer\n"

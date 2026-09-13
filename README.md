@@ -80,6 +80,8 @@ Every Lua file is a QuickApp, like on the HC3 — it gets the real `QuickApp`/
   the **device type skeleton** (`src/flua/devices/devices.json` — 176 real
   HC3 captures, scrubbed of instance data), with `--%%properties` overlaying
   defaults. The instance is exposed as `_FLUA.qa(qaId)`.
+- **Device types.** `--%%type` selects the skeleton; omitting it defaults to
+  `com.fibaro.binarySwitch`, and an unknown type is an error at startup.
 - **Config.** The CLI builds the config for each QA (CLI flags + global
   `--%%` annotations plus the QA's local `--%%` annotations) and exposes it
   on that QA's own `_FLUA.config` — so `--%%name:qa1` appears as
@@ -328,6 +330,12 @@ before the engine starts:
 --%%type:com.fibaro.remoteColorController
 --%%properties:value=false
 --%%var:apiKey=secret
+--%%uid:qa-uuid
+--%%description:my QA
+--%%model:model-x
+--%%build:3
+--%%manufacturer:fibaro
+--%%property:value=true
 --%%file:lib.lua,lib
 ```
 
@@ -339,6 +347,14 @@ collect in declaration order.
 `--%%var:name=value` initializes a **QuickApp variable** (readable with
 `self:getVariable(name)`); values are literal strings, repeated directives
 merge, and several variables may share one line.
+
+Named property directives map directly onto device properties:
+`--%%uid` (quickAppUuid), `--%%description` (userDescription), `--%%model`
+(model), `--%%build` (buildNumber, a number), `--%%manufacturer`
+(manufacturer). The raw form `--%%property:name=value` sets any property
+directly (values parse as scalars — `--%%property:value=true` initializes
+the value property); repeated directives merge. The plural
+`--%%properties:` form still works the same way.
 
 Parameters are either **global** or **local**:
 

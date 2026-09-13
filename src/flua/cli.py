@@ -258,7 +258,10 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         qa_config = dict(global_config)
         qa_config.update(local_params)
         arg0 = path if path is not None else "flua"
-        engine.start_qa(path, code, qa_config, arg0)
+        try:
+            engine.start_qa(path, code, qa_config, arg0)
+        except ValueError as exc:
+            parser.error(str(exc))
 
     start = time.monotonic()
     max_virtual_seconds = None if max_hours is None else max_hours * 3600.0

@@ -1,8 +1,8 @@
 exit=0
 --- stdout ---
 flua 0.1.0, Lua 5.5, Python 3.14.3
-[37m[13.09.2026][02:55:05][32m[DEBUG  ][37m[var-demo5000]: VARS hello world 42 [0m
-[37m[13.09.2026][02:55:05][32m[DEBUG  ][37m[var-demo5000]: UPDATED hi again[0m
+[37m[13.09.2026][07:37:24][32m[DEBUG  ][37m[demo5000]: FQA {"name": "demo", "interfaces": ["autoTurnOff", "light"], "type": "com.fibaro.binarySwitch", "apiVersion": "1.3"}[0m
+[37m[13.09.2026][07:37:24][32m[DEBUG  ][37m[demo5000]: PROPS {"model": "", "deviceRole": "Light", "useEmbededView": true, "uiView": {}, "manufacturer": "", "apiVersion": "1.3", "typeTemplateInitialized": true, "uiCallbacks": {}, "userDescription": "", "buildNumber": 1, "supportedDeviceRoles": ["Light", "Drencher", "Pin", "NightLamp", "Kettle", "Bracket", "AirConditioner", "AlarmAlarm", "Coffee", "GardenLamp", "TvSet", "CeilingFan", "Toaster", "Radio", "RoofWindow", "Other", "AlarmState", "AlarmArm", "VideoGateBell", "VideoGateOpen", "Valve", "Fan"], "viewLayout": {"$jason": {"head": {"title": "quickApp_device_57"}, "body": {"sections": {"items": {}}, "header": {"title": "quickApp_device_57", "style": {"height": "0"}}}}}, "useUiView": true, "quickAppVariables": {}}[0m
 
 --- stderr ---
 

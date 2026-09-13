@@ -21,25 +21,15 @@ DEFAULT_DEVICE_TYPE = "com.fibaro.binarySwitch"
 
 
 def _device_skeleton(device_id: int, name: str, device_type: str | None) -> dict[str, Any]:
-    base = skeleton_for(device_type)
-    if base is not None:
-        base["id"] = device_id
-        base["name"] = name
-        return base
-    # Unknown type (or no type): the minimal skeleton, like the HC3's
-    # com.fibaro.binarySwitch default.
-    return {
-        "id": device_id,
-        "name": name,
-        "type": device_type or DEFAULT_DEVICE_TYPE,
-        "enabled": True,
-        "visible": True,
-        "roomID": DEFAULT_ROOM_ID,
-        "parentId": 0,
-        "interfaces": ["quickApp"],
-        "view": {},
-        "variables": {},
-    }
+    # No --%%type defaults to com.fibaro.binarySwitch; a type that is not in
+    # the catalog is an error (the HC3 would not have it either).
+    resolved = device_type or DEFAULT_DEVICE_TYPE
+    base = skeleton_for(resolved)
+    if base is None:
+        raise ValueError(f"unknown device type: {resolved!r}")
+    base["id"] = device_id
+    base["name"] = name
+    return base
 
 
 def public(value: Any) -> Any:

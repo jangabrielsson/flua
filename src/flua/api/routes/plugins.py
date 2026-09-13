@@ -139,7 +139,10 @@ def plugin_update_view(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     dev = state.device(req.body.get("deviceId"))
     if dev is None:
         return None, 404
-    view = dev.setdefault("view", {})
+    view = dev.get("view")
+    if not isinstance(view, dict):
+        view = {}  # catalog skeletons carry a list-shaped template view
+        dev["view"] = view
     component = view.setdefault(str(req.body.get("componentName", "")), {})
     component[str(req.body.get("propertyName", ""))] = req.body.get("newValue")
     return None, 204

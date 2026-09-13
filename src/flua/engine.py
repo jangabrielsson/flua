@@ -46,6 +46,38 @@ from .timers import TimerManager
 
 logger = logging.getLogger(__name__)
 
+# --%% directives that map directly onto device properties (local per QA)
+_PROPERTY_DIRECTIVES = {
+    "uid": "quickAppUuid",
+    "description": "userDescription",
+    "model": "model",
+    "build": "buildNumber",
+    "manufacturer": "manufacturer",
+}
+
+# .fqa export whitelist: the only device properties a real HC3 accepts in a
+# package. Everything else is dynamic (created by the system at device
+# creation) and must not travel.
+_EXPORT_PROPERTIES = frozenset(
+    {
+        "uiCallbacks",
+        "quickAppVariables",
+        "uiView",
+        "viewLayout",
+        "apiVersion",
+        "useEmbededView",
+        "manufacturer",
+        "useUiView",
+        "model",
+        "buildNumber",
+        "supportedDeviceRoles",
+        "userDescription",
+        "typeTemplateInitialized",
+        "quickAppUuid",
+        "deviceRole",
+    }
+)
+
 # Seconds the pump waits on the outbound queue before re-checking the inbound
 # queue and the running flag. Upper bound on timer delivery latency.
 _PUMP_POLL = 0.01
@@ -200,6 +232,14 @@ class LuaEngine:
             name = Path(arg0).stem if arg0.endswith(".lua") else f"QA{qa_id}"
             qa_config["name"] = name
         self._normalize_files(qa_config)
+        # Device properties: skeleton defaults < --%%properties < --%%property
+        # and the named directives (--%%uid/description/model/build/
+        # manufacturer), which map onto the device's properties directly.
+        device_properties = dict(qa_config.get("properties") or {})
+        device_properties.update(qa_config.get("property") or {})
+        for directive, prop in _PROPERTY_DIRECTIVES.items():
+            if qa_config.get(directive) is not None:
+                device_properties[prop] = qa_config[directive]
         if path is not None:
             # --%%file paths resolve relative to the main file's directory
             base = Path(path).parent
@@ -212,7 +252,7 @@ class LuaEngine:
             "code": code,
             "loaded": False,
             "type": qa_config.get("type"),
-            "properties": qa_config.get("properties") or {},
+            "properties": device_properties,
             "config": qa_config,  # resolved copy (name/type/properties filled in)
         }
         self._qas[qa_id]["files"] = self._build_files(path, code, qa_config)
@@ -220,7 +260,7 @@ class LuaEngine:
         # plugin device exists before onInit executes, and onInit's own api
         # calls (internalStorage, updateProperty) must find it.
         self.api.register_qa(
-            qa_id, name, qa_config.get("type"), qa_config.get("properties") or {}, qa_config.get("var")
+            qa_id, name, qa_config.get("type"), device_properties, qa_config.get("var")
         )
         return qa_id
 
@@ -420,18 +460,43 @@ class LuaEngine:
         return True
 
     def qa_export(self, qa_id: int) -> dict[str, Any] | None:
-        """Export a QA as .fqa JSON: {type, name, files: [{name, type, isMain, content}]}."""
+        """Export a QA as .fqa JSON — the real HC3 package shape:
+        {name, type (device type), apiVersion, initialProperties, files}.
+
+        Only whitelisted properties travel: the system fills dynamic
+        properties at device creation and a real HC3 rejects packages that
+        carry them (the set plua verified against real HC3s)."""
         info = self._qas.get(int(qa_id))
         if info is None:
             return None
+        device = self.api.state.devices.get(int(qa_id)) or {}
+        properties = {
+            key: value
+            for key, value in (device.get("properties") or {}).items()
+            if key in _EXPORT_PROPERTIES
+        }
+        # private (__-prefixed) UI callbacks never travel (plua behavior)
+        callbacks = [c for c in (properties.get("uiCallbacks") or []) if not str(c.get("name", "")).startswith("__")]
+        properties["uiCallbacks"] = callbacks
+        # the HC3 expects these five fields as JSON arrays, never objects
+        for key in ("quickAppVariables", "uiView", "supportedDeviceRoles"):
+            value = properties.get(key)
+            properties[key] = (
+                list(value.values()) if isinstance(value, dict) else (value if isinstance(value, list) else [])
+            )
+        interfaces = [i for i in (device.get("interfaces") or []) if i != "quickApp"]
         return {
-            "type": "QuickApp",
             "name": info["name"],
+            "type": device.get("type") or "com.fibaro.binarySwitch",
+            "apiVersion": "1.3",
+            "initialProperties": properties,
+            "initialInterfaces": interfaces,
             "files": [
                 {
                     "name": f["name"],
-                    "type": f["type"],
                     "isMain": f["isMain"],
+                    "isOpen": False,
+                    "type": "lua",
                     "content": f["source"],
                 }
                 for f in info["files"]
@@ -456,6 +521,9 @@ class LuaEngine:
         self._qa_file_dirs.add(base)
         directory = tempfile.mkdtemp(prefix="import-", dir=base)
         header = [f"--%%name:{fqa.get('name') or 'QuickApp'}"]
+        device_type = fqa.get("type")
+        if device_type and device_type != "QuickApp":  # legacy marker: no type
+            header.append(f"--%%type:{device_type}")
         for entry in files:
             if entry is main:
                 continue
@@ -471,7 +539,18 @@ class LuaEngine:
         main_path = os.path.join(directory, "main.lua")
         with open(main_path, "w", encoding="utf-8") as handle:
             handle.write("\n".join(header) + "\n" + str(main.get("content") or ""))
-        return self.load_qa_file(main_path)
+        qa_id, err = self.load_qa_file(main_path)
+        if err is not None:
+            return qa_id, err
+        device = self.api.state.devices.get(qa_id) if qa_id is not None else None
+        if device is not None:
+            initial = fqa.get("initialProperties")
+            if isinstance(initial, dict):
+                device.setdefault("properties", {}).update(dict(initial))
+            for interface in fqa.get("initialInterfaces") or []:
+                if interface != "quickApp" and interface not in device.get("interfaces", []):
+                    device["interfaces"].append(interface)
+        return qa_id, None
 
     # -- QA directory -----------------------------------------------------------
 

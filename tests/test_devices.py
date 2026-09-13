@@ -1,6 +1,9 @@
 """Device type skeletons: catalog loading, scrubbing, and QA integration."""
 
 import asyncio
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -55,6 +58,36 @@ def test_skeleton_copies_are_independent() -> None:
     # and the cached catalog entry is untouched
     again = skeleton_for("com.fibaro.binarySwitch")
     assert "zz_marker" not in again["properties"]
+
+
+def test_register_qa_defaults_to_binary_switch_skeleton() -> None:
+    api = Api()
+    api.register_qa(5000, "qa", None, {})
+    device = api.state.devices[5000]
+    assert device["type"] == "com.fibaro.binarySwitch"
+    assert "light" in device["interfaces"]  # from the catalog skeleton
+    assert "value" in device["properties"]  # catalog defaults present
+    assert "quickAppVariables" in device["properties"]
+
+
+def test_register_qa_unknown_type_raises() -> None:
+    api = Api()
+    with pytest.raises(ValueError, match="unknown device type"):
+        api.register_qa(5000, "qa", "com.no.such.type", {})
+
+
+def test_cli_unknown_type_is_an_error(tmp_path) -> None:
+    script = tmp_path / "bad.lua"
+    script.write_text("--%%type:com.no.such.type\nprint('x')\n")
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", str(script)],
+        cwd=Path(__file__).resolve().parent.parent,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 2
+    assert "unknown device type" in result.stderr
 
 
 def test_register_qa_uses_type_skeleton() -> None:

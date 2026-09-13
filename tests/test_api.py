@@ -413,7 +413,7 @@ def test_refresh_states(api: Api) -> None:
     data, status = api.dispatch("GET", "/refreshStates")
     assert status == 200
     assert data["last"] == 1
-    assert data["changes"] == [{"id": 5000, "name": "value", "newValue": True, "oldValue": None}]
+    assert data["changes"] == [{"id": 5000, "name": "value", "newValue": True, "oldValue": False}]
     data, _ = api.dispatch("GET", "/refreshStates?last=1")
     assert data["changes"] == [] and data["events"] == []
     api.dispatch("POST", "/customEvents/x")
