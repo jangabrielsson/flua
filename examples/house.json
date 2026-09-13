@@ -1,0 +1,50 @@
+{
+  "rooms": [
+    { "id": 1, "name": "Living Room" },
+    { "id": 2, "name": "Kitchen" },
+    { "id": 3, "name": "Bedroom" }
+  ],
+  "devices": [
+    {
+      "id": 10,
+      "name": "Ceiling Lamp",
+      "type": "com.fibaro.binarySwitch",
+      "roomID": 1,
+      "properties": { "value": false }
+    },
+    {
+      "id": 11,
+      "name": "Dimmer",
+      "type": "com.fibaro.multilevelSwitch",
+      "roomID": 1,
+      "properties": { "value": 0 }
+    },
+    {
+      "id": 12,
+      "name": "Kitchen Thermometer",
+      "type": "com.fibaro.temperatureSensor",
+      "roomID": 2,
+      "properties": { "value": 21.5 }
+    },
+    {
+      "id": 13,
+      "name": "Bedroom Motion",
+      "type": "com.fibaro.motionSensor",
+      "roomID": 3,
+      "properties": { "value": false, "armed": true }
+    }
+  ],
+  "scenes": [
+    { "id": 5, "name": "Evening", "running": false }
+  ],
+  "globalVariables": {
+    "nightMode": "false",
+    "targetTemp": { "value": "21" }
+  },
+  "alarms": [
+    { "id": 1, "name": "Home", "armed": false, "breached": false }
+  ],
+  "profiles": [
+    { "id": 1, "name": "Home", "active": true }
+  ]
+}

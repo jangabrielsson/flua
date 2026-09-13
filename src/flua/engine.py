@@ -38,8 +38,10 @@ from .api import Api
 from .bindings import install_bindings
 from .clock import VirtualClock
 from .config import parse_annotations, split_annotations
+from .devices import catalog_types
 from .http import http_call
 from .mqtt import MqttPool
+from .api.state import public
 from .sync_socket import SyncTCPSockets, SyncUDPSockets
 from .websocket import WebSocketPool
 from .timers import TimerManager
@@ -88,6 +90,7 @@ class LuaEngine:
 
     def __init__(
         self,
+        start: float | None = None,
         speed: float = 1.0,
         config: dict[str, Any] | None = None,
         color: str = "auto",
@@ -100,6 +103,8 @@ class LuaEngine:
         # Virtual time: 1 = realtime, N = accelerated, inf = instant (timers
         # fire immediately and virtual time jumps to their deadlines).
         self.clock = VirtualClock(speed)
+        if start is not None:
+            self.clock.set_start(start)
         # --%% annotations parsed from the script (exposed to Lua as _FLUA.config)
         self.config = config or {}
         # ANSI coloring for QA log lines: auto (tty only), always, never
@@ -459,6 +464,59 @@ class LuaEngine:
         self.restart_qa(int(qa_id))
         return True
 
+    def qa_file_post(
+        self, qa_id: int, name: str, file_type: str = "lua", content: str = ""
+    ) -> dict[str, Any] | None:
+        """POST /quickApp/{id}/files: create a file (empty by default), restart."""
+        return self.qa_file_put(qa_id, name, content or "")
+
+    def qa_files_put(
+        self, qa_id: int, details: list[dict[str, Any]]
+    ) -> list[dict[str, Any]] | None:
+        """PUT /quickApp/{id}/files: update several files, restart once."""
+        info = self._qas.get(int(qa_id))
+        if info is None:
+            return None
+        for entry in details:
+            if isinstance(entry, dict) and entry.get("name") and entry.get("content") is not None:
+                self.qa_file_put(qa_id, str(entry["name"]), str(entry["content"]))
+        return self.qa_file_list(int(qa_id))
+
+    def qa_available_types(self) -> list[dict[str, str]]:
+        """GET /quickApp/availableTypes: the device catalog as {type, label}."""
+        return [{"type": t, "label": t} for t in catalog_types()]
+
+    def create_qa(self, request: dict[str, Any]) -> dict[str, Any] | None:
+        """POST /quickApp: create a QuickApp device (empty main) with the
+        request's initial properties/interfaces/view/roomId."""
+        if not isinstance(request, dict) or not request.get("name"):
+            return None
+        base = os.path.join(tempfile.gettempdir(), f"flua-qa-files-{os.getpid()}")
+        os.makedirs(base, exist_ok=True)
+        self._qa_file_dirs.add(base)
+        directory = tempfile.mkdtemp(prefix="create-", dir=base)
+        header = [f"--%%name:{request['name']}"]
+        if request.get("type"):
+            header.append(f"--%%type:{request['type']}")
+        main_path = os.path.join(directory, "main.lua")
+        with open(main_path, "w", encoding="utf-8") as handle:
+            handle.write("\n".join(header) + "\n")
+        qa_id, err = self.load_qa_file(main_path)
+        if err is not None or qa_id is None:
+            return None
+        device = self.api.state.devices[qa_id]
+        initial = request.get("initialProperties")
+        if isinstance(initial, dict):
+            device.setdefault("properties", {}).update(dict(initial))
+        for interface in request.get("initialInterfaces") or []:
+            if interface != "quickApp" and interface not in device.get("interfaces", []):
+                device["interfaces"].append(interface)
+        if request.get("roomId") is not None:
+            device["roomID"] = int(request["roomId"])
+        if isinstance(request.get("initialView"), dict):
+            device["view"] = dict(request["initialView"])
+        return public(device)
+
     def qa_export(self, qa_id: int) -> dict[str, Any] | None:
         """Export a QA as .fqa JSON — the real HC3 package shape:
         {name, type (device type), apiVersion, initialProperties, files}.
@@ -520,10 +578,52 @@ class LuaEngine:
         os.makedirs(base, exist_ok=True)
         self._qa_file_dirs.add(base)
         directory = tempfile.mkdtemp(prefix="import-", dir=base)
+        main_path, err = self.fqa_to_files(fqa, directory)
+        if err is not None:
+            return None, err
+        qa_id, err = self.load_qa_file(main_path)
+        if err is not None:
+            return qa_id, err
+        device = self.api.state.devices.get(qa_id) if qa_id is not None else None
+        if device is not None:
+            initial = fqa.get("initialProperties")
+            if isinstance(initial, dict):
+                device.setdefault("properties", {}).update(dict(initial))
+            for interface in fqa.get("initialInterfaces") or []:
+                if interface != "quickApp" and interface not in device.get("interfaces", []):
+                    device["interfaces"].append(interface)
+        return qa_id, None
+
+    @staticmethod
+    def _lua_scalar(value: Any) -> str:
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        if value is None:
+            return "nil"
+        return str(value)
+
+    def fqa_to_files(
+        self, fqa: dict[str, Any], directory: str
+    ) -> tuple[str | None, str | None]:
+        """Unpack a .fqa package into ``directory``: the generated main file
+        carries --%% directives (name, type, files, scalar initialProperties),
+        the extras keep their assigned names. The result loads as a normal
+        flua project (this is also what import_qa uses internally)."""
+        files = fqa.get("files")
+        if not isinstance(files, list) or not files:
+            return None, "fqa package has no files"
+        main = next((f for f in files if f.get("isMain") or f.get("name") == "main"), None)
+        if main is None:
+            return None, "fqa package has no main file"
         header = [f"--%%name:{fqa.get('name') or 'QuickApp'}"]
         device_type = fqa.get("type")
         if device_type and device_type != "QuickApp":  # legacy marker: no type
             header.append(f"--%%type:{device_type}")
+        initial = fqa.get("initialProperties")
+        if isinstance(initial, dict):
+            for key, value in initial.items():
+                if isinstance(value, (str, int, float, bool)) or value is None:
+                    header.append(f"--%%property:{key}={self._lua_scalar(value)}")
         for entry in files:
             if entry is main:
                 continue
@@ -539,18 +639,7 @@ class LuaEngine:
         main_path = os.path.join(directory, "main.lua")
         with open(main_path, "w", encoding="utf-8") as handle:
             handle.write("\n".join(header) + "\n" + str(main.get("content") or ""))
-        qa_id, err = self.load_qa_file(main_path)
-        if err is not None:
-            return qa_id, err
-        device = self.api.state.devices.get(qa_id) if qa_id is not None else None
-        if device is not None:
-            initial = fqa.get("initialProperties")
-            if isinstance(initial, dict):
-                device.setdefault("properties", {}).update(dict(initial))
-            for interface in fqa.get("initialInterfaces") or []:
-                if interface != "quickApp" and interface not in device.get("interfaces", []):
-                    device["interfaces"].append(interface)
-        return qa_id, None
+        return main_path, None
 
     # -- QA directory -----------------------------------------------------------
 

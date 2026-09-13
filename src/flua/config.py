@@ -127,6 +127,25 @@ def parse_annotations(source: str) -> dict[str, Any]:
 # that sets it wins. Everything else stays local to the QA's config copy.
 GLOBAL_PARAMS = frozenset({"speed", "instant", "maxhours", "time"})
 
+# Every --%% directive flua understands (globals + locals). --check flags
+# anything else — a typo like --%%instnat:true is silently ignored today.
+KNOWN_DIRECTIVES = frozenset(
+    GLOBAL_PARAMS
+    | {
+        "name",
+        "type",
+        "properties",
+        "property",
+        "var",
+        "file",
+        "uid",
+        "description",
+        "model",
+        "build",
+        "manufacturer",
+    }
+)
+
 
 def split_annotations(
     annotations: dict[str, Any],

@@ -10,6 +10,10 @@ WebSocket, MQTT) — all with `lupa` as the only runtime dependency.
 A smaller, more targeted rewrite of [plua](https://github.com/jangabrielsson/plua)
 with the architecture lessons from it baked in.
 
+**QA developers start at [USAGE.md](USAGE.md)** — install, VS Code setup,
+directives, multi-file QAs, the offline HC3, and deploying to the HC3.
+The rest of this file is how flua works under the hood.
+
 ## Install
 
 ```bash
@@ -39,7 +43,13 @@ Requires Python 3.11+. `lupa` is the only runtime dependency.
 .venv/bin/flua --color always script.lua
 
 # simulated HC3 (offline): seed the REST API with a house
-.venv/bin/flua --seed house.json script.lua
+.venv/bin/flua --seed examples/house.json script.lua
+
+# develop: watch mode (restart on save), static checks, deploy artifacts
+.venv/bin/flua --watch script.lua
+.venv/bin/flua --check script.lua
+.venv/bin/flua export script.lua -o script.fqa
+.venv/bin/flua unpack script.fqa -d project/
 
 # virtual time: accelerated or instant simulation
 .venv/bin/flua --speed 60 script.lua     # 60x faster
@@ -312,6 +322,9 @@ Timers run on the engine's virtual clock, and `os.time()` / `os.clock()` /
 - `--instant` — timers fire immediately and virtual time jumps to each
   timer's deadline: a script that waits for days of simulated time completes
   in milliseconds with `os.time()` showing the corresponding future time
+- `--start "2027/10/6 12:00:20"` (or `--%%time:start=...` / the bare
+  `--%%time:<when>` form) — set the virtual clock's starting time, so a QA
+  can be run at New Year, a leap day, or any interesting date
 
 Because the clock is virtual, the debugger pause freezes it too (see
 Debugging below): a timer scheduled as `setTimeout(fn, 1000*(t - os.time()))`

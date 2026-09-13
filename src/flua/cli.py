@@ -26,6 +26,7 @@ from typing import Any
 
 from . import __version__, messages
 from .config import parse_annotations, split_annotations
+from .clock import parse_start_time
 from .engine import LuaEngine
 
 logger = logging.getLogger(__name__)
@@ -86,6 +87,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="instant mode: timers fire immediately, os.time() jumps by each delay",
     )
     parser.add_argument(
+        "--start",
+        metavar="WHEN",
+        help="virtual start time, e.g. '2027/10/6 12:00:20' (defaults to now)",
+    )
+    parser.add_argument(
         "--color",
         choices=["auto", "always", "never"],
         default="always",
@@ -107,6 +113,16 @@ def _build_parser() -> argparse.ArgumentParser:
         "--nogreet",
         action="store_true",
         help="skip the startup greeting line",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="static checks only (syntax, --%% directives, deprecated APIs); do not run",
+    )
+    parser.add_argument(
+        "--watch",
+        action="store_true",
+        help="restart QAs when their files change (mtime polling, no dependencies)",
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="enable debug logging"
@@ -150,15 +166,15 @@ def _resolve_runtime(
     parser: argparse.ArgumentParser,
     args: argparse.Namespace,
     global_config: dict[str, Any],
-) -> tuple[float, float | None]:
+) -> tuple[float, float | None, float | None]:
     """Resolve virtual-time settings; CLI flags win over global config.
 
     Global config keys: speed, instant, maxhours, or the combined
     --%%time:speed=N,instant=true,hours=H.
-    Returns (speed, max_virtual_hours).
+    Returns (speed, max_virtual_hours, start_epoch_seconds).
     """
-    time_cfg = global_config.get("time")
-    time_cfg = time_cfg if isinstance(time_cfg, dict) else {}
+    time_raw = global_config.get("time")
+    time_cfg = time_raw if isinstance(time_raw, dict) else {}
 
     speed = args.speed
     if speed is None:
@@ -178,7 +194,21 @@ def _resolve_runtime(
     if max_hours is not None and max_hours <= 0:
         parser.error("--max-hours must be > 0 (also for --%%maxhours annotations)")
 
-    return speed, max_hours
+    # virtual start time: --start flag > bare --%%time:2027/10/6 12:00:20 >
+    # the combined form's start= subparameter
+    start_text = args.start
+    if start_text is None and isinstance(time_raw, str):
+        start_text = time_raw  # bare --%%time:<when> form
+    elif start_text is None:
+        start_text = time_cfg.get("start")
+    start_epoch = None
+    if start_text:
+        try:
+            start_epoch = parse_start_time(str(start_text))
+        except ValueError as exc:
+            parser.error(str(exc))
+
+    return speed, max_hours, start_epoch
 
 
 def _start_debugger(engine: LuaEngine, port: int) -> None:
@@ -214,7 +244,11 @@ def _keep_running(
 
 async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     global_config, qa_specs = _load_qas(parser, args)
-    speed, max_hours = _resolve_runtime(parser, args, global_config)
+
+    if args.check:
+        return _check_cli(parser, args)
+
+    speed, max_hours, start_epoch = _resolve_runtime(parser, args, global_config)
     if args.api != "local":
         parser.error("--api remote: not implemented yet (offline sim only)")
     seed: dict[str, Any] | None = None
@@ -228,6 +262,7 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         if not isinstance(seed, dict):
             parser.error("seed file must contain a JSON object")
     engine = LuaEngine(
+        start=start_epoch,
         speed=speed,
         config=global_config,
         color=args.color,
@@ -254,14 +289,46 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         if env_port:
             _start_debugger(engine, int(env_port))
 
+    watch_paths: dict[str, set[int]] = {}
     for path, code, local_params in qa_specs:
         qa_config = dict(global_config)
         qa_config.update(local_params)
         arg0 = path if path is not None else "flua"
         try:
-            engine.start_qa(path, code, qa_config, arg0)
+            qa_id = engine.start_qa(path, code, qa_config, arg0)
         except ValueError as exc:
             parser.error(str(exc))
+        if args.watch:
+            info = engine.qa_info(qa_id)
+            for f in info["files"] if info else []:
+                if f.get("path"):
+                    watch_paths.setdefault(f["path"], set()).add(qa_id)
+
+    if args.watch:
+        args.run_for = 0  # stay alive until exit() or Ctrl-C
+        mtimes = {p: os.path.getmtime(p) for p in watch_paths if os.path.exists(p)}
+
+        async def watch_loop() -> None:
+            while engine.is_running():
+                await asyncio.sleep(0.5)
+                for path, qa_ids in watch_paths.items():
+                    try:
+                        mtime = os.path.getmtime(path)
+                    except OSError:
+                        continue
+                    if mtime != mtimes.get(path):
+                        mtimes[path] = mtime
+                        await asyncio.sleep(0.2)  # let editors finish writing
+                        for qa_id in sorted(qa_ids):
+                            engine.restart_qa(qa_id)
+                            engine.post(
+                                messages.log(
+                                    "info",
+                                    f"[watch] restarted QA {qa_id} ({Path(path).name})",
+                                )
+                            )
+
+        asyncio.create_task(watch_loop(), name="flua-watch")
 
     start = time.monotonic()
     max_virtual_seconds = None if max_hours is None else max_hours * 3600.0
@@ -277,6 +344,65 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
     ):
         print(f"flua: virtual time limit reached ({max_hours}h)", file=sys.stderr)
     return engine.exit_code
+
+
+def _check_cli(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
+    """Static checks for every QA file / -e code; exit 1 only on errors."""
+    from .check import check_file, check_source
+
+    engine = LuaEngine()
+    lua = engine.lua_runtime()
+    findings: list[str] = []
+    if args.code is not None:
+        findings += check_source(args.code, "<command line>", lua)
+    for script in args.scripts:
+        path = Path(script)
+        if not path.exists():
+            parser.error(f"cannot open {script}: no such file")
+        findings += check_file(str(path.resolve()), lua)
+    if not findings:
+        print("ok")
+        return 0
+    for line in findings:
+        print(line)
+    return 1 if any(": error:" in line for line in findings) else 0
+
+
+def _export_cli(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
+    """flua export script.lua -o out.fqa — the deploy artifact, without running."""
+    path = Path(args.script)
+    if not path.exists():
+        parser.error(f"cannot open {args.script}: no such file")
+    source = path.read_text(encoding="utf-8")
+    _, local_params = split_annotations(parse_annotations(source))
+    engine = LuaEngine()
+    qa_id = engine._prepare_qa(str(path.resolve()), None, local_params, str(path.resolve()))
+    fqa = engine.qa_export(qa_id)
+    output = Path(args.output) if args.output else path.with_suffix(".fqa")
+    output.write_text(json.dumps(fqa, indent=2) + "\n", encoding="utf-8")
+    print(f"exported {len(fqa['files'])} files to {output}")
+    return 0
+
+
+def _unpack_cli(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
+    """flua unpack package.fqa -d dir/ — turn an HC3 export into a flua project."""
+    path = Path(args.package)
+    if not path.exists():
+        parser.error(f"cannot open {args.package}: no such file")
+    try:
+        fqa = json.loads(path.read_text(encoding="utf-8"))
+    except ValueError as exc:
+        parser.error(f"invalid fqa JSON: {exc}")
+    if not isinstance(fqa, dict):
+        parser.error("fqa file must contain a JSON object")
+    directory = args.directory or Path(str(fqa.get("name") or "quickapp")).name
+    os.makedirs(directory, exist_ok=True)
+    engine = LuaEngine()
+    main_path, err = engine.fqa_to_files(fqa, directory)
+    if err is not None:
+        parser.error(f"cannot unpack: {err}")
+    print(f"unpacked to {directory}/ (main: {main_path})")
+    return 0
 
 
 def _normalize_debugger_argv(argv: list[str]) -> list[str]:
@@ -309,8 +435,12 @@ def _normalize_debugger_argv(argv: list[str]) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = _build_parser()
     raw = sys.argv[1:] if argv is None else argv
+    # Tool commands (flua export/unpack) get their own parsers — argparse
+    # subparsers would swallow the run mode's first positional script.
+    if raw and raw[0] in ("export", "unpack"):
+        return _tool_main(raw)
+    parser = _build_parser()
     args = parser.parse_args(_normalize_debugger_argv(raw))
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
@@ -321,6 +451,41 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         print("flua: interrupted", file=sys.stderr)
         return 130
+
+
+def _tool_parser(command: str) -> argparse.ArgumentParser:
+    if command == "export":
+        parser = argparse.ArgumentParser(
+            prog="flua export", description="Export a QA file as a .fqa package."
+        )
+        parser.add_argument("script", help="the QA main file")
+        parser.add_argument(
+            "-o",
+            "--output",
+            metavar="FILE",
+            help="output .fqa path (default: <name>.fqa next to the script)",
+        )
+        return parser
+    parser = argparse.ArgumentParser(
+        prog="flua unpack", description="Unpack a .fqa into a flua project directory."
+    )
+    parser.add_argument("package", help="the .fqa file")
+    parser.add_argument(
+        "-d",
+        "--directory",
+        metavar="DIR",
+        help="target directory (default: the QA name)",
+    )
+    return parser
+
+
+def _tool_main(raw: list[str]) -> int:
+    command, rest = raw[0], raw[1:]
+    tool = _tool_parser(command)
+    args = tool.parse_args(rest)
+    if command == "export":
+        return _export_cli(tool, args)
+    return _unpack_cli(tool, args)
 
 
 if __name__ == "__main__":

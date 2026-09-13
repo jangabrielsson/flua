@@ -118,7 +118,7 @@ async def test_quickapp_rest_routes_and_restart(tmp_path, capsys) -> None:
         assert "OLD TIMER" not in out  # the old QA's 1s timer was cancelled
 
         # deleting the file restarts without it
-        assert api.dispatch("DELETE", "/quickApp/5000/files/lib") == (None, 204)
+        assert api.dispatch("DELETE", "/quickApp/5000/files/lib") == (None, 200)
         await asyncio.sleep(0.3)
         out = capsys.readouterr().out
         assert "MODE" in out  # restart happened; MODE is now nil
@@ -193,9 +193,9 @@ async def test_quickapp_export_filters_and_arrayifies(tmp_path, capsys) -> None:
         for key in ("quickAppVariables", "uiView", "supportedDeviceRoles"):
             assert isinstance(props[key], list)
         # the package must round-trip through import and keep the properties
-        qa_id, status = engine.api.dispatch("POST", "/quickApp/import", exported)
-        assert status == 201
-        imported_device = engine.api.state.devices[qa_id]
+        device, status = engine.api.dispatch("POST", "/quickApp/import", exported)
+        assert status == 200
+        imported_device = engine.api.state.devices[device["id"]]
         assert imported_device["properties"]["model"] == "v2"
         assert imported_device["properties"]["uiCallbacks"] == [{"name": "btn1"}]
     finally:
@@ -246,8 +246,9 @@ async def test_quickapp_import_runs_the_qa(tmp_path, capsys) -> None:
                 ],
             },
         )
-        assert status == 201
-        assert qa_id == 5000
+        assert status == 200
+        assert qa_id["id"] == 5000  # DeviceDto, like the HC3
+        qa_id = qa_id["id"]
         await asyncio.sleep(0.4)
         out = capsys.readouterr().out
         assert "IMPORTED works" in out
@@ -334,8 +335,8 @@ async def test_quickapp_import_returns_id_through_lua_api(tmp_path, capsys) -> N
         "    type = 'QuickApp', name = 'from-api',\n"
         "    files = { { name = 'main', isMain = true, content = \"print('API QA')\\n\" } },\n"
         "  }\n"
-        "  local newId, status = api.post('/quickApp/import', fqa)\n"
-        "  print('IMPORTED', type(newId) == 'number', status)\n"
+        "  local dev, status = api.post('/quickApp/import', fqa)\n"
+        "  print('IMPORTED', type(dev) == 'table', status, dev.id)\n"
         "end, 20)\n"
     )
     engine = LuaEngine()
@@ -344,7 +345,7 @@ async def test_quickapp_import_returns_id_through_lua_api(tmp_path, capsys) -> N
         engine.start_qa(str(loader), None, {}, str(loader))
         await asyncio.sleep(0.5)
         out = capsys.readouterr().out
-        assert "IMPORTED true 201" in out
+        assert "IMPORTED true 200 5001" in out
         assert "API QA" in out
     finally:
         await engine.stop()
@@ -367,7 +368,8 @@ async def test_quickapp_import_from_base64(tmp_path, capsys) -> None:
             "/quickApp/import",
             {"file": base64.b64encode(json.dumps(fqa).encode()).decode()},
         )
-        assert status == 201 and qa_id == 5000
+        assert status == 200 and qa_id["id"] == 5000
+        qa_id = qa_id["id"]
         await asyncio.sleep(0.4)
         assert "B64 QA" in capsys.readouterr().out
     finally:
@@ -391,7 +393,7 @@ async def test_quickapp_import_validation(tmp_path, capsys) -> None:
             400,
         )
         # encrypted export is not supported (Fibaro-specific)
-        assert engine.api.dispatch("POST", "/quickApp/export/5000", {}) == (None, 501)
+        assert engine.api.dispatch("POST", "/quickApp/export/5000", {"encrypted": True}) == (None, 501)
     finally:
         await engine.stop()
 
@@ -410,9 +412,90 @@ async def test_quickapp_export_import_roundtrip(tmp_path, capsys) -> None:
         assert "RT 99" in capsys.readouterr().out
         exported, status = engine.api.dispatch("GET", "/quickApp/export/5000")
         assert status == 200
-        qa_id, status = engine.api.dispatch("POST", "/quickApp/import", exported)
-        assert status == 201 and qa_id == 5001
+        device, status = engine.api.dispatch("POST", "/quickApp/import", exported)
+        assert status == 200 and device["id"] == 5001
+        qa_id = device["id"]
         await asyncio.sleep(0.4)
         assert "RT 99" in capsys.readouterr().out  # the imported copy runs too
+    finally:
+        await engine.stop()
+
+
+def test_quickapp_available_types() -> None:
+    from flua.api import Api
+
+    api = Api(engine=LuaEngine())
+    data, status = api._quickapp("GET", ["quickApp", "availableTypes"], None)
+    assert status == 200
+    assert any(t["type"] == "com.fibaro.binarySwitch" for t in data)
+    assert all(set(t) == {"type", "label"} for t in data)
+
+
+@pytest.mark.asyncio
+async def test_quickapp_create_device(tmp_path, capsys) -> None:
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        device, status = engine.api.dispatch(
+            "POST",
+            "/quickApp",
+            {
+                "name": "created-qa",
+                "type": "com.fibaro.binarySwitch",
+                "roomId": 3,
+                "initialProperties": {"model": "m1"},
+                "initialInterfaces": [],
+                "initialView": {},
+            },
+        )
+        assert status == 200
+        assert device["id"] == 5000
+        assert device["name"] == "created-qa"
+        assert device["roomID"] == 3
+        assert device["properties"]["model"] == "m1"
+        # the QA runs (empty main) and its files API shows just main
+        files, status = engine.api.dispatch("GET", "/quickApp/5000/files")
+        assert status == 200
+        assert [f["name"] for f in files] == ["main"]
+        assert engine.api.dispatch("POST", "/quickApp", {"type": "com.fibaro.binarySwitch"}) == (
+            None,
+            400,
+        )  # name required
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_quickapp_files_create_and_bulk_update(tmp_path, capsys) -> None:
+    main = tmp_path / "main.lua"
+    main.write_text("--%%file:lib.lua,lib\n-- --------------- EOH ---------------\nprint('M', LIB)\n")
+    lib = tmp_path / "lib.lua"
+    lib.write_text("LIB = 1\n")
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.load_qa_file(str(main))
+        await asyncio.sleep(0.3)
+        assert "M 1" in capsys.readouterr().out
+        # POST /files creates a new (empty) file
+        entry, status = engine.api.dispatch(
+            "POST", "/quickApp/5000/files", {"name": "util", "type": "lua"}
+        )
+        assert status == 200 and entry["name"] == "util" and entry["content"] == ""
+        # PUT /files updates several files in one call, restarting once
+        entries, status = engine.api.dispatch(
+            "PUT",
+            "/quickApp/5000/files",
+            [
+                {"name": "lib", "content": "LIB = 2\n"},
+                {"name": "util", "content": "LIB = (LIB or '') .. 'u'\n"},
+            ],
+        )
+        assert status == 200
+        assert {f["name"] for f in entries} == {"main", "lib", "util"}
+        await asyncio.sleep(0.3)
+        out = capsys.readouterr().out
+        assert "M 2u" in out  # both files loaded in declaration order
+        assert engine.api.dispatch("PUT", "/quickApp/5000/files", "not-a-list") == (None, 400)
     finally:
         await engine.stop()

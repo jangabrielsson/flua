@@ -18,6 +18,7 @@ virtual time, so ``os.time()``-based absolute-time math stays consistent.
 
 import math
 import time
+from datetime import datetime
 
 
 class VirtualClock:
@@ -62,3 +63,23 @@ class VirtualClock:
     def elapsed(self) -> float:
         """Virtual seconds since the engine started."""
         return self.time - self._start
+
+    def set_start(self, epoch_seconds: float) -> None:
+        """Set the virtual time at engine start (e.g. --%%time:start=...)."""
+        self.time = float(epoch_seconds)
+        self._start = self.time
+
+
+def parse_start_time(text: str) -> float:
+    """Parse a start-time string into epoch seconds.
+
+    Accepts ``2027/10/6 12:00:20``, ``2027-10-06 12:00:20``, or a bare
+    date (midnight). Local time, like os.time() on the same machine.
+    """
+    text = text.strip()
+    for fmt in ("%Y/%m/%d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y/%m/%d", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(text, fmt).timestamp()
+        except ValueError:
+            continue
+    raise ValueError(f"cannot parse start time: {text!r}")

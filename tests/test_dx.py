@@ -1,0 +1,218 @@
+"""Phase-1 developer tools: --check, export/unpack, --watch, the house seed."""
+
+import json
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+FLOA = [sys.executable, "-m", "flua"]
+
+
+def _run(*args: str, timeout: int = 60) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [*FLOA, *args],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+
+
+# -- --check ------------------------------------------------------------------
+
+
+def test_check_clean_file() -> None:
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        script = Path(d) / "good.lua"
+        script.write_text("--%%name:x\nprint('hi')\n")
+        result = _run("--check", str(script))
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "ok" in result.stdout
+
+
+def test_check_flags_unknown_directive() -> None:
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        script = Path(d) / "typo.lua"
+        script.write_text("--%%instnat:true\nprint('hi')\n")  # typo: instant
+        result = _run("--check", str(script))
+        assert result.returncode == 0  # warnings don't fail the check
+        assert "unknown directive --%%instnat" in result.stdout
+
+
+def test_check_flags_deprecated_api() -> None:
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        script = Path(d) / "dep.lua"
+        script.write_text("api.get('/quickApp/export/5000')\n")
+        result = _run("--check", str(script))
+        assert result.returncode == 0
+        assert "deprecated API: GET /quickApp/export/5000" in result.stdout
+
+
+def test_check_syntax_error_exits_1() -> None:
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        script = Path(d) / "syntax.lua"
+        script.write_text("print(\n")
+        result = _run("--check", str(script))
+        assert result.returncode == 1
+        assert "error: syntax" in result.stdout
+
+
+# -- export / unpack ------------------------------------------------------------
+
+
+def test_export_and_unpack_roundtrip(tmp_path) -> None:
+    main = tmp_path / "main.lua"
+    main.write_text(
+        "--%%name:packaged\n"
+        "--%%file:lib.lua,lib\n"
+        "-- --------------- EOH ---------------\n"
+        "print('RUNS', LIB)\n"
+    )
+    (tmp_path / "lib.lua").write_text("LIB = 'ok'\n")
+    package = tmp_path / "out.fqa"
+    result = _run("export", str(main), "-o", str(package))
+    assert result.returncode == 0, result.stdout + result.stderr
+    fqa = json.loads(package.read_text())
+    assert fqa["name"] == "packaged"
+    assert fqa["type"] == "com.fibaro.binarySwitch"
+    assert [f["name"] for f in fqa["files"]] == ["main", "lib"]
+
+    target = tmp_path / "project"
+    result = _run("unpack", str(package), "-d", str(target))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (target / "main.lua").exists()
+    assert (target / "lib").exists()
+    header = (target / "main.lua").read_text()
+    assert "--%%name:packaged" in header
+    assert "--%%file:lib,lib" in header
+    assert "EOH" in header
+    assert "print('RUNS', LIB)" in header  # main content follows the header
+
+    # the unpacked project runs as a normal flua project
+    result = _run(str(target / "main.lua"))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "RUNS ok" in result.stdout
+
+
+# -- --watch ----------------------------------------------------------------------
+
+
+def _collect(proc: subprocess.Popen) -> list[str]:
+    lines: list[str] = []
+    threading.Thread(target=lambda: [lines.append(line) for line in proc.stdout], daemon=True).start()
+    return lines
+
+
+def _wait_for(lines: list[str], marker: str, timeout: float) -> str:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        text = "".join(lines)
+        if marker in text:
+            return text
+        time.sleep(0.05)
+    raise AssertionError(f"{marker!r} not seen in output:\n{''.join(lines)}")
+
+
+def test_watch_restarts_on_change(tmp_path) -> None:
+    main = tmp_path / "main.lua"
+    main.write_text("setTimeout(function() print('REV 1') end, 20)\n")
+    proc = subprocess.Popen(
+        [*FLOA, "--watch", str(main)],
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    try:
+        lines = _collect(proc)
+        _wait_for(lines, "REV 1", 10)
+        main.write_text("setTimeout(function() print('REV 2') end, 20)\n")
+        text = _wait_for(lines, "REV 2", 10)
+        assert "[watch] restarted QA 5000" in text
+    finally:
+        proc.terminate()
+        proc.wait(timeout=5)
+
+
+# -- the house seed -----------------------------------------------------------------
+
+
+def test_house_seed_runs(tmp_path) -> None:
+    script = tmp_path / "house.lua"
+    script.write_text(
+        "setTimeout(function()\n"
+        "  print('ROOM1', #api.get('/devices?roomID=1'))\n"
+        "  print('NIGHT', fibaro.getGlobalVariable('nightMode'))\n"
+        "  print('SCENES', #api.get('/scenes'))\n"
+        "end, 20)\n"
+    )
+    result = _run("--seed", "examples/house.json", str(script))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "ROOM1 2" in result.stdout
+    assert "NIGHT false" in result.stdout
+    assert "SCENES 1" in result.stdout
+
+
+# -- virtual start time --------------------------------------------------------
+
+
+def test_start_time_crosses_new_year_instantly(tmp_path) -> None:
+    # --%%time:start=... + instant: the 20 s timer fires past midnight —
+    # the QA observes the year roll over without waiting
+    script = tmp_path / "ny.lua"
+    script.write_text(
+        "--%%time:start=2027/12/31 23:59:50,instant=true\n"
+        "-- --------------- EOH ---------------\n"
+        "print('T0', os.date('%Y/%m/%d %H:%M:%S'))\n"
+        "setTimeout(function() print('T1', os.date('%Y/%m/%d %H:%M:%S')) end, 20000)\n"
+    )
+    result = _run(str(script))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "T0 2027/12/31 23:59:50" in result.stdout
+    assert "T1 2028/01/01 00:00:10" in result.stdout
+
+
+def test_start_time_bare_form(tmp_path) -> None:
+    # the bare --%%time:<when> form sets the start time directly
+    script = tmp_path / "bare.lua"
+    script.write_text(
+        "--%%time:2027/10/6 12:00:20\n"
+        "-- --------------- EOH ---------------\n"
+        "print('WHEN', os.date('%Y/%m/%d %H:%M:%S'))\n"
+    )
+    result = _run(str(script))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "WHEN 2027/10/06 12:00:20" in result.stdout
+
+
+def test_start_flag_wins_over_directive(tmp_path) -> None:
+    script = tmp_path / "flag.lua"
+    script.write_text(
+        "--%%time:start=2020/1/1 00:00:00\n"
+        "-- --------------- EOH ---------------\n"
+        "print('WHEN', os.date('%Y/%m/%d %H:%M:%S'))\n"
+    )
+    result = _run("--start", "2027/10/6 12:00:20", str(script))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "WHEN 2027/10/06 12:00:20" in result.stdout
+    assert "WHEN 2020/1/1" not in result.stdout
+
+
+def test_start_bad_format_is_an_error(tmp_path) -> None:
+    script = tmp_path / "ok.lua"
+    script.write_text("print('x')\n")
+    result = _run("--start", "garbage", str(script))
+    assert result.returncode == 2
+    assert "cannot parse start time" in result.stderr

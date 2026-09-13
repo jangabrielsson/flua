@@ -1,6 +1,38 @@
 """Unit tests for the virtual clock."""
 
 import math
+import time as time_mod
+
+from flua.clock import VirtualClock, parse_start_time
+
+
+def test_parse_start_time_formats() -> None:
+    from datetime import datetime
+
+    expected = datetime(2027, 10, 6, 12, 0, 20).timestamp()
+    assert parse_start_time("2027/10/6 12:00:20") == expected
+    assert parse_start_time("2027-10-06 12:00:20") == expected
+    assert parse_start_time(" 2027/10/6 12:00:20 ") == expected
+    assert parse_start_time("2027/10/6") == datetime(2027, 10, 6).timestamp()
+
+
+def test_parse_start_time_rejects_garbage() -> None:
+    import pytest
+
+    with pytest.raises(ValueError, match="cannot parse start time"):
+        parse_start_time("not a time")
+
+
+def test_clock_set_start() -> None:
+    import pytest
+
+    clock = VirtualClock()
+    epoch = time_mod.time() + 3600  # one hour in the future
+    clock.set_start(epoch)
+    assert clock.time == epoch
+    assert clock.elapsed() == 0  # elapsed still measures since start
+    clock.tick(time_mod.monotonic() + 1)
+    assert clock.time == pytest.approx(epoch + 1)  # advances from the new start
 
 import pytest
 

@@ -1,8 +1,11 @@
-exit=0
---- stdout ---
+--- NY (exit=0) ---
 flua 0.1.0, Lua 5.5, Python 3.14.3
-[37m[13.09.2026][07:37:24][32m[DEBUG  ][37m[demo5000]: FQA {"name": "demo", "interfaces": ["autoTurnOff", "light"], "type": "com.fibaro.binarySwitch", "apiVersion": "1.3"}[0m
-[37m[13.09.2026][07:37:24][32m[DEBUG  ][37m[demo5000]: PROPS {"model": "", "deviceRole": "Light", "useEmbededView": true, "uiView": {}, "manufacturer": "", "apiVersion": "1.3", "typeTemplateInitialized": true, "uiCallbacks": {}, "userDescription": "", "buildNumber": 1, "supportedDeviceRoles": ["Light", "Drencher", "Pin", "NightLamp", "Kettle", "Bracket", "AirConditioner", "AlarmAlarm", "Coffee", "GardenLamp", "TvSet", "CeilingFan", "Toaster", "Radio", "RoofWindow", "Other", "AlarmState", "AlarmArm", "VideoGateBell", "VideoGateOpen", "Valve", "Fan"], "viewLayout": {"$jason": {"head": {"title": "quickApp_device_57"}, "body": {"sections": {"items": {}}, "header": {"title": "quickApp_device_57", "style": {"height": "0"}}}}}, "useUiView": true, "quickAppVariables": {}}[0m
+[37m[31.12.2027][23:59:50][32m[DEBUG  ][37m[FLUA]: T0 2027/12/31 23:59:50[0m
+[37m[01.01.2028][00:00:10][32m[DEBUG  ][37m[ny5000]: T1 2028/01/01 00:00:10[0m
 
---- stderr ---
+--- BARE (exit=0) ---
+flua 0.1.0, Lua 5.5, Python 3.14.3
+[37m[06.10.2027][12:00:20][32m[DEBUG  ][37m[FLUA]: WHEN 2027/10/06 12:00:20[0m
+
+--- BARE stderr ---
 

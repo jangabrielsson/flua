@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any, Callable
 
 from . import routes
 from .request import ApiRequest, parse_url
-from .state import SimState
+from .state import SimState, public
 
 if TYPE_CHECKING:
     from ..engine import LuaEngine
@@ -118,6 +118,12 @@ class Api:
         if self._engine is None:
             return None, 404  # unit tests without an engine
         try:
+            if len(segments) == 1 and method == "POST":
+                # POST /quickApp — create a QuickApp device (empty main)
+                device = self._engine.create_qa(body)
+                return (device, 200) if device is not None else (None, 400)
+            if segments[1] == "availableTypes" and method == "GET":
+                return self._engine.qa_available_types(), 200
             if segments[1] == "import" and method == "POST":
                 fqa = self._parse_fqa_body(body)
                 if fqa is None:
@@ -125,19 +131,45 @@ class Api:
                 qa_id, err = self._engine.import_qa(fqa)
                 if err is not None:
                     return None, 400
-                return qa_id, 201
+                device = self._engine.api.state.devices.get(qa_id)
+                if device is None:
+                    return None, 400
+                if isinstance(body, dict) and body.get("roomId") is not None:
+                    device["roomID"] = int(body["roomId"])
+                return public(device), 200  # DeviceDto, like the HC3
             if segments[1] == "export" and method == "POST":
-                # encrypted .fqax — Fibaro-specific, not supported offline
-                return None, 501
+                if isinstance(body, dict) and body.get("encrypted"):
+                    return None, 501  # .fqax — Fibaro-specific
+                exported = self._engine.qa_export(int(segments[2]))
+                return (exported, 200) if exported is not None else (None, 404)
             if segments[1] == "export" and method == "GET":
                 exported = self._engine.qa_export(int(segments[2]))
                 return (exported, 200) if exported is not None else (None, 404)
             device_id = int(segments[1])
             if len(segments) < 3 or segments[2] != "files":
                 return None, 404
-            if len(segments) == 3 and method == "GET":
-                files = self._engine.qa_file_list(device_id)
-                return (files, 200) if files is not None else (None, 404)
+            if len(segments) == 3:
+                if method == "GET":
+                    files = self._engine.qa_file_list(device_id)
+                    return (files, 200) if files is not None else (None, 404)
+                if method == "POST":
+                    # create a file (QuickAppFile body; empty by default)
+                    if not isinstance(body, dict) or not body.get("name"):
+                        return None, 400
+                    entry = self._engine.qa_file_post(
+                        device_id,
+                        str(body["name"]),
+                        str(body.get("type") or "lua"),
+                        str(body.get("content") or ""),
+                    )
+                    return (entry, 200) if entry is not None else (None, 404)
+                if method == "PUT":
+                    # bulk update (array of QuickAppFileDetails), restart once
+                    if not isinstance(body, list):
+                        return None, 400
+                    entries = self._engine.qa_files_put(device_id, body)
+                    return (entries, 200) if entries is not None else (None, 404)
+                return None, 404
             if len(segments) < 4:
                 return None, 404
             name = segments[3]
@@ -154,7 +186,7 @@ class Api:
                 entry = self._engine.qa_file_put(device_id, name, content)
                 return (entry, 200) if entry is not None else (None, 404)
             if method == "DELETE":
-                return (None, 204) if self._engine.qa_file_delete(device_id, name) else (None, 404)
+                return (None, 200) if self._engine.qa_file_delete(device_id, name) else (None, 404)
             return None, 404
         except (ValueError, IndexError):
             return None, 404
