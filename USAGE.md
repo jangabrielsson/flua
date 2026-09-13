@@ -153,6 +153,12 @@ testing dates: leap years, DST switches, New Year logic. Combine with
 # or in the file: --%%time:start=2027/12/31 23:59:50,instant=true
 ```
 
+`os.getenv(name)` reads through flua's environment chain: the local `.env`
+in the directory you run from, then `~/.env`, then the shell environment.
+Files are plain `KEY=value` lines (comments and quotes supported) and are
+re-read when they change — handy for API tokens and per-machine settings
+that don't belong in the QA code.
+
 ## Multi-file QAs
 
 On the HC3 a QA is a set of named Lua files — one is `main`. flua keeps your

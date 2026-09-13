@@ -1,2 +1,6 @@
-license entries: ['fibaro_flua-0.1.0.dist-info/licenses/LICENSE']
-all dist-info entries: ['fibaro_flua-0.1.0.dist-info/licenses/LICENSE', 'fibaro_flua-0.1.0.dist-info/METADATA', 'fibaro_flua-0.1.0.dist-info/WHEEL', 'fibaro_flua-0.1.0.dist-info/entry_points.txt', 'fibaro_flua-0.1.0.dist-info/top_level.txt', 'fibaro_flua-0.1.0.dist-info/RECORD']
+exit=0
+flua 0.1.1, Lua 5.5, Python 3.14.3
+[37m[13.09.2026][19:51:50][32m[DEBUG  ][37m[FLUA]: TOKEN secret-from-local-env[0m
+[37m[13.09.2026][19:51:50][32m[DEBUG  ][37m[FLUA]: PASS quoted value[0m
+[37m[13.09.2026][19:51:50][32m[DEBUG  ][37m[FLUA]: NONE[0m
+

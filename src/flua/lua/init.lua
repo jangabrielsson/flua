@@ -104,6 +104,7 @@ os.date = function(fmt, t)
 end
 
 os.clock = function() return _PY.vclock() end
+os.getenv = function(name) return _PY.getenv(name) end
 
 local function traceback(err)
   postLog("error", tostring(err))

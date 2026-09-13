@@ -38,6 +38,7 @@ from .api import Api
 from .bindings import install_bindings
 from .clock import VirtualClock
 from .config import parse_annotations, split_annotations
+from .environment import EnvChain
 from .devices import catalog_types
 from .http import http_call
 from .mqtt import MqttPool
@@ -146,6 +147,7 @@ class LuaEngine:
         # temp files backing loadQAfromString QAs; deleted once the QA loads
         self._temp_qa_paths: set[str] = set()
         self._qa_file_dirs: set[str] = set()  # temp dirs for api-managed QA files
+        self.env = EnvChain()  # os.getenv chain: local .env > ~/.env > process env
         # in-flight net.HTTPClient tasks: they count as pending work, so the
         # CLI keeps running until responses are delivered
         self._http_tasks: set[asyncio.Task[None]] = set()

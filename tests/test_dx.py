@@ -216,3 +216,41 @@ def test_start_bad_format_is_an_error(tmp_path) -> None:
     result = _run("--start", "garbage", str(script))
     assert result.returncode == 2
     assert "cannot parse start time" in result.stderr
+
+
+# -- the os.getenv chain --------------------------------------------------------
+
+
+def test_getenv_reads_local_dotenv(tmp_path) -> None:
+    # a .env in the working directory feeds os.getenv in QA code
+    (tmp_path / ".env").write_text("# dev secrets\nAPI_TOKEN=secret123\n")
+    script = tmp_path / "env.lua"
+    script.write_text(
+        "print('TOKEN', os.getenv('API_TOKEN'))\n"
+        "print('MISSING', os.getenv('NOPE'))\n"
+    )
+    result = subprocess.run(
+        [*FLOA, str(script)],
+        cwd=tmp_path,  # the local .env lives here
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "TOKEN secret123" in result.stdout
+    assert "MISSING" in result.stdout  # nil is fine, printed as nothing
+
+
+def test_getenv_falls_back_to_process_env(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("FROM_PROCESS", "from-shell")
+    script = tmp_path / "env.lua"
+    script.write_text("print('PROC', os.getenv('FROM_PROCESS'))\n")
+    result = subprocess.run(
+        [*FLOA, str(script)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PROC from-shell" in result.stdout

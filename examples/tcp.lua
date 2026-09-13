@@ -11,7 +11,7 @@
 local HOST, PORT = "127.0.0.1", 7777
 
 setTimeout(function()
-  local sock = net.TCPSocket({ timeout = 2000 })  -- ms
+  local sock = net.TCPSocket({ timeout = 8000 })  -- ms
   sock:connect(HOST, PORT, {
     success = function()
       print("connected to", HOST, PORT)

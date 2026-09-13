@@ -106,6 +106,7 @@ def install_bindings(engine: "LuaEngine") -> None:
     py["vclock"] = lambda: engine.clock.elapsed()
     py["note_debugger_pause"] = engine.note_debugger_pause
     py["log"] = engine.log_line
+    py["getenv"] = engine.env.get
     py["version"] = lambda: __version__
     py["color_enabled"] = engine.color_enabled
 

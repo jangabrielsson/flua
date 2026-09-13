@@ -583,7 +583,7 @@ function Socket:nsend(str)
   while total_sent < #str do
     local sent, err = self:send(str, total_sent + 1)
     if sent then
-      if send == 0 then
+      if sent == 0 then
         attempt = attempt - 1
         if attempt == 0 then
           return nil, err or 'no progress'
