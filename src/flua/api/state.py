@@ -32,7 +32,6 @@ def _device_skeleton(device_id: int, name: str, device_type: str | None) -> dict
         "id": device_id,
         "name": name,
         "type": device_type or DEFAULT_DEVICE_TYPE,
-        "properties": {},
         "enabled": True,
         "visible": True,
         "roomID": DEFAULT_ROOM_ID,
@@ -173,6 +172,7 @@ class SimState:
         name: str,
         device_type: str | None,
         properties: Any,
+        variables: dict[str, Any] | None = None,
     ) -> None:
         """Register a running QA as a device (mirrors init.lua's dev table)."""
         dev = _device_skeleton(qa_id, name, device_type)
@@ -181,6 +181,17 @@ class SimState:
             merged = dict(dev.get("properties") or {})
             merged.update(properties)
             dev["properties"] = merged
+        if variables:
+            # --%%var initializers: merge into the device's quickAppVariables
+            existing = dev["properties"].get("quickAppVariables")
+            if not isinstance(existing, list):
+                existing = []
+            merged_vars = {
+                v["name"]: v for v in existing if isinstance(v, dict) and v.get("name")
+            }
+            for var_name, value in variables.items():
+                merged_vars[str(var_name)] = {"name": str(var_name), "value": value}
+            dev["properties"]["quickAppVariables"] = list(merged_vars.values())
         self.devices[qa_id] = dev
 
     # -- entities ---------------------------------------------------------------

@@ -22,6 +22,7 @@ import asyncio
 import contextlib
 import logging
 import os
+import shutil
 import sys
 import tempfile
 import time
@@ -38,7 +39,9 @@ from .bindings import install_bindings
 from .clock import VirtualClock
 from .config import parse_annotations, split_annotations
 from .http import http_call
+from .mqtt import MqttPool
 from .sync_socket import SyncTCPSockets, SyncUDPSockets
+from .websocket import WebSocketPool
 from .timers import TimerManager
 
 logger = logging.getLogger(__name__)
@@ -86,6 +89,13 @@ class LuaEngine:
             messages.TCP_READ: self._handle_tcp_read,
             messages.UDP_SEND: self._handle_udp_send,
             messages.UDP_RECEIVE: self._handle_udp_receive,
+            messages.WS_CONNECT: self._handle_ws_connect,
+            messages.WS_SEND: self._handle_ws_send,
+            messages.MQTT_CONNECT: self._handle_mqtt_connect,
+            messages.MQTT_SUBSCRIBE: self._handle_mqtt_subscribe,
+            messages.MQTT_UNSUBSCRIBE: self._handle_mqtt_unsubscribe,
+            messages.MQTT_PUBLISH: self._handle_mqtt_publish,
+            messages.MQTT_DISCONNECT: self._handle_mqtt_disconnect,
             messages.CLEAR_TIMEOUT: self._handle_clear_timeout,
             messages.LOG: self._handle_log,
             messages.EXIT: self._handle_exit,
@@ -98,6 +108,7 @@ class LuaEngine:
         self._qas: dict[int, dict[str, Any]] = {}  # QA directory (engine-owned)
         # temp files backing loadQAfromString QAs; deleted once the QA loads
         self._temp_qa_paths: set[str] = set()
+        self._qa_file_dirs: set[str] = set()  # temp dirs for api-managed QA files
         # in-flight net.HTTPClient tasks: they count as pending work, so the
         # CLI keeps running until responses are delivered
         self._http_tasks: set[asyncio.Task[None]] = set()
@@ -105,6 +116,9 @@ class LuaEngine:
         # debugger's sockets stay single-threaded on the main thread)
         self.qa_sockets = SyncTCPSockets()
         self.qa_udp = SyncUDPSockets()
+        self.qa_websockets = WebSocketPool(self._on_ws_event)
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self.qa_mqtt = MqttPool(self._on_mqtt_event)
         install_bindings(self)
 
     # -- bridge surface (used by bindings.py) ---------------------------------
@@ -185,6 +199,13 @@ class LuaEngine:
             # basename without path/suffix, else QA<id>
             name = Path(arg0).stem if arg0.endswith(".lua") else f"QA{qa_id}"
             qa_config["name"] = name
+        self._normalize_files(qa_config)
+        if path is not None:
+            # --%%file paths resolve relative to the main file's directory
+            base = Path(path).parent
+            for entry in qa_config.get("files") or []:
+                if entry.get("path") and not Path(entry["path"]).is_absolute():
+                    entry["path"] = str(base / entry["path"])
         self._qas[qa_id] = {
             "name": name,
             "path": path,
@@ -194,11 +215,77 @@ class LuaEngine:
             "properties": qa_config.get("properties") or {},
             "config": qa_config,  # resolved copy (name/type/properties filled in)
         }
+        self._qas[qa_id]["files"] = self._build_files(path, code, qa_config)
         # Register the QA as a device before its code runs: on the HC3 the
         # plugin device exists before onInit executes, and onInit's own api
         # calls (internalStorage, updateProperty) must find it.
-        self.api.register_qa(qa_id, name, qa_config.get("type"), qa_config.get("properties") or {})
+        self.api.register_qa(
+            qa_id, name, qa_config.get("type"), qa_config.get("properties") or {}, qa_config.get("var")
+        )
         return qa_id
+
+    @staticmethod
+    def _normalize_files(config: dict[str, Any]) -> list[dict[str, str]]:
+        """--%%file:path,name entries -> ordered [{name, path}] (config["files"])."""
+        raw = config.pop("file", None)
+        entries: list[dict[str, str]] = []
+        if raw is not None:
+            if not isinstance(raw, list):
+                raw = [raw]
+            for spec in raw:
+                path, _, name = str(spec).partition(",")
+                path = path.strip()
+                name = name.strip() or (Path(path).name if path else "")
+                entries.append({"name": name, "path": path})
+        config["files"] = entries
+        return entries
+
+    @staticmethod
+    def _read_source(path: str) -> str:
+        try:
+            return Path(path).read_text(encoding="utf-8")
+        except OSError as exc:
+            logger.warning("cannot read QA file %s: %s", path, exc)
+            return ""
+
+    def _build_files(
+        self, path: str | None, code: str | None, config: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        """Full file list (main first): {name, path, isMain, type, source}."""
+        if path is not None:
+            files: list[dict[str, Any]] = [
+                {
+                    # HC3 has no file paths: the main file is named "main";
+                    # the disk path stays internal (engine directory only)
+                    "name": "main",
+                    "path": str(path),
+                    "isMain": True,
+                    "type": "lua",
+                    "source": self._read_source(str(path)),
+                }
+            ]
+        else:
+            files = [
+                {
+                    "name": "main",
+                    "path": "",
+                    "isMain": True,
+                    "type": "lua",
+                    "source": code or "",
+                }
+            ]
+        for entry in config.get("files") or []:
+            source = self._read_source(entry["path"]) if entry.get("path") else ""
+            files.append(
+                {
+                    "name": entry["name"],
+                    "path": entry.get("path") or "",
+                    "isMain": False,
+                    "type": "lua",
+                    "source": source,
+                }
+            )
+        return files
 
     # -- dynamic loading (loadQAfromFile / loadQAfromString) ----------------------
 
@@ -222,7 +309,8 @@ class LuaEngine:
         config.update(global_params)
         config.update(local_params)
         qa_id = self._prepare_qa(path, None, config, path)
-        self.enqueue_outbound(messages.start_qa_msg(qa_id, path, config, path))
+        resolved = self._qas[qa_id]["config"]  # files normalized inside _prepare_qa
+        self.enqueue_outbound(messages.start_qa_msg(qa_id, path, resolved, path))
         return qa_id, None
 
     def qa_temp_file(self, code: str) -> str:
@@ -239,6 +327,151 @@ class LuaEngine:
         with contextlib.suppress(OSError):
             Path(path).unlink()
             Path(path).parent.rmdir()
+
+    # -- quickApp files API (multi-file QAs + .fqa export) -----------------------
+
+    def restart_qa(self, qa_id: int) -> None:
+        """Re-run a QA's code (after a file change). Timers are cancelled,
+        sources re-read from disk, and the new code boots via the pump.
+        Device entry and variables persist — like an HC3 restart."""
+        info = self._qas.get(int(qa_id))
+        if info is None:
+            raise ValueError(f"unknown QA {qa_id}")
+        info["files"] = self._build_files(info["path"], info["code"], info["config"])
+        self._timers.cancel_qa(int(qa_id))
+        self.enqueue_outbound(
+            messages.restart_qa_msg(
+                int(qa_id), info["path"] or "", info["config"], info["path"] or ""
+            )
+        )
+
+    def _qa_file_dir(self, qa_id: int) -> str:
+        base = os.path.join(tempfile.gettempdir(), f"flua-qa-files-{os.getpid()}")
+        directory = os.path.join(base, str(qa_id))
+        os.makedirs(directory, exist_ok=True)
+        self._qa_file_dirs.add(base)
+        return directory
+
+    @staticmethod
+    def _safe_file_name(name: str) -> str:
+        safe = os.path.basename(str(name)).strip()
+        if not safe or safe in (".", ".."):
+            raise ValueError(f"bad file name: {name!r}")
+        return safe
+
+    def qa_file_list(self, qa_id: int) -> list[dict[str, Any]] | None:
+        """Public (metadata-only) view of a QA's files, main first."""
+        info = self._qas.get(int(qa_id))
+        if info is None:
+            return None
+        return [
+            {"name": f["name"], "type": f["type"], "isMain": f["isMain"], "isOpen": False}
+            for f in info["files"]
+        ]
+
+    def qa_file_get(self, qa_id: int, name: str) -> dict[str, Any] | None:
+        info = self._qas.get(int(qa_id))
+        if info is None:
+            return None
+        entry = next((f for f in info["files"] if f["name"] == name), None)
+        if entry is None:
+            return None
+        return {
+            "name": entry["name"],
+            "type": entry["type"],
+            "isMain": entry["isMain"],
+            "isOpen": False,
+            "content": entry["source"],
+        }
+
+    def qa_file_put(self, qa_id: int, name: str, content: str) -> dict[str, Any] | None:
+        """Create/update a QA file (on disk in a temp dir) and restart the QA."""
+        info = self._qas.get(int(qa_id))
+        if info is None:
+            return None
+        safe = self._safe_file_name(name)
+        entry = next((f for f in info["files"] if f["name"] == safe), None)
+        if entry is None:
+            path = os.path.join(self._qa_file_dir(int(qa_id)), safe)
+            entry = {"name": safe, "path": path, "isMain": False, "type": "lua", "source": ""}
+            info["files"].append(entry)
+            info["config"]["files"] = info["config"].get("files") or []
+            info["config"]["files"].append({"name": safe, "path": path})
+        with open(entry["path"], "w", encoding="utf-8") as handle:
+            handle.write(content)
+        entry["source"] = content
+        self.restart_qa(int(qa_id))
+        return self.qa_file_get(int(qa_id), safe)
+
+    def qa_file_delete(self, qa_id: int, name: str) -> bool:
+        info = self._qas.get(int(qa_id))
+        if info is None:
+            return False
+        entry = next((f for f in info["files"] if f["name"] == name), None)
+        if entry is None or entry["isMain"]:
+            return False
+        info["files"].remove(entry)
+        info["config"]["files"] = [
+            f for f in info["config"].get("files") or [] if f["name"] != name
+        ]
+        with contextlib.suppress(OSError):
+            Path(entry["path"]).unlink()
+        self.restart_qa(int(qa_id))
+        return True
+
+    def qa_export(self, qa_id: int) -> dict[str, Any] | None:
+        """Export a QA as .fqa JSON: {type, name, files: [{name, type, isMain, content}]}."""
+        info = self._qas.get(int(qa_id))
+        if info is None:
+            return None
+        return {
+            "type": "QuickApp",
+            "name": info["name"],
+            "files": [
+                {
+                    "name": f["name"],
+                    "type": f["type"],
+                    "isMain": f["isMain"],
+                    "content": f["source"],
+                }
+                for f in info["files"]
+            ],
+        }
+
+    def import_qa(self, fqa: dict[str, Any]) -> tuple[int | None, str | None]:
+        """Install and run a QA from a .fqa package.
+
+        The package is unpacked to Lua files in a temp dir and the generated
+        main file carries --%% directives (name + --%%file entries), so the
+        standard pipeline — annotation parsing, file normalization, startQA —
+        loads it like any other QA. Returns (qa_id, None) or (None, error)."""
+        files = fqa.get("files")
+        if not isinstance(files, list) or not files:
+            return None, "fqa package has no files"
+        main = next((f for f in files if f.get("isMain") or f.get("name") == "main"), None)
+        if main is None:
+            return None, "fqa package has no main file"
+        base = os.path.join(tempfile.gettempdir(), f"flua-qa-files-{os.getpid()}")
+        os.makedirs(base, exist_ok=True)
+        self._qa_file_dirs.add(base)
+        directory = tempfile.mkdtemp(prefix="import-", dir=base)
+        header = [f"--%%name:{fqa.get('name') or 'QuickApp'}"]
+        for entry in files:
+            if entry is main:
+                continue
+            try:
+                name = self._safe_file_name(str(entry.get("name") or ""))
+            except ValueError as exc:
+                return None, str(exc)
+            path = os.path.join(directory, name)
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(str(entry.get("content") or ""))
+            header.append(f"--%%file:{name},{name}")
+        header.append("-- --------------- EOH ---------------")
+        main_path = os.path.join(directory, "main.lua")
+        with open(main_path, "w", encoding="utf-8") as handle:
+            handle.write("\n".join(header) + "\n" + str(main.get("content") or ""))
+        return self.load_qa_file(main_path)
 
     # -- QA directory -----------------------------------------------------------
 
@@ -261,6 +494,7 @@ class LuaEngine:
     # -- lifecycle --------------------------------------------------------------
 
     async def start(self) -> None:
+        self._loop = asyncio.get_running_loop()
         if self._running:
             return
         self._running = True
@@ -281,6 +515,12 @@ class LuaEngine:
             self._cleanup_temp_qa(path)
         for task in list(self._http_tasks):
             task.cancel()
+        self.qa_websockets.close_all()
+        self.qa_mqtt.close_all()
+        for base in list(self._qa_file_dirs):
+            with contextlib.suppress(OSError):
+                shutil.rmtree(base, ignore_errors=True)
+        self._qa_file_dirs.clear()
 
     def is_running(self) -> bool:
         return self._running
@@ -297,6 +537,8 @@ class LuaEngine:
             or bool(self._inbound)
             or not self._outbound.empty()
             or bool(self._http_tasks)
+            or self.qa_websockets.active_count() > 0
+            or self.qa_mqtt.active_count() > 0
         )
 
     # -- pump --------------------------------------------------------------------
@@ -444,6 +686,135 @@ class LuaEngine:
             msg["id"], msg.get("qa"), ok, data=value if ok else None, err=None if ok else value
         )
         self.enqueue_outbound(out)
+
+    # -- net.WebSocketClient (RFC 6455 client in worker threads) ---------------
+
+    def _handle_ws_connect(self, msg: dict[str, Any]) -> None:
+        logger.debug("ws connect conn=%s url=%s", msg["conn"], msg["url"])
+        task = asyncio.create_task(self._run_ws_connect(msg), name="flua-ws")
+        self._http_tasks.add(task)
+        task.add_done_callback(self._http_tasks.discard)
+
+    async def _run_ws_connect(self, msg: dict[str, Any]) -> None:
+        conn = int(msg["conn"])
+        ok, err = await asyncio.to_thread(
+            self.qa_websockets.connect,
+            conn,
+            str(msg["url"]),
+            float(msg.get("timeout") or 10.0),
+        )
+        if not ok:
+            self._on_ws_event(conn, "error", err)
+            return
+        self._on_ws_event(conn, "connected", None)
+        self.qa_websockets.start_receiver(conn)
+
+    def _handle_ws_send(self, msg: dict[str, Any]) -> None:
+        logger.debug("ws send conn=%s", msg["conn"])
+        task = asyncio.create_task(
+            self._run_ws_send(msg, int(msg["conn"]), str(msg.get("data") or "")),
+            name="flua-ws",
+        )
+        self._http_tasks.add(task)
+        task.add_done_callback(self._http_tasks.discard)
+
+    async def _run_ws_send(self, msg: dict[str, Any], conn: int, data: str) -> None:
+        ok, err = await asyncio.to_thread(self.qa_websockets.send, conn, data)
+        if not ok:
+            self._on_ws_event(conn, "error", err)
+
+    def _on_ws_event(self, conn: int, event: str, data: Any) -> None:
+        """Event sink for WsClient receiver threads (any thread)."""
+        qa = self.qa_websockets.qa_of(conn)
+        if qa is None:
+            return
+        out = messages.ws_event(qa, conn, event, data)
+        loop = self._loop
+        try:
+            running = asyncio.get_running_loop()
+        except RuntimeError:
+            running = None
+        if loop is not None and running is not loop:
+            loop.call_soon_threadsafe(self.enqueue_outbound, out)  # worker thread
+        else:
+            self.enqueue_outbound(out)
+
+    # -- mqtt.* client (MQTT 3.1.1 in worker threads) ---------------------------
+
+    def _spawn_mqtt_op(self, msg: dict[str, Any], func: Any, *args: Any) -> None:
+        task = asyncio.create_task(
+            self._run_mqtt_op(msg, func, *args), name="flua-mqtt"
+        )
+        self._http_tasks.add(task)
+        task.add_done_callback(self._http_tasks.discard)
+
+    async def _run_mqtt_op(self, msg: dict[str, Any], func: Any, *args: Any) -> None:
+        try:
+            ok, err = await asyncio.to_thread(func, *args)
+        except Exception as exc:
+            ok, err = False, str(exc)
+        conn = int(msg["conn"])
+        if ok:
+            self._on_mqtt_event(conn, "opDone", {"kind": msg["type"], "packetId": msg.get("packetId"), "code": 0})
+        else:
+            self._on_mqtt_event(conn, "opDone", {"kind": msg["type"], "packetId": msg.get("packetId"), "code": -1, "message": err})
+
+    def _handle_mqtt_connect(self, msg: dict[str, Any]) -> None:
+        conn = int(msg["conn"])
+        options = dict(msg.get("options") or {})
+
+        async def run() -> None:
+            ok, err = await asyncio.to_thread(
+                self.qa_mqtt.connect, conn, str(msg["uri"]), options, float(options.get("timeout") or 10.0)
+            )
+            if not ok:
+                self._on_mqtt_event(conn, "connectDone", {"code": -1, "message": err})
+                return
+            self._on_mqtt_event(conn, "connectDone", {"code": 0})
+            self.qa_mqtt.start_receiver(conn)
+
+        task = asyncio.create_task(run(), name="flua-mqtt")
+        self._http_tasks.add(task)
+        task.add_done_callback(self._http_tasks.discard)
+
+    def _handle_mqtt_subscribe(self, msg: dict[str, Any]) -> None:
+        topics = [[str(t), int(q)] for t, q in (msg.get("topics") or [])]
+        self._spawn_mqtt_op(msg, self.qa_mqtt.subscribe, int(msg["conn"]), int(msg["packetId"]), topics)
+
+    def _handle_mqtt_unsubscribe(self, msg: dict[str, Any]) -> None:
+        topics = [str(t) for t in (msg.get("topics") or [])]
+        self._spawn_mqtt_op(msg, self.qa_mqtt.unsubscribe, int(msg["conn"]), int(msg["packetId"]), topics)
+
+    def _handle_mqtt_publish(self, msg: dict[str, Any]) -> None:
+        self._spawn_mqtt_op(
+            msg,
+            self.qa_mqtt.publish,
+            int(msg["conn"]),
+            int(msg["packetId"]),
+            str(msg["topic"]),
+            str(msg.get("payload") or ""),
+            int(msg.get("qos") or 0),
+            bool(msg.get("retain", False)),
+        )
+
+    def _handle_mqtt_disconnect(self, msg: dict[str, Any]) -> None:
+        self._spawn_mqtt_op(msg, self.qa_mqtt.disconnect, int(msg["conn"]))
+
+    def _on_mqtt_event(self, conn: int, event: str, data: Any) -> None:
+        """Event sink for MqttClient receiver threads (any thread)."""
+        qa = self.qa_mqtt.qa_of(conn)
+        if qa is None:
+            return
+        out = messages.mqtt_event(qa, conn, event, data)
+        loop = self._loop
+        try:
+            running = asyncio.get_running_loop()
+        except RuntimeError:
+            running = None
+        if loop is not None and running is not loop:
+            loop.call_soon_threadsafe(self.enqueue_outbound, out)  # worker thread
+        else:
+            self.enqueue_outbound(out)
 
     async def _run_http_request(self, msg: dict[str, Any]) -> None:
         result: dict[str, Any]

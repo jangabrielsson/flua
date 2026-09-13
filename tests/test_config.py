@@ -57,6 +57,19 @@ def test_headers_anywhere_in_file() -> None:
     assert parse_annotations(source) == {"maxhours": 24}
 
 
+def test_file_directives_collect_in_order() -> None:
+    # --%%file:path,name — later declarations do NOT override earlier ones
+    source = "--%%file:b.lua,b\n--%%file:a.lua,a\n"
+    assert parse_annotations(source) == {"file": ["b.lua,b", "a.lua,a"]}
+
+
+def test_var_directives_merge_with_string_values() -> None:
+    # --%%var:name=value — values stay literal strings, repeated directives
+    # merge, and several vars may share one line
+    source = "--%%var:x=1\n--%%var:y=hello\n--%%var:z=1,w=2\n"
+    assert parse_annotations(source) == {"var": {"x": "1", "y": "hello", "z": "1", "w": "2"}}
+
+
 def test_eoh_stops_parsing() -> None:
     source = (
         "--%%name:outer\n"

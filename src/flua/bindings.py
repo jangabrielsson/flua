@@ -127,6 +127,8 @@ def install_bindings(engine: "LuaEngine") -> None:
         data, status = engine.api.dispatch(method, url, lua_to_python(body))
         if data is None:
             return None, status
+        if not isinstance(data, (dict, list, tuple)):
+            return data, status  # scalars cross the bridge natively
         return lua.table_from(data, recursive=True), status
 
     # Enriched device for a QA (type skeleton + config, registered by the
@@ -165,6 +167,15 @@ def install_bindings(engine: "LuaEngine") -> None:
     py["qa_temp_file"] = qa_temp_file
     py["udp_open"] = udp_open
     py["udp_close"] = engine.qa_udp.close
+    # net.WebSocketClient: the constructor claims a connection slot
+    # synchronously (no I/O); connect/send ride the pump, events come back
+    # as wsEvent messages. isOpen/close are instant state operations.
+    py["ws_new"] = engine.qa_websockets.new_slot
+    py["ws_is_open"] = engine.qa_websockets.is_open
+    py["ws_close"] = engine.qa_websockets.close
+    # mqtt.* client: the constructor claims a connection slot synchronously
+    # (no I/O); ops ride the pump, events come back as mqttEvent messages.
+    py["mqtt_new"] = engine.qa_mqtt.new_slot
 
     # Blocking LuaSocket-compatible TCP calls for mobdebug. These may block
     # the asyncio loop (documented exception — a debugger pause freezes time).

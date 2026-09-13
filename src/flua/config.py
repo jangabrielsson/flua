@@ -74,7 +74,29 @@ def parse_annotations(source: str) -> dict[str, Any]:
         value = value.strip()
         if not value:
             continue
-        if "=" in value:
+        if name == "file":
+            # --%%file:path,name — declarations load in order, so collect
+            # repeated file directives into an ordered list (later lines do
+            # not override earlier ones for this parameter).
+            existing = config.get("file")
+            if not isinstance(existing, list):
+                existing = [existing] if existing is not None else []
+            existing.append(parse_scalar(value))
+            config["file"] = existing
+        elif name == "var":
+            # --%%var:name=value — QuickApp variable initializers. Values are
+            # literal strings (HC3 QA variables are strings); repeated
+            # directives merge, and several vars may share one line.
+            sub = config.get("var")
+            if not isinstance(sub, dict):
+                sub = {}
+            for part in value.split(","):
+                key, _, val = part.partition("=")
+                key = key.strip()
+                if key:
+                    sub[key] = val.strip()
+            config["var"] = sub
+        elif "=" in value:
             sub: dict[str, Any] = {}
             for part in value.split(","):
                 key, _, val = part.partition("=")

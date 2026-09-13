@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import logging
 import re
+import base64
+import json
 from typing import TYPE_CHECKING, Any, Callable
 
 from . import routes
@@ -61,8 +63,15 @@ class Api:
         if self._engine is not None:
             self._engine.enqueue_outbound(msg)
 
-    def register_qa(self, qa_id: int, name: str, device_type: str | None, properties: Any) -> None:
-        self.state.register_qa(qa_id, name, device_type, properties)
+    def register_qa(
+        self,
+        qa_id: int,
+        name: str,
+        device_type: str | None,
+        properties: Any,
+        variables: dict[str, Any] | None = None,
+    ) -> None:
+        self.state.register_qa(qa_id, name, device_type, properties, variables)
 
     def dispatch(
         self,
@@ -74,6 +83,10 @@ class Api:
         """Route one REST call; returns (data, status) with data=None on failures."""
         method = method.upper()
         segments, query = parse_url(url)
+        if segments[:1] == ["quickApp"]:
+            # /api/quickApp/* — QA source files + export, engine-backed
+            # (they mutate the running QAs, not the static sim state)
+            return self._quickapp(method, segments, body)
         path = "/" + "/".join(segments)
         for route_method, regex, params, handler in _COMPILED:
             if route_method != method:
@@ -98,3 +111,69 @@ class Api:
             return data, status
         logger.debug("no offline route for %s %s", method, url)
         return None, 404
+
+    # -- /api/quickApp/* (multi-file QAs: files + export, offline) --------------
+
+    def _quickapp(self, method: str, segments: list[str], body: Any) -> tuple[Any, int]:
+        if self._engine is None:
+            return None, 404  # unit tests without an engine
+        try:
+            if segments[1] == "import" and method == "POST":
+                fqa = self._parse_fqa_body(body)
+                if fqa is None:
+                    return None, 400
+                qa_id, err = self._engine.import_qa(fqa)
+                if err is not None:
+                    return None, 400
+                return qa_id, 201
+            if segments[1] == "export" and method == "POST":
+                # encrypted .fqax — Fibaro-specific, not supported offline
+                return None, 501
+            if segments[1] == "export" and method == "GET":
+                exported = self._engine.qa_export(int(segments[2]))
+                return (exported, 200) if exported is not None else (None, 404)
+            device_id = int(segments[1])
+            if len(segments) < 3 or segments[2] != "files":
+                return None, 404
+            if len(segments) == 3 and method == "GET":
+                files = self._engine.qa_file_list(device_id)
+                return (files, 200) if files is not None else (None, 404)
+            if len(segments) < 4:
+                return None, 404
+            name = segments[3]
+            if method == "GET":
+                entry = self._engine.qa_file_get(device_id, name)
+                return (entry, 200) if entry is not None else (None, 404)
+            if method == "PUT":
+                existing = self._engine.qa_file_get(device_id, name)
+                if existing is not None and existing["isMain"]:
+                    return None, 403  # offline: main lives on the user's disk
+                content = body.get("content") if isinstance(body, dict) else body
+                if not isinstance(content, str):
+                    return None, 400
+                entry = self._engine.qa_file_put(device_id, name, content)
+                return (entry, 200) if entry is not None else (None, 404)
+            if method == "DELETE":
+                return (None, 204) if self._engine.qa_file_delete(device_id, name) else (None, 404)
+            return None, 404
+        except (ValueError, IndexError):
+            return None, 404
+
+    @staticmethod
+    def _parse_fqa_body(body: Any) -> dict[str, Any] | None:
+        """Accept the documented base64 body ({"file": "<base64>"}) or a
+        direct .fqa table (flua convenience)."""
+        if not isinstance(body, dict):
+            return None
+        if "file" in body:
+            raw = str(body["file"]).strip()
+            try:
+                raw += "=" * (-len(raw) % 4)  # tolerate missing padding
+                fqa = json.loads(base64.b64decode(raw).decode("utf-8"))
+            except Exception:
+                return None
+        else:
+            fqa = body
+        if not isinstance(fqa, dict) or not isinstance(fqa.get("files"), list):
+            return None
+        return fqa

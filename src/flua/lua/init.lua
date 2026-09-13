@@ -319,6 +319,8 @@ end
 local qaInstances = {}  -- qaId -> QuickApp instance (registered by the bootstrap)
 -- net.HTTPClient response routing: net.lua registers one handler per QA.
 _FLUA.netHandlers = {}
+-- mqtt.* response routing: mqtt.lua registers one handler per QA.
+_FLUA.mqttHandlers = {}
 
 -- HC3-style log lines for fibaro.debug/trace/warning/error, colored like
 -- plua: gray date and tag, level in its color (DEBUG=green, TRACE=cyan,
@@ -378,7 +380,7 @@ local function installQaGlobals(env)
   }
 end
 
-local qaRuntimeLibs = { "quickapp.lua", "fibaro.lua", "net.lua" }
+local qaRuntimeLibs = { "quickapp.lua", "fibaro.lua", "net.lua", "mqtt.lua" }
 
 local function installQaLibs(env)
   installQaGlobals(env)
@@ -508,9 +510,29 @@ local function runQa(env, qaId, config, args, loader, sourceName)
   end, 0)
 end
 
+-- Multi-file QAs (--%%file:path,name): extra files load into the env in
+-- declaration order BEFORE the main file. Shared by startQaFile, startQA
+-- (dynamic loads) and restartQA.
+local function loadExtraFiles(files, env)
+  for _, f in ipairs(files or {}) do
+    local chunk, err = loadfile(f.path, "bt", env)
+    if not chunk then
+      return nil, err
+    end
+    local ok, err2 = pcall(chunk)
+    if not ok then
+      print("Error in file " .. tostring(f.name) .. ": " .. tostring(err2))
+      return nil, "failed to load " .. tostring(f.name)
+    end
+  end
+  return true
+end
+
 function _FLUA.startQaFile(qaId, path, config, args)
   local env = qaEnvFor(qaId)
   runQa(env, qaId, config, args, function()
+    local ok, err = loadExtraFiles(config and config.files, env)
+    if not ok then return nil, err end
     return loadfile(path, "bt", env)
   end, path)
 end
@@ -590,6 +612,17 @@ end
 handlers.startQA = function(msg)
   local env = qaEnvFor(msg.id)
   startQaInEnv(env, msg.id, msg.config or {}, msg.arg0, function()
+    local ok, err = loadExtraFiles(msg.files, env)
+    if not ok then return nil, err end
+    return loadfile(msg.path, "bt", env)
+  end, msg.path)
+end
+
+handlers.restartQA = function(msg)
+  local env = qaEnvFor(msg.id)
+  startQaInEnv(env, msg.id, msg.config or {}, msg.arg0, function()
+    local ok, err = loadExtraFiles(msg.files, env)
+    if not ok then return nil, err end
     return loadfile(msg.path, "bt", env)
   end, msg.path)
 end
@@ -610,6 +643,20 @@ end
 
 handlers.udpResult = function(msg)
   local h = _FLUA.netHandlers[msg.qa]
+  if h then
+    xpcall(function() h(msg) end, traceback)
+  end
+end
+
+handlers.wsEvent = function(msg)
+  local h = _FLUA.netHandlers[msg.qa]
+  if h then
+    xpcall(function() h(msg) end, traceback)
+  end
+end
+
+handlers.mqttEvent = function(msg)
+  local h = _FLUA.mqttHandlers[msg.qa]
   if h then
     xpcall(function() h(msg) end, traceback)
   end

@@ -1,8 +1,8 @@
 exit=0
 --- stdout ---
 flua 0.1.0, Lua 5.5, Python 3.14.3
-[37m[12.09.2026][18:55:01][32m[DEBUG  ][37m[udp-demo5000]: sent broadcast to 255.255.255.255:44444[0m
-[37m[12.09.2026][18:55:02][32m[DEBUG  ][37m[udp-demo5000]: no reply ( timeout ) — that's fine[0m
+[37m[13.09.2026][02:55:05][32m[DEBUG  ][37m[var-demo5000]: VARS hello world 42 [0m
+[37m[13.09.2026][02:55:05][32m[DEBUG  ][37m[var-demo5000]: UPDATED hi again[0m
 
 --- stderr ---
 

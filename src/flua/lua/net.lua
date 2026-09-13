@@ -193,6 +193,89 @@ local function handleTcpResult(msg)
   end
 end
 
+-- -------------------------------------------------------------- WebSocket
+-- net.WebSocketClient / net.WebSocketClientTls (ws/wss), HC3-style.
+-- The constructor claims a connection slot synchronously (no I/O);
+-- connect() performs TCP+TLS + the RFC 6455 handshake in a worker thread.
+-- Events arrive through the pump and fire addEventListener callbacks:
+--
+--   local ws = net.WebSocketClient({timeout = 10000})  -- ms, optional
+--   ws:addEventListener("connected", function() ... end)
+--   ws:addEventListener("disconnected", function() ... end)
+--   ws:addEventListener("error", function(err) ... end)
+--   ws:addEventListener("dataReceived", function(data) ... end)
+--   ws:connect("ws://echo.websocket.org")
+--   ws:send("hello")   ws:isOpen()   ws:close()
+--
+-- Text frames arrive as UTF-8; binary frames arrive latin-1-decoded (each
+-- byte preserved as one character, 0-255).
+local wsClients = {}  -- conn -> client instance
+
+local WsBase = {}
+WsBase.__index = WsBase
+
+function WsBase:addEventListener(eventName, callback)
+  local list = self._listeners[eventName]
+  if not list then
+    list = {}
+    self._listeners[eventName] = list
+  end
+  list[#list + 1] = callback
+end
+
+function WsBase:connect(url)
+  _PY.post{
+    type = "wsConnect",
+    qa = qaId,
+    conn = self._conn,
+    url = tostring(url),
+    timeout = self._timeout,
+  }
+end
+
+function WsBase:send(data)
+  _PY.post{ type = "wsSend", qa = qaId, conn = self._conn, data = tostring(data) }
+end
+
+function WsBase:isOpen()
+  return _PY.ws_is_open(self._conn)
+end
+
+function WsBase:close()
+  _PY.ws_close(self._conn)
+end
+
+local function newWsClient(options)
+  local timeout = options and options.timeout or 10000  -- ms (docs example)
+  local client = setmetatable({ _listeners = {} }, WsBase)
+  client._timeout = tonumber(timeout) / 1000
+  client._conn = _PY.ws_new(qaId)
+  wsClients[client._conn] = client
+  return client
+end
+
+local WebSocketClient = {}
+setmetatable(WebSocketClient, WebSocketClient)
+WebSocketClient.__index = WsBase
+WebSocketClient.__call = function(_, options)
+  return newWsClient(options)
+end
+
+local WebSocketClientTls = {}
+setmetatable(WebSocketClientTls, WebSocketClientTls)
+WebSocketClientTls.__index = WsBase
+WebSocketClientTls.__call = WebSocketClient.__call  -- TLS comes from the wss:// URL
+
+local function handleWsEvent(msg)
+  local client = wsClients[msg.conn]
+  if not client then return end
+  local list = client._listeners[msg.event]
+  if not list then return end
+  for _, fn in ipairs(list) do
+    xpcall(function() fn(msg.data) end, callbackErr)
+  end
+end
+
 -- ------------------------------------------------------------------ dispatch
 -- One handler per QA; the shared dispatch (init.lua) routes by the
 -- request's qa attribution.
@@ -203,7 +286,15 @@ _FLUA.netHandlers[qaId] = function(msg)
     handleTcpResult(msg)
   elseif msg.type == "udpResult" then
     handleTcpResult(msg)  -- same entry shape: {sock, kind, cb}
+  elseif msg.type == "wsEvent" then
+    handleWsEvent(msg)
   end
 end
 
-net = { HTTPClient = HTTPClient, TCPSocket = TCPSocket, UDPSocket = UDPSocket }
+net = {
+  HTTPClient = HTTPClient,
+  TCPSocket = TCPSocket,
+  UDPSocket = UDPSocket,
+  WebSocketClient = WebSocketClient,
+  WebSocketClientTls = WebSocketClientTls,
+}
