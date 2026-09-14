@@ -246,6 +246,40 @@ def test_global_variables(api: Api) -> None:
     assert [v["name"] for v in data] == ["new", "night", "plain"]
 
 
+def test_global_variable_create(api: Api) -> None:
+    # POST /globalVariables — the real HC3's create call (the body carries
+    # the name; a nameless body is a bad request)
+    var, status = api.dispatch("POST", "/globalVariables", {"name": "FLUA", "value": "1"})
+    assert status == 200
+    assert var["name"] == "FLUA" and var["value"] == "1"
+    got, status = api.dispatch("GET", "/globalVariables/FLUA")
+    assert status == 200 and got["value"] == "1"
+    assert api.dispatch("POST", "/globalVariables", {"value": "1"})[1] == 400
+    data, _ = api.dispatch("GET", "/globalVariables")
+    assert [v["name"] for v in data] == ["FLUA", "night", "plain"]
+
+
+@pytest.mark.asyncio
+async def test_print_of_api_error_shows_status(tmp_path, capsys) -> None:
+    # print(api.post(...)) on an unknown endpoint returns (nil, status); a nil
+    # first arg must not blank the QA log message (logStr used to drop it)
+    script = tmp_path / "p.lua"
+    script.write_text(
+        "print(api.post('/notAnEndpoint', {name='FLUA', value='1'}))\n"
+        "print(api.post('/globalVariables', {name='FLUA', value='1'}))\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await asyncio.sleep(0.4)
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "nil 404" in out  # the error status is visible, not blanked
+    assert " 200" in out  # the create call's status prints beside the table
+
+
 def test_rooms(api: Api) -> None:
     data, status = api.dispatch("GET", "/rooms")
     assert status == 200 and data[0]["name"] == "Living Room"

@@ -58,6 +58,7 @@ from .scenes import (
 from .system import (
     global_get,
     global_put,
+    globals_create,
     globals_list,
     profile_activate,
     profiles_list,
@@ -107,6 +108,7 @@ ROUTES: list[tuple[str, str, Handler]] = [
     ("DELETE", "/alarms/v1/partitions/{id}/actions/disarm", partition_disarm),
     # -- system ------------------------------------------------------------------
     ("GET", "/globalVariables", globals_list),
+    ("POST", "/globalVariables", globals_create),
     ("GET", "/globalVariables/{name}", global_get),
     ("PUT", "/globalVariables/{name}", global_put),
     ("GET", "/refreshStates", refresh_states),

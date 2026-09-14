@@ -93,9 +93,9 @@ end
 
 local logStr = function(...) 
   local b = {} 
-  for _,e in ipairs({...}) do 
-    b[#b+1]=tostring(e)
-  end 
+  for i = 1, select("#", ...) do
+    b[i] = tostring(select(i, ...))
+  end
   return table.concat(b," ")
 end
 

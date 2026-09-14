@@ -33,6 +33,21 @@ def global_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     return public(var), 200
 
 
+def globals_create(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # POST /globalVariables — the real HC3's create-a-global-variable call
+    if not isinstance(req.body, dict) or not req.body.get("name"):
+        return None, 400
+    name = str(req.body["name"])
+    value = req.body.get("value")
+    var = {
+        "name": name,
+        "value": "" if value is None else str(value),
+        "modified": int(req.body.get("modified", 0) or 0),
+    }
+    state.global_variables[name] = var
+    return public(var), 200
+
+
 def rooms_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     rooms = sorted(state.rooms.values(), key=lambda r: r["id"])
     return public(rooms), 200
