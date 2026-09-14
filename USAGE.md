@@ -341,6 +341,22 @@ refreshStates and mirrors its events into the same feed. Both arrive at
 subscribers through the message pump (plua's `_PY.newRefreshStatesEvent`
 bridge hack replaced by a `refreshStateEvent` message).
 
+The poller never keeps flua alive by itself: online runs still exit when no
+timers, messages, or connections are pending. A QA that must keep running
+past idle — waiting for HC3 events like it would on the controller — opts in
+with a directive:
+
+```lua
+--%%keep-alive:true
+```
+
+While a loaded keep-alive QA is running, flua holds the HC3's long poll and
+stays up until the QA exits (or Ctrl-C; a fixed `--run-for -5` also works);
+without the directive the poller still mirrors events for the running QAs,
+but never holds the process open — a drained run exits promptly. Ctrl-C
+always terminates flua immediately, even mid-long-poll, and exits with
+status 130.
+
 `--seed` loads a simulated house (see `examples/house.json`):
 
 ```bash

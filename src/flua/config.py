@@ -159,6 +159,7 @@ KNOWN_DIRECTIVES = frozenset(
         "model",
         "build",
         "manufacturer",
+        "keep-alive",
     }
 )
 

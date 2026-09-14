@@ -1,8 +1,8 @@
-exit=0
+exit=1
 --- stdout ---
 flua 0.1.1, Lua 5.5, Python 3.14.3
-[37m[14.09.2026][11:33:58][32m[DEBUG  ][37m[api-demo5000]: QuickApp API demo initialized[0m
-[37m[14.09.2026][11:33:58][32m[DEBUG  ][37m[api-demo5000]: Value: false[0m
+[37m[14.09.2026][12:37:19][32m[DEBUG  ][37m[FLUA]: ok[0m
 
 --- stderr ---
+ERROR flua.engine: HC3 authentication failed (HTTP 401 for http://127.0.0.1:61054/api/refreshStates): check HC3_USER/HC3_PASSWORD in the environment — flua exits immediately, the HC3 locks itself after 4 wrong attempts.
 

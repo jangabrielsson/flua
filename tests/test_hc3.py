@@ -8,6 +8,7 @@ import asyncio
 import base64
 import json
 import os
+import signal
 import subprocess
 import sys
 import threading
@@ -33,13 +34,17 @@ class _MockHc3(BaseHTTPRequestHandler):
     refresh_events_sent = False  # serve the event feed exactly once per run
     refresh_polls = 0
     auth_all = False  # when set, every endpoint requires valid basic auth
+    hold_refresh = 0.0  # hold the refreshStates response this many seconds (SIGINT tests)
 
     def _send_json(self, data, status: int = 200) -> None:
         payload = json.dumps(data).encode()
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(payload)
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(payload)
+        except OSError:
+            pass  # the client gave up (e.g. killed by SIGINT mid-poll)
 
     def _authed(self) -> bool:
         return self.headers.get("Authorization") == GOOD_CREDS
@@ -59,6 +64,8 @@ class _MockHc3(BaseHTTPRequestHandler):
             if type(self).auth_all and not self._authed():
                 self._send_json({"error": "unauthorized"}, 401)
                 return
+            if type(self).hold_refresh:
+                time.sleep(type(self).hold_refresh)
             type(self).refresh_polls += 1
             now = int(time.time())
             # the event arrives on the SECOND poll — after QAs have had time
@@ -102,6 +109,7 @@ def mock_hc3() -> str:
     _MockHc3.refresh_events_sent = False
     _MockHc3.refresh_polls = 0
     _MockHc3.auth_all = False
+    _MockHc3.hold_refresh = 0.0
     server = ThreadingHTTPServer(("127.0.0.1", 0), _MockHc3)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{server.server_port}"
@@ -155,7 +163,9 @@ async def test_hybrid_routing_local_sim_and_remote_hc3(tmp_path, capsys, mock_hc
 
 
 @pytest.mark.asyncio
-async def test_auth_failure_aborts_immediately(tmp_path, capsys, mock_hc3, monkeypatch) -> None:
+async def test_auth_failure_aborts_immediately(
+    tmp_path, capsys, caplog, mock_hc3, monkeypatch
+) -> None:
     # wrong password -> 401 -> loud warning + exit(1), exactly ONE attempt
     monkeypatch.setenv("HOME", str(tmp_path / "home"))  # isolate from the user's ~/.env
     monkeypatch.setenv("HC3_URL", mock_hc3)
@@ -175,9 +185,11 @@ async def test_auth_failure_aborts_immediately(tmp_path, capsys, mock_hc3, monke
         await asyncio.sleep(0.5)
     finally:
         await engine.stop()
-    out = capsys.readouterr().out
-    assert "HC3 authentication failed (HTTP 401" in out
-    assert "locks itself after 4 wrong attempts" in out
+    captured = capsys.readouterr()
+    assert "HC3 authentication failed" not in captured.out  # one channel only
+    records = [r for r in caplog.records if "HC3 authentication failed" in r.getMessage()]
+    assert len(records) == 1  # logged once (stderr in a real CLI run)
+    assert "locks itself after 4 wrong attempts" in records[0].getMessage()
     assert engine.exit_code == 1
     device_requests = [r for r in _MockHc3.requests_seen if r.startswith("/api/devices/45")]
     assert len(device_requests) == 1  # never retried
@@ -331,7 +343,64 @@ async def test_online_poller_mirrors_events_into_buffer(tmp_path, capsys, mock_h
 
 
 @pytest.mark.asyncio
-async def test_poller_auth_failure_stops_after_one_attempt(tmp_path, capsys, mock_hc3, monkeypatch) -> None:
+async def test_keep_alive_directive_keeps_engine_pending(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # --%%keep-alive:true keeps the online engine pending past idle (like a QA
+    # on the real HC3, which runs forever); without it the run drains and the
+    # engine is done — the poller alone must never hold the process open.
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    script = tmp_path / "idle.lua"
+
+    script.write_text("setTimeout(function() print('DONE') end, 50)\n")
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await asyncio.sleep(0.6)
+        out = capsys.readouterr().out
+        assert "DONE" in out
+        assert not engine.has_pending_work()  # idle run drains despite the poller
+    finally:
+        await engine.stop()
+
+    script.write_text(
+        "--%%keep-alive:true\n"
+        "setTimeout(function() print('KEEP') end, 50)\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        engine.load_qa_file(str(script))  # parses the --%% header like the CLI
+        await asyncio.sleep(0.6)
+        out = capsys.readouterr().out
+        assert "KEEP" in out
+        assert engine.has_pending_work()  # the keep-alive QA holds the engine open
+    finally:
+        await engine.stop()
+
+    # a keep-alive QA that exits releases the hold (exit() records a falsy 0)
+    script.write_text(
+        "--%%keep-alive:true\n"
+        "setTimeout(function() exit() end, 50)\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        engine.load_qa_file(str(script))
+        await asyncio.sleep(0.6)
+        assert not engine.has_pending_work()  # the exited QA no longer holds it
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_poller_auth_failure_stops_after_one_attempt(
+    tmp_path, capsys, caplog, mock_hc3, monkeypatch
+) -> None:
     # the poller is usually the FIRST thing to hit the HC3 — wrong credentials
     # must cost exactly ONE attempt against the 4-attempt lockout budget
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
@@ -351,9 +420,11 @@ async def test_poller_auth_failure_stops_after_one_attempt(tmp_path, capsys, moc
     polls = [r for r in _MockHc3.requests_seen if r.startswith("/api/refreshStates")]
     assert len(polls) == 1  # the poller never retries an auth failure
     assert engine.exit_code == 1
-    out = capsys.readouterr().out
-    assert "HC3 authentication failed" in out
-    assert "locks itself after 4 wrong attempts" in out
+    captured = capsys.readouterr()
+    assert "HC3 authentication failed" not in captured.out  # one channel only
+    records = [r for r in caplog.records if "HC3 authentication failed" in r.getMessage()]
+    assert len(records) == 1  # logged once (stderr in a real CLI run)
+    assert "locks itself after 4 wrong attempts" in records[0].getMessage()
 
 
 def _hc3_env(mock_url: str, home: str) -> dict[str, str]:
@@ -388,6 +459,37 @@ def test_cli_defaults_to_online_with_hc3_env(tmp_path, mock_hc3) -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "MODE 200 hc3-device" in result.stdout
+
+
+def test_ctrl_c_terminates_promptly_mid_long_poll(tmp_path, mock_hc3) -> None:
+    # Ctrl-C must not wait out a held refreshStates long poll: the request
+    # runs on a daemon thread, so the process exits right away (code 130).
+    # (Before the daemon thread, asyncio.run joined the abandoned executor
+    # worker — exit waited out the mock's full 20s hold.)
+    script = tmp_path / "keep.lua"
+    script.write_text("--%%keep-alive:true\nprint('KA')\n")
+    home = tmp_path / "home"
+    home.mkdir()
+    _MockHc3.hold_refresh = 20.0
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "flua", str(script)],
+        env=_hc3_env(mock_hc3, str(home)),
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    try:
+        time.sleep(1.0)  # the keep-alive long poll is in flight, held 20s
+        started = time.monotonic()
+        proc.send_signal(signal.SIGINT)
+        _out, err = proc.communicate(timeout=10)
+    finally:
+        _MockHc3.hold_refresh = 0.0
+        if proc.poll() is None:
+            proc.kill()
+    assert time.monotonic() - started < 5.0  # prompt exit, not the 20s hold
+    assert proc.returncode == 130
+    assert "flua: interrupted" in err.decode()
 
 
 def test_cli_main_file_offline_directive_forces_sim(tmp_path, mock_hc3) -> None:

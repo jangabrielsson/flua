@@ -25,6 +25,7 @@ import os
 import shutil
 import sys
 import tempfile
+import threading
 import time
 from collections import deque
 from collections.abc import Callable
@@ -77,6 +78,13 @@ _EXPORT_PROPERTIES = frozenset(
 # Seconds the pump waits on the outbound queue before re-checking the inbound
 # queue and the running flag. Upper bound on timer delivery latency.
 _PUMP_POLL = 0.01
+
+# Seconds the client waits on the HC3's refreshStates long poll: the HC3
+# answers immediately with events and holds the request ~30s when idle.
+# The request runs on a dedicated daemon thread (see _poll_once), never the
+# default executor, so an abandoned poll can't delay Ctrl-C or exit —
+# asyncio.run would otherwise wait for the executor worker at shutdown.
+_HC3_POLL_TIMEOUT = 40.0
 
 
 class LuaEngine:
@@ -184,6 +192,20 @@ class LuaEngine:
             return False
         info = self._qas.get(int(qa_id))
         return bool(info and info.get("config", {}).get("offline"))
+
+    def _keep_alive_active(self) -> bool:
+        """Any loaded QA with --%%keep-alive:true that hasn't exited keeps the
+        online engine (and the HC3 poller's long poll) alive past idle — like
+        a QA on the real HC3, which runs forever. Offline there is no poller
+        to feed, so the directive has no effect there."""
+        if self.hc3 is None:
+            return False
+        return any(
+            info.get("loaded")
+            and info.get("exited") is None
+            and bool(info.get("config", {}).get("keep-alive"))
+            for info in self._qas.values()
+        )
 
     @staticmethod
     def _find_lua_config() -> Path | None:
@@ -438,10 +460,41 @@ class LuaEngine:
             "check HC3_USER/HC3_PASSWORD in the environment — flua exits "
             "immediately, the HC3 locks itself after 4 wrong attempts."
         )
-        print(message, flush=True)
         logger.error(message)
         self._exit_code = 1
         self._running = False
+
+    def _poll_once(
+        self, query: dict[str, str], timeout: float
+    ) -> "asyncio.Future[tuple[Any, int]]":
+        """One blocking refreshStates request on a dedicated daemon thread.
+
+        The default executor would be joined by asyncio.run at shutdown, so an
+        abandoned long poll (Ctrl-C, engine stop) would delay exit by up to its
+        full timeout. Daemon threads are never joined: the process always
+        leaves at once, and a cancelled poll simply drops its result.
+        """
+        loop = asyncio.get_running_loop()
+        fut: asyncio.Future[tuple[Any, int]] = loop.create_future()
+
+        def worker() -> None:
+            # Hc3Remote.request never raises (transport errors -> (None, 0));
+            # its 401/403 auth guard fires inside request, from this thread.
+            result = self.hc3.request("GET", "/refreshStates", query, None, timeout)
+            try:
+                loop.call_soon_threadsafe(self._deliver_poll_result, fut, result)
+            except RuntimeError:
+                pass  # loop already closed — the process is exiting
+
+        threading.Thread(target=worker, name="flua-hc3-poll", daemon=True).start()
+        return fut
+
+    @staticmethod
+    def _deliver_poll_result(
+        fut: "asyncio.Future[tuple[Any, int]]", result: tuple[Any, int]
+    ) -> None:
+        if not fut.done():  # cancelled/abandoned polls drop their result
+            fut.set_result(result)
 
     async def _hc3_poll(self) -> None:
         """Long-poll the real HC3's refreshStates (online mode) and mirror
@@ -451,14 +504,7 @@ class LuaEngine:
         while self._running:
             try:
                 query = {} if self._hc3_last is None else {"last": self._hc3_last}
-                data, status = await asyncio.to_thread(
-                    self.hc3.request,
-                    "GET",
-                    "/refreshStates",
-                    query,
-                    None,
-                    40.0,  # the HC3's long-poll blocks ~30s when idle
-                )
+                data, status = await self._poll_once(query, _HC3_POLL_TIMEOUT)
                 if status in (401, 403):
                     # the auth guard has aborted the engine — stop polling
                     # immediately: every retry is another attempt against the
@@ -839,9 +885,11 @@ class LuaEngine:
         return self._exit_code
 
     def has_pending_work(self) -> bool:
-        """True while timers, message queues, or in-flight worker tasks exist."""
+        """True while timers, message queues, in-flight worker tasks, or a
+        --%%keep-alive QA (online) exist."""
         return (
             self._timers.active_count() > 0
+            or self._keep_alive_active()
             or bool(self._inbound)
             or not self._outbound.empty()
             or bool(self._http_tasks)

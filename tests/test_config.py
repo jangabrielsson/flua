@@ -14,6 +14,12 @@ def test_scalar_values() -> None:
     assert parse_scalar("bare") == "bare"
 
 
+def test_keep_alive_directive() -> None:
+    cfg = parse_annotations("--%%keep-alive:true\n")
+    assert cfg["keep-alive"] is True
+    assert parse_annotations("--%%keep-alive:false\n")["keep-alive"] is False
+
+
 def test_annotations() -> None:
     source = (
         "--%%speed:10\n"
