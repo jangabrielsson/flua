@@ -79,7 +79,7 @@ def test_maxhours_annotation_stops_endless_interval(tmp_path) -> None:
 def test_config_exposed_to_lua(tmp_path) -> None:
     script = tmp_path / "cfg.lua"
     script.write_text(
-        "--%%speed:7\n"        # global param: copied up to the global config
+        "--%%speed:7\n"  # global param: copied up to the global config
         "--%%myparam:hello\n"  # local param: visible on the QA's config
         "print('CFG', _FLUA.config.speed, _FLUA.config.myparam)\n"
         "exit(0)\n"

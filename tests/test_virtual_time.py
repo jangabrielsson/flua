@@ -2,13 +2,28 @@
 
 import math
 import re
+import subprocess
+import sys
 import time
+from pathlib import Path
 
 import pytest
 
 pytest.importorskip("lupa")
 
 from flua.engine import LuaEngine  # noqa: E402
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _run_cli(*args: str, timeout: int = 30) -> "subprocess.CompletedProcess[str]":
+    return subprocess.run(
+        [sys.executable, "-m", "flua", *args],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
 
 
 async def wait_until(predicate, timeout: float = 3.0) -> None:
@@ -83,3 +98,68 @@ async def test_accelerated_mode_fires_early_but_keeps_virtual_time(capsys) -> No
         assert 300 < virtual_dt < 700  # virtual time still ran the full 0.5 s
     finally:
         await engine.stop()
+
+
+def test_run_for_negative_instant_stops_at_virtual_limit() -> None:
+    # --instant --run-for -5: five simulated seconds — the 1000 ms interval
+    # fires exactly five times and the process exits in milliseconds of wall
+    # time (this used to be 5 wall seconds of unbounded firing)
+    start = time.monotonic()
+    result = _run_cli(
+        "--color",
+        "never",
+        "--instant",
+        "--run-for",
+        "-5",
+        "-e",
+        "setInterval(function() print(42) end,1000)",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert time.monotonic() - start < 3.0  # instant, not 5 wall seconds
+    assert result.stdout.count("42") == 5  # exactly five virtual seconds
+
+
+def test_run_for_negative_speed_uses_virtual_seconds() -> None:
+    # --speed 10 --run-for -1: one virtual second at 10x ≈ 100 ms wall —
+    # the 500 ms timer fires inside the limit and the run ends well before
+    # one wall second (the old wall-based fixed run took a full wall second)
+    start = time.monotonic()
+    result = _run_cli(
+        "--color",
+        "never",
+        "--speed",
+        "10",
+        "--run-for",
+        "-1",
+        "-e",
+        "setTimeout(function() print('FIRED') end, 500)",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert time.monotonic() - start < 0.8  # ~100 ms, not a full wall second
+    assert "FIRED" in result.stdout
+
+
+def test_run_for_negative_instant_with_no_timers_still_exits() -> None:
+    # virtual time cannot advance with nothing left to fire — the wall bound
+    # ends the run instead of hanging forever
+    start = time.monotonic()
+    result = _run_cli(
+        "--color",
+        "never",
+        "--instant",
+        "--run-for",
+        "-2",
+        "-e",
+        "print('HI')",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert time.monotonic() - start < 10.0  # bounded by the 2 s wall fallback
+
+
+def test_run_for_negative_realtime_still_wall_seconds() -> None:
+    # realtime is unchanged: virtual time tracks the wall clock, so a fixed
+    # run of -1 lasts about one wall second
+    start = time.monotonic()
+    result = _run_cli("--color", "never", "--run-for", "-1", "-e", "print('HI')")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert 0.8 <= time.monotonic() - start < 3.0

@@ -77,11 +77,13 @@ makes flua exit; QAs with timers or open connections keep running.
 .venv/bin/flua script.lua              # one QA
 .venv/bin/flua qa1.lua qa2.lua         # several QAs, isolated, can talk to each other
 .venv/bin/flua -e 'setTimeout(function() print("hi") end, 100)'
-.venv/bin/flua --run-for 5 script.lua  # at least 5 s, then exit when idle
-.venv/bin/flua --run-for -3 script.lua # exactly 3 s
+.venv/bin/flua --run-for 5 script.lua  # at least 5 virtual s, then exit when idle
+.venv/bin/flua --run-for -3 script.lua # exactly 3 virtual s
 ```
 
-Virtual time — great for testing long-running logic:
+Virtual time — great for testing long-running logic (`--run-for` counts
+virtual seconds: `--instant --run-for -5` runs five simulated seconds, and
+an interval firing once per simulated second fires exactly five times):
 
 ```bash
 .venv/bin/flua --speed 60 script.lua    # 60x faster

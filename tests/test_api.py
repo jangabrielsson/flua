@@ -178,15 +178,18 @@ def test_create_child_device(api: Api) -> None:
     children, _ = api.dispatch("GET", "/devices?parentId=5000")
     assert [d["id"] for d in children] == [child["id"]]
     # unknown parent
-    assert api.dispatch(
-        "POST", "/plugins/createChildDevice", {"name": "x", "parentId": 9999}
-    ) == (None, 404)
+    assert api.dispatch("POST", "/plugins/createChildDevice", {"name": "x", "parentId": 9999}) == (
+        None,
+        404,
+    )
 
 
 def test_update_property(api: Api) -> None:
     api.register_qa(5000, "qa", None, {})
     assert api.dispatch(
-        "POST", "/plugins/updateProperty", {"deviceId": 5000, "propertyName": "value", "value": True}
+        "POST",
+        "/plugins/updateProperty",
+        {"deviceId": 5000, "propertyName": "value", "value": True},
     ) == (None, 204)
     data, _ = api.dispatch("GET", "/devices/5000")
     assert data["properties"]["value"] is True
@@ -233,7 +236,9 @@ def test_global_variables(api: Api) -> None:
     data, status = api.dispatch("GET", "/globalVariables/night")
     assert status == 200 and data["value"] == "false"
     assert api.dispatch("GET", "/globalVariables/missing") == (None, 404)
-    var, status = api.dispatch("PUT", "/globalVariables/night", {"value": True, "invokeScenes": True})
+    var, status = api.dispatch(
+        "PUT", "/globalVariables/night", {"value": True, "invokeScenes": True}
+    )
     assert status == 200 and var["value"] == "True"
     var, status = api.dispatch("PUT", "/globalVariables/new", {"value": 42})
     assert status == 200 and var["value"] == "42"
@@ -335,7 +340,12 @@ def test_cli_api_remote_rejected(tmp_path) -> None:
 def test_device_action_emits(api: Api) -> None:
     api.register_qa(5000, "qa", None, {})
     assert api.dispatch("POST", "/devices/5000/action/turnOn", {"args": [1, 2]}) == (None, 202)
-    assert api.emitted[0] == {"type": "deviceAction", "id": 5000, "action": "turnOn", "args": [1, 2]}
+    assert api.emitted[0] == {
+        "type": "deviceAction",
+        "id": 5000,
+        "action": "turnOn",
+        "args": [1, 2],
+    }
     assert api.emitted[1]["type"] == "refreshStateEvent"
     assert api.emitted[1]["event"]["type"] == "DeviceActionRanEvent"
 
@@ -415,7 +425,9 @@ def test_alarms_breached_from_seed() -> None:
 def test_refresh_states(api: Api) -> None:
     api.register_qa(5000, "qa", None, {})
     assert api.dispatch(
-        "POST", "/plugins/updateProperty", {"deviceId": 5000, "propertyName": "value", "value": True}
+        "POST",
+        "/plugins/updateProperty",
+        {"deviceId": 5000, "propertyName": "value", "value": True},
     ) == (None, 204)
     data, status = api.dispatch("GET", "/refreshStates")
     assert status == 200
@@ -433,7 +445,11 @@ def test_refresh_states(api: Api) -> None:
     assert events[0]["data"] == {"id": 5000, "name": "value", "newValue": True, "oldValue": False}
     assert isinstance(events[0]["created"], int) and isinstance(events[0]["createdMillis"], int)
     # the same value again: no state change, no event (the user's rule)
-    api.dispatch("POST", "/plugins/updateProperty", {"deviceId": 5000, "propertyName": "value", "value": True})
+    api.dispatch(
+        "POST",
+        "/plugins/updateProperty",
+        {"deviceId": 5000, "propertyName": "value", "value": True},
+    )
     data, _ = api.dispatch("GET", "/refreshStates?last=1")
     assert "events" not in data
     data, _ = api.dispatch("GET", "/refreshStates?last=1")

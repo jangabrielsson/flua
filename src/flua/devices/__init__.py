@@ -77,7 +77,14 @@ def skeleton_for(device_type: str | None) -> dict[str, Any] | None:
     # the catalog captured empty Lua tables as {} where the HC3 declares
     # arrays — normalize the known array fields so the sim serves the same
     # shapes as the real HC3 (and exports parse)
-    for key in ("categories", "initialInterfaces", "quickAppVariables", "uiCallbacks", "uiView", "supportedDeviceRoles"):
+    for key in (
+        "categories",
+        "initialInterfaces",
+        "quickAppVariables",
+        "uiCallbacks",
+        "uiView",
+        "supportedDeviceRoles",
+    ):
         value = properties.get(key)
         if isinstance(value, dict):
             value = list(value.values()) if value else []
@@ -86,7 +93,7 @@ def skeleton_for(device_type: str | None) -> dict[str, Any] | None:
         properties[key] = value
     layout = properties.get("viewLayout")
     if isinstance(layout, dict):
-        sections = (((layout.get("$jason") or {}).get("body") or {}).get("sections"))
+        sections = ((layout.get("$jason") or {}).get("body") or {}).get("sections")
         if isinstance(sections, dict):
             items = sections.get("items")
             if isinstance(items, dict):

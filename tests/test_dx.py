@@ -111,7 +111,9 @@ def test_export_and_unpack_roundtrip(tmp_path) -> None:
 
 def _collect(proc: subprocess.Popen) -> list[str]:
     lines: list[str] = []
-    threading.Thread(target=lambda: [lines.append(line) for line in proc.stdout], daemon=True).start()
+    threading.Thread(
+        target=lambda: [lines.append(line) for line in proc.stdout], daemon=True
+    ).start()
     return lines
 
 
@@ -226,8 +228,7 @@ def test_getenv_reads_local_dotenv(tmp_path) -> None:
     (tmp_path / ".env").write_text("# dev secrets\nAPI_TOKEN=secret123\n")
     script = tmp_path / "env.lua"
     script.write_text(
-        "print('TOKEN', os.getenv('API_TOKEN'))\n"
-        "print('MISSING', os.getenv('NOPE'))\n"
+        "print('TOKEN', os.getenv('API_TOKEN'))\nprint('MISSING', os.getenv('NOPE'))\n"
     )
     result = subprocess.run(
         [*FLOA, str(script)],

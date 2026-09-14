@@ -10,11 +10,12 @@ exceptions are logged and reported as status 500.
 
 from __future__ import annotations
 
-import logging
-import re
 import base64
 import json
-from typing import TYPE_CHECKING, Any, Callable
+import logging
+import re
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from . import routes
 from .request import ApiRequest, parse_url
@@ -52,7 +53,7 @@ _COMPILED = _compile_routes()
 class Api:
     """Dispatch facade owned by the engine. Offline: everything is local."""
 
-    def __init__(self, engine: "LuaEngine | None" = None, seed: dict[str, Any] | None = None) -> None:
+    def __init__(self, engine: LuaEngine | None = None, seed: dict[str, Any] | None = None) -> None:
         self._engine = engine  # M2+: event enqueue (device actions); None in unit tests
         self._remote = engine.hc3 if engine is not None else None  # M3: the real HC3
         self.state = SimState(seed)
@@ -110,7 +111,11 @@ class Api:
                 logger.exception("api handler failed for %s %s", method, url)
                 return None, 500
             offline = self._engine is not None and self._engine.qa_is_offline(req.qa_id)
-            flua_id = len(segments) >= 2 and segments[0] in ("devices", "plugins") and self.state.is_flua_id(segments[1])
+            flua_id = (
+                len(segments) >= 2
+                and segments[0] in ("devices", "plugins")
+                and self.state.is_flua_id(segments[1])
+            )
             if (
                 data is None
                 and status == 404
@@ -123,7 +128,11 @@ class Api:
             return data, status
         logger.debug("no offline route for %s %s", method, url)
         offline = self._engine is not None and self._engine.qa_is_offline(qa_id)
-        flua_id = len(segments) >= 2 and segments[0] in ("devices", "plugins") and self.state.is_flua_id(segments[1])
+        flua_id = (
+            len(segments) >= 2
+            and segments[0] in ("devices", "plugins")
+            and self.state.is_flua_id(segments[1])
+        )
         if self._remote is not None and not offline and not flua_id:
             # online mode: anything the sim doesn't own goes to the real HC3
             return self._remote.request(method, path, query, body)

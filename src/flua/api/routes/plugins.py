@@ -78,7 +78,9 @@ def variable_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     spec = _var_from_body(req, default_name=key)
     if spec is None:
         return None, 400
-    entry = state.record_property_event(dev["id"], key, spec["value"], variables[key].get("value"), _now(req))
+    entry = state.record_property_event(
+        dev["id"], key, spec["value"], variables[key].get("value"), _now(req)
+    )
     if entry is not None and req.emit is not None:
         req.emit(messages.refresh_state_event(entry))
     variables[key] = spec
@@ -93,7 +95,13 @@ def variable_post(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     if spec is None:
         return None, 400
     variables = _variables(state, dev)
-    entry = state.record_property_event(dev["id"], spec["name"], spec["value"], variables.get(spec["name"], {}).get("value"), _now(req))
+    entry = state.record_property_event(
+        dev["id"],
+        spec["name"],
+        spec["value"],
+        variables.get(spec["name"], {}).get("value"),
+        _now(req),
+    )
     if entry is not None and req.emit is not None:
         req.emit(messages.refresh_state_event(entry))
     variables[spec["name"]] = spec

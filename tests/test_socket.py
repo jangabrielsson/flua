@@ -345,30 +345,44 @@ def test_debugger_vscode_protocol_breakpoint_stop(tmp_path) -> None:
             return
         events.append("connected")
         try:
-            conn.sendall(_vsc_frame({
-                "command": "welcome",
-                "arguments": {
-                    "sourceBasePath": base,
-                    "stopOnEntry": False,
-                    "directorySeperator": "/",
-                    "pathMap": [],
-                },
-            }))
+            conn.sendall(
+                _vsc_frame(
+                    {
+                        "command": "welcome",
+                        "arguments": {
+                            "sourceBasePath": base,
+                            "stopOnEntry": False,
+                            "directorySeperator": "/",
+                            "pathMap": [],
+                        },
+                    }
+                )
+            )
             time.sleep(0.3)
-            conn.sendall(_vsc_frame({
-                "seq": 1,
-                "type": "request",
-                "command": "setBreakpoints",
-                "arguments": {
-                    "source": {"path": script_path},
-                    "breakpoints": [{"line": 2}],
-                },
-            }))
+            conn.sendall(
+                _vsc_frame(
+                    {
+                        "seq": 1,
+                        "type": "request",
+                        "command": "setBreakpoints",
+                        "arguments": {
+                            "source": {"path": script_path},
+                            "breakpoints": [{"line": 2}],
+                        },
+                    }
+                )
+            )
             resp = _vsc_response(conn, 1)
             events.append(f"setBreakpoints:{bool(resp and resp.get('success'))}")
-            conn.sendall(_vsc_frame({
-                "seq": 2, "type": "request", "command": "configurationDone",
-            }))
+            conn.sendall(
+                _vsc_frame(
+                    {
+                        "seq": 2,
+                        "type": "request",
+                        "command": "configurationDone",
+                    }
+                )
+            )
             resp = _vsc_response(conn, 2)
             events.append(f"configurationDone:{bool(resp and resp.get('success'))}")
             # like the real IDE: no continue yet — the next message must be
@@ -380,20 +394,30 @@ def test_debugger_vscode_protocol_breakpoint_stop(tmp_path) -> None:
                     break
                 if msg.get("type") == "event" and msg.get("event") == "stopped":
                     events.append(f"stopped:{msg['body'].get('reason')}")
-                    conn.sendall(_vsc_frame({
-                        "seq": 3,
-                        "type": "request",
-                        "command": "stackTrace",
-                        "arguments": {"threadId": 0, "startFrame": 0, "levels": 2},
-                    }))
+                    conn.sendall(
+                        _vsc_frame(
+                            {
+                                "seq": 3,
+                                "type": "request",
+                                "command": "stackTrace",
+                                "arguments": {"threadId": 0, "startFrame": 0, "levels": 2},
+                            }
+                        )
+                    )
                     resp = _vsc_response(conn, 3)
                     frames = ((resp or {}).get("body") or {}).get("stackFrames") or []
                     if frames:
                         top_frame["path"] = frames[0]["source"]["path"]
                         top_frame["line"] = frames[0]["line"]
-                    conn.sendall(_vsc_frame({
-                        "seq": 4, "type": "request", "command": "continue",
-                    }))
+                    conn.sendall(
+                        _vsc_frame(
+                            {
+                                "seq": 4,
+                                "type": "request",
+                                "command": "continue",
+                            }
+                        )
+                    )
                     break
         finally:
             conn.close()
@@ -464,29 +488,43 @@ def test_debugger_vscode_extension_injected_bootstrap(tmp_path) -> None:
             return
         events.append("connected")
         try:
-            conn.sendall(_vsc_frame({
-                "command": "welcome",
-                "arguments": {
-                    "sourceBasePath": base,
-                    "stopOnEntry": False,
-                    "directorySeperator": "/",
-                    "pathMap": [],
-                },
-            }))
+            conn.sendall(
+                _vsc_frame(
+                    {
+                        "command": "welcome",
+                        "arguments": {
+                            "sourceBasePath": base,
+                            "stopOnEntry": False,
+                            "directorySeperator": "/",
+                            "pathMap": [],
+                        },
+                    }
+                )
+            )
             time.sleep(0.3)
-            conn.sendall(_vsc_frame({
-                "seq": 1,
-                "type": "request",
-                "command": "setBreakpoints",
-                "arguments": {
-                    "source": {"path": script_path},
-                    "breakpoints": [{"line": 2}],
-                },
-            }))
+            conn.sendall(
+                _vsc_frame(
+                    {
+                        "seq": 1,
+                        "type": "request",
+                        "command": "setBreakpoints",
+                        "arguments": {
+                            "source": {"path": script_path},
+                            "breakpoints": [{"line": 2}],
+                        },
+                    }
+                )
+            )
             time.sleep(0.2)
-            conn.sendall(_vsc_frame({
-                "seq": 2, "type": "request", "command": "configurationDone",
-            }))
+            conn.sendall(
+                _vsc_frame(
+                    {
+                        "seq": 2,
+                        "type": "request",
+                        "command": "configurationDone",
+                    }
+                )
+            )
             conn.settimeout(15.0)
             while True:
                 msg = _vsc_read(conn)
@@ -494,25 +532,35 @@ def test_debugger_vscode_extension_injected_bootstrap(tmp_path) -> None:
                     break
                 if msg.get("type") == "event" and msg.get("event") == "stopped":
                     events.append(f"stopped:{msg['body'].get('reason')}")
-                    conn.sendall(_vsc_frame({
-                        "seq": 3,
-                        "type": "request",
-                        "command": "stackTrace",
-                        "arguments": {"threadId": 0, "startFrame": 0, "levels": 2},
-                    }))
+                    conn.sendall(
+                        _vsc_frame(
+                            {
+                                "seq": 3,
+                                "type": "request",
+                                "command": "stackTrace",
+                                "arguments": {"threadId": 0, "startFrame": 0, "levels": 2},
+                            }
+                        )
+                    )
                     while True:
                         r = _vsc_read(conn)
                         if r is None:
                             break
                         if r.get("type") == "response" and r.get("request_seq") == 3:
-                            frames = ((r.get("body") or {}).get("stackFrames") or [])
+                            frames = (r.get("body") or {}).get("stackFrames") or []
                             if frames:
                                 top_frame["path"] = frames[0]["source"]["path"]
                                 top_frame["line"] = frames[0]["line"]
                             break
-                    conn.sendall(_vsc_frame({
-                        "seq": 4, "type": "request", "command": "continue",
-                    }))
+                    conn.sendall(
+                        _vsc_frame(
+                            {
+                                "seq": 4,
+                                "type": "request",
+                                "command": "continue",
+                            }
+                        )
+                    )
                     break
         finally:
             conn.close()

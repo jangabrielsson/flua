@@ -22,10 +22,7 @@ def test_keep_alive_directive() -> None:
 
 def test_annotations() -> None:
     source = (
-        "--%%speed:10\n"
-        "--%%instant:false\n"
-        "--%%time:instant=true,hours=48,speed=2\n"
-        'print("hi")\n'
+        '--%%speed:10\n--%%instant:false\n--%%time:instant=true,hours=48,speed=2\nprint("hi")\n'
     )
     cfg = parse_annotations(source)
     assert cfg["speed"] == 10
@@ -41,10 +38,10 @@ def test_subparams_tolerate_spaces() -> None:
 def test_non_header_lines_ignored() -> None:
     source = (
         "-- a plain comment\n"
-        "--%%\n"          # no name
-        "--%% :x\n"       # name before colon is empty
-        "--%%name\n"      # no colon
-        "--%%name:\n"     # empty value
+        "--%%\n"  # no name
+        "--%% :x\n"  # name before colon is empty
+        "--%%name\n"  # no colon
+        "--%%name:\n"  # empty value
     )
     assert parse_annotations(source) == {}
 
@@ -55,11 +52,7 @@ def test_later_lines_override() -> None:
 
 
 def test_headers_anywhere_in_file() -> None:
-    source = (
-        'print("start")\n'
-        "--%%maxhours:24\n"
-        'print("end")\n'
-    )
+    source = 'print("start")\n--%%maxhours:24\nprint("end")\n'
     assert parse_annotations(source) == {"maxhours": 24}
 
 
@@ -80,9 +73,7 @@ def test_property_directives_merge_with_scalar_values() -> None:
     # --%%property:name=value — raw device properties, values parse as
     # scalars, repeated directives merge
     source = "--%%property:value=true\n--%%property:delay=30\n--%%property:x=1,y=2\n"
-    assert parse_annotations(source) == {
-        "property": {"value": True, "delay": 30, "x": 1, "y": 2}
-    }
+    assert parse_annotations(source) == {"property": {"value": True, "delay": 30, "x": 1, "y": 2}}
 
 
 def test_peek_offline_true_forms() -> None:
@@ -95,29 +86,17 @@ def test_peek_offline_true_forms() -> None:
 
 
 def test_eoh_stops_parsing() -> None:
-    source = (
-        "--%%name:outer\n"
-        "-- --------------- EOH ---------------\n"
-        "--%%name:inner\n"
-    )
+    source = "--%%name:outer\n-- --------------- EOH ---------------\n--%%name:inner\n"
     assert parse_annotations(source) == {"name": "outer"}
 
 
 def test_eoh_requires_dashed_comment() -> None:
     # a bare comment that merely mentions EOH does not end the header
-    source = (
-        "--%%name:outer\n"
-        "-- just a comment about EOH\n"
-        "--%%speed:3\n"
-    )
+    source = "--%%name:outer\n-- just a comment about EOH\n--%%speed:3\n"
     assert parse_annotations(source) == {"name": "outer", "speed": 3}
 
 
 def test_eoh_must_be_a_comment_line() -> None:
     # the marker inside a Lua string (not a comment) does not end the header
-    source = (
-        "--%%name:outer\n"
-        'print("--- EOH ---")\n'
-        "--%%speed:3\n"
-    )
+    source = '--%%name:outer\nprint("--- EOH ---")\n--%%speed:3\n'
     assert parse_annotations(source) == {"name": "outer", "speed": 3}

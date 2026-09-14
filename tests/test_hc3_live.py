@@ -17,7 +17,6 @@ Skipped entirely unless HC3_TEST=1 AND HC3_URL/HC3_HOST are configured, so a
 plain ``pytest`` run never reaches a production controller.
 """
 
-import base64
 import json
 import os
 import time
@@ -27,8 +26,8 @@ import pytest
 
 pytest.importorskip("lupa")
 
-from flua.environment import EnvChain
 from flua.engine import LuaEngine
+from flua.environment import EnvChain
 from flua.hc3 import Hc3Remote
 
 REPO_ROOT = Path(__file__).resolve().parent.parent

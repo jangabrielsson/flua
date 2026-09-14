@@ -3,6 +3,8 @@
 import math
 import time as time_mod
 
+import pytest
+
 from flua.clock import VirtualClock, parse_start_time
 
 
@@ -17,15 +19,11 @@ def test_parse_start_time_formats() -> None:
 
 
 def test_parse_start_time_rejects_garbage() -> None:
-    import pytest
-
     with pytest.raises(ValueError, match="cannot parse start time"):
         parse_start_time("not a time")
 
 
 def test_clock_set_start() -> None:
-    import pytest
-
     clock = VirtualClock()
     epoch = time_mod.time() + 3600  # one hour in the future
     clock.set_start(epoch)
@@ -33,10 +31,6 @@ def test_clock_set_start() -> None:
     assert clock.elapsed() == 0  # elapsed still measures since start
     clock.tick(time_mod.monotonic() + 1)
     assert clock.time == pytest.approx(epoch + 1)  # advances from the new start
-
-import pytest
-
-from flua.clock import VirtualClock
 
 
 def test_realtime_advances_with_wall_clock() -> None:

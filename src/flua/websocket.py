@@ -22,7 +22,8 @@ import socket
 import ssl
 import struct
 import threading
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -130,7 +131,7 @@ class WsClient:
                 self._sock.settimeout(0.5)
                 try:
                     chunk = self._sock.recv(4096)
-                except (socket.timeout, TimeoutError):
+                except TimeoutError:
                     continue
                 except (OSError, ssl.SSLError) as exc:
                     if not self._stop.is_set():
@@ -214,9 +215,7 @@ class WsClient:
 
     # -- send / close -----------------------------------------------------------
 
-    def _send_frame(
-        self, opcode: int, payload: bytes, sock: socket.socket | None = None
-    ) -> None:
+    def _send_frame(self, opcode: int, payload: bytes, sock: socket.socket | None = None) -> None:
         sock = sock or self._sock
         if sock is None:
             raise WsError("not connected")

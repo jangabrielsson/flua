@@ -60,9 +60,7 @@ async def test_qa_environments_are_isolated(tmp_path, capsys) -> None:
 @pytest.mark.asyncio
 async def test_qa_timers_are_tracked(tmp_path) -> None:
     a = tmp_path / "a.lua"
-    a.write_text(
-        "setTimeout(function() end, 400)\nsetTimeout(function() end, 800)\n"
-    )
+    a.write_text("setTimeout(function() end, 400)\nsetTimeout(function() end, 800)\n")
     b = tmp_path / "b.lua"
     b.write_text("setTimeout(function() end, 300)\n")
     engine = LuaEngine()
@@ -73,8 +71,7 @@ async def test_qa_timers_are_tracked(tmp_path) -> None:
         # after the 0 ms bootstrap timers fire and the QAs schedule their
         # own timers, QA a tracks two and QA b tracks one
         await wait_until(
-            lambda: qa_timer_count(engine, id_a) == 2
-            and qa_timer_count(engine, id_b) == 1
+            lambda: qa_timer_count(engine, id_a) == 2 and qa_timer_count(engine, id_b) == 1
         )
         await wait_until(lambda: not engine.has_pending_work())
         assert qa_timer_count(engine, id_a) == 0  # fired timers untrack
@@ -101,9 +98,7 @@ async def test_qa_config_copy(tmp_path, capsys) -> None:
 def test_cli_runs_multiple_qas_isolated(tmp_path) -> None:
     a = tmp_path / "a.lua"
     a.write_text(
-        "--%%name:qa-a\n"
-        "x = 'a'\n"
-        "setTimeout(function() print('A', x, _FLUA.config.name) end, 20)\n"
+        "--%%name:qa-a\nx = 'a'\nsetTimeout(function() print('A', x, _FLUA.config.name) end, 20)\n"
     )
     b = tmp_path / "b.lua"
     b.write_text(
@@ -452,9 +447,7 @@ def test_exit_terminates_only_the_calling_qa(tmp_path) -> None:
         "setTimeout(function() print('A_EXIT'); exit(0) end, 10)\n"
     )
     b = tmp_path / "b.lua"
-    b.write_text(
-        "setTimeout(function() print('B_DONE'); exit(0) end, 200)\n"
-    )
+    b.write_text("setTimeout(function() print('B_DONE'); exit(0) end, 200)\n")
     result = subprocess.run(
         [sys.executable, "-m", "flua", str(a), str(b)],
         cwd=REPO_ROOT,

@@ -51,10 +51,7 @@ async def test_extra_files_load_in_declaration_order(capsys) -> None:
                 "end\n"
             ),
             "b.lua": 'ORDER = (ORDER or "") .. "b"\n',
-            "a.lua": (
-                'ORDER = (ORDER or "") .. "a"\n'
-                "function sharedHelper() return 42 end\n"
-            ),
+            "a.lua": ('ORDER = (ORDER or "") .. "a"\nfunction sharedHelper() return 42 end\n'),
         },
         capsys=capsys,
     )
@@ -111,7 +108,9 @@ async def test_quickapp_rest_routes_and_restart(tmp_path, capsys) -> None:
         )
 
         # updating an extra file restarts the QA
-        assert api.dispatch("PUT", "/quickApp/5000/files/lib", {"content": 'MODE = "v2"\n'})[1] == 200
+        assert (
+            api.dispatch("PUT", "/quickApp/5000/files/lib", {"content": 'MODE = "v2"\n'})[1] == 200
+        )
         await asyncio.sleep(0.3)
         out = capsys.readouterr().out
         assert "MODE v2" in out
@@ -237,9 +236,7 @@ async def test_quickapp_import_runs_the_qa(tmp_path, capsys) -> None:
                         "type": "lua",
                         "isMain": True,
                         "content": (
-                            "function QuickApp:onInit()\n"
-                            "  print('IMPORTED', helper())\n"
-                            "end\n"
+                            "function QuickApp:onInit()\n  print('IMPORTED', helper())\nend\n"
                         ),
                     },
                     {
@@ -309,7 +306,8 @@ async def test_var_directive_initializes_quickapp_variables(tmp_path, capsys) ->
         "--%%var:count=42\n"
         "-- --------------- EOH ---------------\n"
         "function QuickApp:onInit()\n"
-        "  print('VARS', self:getVariable('greeting'), self:getVariable('count'), self:getVariable('missing'))\n"
+        "  print('VARS', self:getVariable('greeting'), self:getVariable('count'), "
+        "self:getVariable('missing'))\n"
         "  self:setVariable('greeting', 'hi again')\n"
         "  print('UPDATED', self:getVariable('greeting'))\n"
         "  print('TYPE', type(self:getVariable('count')))\n"
@@ -400,7 +398,10 @@ async def test_quickapp_import_validation(tmp_path, capsys) -> None:
             400,
         )
         # encrypted export is not supported (Fibaro-specific)
-        assert engine.api.dispatch("POST", "/quickApp/export/5000", {"encrypted": True}) == (None, 501)
+        assert engine.api.dispatch("POST", "/quickApp/export/5000", {"encrypted": True}) == (
+            None,
+            501,
+        )
     finally:
         await engine.stop()
 
@@ -421,7 +422,6 @@ async def test_quickapp_export_import_roundtrip(tmp_path, capsys) -> None:
         assert status == 200
         device, status = engine.api.dispatch("POST", "/quickApp/import", exported)
         assert status == 200 and device["id"] == 5001
-        qa_id = device["id"]
         await asyncio.sleep(0.4)
         assert "RT 99" in capsys.readouterr().out  # the imported copy runs too
     finally:
@@ -475,7 +475,9 @@ async def test_quickapp_create_device(tmp_path, capsys) -> None:
 @pytest.mark.asyncio
 async def test_quickapp_files_create_and_bulk_update(tmp_path, capsys) -> None:
     main = tmp_path / "main.lua"
-    main.write_text("--%%file:lib.lua,lib\n-- --------------- EOH ---------------\nprint('M', LIB)\n")
+    main.write_text(
+        "--%%file:lib.lua,lib\n-- --------------- EOH ---------------\nprint('M', LIB)\n"
+    )
     lib = tmp_path / "lib.lua"
     lib.write_text("LIB = 1\n")
     engine = LuaEngine()
@@ -512,7 +514,9 @@ async def test_quickapp_files_create_and_bulk_update(tmp_path, capsys) -> None:
 async def test_var_expressions_evaluate_lua_values(tmp_path, capsys, monkeypatch) -> None:
     # --%%var values are Lua expressions evaluated with {config, os} in scope
     monkeypatch.setenv("HOME", str(tmp_path / "home"))  # isolate from the real ~/.flua.lua
-    (tmp_path / ".flua.lua").write_text("return { color = 'red', user = 'alice', nested = { n = 1 } }\n")
+    (tmp_path / ".flua.lua").write_text(
+        "return { color = 'red', user = 'alice', nested = { n = 1 } }\n"
+    )
     monkeypatch.setenv("QA_TOKEN", "tok-123")
     monkeypatch.chdir(tmp_path)
     main = tmp_path / "main.lua"
@@ -624,7 +628,8 @@ async def test_var_expression_nil_result_is_fine(tmp_path, capsys, monkeypatch) 
         "--%%var:fine=1+1\n"
         "-- --------------- EOH ---------------\n"
         "function QuickApp:onInit()\n"
-        "  print('VARS', self:getVariable('fine'), self:getVariable('maybe'), self:getVariable('env'))\n"
+        "  print('VARS', self:getVariable('fine'), self:getVariable('maybe'), "
+        "self:getVariable('env'))\n"
         "end\n"
     )
     engine = LuaEngine()

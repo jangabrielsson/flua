@@ -112,14 +112,20 @@ def _compare(method: str, path: str, live_filter=None) -> None:
     problems, gaps = _drift(offline_data, live_data)
     assert not problems, f"{method} {path} shape drift vs the real HC3:\n" + "\n".join(problems)
     if gaps:
-        print(f"info: {method} {path} — {len(gaps)} fields the sim does not model yet "
-              f"(catalog-capture gaps): " + ", ".join(gaps[:5]) + ("…" if len(gaps) > 5 else ""))
+        print(
+            f"info: {method} {path} — {len(gaps)} fields the sim does not model yet "
+            f"(catalog-capture gaps): " + ", ".join(gaps[:5]) + ("…" if len(gaps) > 5 else "")
+        )
 
 
 @pytest.mark.parametrize(
     "method,path,live_filter",
     [
-        ("GET", "/devices", lambda devices: [d for d in devices if d.get("type") == "com.fibaro.binarySwitch"]),
+        (
+            "GET",
+            "/devices",
+            lambda devices: [d for d in devices if d.get("type") == "com.fibaro.binarySwitch"],
+        ),
         ("GET", "/globalVariables", None),
         ("GET", "/rooms", None),
         ("GET", "/refreshStates", None),
@@ -145,5 +151,7 @@ def test_single_device_shape_matches() -> None:
     problems, gaps = _drift(offline_device, live_device)
     assert not problems, "device shape drift vs the real HC3:\n" + "\n".join(problems)
     if gaps:
-        print(f"info: single-device — {len(gaps)} fields the sim does not model yet "
-              f"(catalog-capture gaps): " + ", ".join(gaps[:5]) + ("…" if len(gaps) > 5 else ""))
+        print(
+            f"info: single-device — {len(gaps)} fields the sim does not model yet "
+            f"(catalog-capture gaps): " + ", ".join(gaps[:5]) + ("…" if len(gaps) > 5 else "")
+        )

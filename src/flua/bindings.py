@@ -41,9 +41,11 @@ def lua_to_python(value: object) -> object:
     if _is_lua_table(value):
         items = list(value.items())
         keys = [key for key, _ in items]
-        if keys and all(isinstance(key, int) and key >= 1 for key in keys) and sorted(
+        if (
             keys
-        ) == list(range(1, len(keys) + 1)):
+            and all(isinstance(key, int) and key >= 1 for key in keys)
+            and sorted(keys) == list(range(1, len(keys) + 1))
+        ):
             # array-shaped table -> list
             return [lua_to_python(val) for _, val in sorted(items)]
         result = {}
@@ -75,9 +77,11 @@ def _json_to_python(value: object, lua: object) -> object:
         if marked:
             int_keys = sorted(key for key in keys if isinstance(key, int) and key >= 1)
             return [_json_to_python(value[key], lua) for key in int_keys]
-        if keys and all(isinstance(key, int) and key >= 1 for key in keys) and sorted(
+        if (
             keys
-        ) == list(range(1, len(keys) + 1)):
+            and all(isinstance(key, int) and key >= 1 for key in keys)
+            and sorted(keys) == list(range(1, len(keys) + 1))
+        ):
             # array-shaped table -> list
             return [_json_to_python(val, lua) for _, val in sorted(items)]
         result = {}
@@ -124,7 +128,9 @@ def install_bindings(engine: "LuaEngine") -> None:
     # HC3 REST bridge: api.get/post/put/delete -> (data, status). Synchronous
     # like the real HC3 builtins; offline it dispatches to the simulated HC3
     # (running QAs + seeded state), online mode will route to the real HC3.
-    def api_call(method: str, url: str, body: object, qa_id: int | None = None) -> tuple[object, int]:
+    def api_call(
+        method: str, url: str, body: object, qa_id: int | None = None
+    ) -> tuple[object, int]:
         data, status = engine.api.dispatch(method, url, lua_to_python(body), qa_id=qa_id)
         if data is None:
             return None, status

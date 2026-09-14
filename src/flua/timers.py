@@ -30,6 +30,13 @@ class TimerManager:
         self._heap: list[tuple[float, int]] = []  # (deadline, timer_id)
         self._deadlines: dict[int, float] = {}
         self._timer_qa: dict[int, int] = {}  # timer_id -> qa_id attribution
+        self._horizon: float | None = None  # absolute virtual run limit
+
+    def set_horizon(self, deadline: float | None) -> None:
+        """Cap simulated time at an absolute virtual deadline (fixed --run-for
+        and --%%maxhours). Timers beyond it never fire — in instant mode the
+        heap would otherwise race far past the limit between CLI polls."""
+        self._horizon = deadline
 
     def set_timeout(self, timer_id: int, delay_ms: int, qa_id: int | None = None) -> None:
         """Schedule a one-shot timer; re-using an existing ID replaces it.
@@ -79,6 +86,8 @@ class TimerManager:
             if self._deadlines.get(timer_id) != deadline:
                 heapq.heappop(self._heap)  # stale entry (cancelled/rescheduled)
                 continue
+            if self._horizon is not None and deadline > self._horizon:
+                break  # beyond the run horizon (fixed --run-for / maxhours)
             if not self._clock.instant and deadline > self._clock.time:
                 break  # realtime/speed modes: only fire what is due
             heapq.heappop(self._heap)

@@ -85,7 +85,9 @@ def action_device(state: SimState, req: ApiRequest) -> tuple[Any, int]:
         return None, 400
     if req.emit is not None:
         req.emit(messages.device_action(int(dev["id"]), req.path_params["action"], list(args)))
-    entry = state.record_action_event(int(dev["id"]), req.path_params["action"], list(args), _now(req))
+    entry = state.record_action_event(
+        int(dev["id"]), req.path_params["action"], list(args), _now(req)
+    )
     if entry is not None and req.emit is not None:
         req.emit(messages.refresh_state_event(entry))
     return None, 202
@@ -105,7 +107,9 @@ def group_action(state: SimState, req: ApiRequest) -> tuple[Any, int]:
         acted.append(int(device_id))
         if req.emit is not None:
             req.emit(messages.device_action(int(device_id), req.path_params["action"], list(args)))
-        entry = state.record_action_event(int(device_id), req.path_params["action"], list(args), _now(req))
+        entry = state.record_action_event(
+            int(device_id), req.path_params["action"], list(args), _now(req)
+        )
         if entry is not None and req.emit is not None:
             req.emit(messages.refresh_state_event(entry))
     return {"devices": acted}, 202

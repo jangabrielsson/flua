@@ -6,6 +6,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.error
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -71,9 +72,7 @@ def test_http_call_404_reaches_success(http_server: str) -> None:
 
 
 def test_http_call_post_body_and_headers(http_server: str) -> None:
-    status, body, _ = http_call(
-        "POST", http_server + "/post", {"X-Custom": "v"}, "hello body"
-    )
+    status, body, _ = http_call("POST", http_server + "/post", {"X-Custom": "v"}, "hello body")
     assert status == 200
     data = json.loads(body)
     assert data["method"] == "POST"
@@ -81,12 +80,12 @@ def test_http_call_post_body_and_headers(http_server: str) -> None:
 
 
 def test_http_call_timeout_raises(http_server: str) -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(TimeoutError):
         http_call("GET", http_server + "/slow", timeout=0.2)
 
 
 def test_http_call_refused_raises() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(urllib.error.URLError):
         http_call("GET", "http://127.0.0.1:1/x", timeout=1.0)
 
 

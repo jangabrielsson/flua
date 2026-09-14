@@ -25,8 +25,8 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__, messages
-from .config import parse_annotations, peek_offline, split_annotations
 from .clock import parse_start_time
+from .config import parse_annotations, peek_offline, split_annotations
 from .engine import LuaEngine
 
 logger = logging.getLogger(__name__)
@@ -37,9 +37,7 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="flua",
         description="Minimal Lua engine on lupa + asyncio with cooperative timers.",
     )
-    parser.add_argument(
-        "scripts", nargs="*", help="Lua QuickApp files to run (each isolated)"
-    )
+    parser.add_argument("scripts", nargs="*", help="Lua QuickApp files to run (each isolated)")
     parser.add_argument(
         "-e",
         "--execute",
@@ -57,7 +55,8 @@ def _build_parser() -> argparse.ArgumentParser:
         type=float,
         default=None,
         metavar="N",
-        help="0 = run until exit(); N>0 = at least N s; N<0 = exactly abs(N) s",
+        help="0 = run until exit(); N>0 = at least N virtual s, then exit "
+        "when idle; N<0 = exactly abs(N) virtual s",
     )
     parser.add_argument(
         "--debugger",
@@ -125,9 +124,7 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="restart QAs when their files change (mtime polling, no dependencies)",
     )
-    parser.add_argument(
-        "-v", "--verbose", action="store_true", help="enable debug logging"
-    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="enable debug logging")
     parser.add_argument("--version", action="version", version=f"flua {__version__}")
     return parser
 
@@ -233,14 +230,21 @@ def _keep_running(
         return False
     if max_virtual_seconds is not None and engine.clock.elapsed() >= max_virtual_seconds:
         return False  # virtual time limit reached
-    elapsed = time.monotonic() - start
     if run_for is None:
         return engine.has_pending_work()  # graceful: exit when all work is done
     if run_for == 0:
         return True  # run until exit()
+    # --run-for measures VIRTUAL seconds (the engine's clock): with --speed/
+    # --instant it counts simulated time. Instant mode advances virtual time
+    # only when timers fire, so a run with nothing left to fire would never
+    # reach N — the wall bound keeps such runs from hanging.
+    virtual = engine.clock.elapsed()
+    wall = time.monotonic() - start
     if run_for > 0:
-        return elapsed < run_for or engine.has_pending_work()
-    return elapsed < -run_for  # fixed duration
+        # at least N virtual seconds, then exit when idle
+        return (virtual < run_for and wall < run_for) or engine.has_pending_work()
+    # fixed duration: exactly N virtual seconds (never longer than N wall)
+    return virtual < -run_for and wall < -run_for
 
 
 async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
@@ -275,12 +279,12 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             if peek_offline(main_source):
                 api_mode = "local"
         engine = LuaEngine(
-        start=start_epoch,
-        speed=speed,
-        config=global_config,
-        color=args.color,
-        api_mode=api_mode,
-        seed=seed,
+            start=start_epoch,
+            speed=speed,
+            config=global_config,
+            color=args.color,
+            api_mode=api_mode,
+            seed=seed,
         )
     except ValueError as exc:
         parser.error(str(exc))
@@ -291,8 +295,7 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         engine.post(
             messages.log(
                 "info",
-                f"flua {__version__}, {engine.lua_version()}, "
-                f"Python {sys.version.split()[0]}",
+                f"flua {__version__}, {engine.lua_version()}, Python {sys.version.split()[0]}",
             )
         )
     if args.debugger is not None:
@@ -356,16 +359,20 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
 
     start = time.monotonic()
     max_virtual_seconds = None if max_hours is None else max_hours * 3600.0
+    # cap simulated time at the run limit (fixed --run-for, --%%maxhours) so
+    # instant mode stops firing exactly there instead of overshooting
+    horizon: float | None = max_virtual_seconds
+    if args.run_for is not None and args.run_for < 0:
+        horizon = -args.run_for if horizon is None else min(horizon, -args.run_for)
+    if horizon is not None:
+        engine.limit_run(horizon)
     try:
         while _keep_running(engine, args.run_for, start, max_virtual_seconds):
             await asyncio.sleep(0.05)
     finally:
         with contextlib.suppress(asyncio.CancelledError):
             await engine.stop()
-    if (
-        max_virtual_seconds is not None
-        and engine.clock.elapsed() >= max_virtual_seconds
-    ):
+    if max_virtual_seconds is not None and engine.clock.elapsed() >= max_virtual_seconds:
         print(f"flua: virtual time limit reached ({max_hours}h)", file=sys.stderr)
     return engine.exit_code
 

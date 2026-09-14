@@ -8,8 +8,8 @@ This module stays free of asyncio and lupa on purpose.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import parse_qs, unquote
 

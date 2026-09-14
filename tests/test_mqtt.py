@@ -125,7 +125,9 @@ class MiniBroker:
                         topic, offset = _read_string(body, offset)
                         with self._lock:
                             self._subs = [
-                                (c, t, q) for c, t, q in self._subs if not (c is conn and t == topic)
+                                (c, t, q)
+                                for c, t, q in self._subs
+                                if not (c is conn and t == topic)
                             ]
                     conn.sendall(_packet(0xB0, struct.pack(">H", packet_id)))
                 elif ptype == 3:  # PUBLISH
@@ -144,9 +146,7 @@ class MiniBroker:
             offset += 2
         payload = body[offset:]
         with self._lock:
-            subs = [
-                (c, t) for c, t, _ in self._subs if _topic_matches(t, topic)
-            ]
+            subs = [(c, t) for c, t, _ in self._subs if _topic_matches(t, topic)]
         for target, _ in subs:
             try:
                 forward = 0x30 | (0x01 if header & 0x01 else 0) | (0x02 if qos > 0 else 0)
@@ -194,12 +194,14 @@ async def test_mqtt_connect_subscribe_publish_roundtrip(capsys) -> None:
         "  })\n"
         "  client:addEventListener('connected', function(e)\n"
         "    print('CONNECTED', e.sessionPresent, e.returnCode, client:isConnected())\n"
-        "    local pid = client:subscribe('flua/test', { qos = mqtt.QoS.AT_LEAST_ONCE, callback = function(c) print('SUB CB', c) end })\n"
+        "    local pid = client:subscribe('flua/test', { qos = mqtt.QoS.AT_LEAST_ONCE, "
+        "callback = function(c) print('SUB CB', c) end })\n"
         "    print('SUB PID', type(pid) == 'number')\n"
         "  end)\n"
         "  client:addEventListener('subscribed', function(e)\n"
         "    print('SUBSCRIBED', e.packetId ~= nil, e.results[1])\n"
-        "    client:publish('flua/test', 'hello', { qos = 1, retain = true, callback = function(c) print('PUB CB', c) end })\n"
+        "    client:publish('flua/test', 'hello', { qos = 1, retain = true, "
+        "callback = function(c) print('PUB CB', c) end })\n"
         "  end)\n"
         "  client:addEventListener('published', function(e)\n"
         "    print('PUBLISHED', e.packetId ~= nil)\n"

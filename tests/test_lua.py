@@ -41,9 +41,7 @@ def _assert_passed(result: subprocess.CompletedProcess[str], script_name: str) -
     )
 
 
-SCRIPTS = sorted(
-    path for path in LUA_TESTS.glob("*.lua") if path.name not in EXCLUDED
-)
+SCRIPTS = sorted(path for path in LUA_TESTS.glob("*.lua") if path.name not in EXCLUDED)
 
 
 @pytest.mark.parametrize("script", SCRIPTS, ids=lambda path: path.name)

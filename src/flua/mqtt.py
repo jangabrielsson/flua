@@ -21,7 +21,8 @@ import ssl
 import struct
 import threading
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -97,7 +98,9 @@ class MqttClient:
         if parsed.scheme not in ("mqtt", "mqtts"):
             raise MqttError(f"unsupported scheme {parsed.scheme!r} (expected mqtt:// or mqtts://)")
         self._host = parsed.hostname or "127.0.0.1"
-        self._port = options.get("port") or parsed.port or (8883 if parsed.scheme == "mqtts" else 1883)
+        self._port = (
+            options.get("port") or parsed.port or (8883 if parsed.scheme == "mqtts" else 1883)
+        )
         self._tls = parsed.scheme == "mqtts" or "tls" in options
         self._sock: socket.socket | None = None
         self._stop = threading.Event()
@@ -183,7 +186,9 @@ class MqttClient:
             flags |= (will_qos << 3) & 0x18
             if will.get("retain"):
                 flags |= 0x20
-            body += _encode_string(str(will["topic"])) + _encode_string(str(will.get("payload") or ""))
+            body += _encode_string(str(will["topic"])) + _encode_string(
+                str(will.get("payload") or "")
+            )
         var_header = b"\x00\x04MQTT\x04" + bytes([flags]) + struct.pack(">H", keepalive)
         body = _encode_string(client_id) + body
         if username is not None:
@@ -237,7 +242,7 @@ class MqttClient:
                 self._sock.settimeout(0.5)
                 try:
                     chunk = self._sock.recv(4096)
-                except (socket.timeout, TimeoutError):
+                except TimeoutError:
                     continue
                 except (OSError, ssl.SSLError) as exc:
                     if not self._stop.is_set():
@@ -419,11 +424,15 @@ class MqttPool:
         entry = self._entry(conn)
         return entry["qa"] if entry else None
 
-    def connect(self, conn: int, uri: str, options: dict[str, Any], timeout: float) -> tuple[bool, str | None]:
+    def connect(
+        self, conn: int, uri: str, options: dict[str, Any], timeout: float
+    ) -> tuple[bool, str | None]:
         entry = self._entry(conn)
         if entry is None:
             return False, "unknown connection"
-        client = MqttClient(uri, options, timeout, lambda event, data: self._emit(conn, event, data))
+        client = MqttClient(
+            uri, options, timeout, lambda event, data: self._emit(conn, event, data)
+        )
         try:
             client.connect()
         except Exception as exc:
@@ -442,7 +451,9 @@ class MqttPool:
         entry = self._entry(conn)
         return entry["client"] if entry else None
 
-    def subscribe(self, conn: int, packet_id: int, topics: list[tuple[str, int]]) -> tuple[bool, str | None]:
+    def subscribe(
+        self, conn: int, packet_id: int, topics: list[tuple[str, int]]
+    ) -> tuple[bool, str | None]:
         client = self._client(conn)
         if client is None or not client.is_connected():
             return False, "client not connected"
@@ -462,7 +473,9 @@ class MqttPool:
         except Exception as exc:
             return False, str(exc)
 
-    def publish(self, conn: int, packet_id: int, topic: str, payload: str, qos: int, retain: bool) -> tuple[bool, str | None]:
+    def publish(
+        self, conn: int, packet_id: int, topic: str, payload: str, qos: int, retain: bool
+    ) -> tuple[bool, str | None]:
         client = self._client(conn)
         if client is None or not client.is_connected():
             return False, "client not connected"

@@ -13,13 +13,14 @@ it is never retried.
 from __future__ import annotations
 
 import base64
+import binascii
 import json
 import logging
-import binascii
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

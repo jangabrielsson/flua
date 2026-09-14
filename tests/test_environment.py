@@ -2,8 +2,6 @@
 
 import os
 
-import pytest
-
 from flua.environment import EnvChain
 
 

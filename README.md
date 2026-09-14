@@ -33,10 +33,11 @@ Requires Python 3.11+. `lupa` is the only runtime dependency.
 # one-liner
 .venv/bin/flua -e 'setTimeout(function() print("hi") end, 100)'
 
-# lifetime control
+# lifetime control (--run-for counts VIRTUAL seconds — under --speed/--instant
+# it measures simulated time; at realtime speed virtual seconds == wall seconds)
 .venv/bin/flua --run-for 0 script.lua    # run until exit()
-.venv/bin/flua --run-for 5 script.lua    # at least 5 s, then exit when idle
-.venv/bin/flua --run-for -3 script.lua   # exactly 3 s
+.venv/bin/flua --run-for 5 script.lua    # at least 5 virtual s, then exit when idle
+.venv/bin/flua --run-for -3 script.lua   # exactly 3 virtual s
 
 # ANSI colors on QA log lines (debug=green, trace=cyan, warning=orange,
 # error=red — plua style): always (default), auto, never

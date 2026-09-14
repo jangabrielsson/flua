@@ -36,18 +36,18 @@ import lupa
 
 from . import messages
 from .api import Api
+from .api.state import public
 from .bindings import install_bindings
 from .clock import VirtualClock
 from .config import parse_annotations, split_annotations
-from .environment import EnvChain
 from .devices import catalog_types
-from .http import http_call
+from .environment import EnvChain
 from .hc3 import Hc3Remote
+from .http import http_call
 from .mqtt import MqttPool
-from .api.state import public
 from .sync_socket import SyncTCPSockets, SyncUDPSockets
-from .websocket import WebSocketPool
 from .timers import TimerManager
+from .websocket import WebSocketPool
 
 logger = logging.getLogger(__name__)
 
@@ -341,9 +341,7 @@ class LuaEngine:
         # Register the QA as a device before its code runs: on the HC3 the
         # plugin device exists before onInit executes, and onInit's own api
         # calls (internalStorage, updateProperty) must find it.
-        self.api.register_qa(
-            qa_id, name, qa_config.get("type"), device_properties
-        )
+        self.api.register_qa(qa_id, name, qa_config.get("type"), device_properties)
         return qa_id
 
     @staticmethod
@@ -690,7 +688,11 @@ class LuaEngine:
             if key in _EXPORT_PROPERTIES
         }
         # private (__-prefixed) UI callbacks never travel (plua behavior)
-        callbacks = [c for c in (properties.get("uiCallbacks") or []) if not str(c.get("name", "")).startswith("__")]
+        callbacks = [
+            c
+            for c in (properties.get("uiCallbacks") or [])
+            if not str(c.get("name", "")).startswith("__")
+        ]
         properties["uiCallbacks"] = callbacks
         # the HC3 expects these five fields as JSON arrays, never objects
         for key in ("quickAppVariables", "uiView", "supportedDeviceRoles"):
@@ -698,7 +700,9 @@ class LuaEngine:
                 continue  # filtered out by the whitelist (e.g. supportedDeviceRoles)
             value = properties.get(key)
             properties[key] = (
-                list(value.values()) if isinstance(value, dict) else (value if isinstance(value, list) else [])
+                list(value.values())
+                if isinstance(value, dict)
+                else (value if isinstance(value, list) else [])
             )
         interfaces = [i for i in (device.get("interfaces") or []) if i != "quickApp"]
         fqa = {
@@ -719,7 +723,6 @@ class LuaEngine:
         }
         return self._arrayify_fqa(fqa)
 
-
     @staticmethod
     def _arrayify_fqa(fqa: dict[str, Any]) -> dict[str, Any]:
         """The HC3's import rejects empty JSON objects where its schema declares
@@ -731,7 +734,7 @@ class LuaEngine:
             return fqa
         layout = properties.get("viewLayout")
         if isinstance(layout, dict):
-            sections = (((layout.get("$jason") or {}).get("body") or {}).get("sections"))
+            sections = ((layout.get("$jason") or {}).get("body") or {}).get("sections")
             if isinstance(sections, dict):
                 items = sections.get("items")
                 if isinstance(items, dict):
@@ -781,9 +784,7 @@ class LuaEngine:
             return "nil"
         return str(value)
 
-    def fqa_to_files(
-        self, fqa: dict[str, Any], directory: str
-    ) -> tuple[str | None, str | None]:
+    def fqa_to_files(self, fqa: dict[str, Any], directory: str) -> tuple[str | None, str | None]:
         """Unpack a .fqa package into ``directory``: the generated main file
         carries --%% directives (name, type, files, scalar initialProperties),
         the extras keep their assigned names. The result loads as a normal
@@ -839,6 +840,14 @@ class LuaEngine:
         return self._timers.qa_timer_count(qa_id)
 
     # -- lifecycle --------------------------------------------------------------
+
+    def limit_run(self, virtual_seconds: float) -> None:
+        """Cap simulated time (fixed ``--run-for -N``, ``--%%maxhours``):
+        timers whose deadline lies beyond this many virtual seconds never
+        fire, so instant mode stops exactly at the limit instead of racing
+        past it between CLI polls."""
+        self.clock.rebase()  # startup wall time must not become virtual time
+        self._timers.set_horizon(self.clock.time + virtual_seconds)
 
     async def start(self) -> None:
         self._loop = asyncio.get_running_loop()
@@ -905,9 +914,7 @@ class LuaEngine:
             self._timers.fire_due()
             await self._drain_inbound()
             try:
-                batch = [
-                    await asyncio.wait_for(self._outbound.get(), timeout=_PUMP_POLL)
-                ]
+                batch = [await asyncio.wait_for(self._outbound.get(), timeout=_PUMP_POLL)]
             except TimeoutError:
                 continue
             while not self._outbound.empty():
@@ -919,9 +926,7 @@ class LuaEngine:
             msg = self._inbound.popleft()
             handler = self._handlers.get(msg.get("type"))
             if handler is None:
-                logger.warning(
-                    "no handler for message type %r; dropped %r", msg.get("type"), msg
-                )
+                logger.warning("no handler for message type %r; dropped %r", msg.get("type"), msg)
                 continue
             try:
                 result = handler(msg)
@@ -952,9 +957,7 @@ class LuaEngine:
         existing = properties.get("quickAppVariables")
         if not isinstance(existing, list):
             existing = []
-        merged = {
-            v.get("name"): v for v in existing if isinstance(v, dict) and v.get("name")
-        }
+        merged = {v.get("name"): v for v in existing if isinstance(v, dict) and v.get("name")}
         for name, value in (msg.get("vars") or {}).items():
             if str(name) not in merged:  # initializers never clobber runtime state
                 merged[str(name)] = {"name": str(name), "value": value}
@@ -1115,9 +1118,7 @@ class LuaEngine:
     # -- mqtt.* client (MQTT 3.1.1 in worker threads) ---------------------------
 
     def _spawn_mqtt_op(self, msg: dict[str, Any], func: Any, *args: Any) -> None:
-        task = asyncio.create_task(
-            self._run_mqtt_op(msg, func, *args), name="flua-mqtt"
-        )
+        task = asyncio.create_task(self._run_mqtt_op(msg, func, *args), name="flua-mqtt")
         self._http_tasks.add(task)
         task.add_done_callback(self._http_tasks.discard)
 
@@ -1128,9 +1129,15 @@ class LuaEngine:
             ok, err = False, str(exc)
         conn = int(msg["conn"])
         if ok:
-            self._on_mqtt_event(conn, "opDone", {"kind": msg["type"], "packetId": msg.get("packetId"), "code": 0})
+            self._on_mqtt_event(
+                conn, "opDone", {"kind": msg["type"], "packetId": msg.get("packetId"), "code": 0}
+            )
         else:
-            self._on_mqtt_event(conn, "opDone", {"kind": msg["type"], "packetId": msg.get("packetId"), "code": -1, "message": err})
+            self._on_mqtt_event(
+                conn,
+                "opDone",
+                {"kind": msg["type"], "packetId": msg.get("packetId"), "code": -1, "message": err},
+            )
 
     def _handle_mqtt_connect(self, msg: dict[str, Any]) -> None:
         conn = int(msg["conn"])
@@ -1138,7 +1145,11 @@ class LuaEngine:
 
         async def run() -> None:
             ok, err = await asyncio.to_thread(
-                self.qa_mqtt.connect, conn, str(msg["uri"]), options, float(options.get("timeout") or 10.0)
+                self.qa_mqtt.connect,
+                conn,
+                str(msg["uri"]),
+                options,
+                float(options.get("timeout") or 10.0),
             )
             if not ok:
                 self._on_mqtt_event(conn, "connectDone", {"code": -1, "message": err})
@@ -1152,11 +1163,15 @@ class LuaEngine:
 
     def _handle_mqtt_subscribe(self, msg: dict[str, Any]) -> None:
         topics = [[str(t), int(q)] for t, q in (msg.get("topics") or [])]
-        self._spawn_mqtt_op(msg, self.qa_mqtt.subscribe, int(msg["conn"]), int(msg["packetId"]), topics)
+        self._spawn_mqtt_op(
+            msg, self.qa_mqtt.subscribe, int(msg["conn"]), int(msg["packetId"]), topics
+        )
 
     def _handle_mqtt_unsubscribe(self, msg: dict[str, Any]) -> None:
         topics = [str(t) for t in (msg.get("topics") or [])]
-        self._spawn_mqtt_op(msg, self.qa_mqtt.unsubscribe, int(msg["conn"]), int(msg["packetId"]), topics)
+        self._spawn_mqtt_op(
+            msg, self.qa_mqtt.unsubscribe, int(msg["conn"]), int(msg["packetId"]), topics
+        )
 
     def _handle_mqtt_publish(self, msg: dict[str, Any]) -> None:
         self._spawn_mqtt_op(
@@ -1203,9 +1218,7 @@ class LuaEngine:
             result = messages.http_result(msg["id"], msg.get("qa"), status, data, headers)
         except Exception as exc:
             result = messages.http_result(msg["id"], msg.get("qa"), error=str(exc))
-        logger.debug(
-            "http result id=%s %s", msg["id"], result.get("status", result.get("error"))
-        )
+        logger.debug("http result id=%s %s", msg["id"], result.get("status", result.get("error")))
         self.enqueue_outbound(result)
 
     def _handle_clear_timeout(self, msg: dict[str, Any]) -> None:

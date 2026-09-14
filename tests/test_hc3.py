@@ -94,7 +94,13 @@ class _MockHc3(BaseHTTPRequestHandler):
                 )
                 return
             self._send_json(
-                {"status": "IDLE", "last": 5, "date": "x", "timestamp": now, "timestampMillis": now * 1000}
+                {
+                    "status": "IDLE",
+                    "last": 5,
+                    "date": "x",
+                    "timestamp": now,
+                    "timestampMillis": now * 1000,
+                }
             )
             return
         self._send_json({"error": "not found"}, 404)
@@ -134,7 +140,9 @@ async def _run_qa(script: str, sleep: float = 0.6, capsys=None) -> str:
 
 
 @pytest.mark.asyncio
-async def test_hybrid_routing_local_sim_and_remote_hc3(tmp_path, capsys, mock_hc3, monkeypatch) -> None:
+async def test_hybrid_routing_local_sim_and_remote_hc3(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
     # the QA itself (id 5000) comes from the sim; device 45 comes from the
     # mock HC3 — one api.get call each, same Lua surface
     monkeypatch.setenv("HOME", str(tmp_path / "home"))  # isolate from the user's ~/.env
@@ -196,7 +204,9 @@ async def test_auth_failure_aborts_immediately(
 
 
 @pytest.mark.asyncio
-async def test_api_hc3_bypasses_the_hybrid_dispatch(tmp_path, capsys, mock_hc3, monkeypatch) -> None:
+async def test_api_hc3_bypasses_the_hybrid_dispatch(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
     # api.get serves the local QA (id 5000) from the sim; api.hc3.get must
     # bypass the sim and ask the mock HC3 — which doesn't know device 5000.
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
@@ -254,9 +264,7 @@ async def test_flua_namespace_ids_never_forward(tmp_path, capsys, mock_hc3, monk
     out = capsys.readouterr().out
     assert "FLOA_NS 404" in out  # answered locally, no forwarding
     assert "HC3_NS 200 hc3-device" in out  # lower ids still reach the HC3
-    forwarded = [
-        r for r in _MockHc3.requests_seen if r.startswith("/api/devices/5001")
-    ]
+    forwarded = [r for r in _MockHc3.requests_seen if r.startswith("/api/devices/5001")]
     assert forwarded == []
 
 
@@ -309,7 +317,9 @@ async def test_refresh_state_subscriber_receives_sim_events(tmp_path, capsys, mo
 
 
 @pytest.mark.asyncio
-async def test_online_poller_mirrors_events_into_buffer(tmp_path, capsys, mock_hc3, monkeypatch) -> None:
+async def test_online_poller_mirrors_events_into_buffer(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
     # online mode: the poller long-polls the (mock) HC3's refreshStates and
     # mirrors events into the local buffer + the Lua subscribers
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
@@ -367,10 +377,7 @@ async def test_keep_alive_directive_keeps_engine_pending(
     finally:
         await engine.stop()
 
-    script.write_text(
-        "--%%keep-alive:true\n"
-        "setTimeout(function() print('KEEP') end, 50)\n"
-    )
+    script.write_text("--%%keep-alive:true\nsetTimeout(function() print('KEEP') end, 50)\n")
     engine = LuaEngine(api_mode="remote")
     await engine.start()
     try:
@@ -383,10 +390,7 @@ async def test_keep_alive_directive_keeps_engine_pending(
         await engine.stop()
 
     # a keep-alive QA that exits releases the hold (exit() records a falsy 0)
-    script.write_text(
-        "--%%keep-alive:true\n"
-        "setTimeout(function() exit() end, 50)\n"
-    )
+    script.write_text("--%%keep-alive:true\nsetTimeout(function() exit() end, 50)\n")
     engine = LuaEngine(api_mode="remote")
     await engine.start()
     try:
@@ -520,7 +524,9 @@ def test_cli_main_file_offline_directive_forces_sim(tmp_path, mock_hc3) -> None:
 
 
 @pytest.mark.asyncio
-async def test_offline_directive_pins_secondary_qa_to_sim(tmp_path, capsys, mock_hc3, monkeypatch) -> None:
+async def test_offline_directive_pins_secondary_qa_to_sim(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
     # in an online run, a SECONDARY QA with --%%offline:true stays in the sim
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.setenv("HC3_URL", mock_hc3)
@@ -528,7 +534,8 @@ async def test_offline_directive_pins_secondary_qa_to_sim(tmp_path, capsys, mock
     monkeypatch.setenv("HC3_PASSWORD", "secret")
     a = tmp_path / "a.lua"
     a.write_text(
-        "setTimeout(function() local d, s = api.get('/devices/45'); print('A', s, d and d.name) end, 20)\n"
+        "setTimeout(function() local d, s = api.get('/devices/45'); "
+        "print('A', s, d and d.name) end, 20)\n"
     )
     b = tmp_path / "b.lua"
     b.write_text(

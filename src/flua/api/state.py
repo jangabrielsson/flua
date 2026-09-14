@@ -14,7 +14,7 @@ import copy
 import time
 from typing import Any
 
-from ..devices import DEFAULT_ROOM_ID, skeleton_for
+from ..devices import skeleton_for
 
 FIRST_RUNTIME_ID = 900000
 
@@ -151,7 +151,9 @@ class SimState:
         )
 
     @staticmethod
-    def _envelope(event_type: str, now: float, source_type: str, device_id: int, data: dict[str, Any]) -> dict[str, Any]:
+    def _envelope(
+        event_type: str, now: float, source_type: str, device_id: int, data: dict[str, Any]
+    ) -> dict[str, Any]:
         """The real HC3's event envelope: type/created/sourceType/objects/data."""
         return {
             "type": event_type,
@@ -180,7 +182,12 @@ class SimState:
                     now,
                     "system",
                     device_id,
-                    {"id": int(device_id), "name": name, "newValue": new_value, "oldValue": old_value},
+                    {
+                        "id": int(device_id),
+                        "name": name,
+                        "newValue": new_value,
+                        "oldValue": old_value,
+                    },
                 ),
             )
         )
@@ -197,7 +204,12 @@ class SimState:
                     now,
                     "user",
                     device_id,
-                    {"id": int(device_id), "actionName": action, "args": list(args), "isSupportedByDevice": True},
+                    {
+                        "id": int(device_id),
+                        "actionName": action,
+                        "args": list(args),
+                        "isSupportedByDevice": True,
+                    },
                 ),
             )
         )

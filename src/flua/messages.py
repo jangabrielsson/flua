@@ -14,40 +14,59 @@ from typing import Any
 
 # --- Lua -> Python (inbound, posted by _PY.post) -----------------------------
 
-SET_TIMEOUT = "setTimeout"      # {"id": int, "delay": int, "qa": int?}  ms + QA attribution
-HTTP_REQUEST = "httpRequest"    # {"id": int, "qa": int?, "url": str, "method": str, "headers": dict?, "data": str?, "timeout": number?}
-TCP_CONNECT = "tcpConnect"      # {"id": int, "qa": int?, "host": str, "port": int, "timeout": number?}
-TCP_SEND = "tcpSend"            # {"id": int, "qa": int?, "conn": int, "data": str}
-TCP_READ = "tcpRead"            # {"id": int, "qa": int?, "conn": int, "pattern"?: "*l"|"*a"|int, "delimiter"?: str}
-UDP_SEND = "udpSend"            # {"id": int, "qa": int?, "conn": int, "data": str, "ip": str, "port": int}
-UDP_RECEIVE = "udpReceive"      # {"id": int, "qa": int?, "conn": int}
-WS_CONNECT = "wsConnect"        # {"id": int, "qa": int?, "conn": int, "url": str, "timeout"?: number}
-WS_SEND = "wsSend"              # {"id": int, "qa": int?, "conn": int, "data": str}
-MQTT_CONNECT = "mqttConnect"    # {"qa": int?, "conn": int, "uri": str, "options": dict}
-MQTT_SUBSCRIBE = "mqttSubscribe"  # {"qa": int?, "conn": int, "packetId": int, "topics": [[topic, qos], ...]}
+SET_TIMEOUT = "setTimeout"  # {"id": int, "delay": int, "qa": int?}  ms + QA attribution
+HTTP_REQUEST = (
+    "httpRequest"  # {"id": int, "qa": int?, "url": str, "method": str,
+    # "headers": dict?, "data": str?, "timeout": number?}
+)
+TCP_CONNECT = "tcpConnect"  # {"id": int, "qa": int?, "host": str, "port": int, "timeout": number?}
+TCP_SEND = "tcpSend"  # {"id": int, "qa": int?, "conn": int, "data": str}
+TCP_READ = (
+    "tcpRead"  # {"id": int, "qa": int?, "conn": int, "pattern"?: "*l"|"*a"|int, "delimiter"?: str}
+)
+UDP_SEND = "udpSend"  # {"id": int, "qa": int?, "conn": int, "data": str, "ip": str, "port": int}
+UDP_RECEIVE = "udpReceive"  # {"id": int, "qa": int?, "conn": int}
+WS_CONNECT = "wsConnect"  # {"id": int, "qa": int?, "conn": int, "url": str, "timeout"?: number}
+WS_SEND = "wsSend"  # {"id": int, "qa": int?, "conn": int, "data": str}
+MQTT_CONNECT = "mqttConnect"  # {"qa": int?, "conn": int, "uri": str, "options": dict}
+MQTT_SUBSCRIBE = (
+    "mqttSubscribe"  # {"qa": int?, "conn": int, "packetId": int, "topics": [[topic, qos], ...]}
+)
 MQTT_UNSUBSCRIBE = "mqttUnsubscribe"  # {"qa": int?, "conn": int, "packetId": int, "topics": [...]}
-MQTT_PUBLISH = "mqttPublish"    # {"qa": int?, "conn": int, "packetId": int, "topic": str, "payload": str, "qos": int, "retain": bool}
+MQTT_PUBLISH = (
+    "mqttPublish"  # {"qa": int?, "conn": int, "packetId": int, "topic": str,
+    # "payload": str, "qos": int, "retain": bool}
+)
 MQTT_DISCONNECT = "mqttDisconnect"  # {"qa": int?, "conn": int}
 CLEAR_TIMEOUT = "clearTimeout"  # {"id": int}
-LOG = "log"                     # {"level": "info|warning|error", "text": str}
-EXIT = "exit"                   # {"code": int}
-QA_LOADED = "qaLoaded"          # {"id": int}  a QA finished loading its code
+LOG = "log"  # {"level": "info|warning|error", "text": str}
+EXIT = "exit"  # {"code": int}
+QA_LOADED = "qaLoaded"  # {"id": int}  a QA finished loading its code
 
 # --- Python -> Lua (outbound, delivered via _PY.dispatch) --------------------
 
 TIMER_EXPIRED = "timerExpired"  # {"id": int}  run registered callback id
-START_QA = "startQA"            # {"id": int, "path": str, "config": dict, "arg0": str}
-HTTP_RESULT = "httpResult"      # {"id": int, "qa": int?, "status": int?, "data": str?, "headers": dict?, "error": str?}
-TCP_RESULT = "tcpResult"        # {"id": int, "qa": int?, "ok": bool, "conn"?: int, "data"?: str, "err"?: str}
-UDP_RESULT = "udpResult"        # {"id": int, "qa": int?, "ok": bool, "data"?: str, "err"?: str}
-WS_EVENT = "wsEvent"            # {"qa": int, "conn": int, "event": str, "data"?: str}
-MQTT_EVENT = "mqttEvent"        # {"qa": int, "conn": int, "event": str, "data"?: dict}
-REFRESH_STATE_EVENT = "refreshStateEvent"  # {"event": {...}}  pump-delivered to RefreshStateSubscribers
-RUN_PREAMBLE = "runPreamble"    # {"code": str}  -e bootstrap runs in the main Lua state
-RESTART_QA = "restartQA"        # {"id": int, "path": str, "config": dict, "files": [{name,path}], "arg0": str}
-QA_VARS = "qaVars"              # {"id": int, "vars": {name: value}}  evaluated --%%var values
+START_QA = "startQA"  # {"id": int, "path": str, "config": dict, "arg0": str}
+HTTP_RESULT = (
+    "httpResult"  # {"id": int, "qa": int?, "status": int?, "data": str?,
+    # "headers": dict?, "error": str?}
+)
+TCP_RESULT = (
+    "tcpResult"  # {"id": int, "qa": int?, "ok": bool, "conn"?: int, "data"?: str, "err"?: str}
+)
+UDP_RESULT = "udpResult"  # {"id": int, "qa": int?, "ok": bool, "data"?: str, "err"?: str}
+WS_EVENT = "wsEvent"  # {"qa": int, "conn": int, "event": str, "data"?: str}
+MQTT_EVENT = "mqttEvent"  # {"qa": int, "conn": int, "event": str, "data"?: dict}
+REFRESH_STATE_EVENT = (
+    "refreshStateEvent"  # {"event": {...}}  pump-delivered to RefreshStateSubscribers
+)
+RUN_PREAMBLE = "runPreamble"  # {"code": str}  -e bootstrap runs in the main Lua state
+RESTART_QA = (
+    "restartQA"  # {"id": int, "path": str, "config": dict, "files": [{name,path}], "arg0": str}
+)
+QA_VARS = "qaVars"  # {"id": int, "vars": {name: value}}  evaluated --%%var values
 DEVICE_ACTION = "deviceAction"  # {"id": int, "action": str, "args": list}
-CUSTOM_EVENT = "customEvent"    # {"name": str}
+CUSTOM_EVENT = "customEvent"  # {"name": str}
 
 
 def set_timeout(timer_id: int, delay_ms: int, qa: int | None = None) -> dict[str, Any]:

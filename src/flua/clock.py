@@ -60,6 +60,16 @@ class VirtualClock:
         """
         self._frozen_since = time.monotonic()
 
+    def rebase(self) -> None:
+        """Restart the tick baseline now (the run's real start).
+
+        Wall time spent on interpreter/engine startup before the first tick
+        must not become virtual time: in accelerated mode those milliseconds
+        would otherwise jump virtual time far past a --run-for horizon, and
+        the horizon cap would kill every timer before it fires.
+        """
+        self._last = time.monotonic()
+
     def elapsed(self) -> float:
         """Virtual seconds since the engine started."""
         return self.time - self._start
