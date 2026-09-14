@@ -246,6 +246,11 @@ new type:
 
 ## Architecture
 
+**Full detail, with diagrams, lives in [ARCHITECTURE.md](ARCHITECTURE.md)** —
+the single-entry discipline, message flow, the dispatcher's hybrid routing,
+worker threads, virtual time, online mode, and the invariants. This section
+is the short version.
+
 ```
 Lua code  -> _PY.post(msg)          -> inbound deque
 pump      -> handler(msg)           -> timers, api state, worker tasks
