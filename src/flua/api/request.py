@@ -28,6 +28,7 @@ class ApiRequest:
     body: Any
     path_params: dict[str, str] = field(default_factory=dict)
     qa_id: int | None = None
+    clock: Any = None  # the engine's virtual clock (refreshStates timestamps)
     # Filled by Api.dispatch: handlers call this to hand an event to the
     # engine's outbound queue (device actions, custom events). None when a
     # handler is invoked outside dispatch.

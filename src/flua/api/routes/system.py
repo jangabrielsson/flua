@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from ..request import ApiRequest
@@ -46,16 +47,32 @@ def room_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def refresh_states(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    """GET /refreshStates?last=N: changes and events with seq > N."""
+    """GET /refreshStates?last=N — the HC3's polling contract.
+
+    The base fields (status/last/date/timestamp/timestampMillis) are always
+    present, like the real HC3's idle response; changes/events appear only
+    when something has been emitted since ``last`` (they vary with activity
+    on the real HC3 too).
+    """
     try:
         last = int(req.query.get("last", 0) or 0)
     except ValueError:
         return None, 400
-    return {
+    epoch = time.time() if req.clock is None else req.clock.time
+    response: dict[str, Any] = {
+        "status": "IDLE",
         "last": state.refresh_seq(),
-        "changes": [entry for seq, entry in state.changes if seq > last],
-        "events": [entry for seq, entry in state.events if seq > last],
-    }, 200
+        "date": time.strftime("%H:%M | %d.%m.%Y", time.localtime(epoch)),
+        "timestamp": int(epoch),
+        "timestampMillis": int(epoch * 1000),
+    }
+    changes = [entry for seq, entry in state.changes if seq > last]
+    events = [entry for seq, entry in state.events if seq > last]
+    if changes:
+        response["changes"] = changes
+    if events:
+        response["events"] = events
+    return response, 200
 
 
 def profiles_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:

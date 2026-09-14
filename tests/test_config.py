@@ -1,6 +1,6 @@
 """Unit tests for --%% annotation parsing (no lupa needed)."""
 
-from flua.config import parse_annotations, parse_scalar
+from flua.config import parse_annotations, parse_scalar, peek_offline
 
 
 def test_scalar_values() -> None:
@@ -64,10 +64,10 @@ def test_file_directives_collect_in_order() -> None:
 
 
 def test_var_directives_merge_with_string_values() -> None:
-    # --%%var:name=value — values stay literal strings, repeated directives
-    # merge, and several vars may share one line
-    source = "--%%var:x=1\n--%%var:y=hello\n--%%var:z=1,w=2\n"
-    assert parse_annotations(source) == {"var": {"x": "1", "y": "hello", "z": "1", "w": "2"}}
+    # --%%var:name=expr — raw expressions, repeated directives merge; the
+    # whole value after the first '=' is kept (tables contain commas)
+    source = "--%%var:x=1\n--%%var:y='hello'\n--%%var:t={a=1,b=2}\n"
+    assert parse_annotations(source) == {"var": {"x": "1", "y": "'hello'", "t": "{a=1,b=2}"}}
 
 
 def test_property_directives_merge_with_scalar_values() -> None:
@@ -77,6 +77,15 @@ def test_property_directives_merge_with_scalar_values() -> None:
     assert parse_annotations(source) == {
         "property": {"value": True, "delay": 30, "x": 1, "y": 2}
     }
+
+
+def test_peek_offline_true_forms() -> None:
+    assert peek_offline("--%%offline:true\nprint('x')\n")
+    assert peek_offline("--%%name:x\n--%%offline:true\n")
+    assert not peek_offline("--%%offline:false\n")
+    assert not peek_offline("print('x')\n")  # not a directive header
+    # after EOH the header is over: not a directive
+    assert not peek_offline("-- --------------- EOH ---------------\n--%%offline:true\n")
 
 
 def test_eoh_stops_parsing() -> None:

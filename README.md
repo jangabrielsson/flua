@@ -313,8 +313,9 @@ automatically).
 
 ## Virtual time
 
-Timers run on the engine's virtual clock, and `os.time()` / `os.clock()` /
-`os.date()` (and `_PY.now()`) read that clock. Modes, via CLI flags:
+Timers run on the engine's virtual clock, and `os.time()` (integer seconds)
+and `os.date()` (and `_PY.now()`) read that clock; `os.clock()` stays Lua's
+real runtime clock. Modes, via CLI flags:
 
 - `--speed 1` (default) — realtime; virtual time tracks the wall clock
 - `--speed N` — virtual time runs N times faster; timers fire at the correct
@@ -370,6 +371,14 @@ the value property); repeated directives merge. The plural
 `--%%properties:` form still works the same way.
 
 Parameters are either **global** or **local**:
+
+`--%%var:name=expr` initializes a QuickApp variable, where `expr` is a Lua
+expression evaluated at bootstrap with `{config, os}` in scope — so values
+can be Lua data (`{a=1}`, `42`, `'text'`) or come from the Lua config file
+(`.flua.lua`, local or `~/.flua.lua`, legacy `~/.plua/config.lua` — a chunk
+that `return`s a table, merged into `_FLUA.config`) or the .env chain
+(`os.getenv("X")`). Initializers only set missing variables, so runtime
+changes persist across restarts.
 
 - **Local** (everything not listed below) stay on the QA's own `config` —
   e.g. `--%%name:qa1` gives that QA `config.name`.

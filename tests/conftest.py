@@ -1,9 +1,27 @@
-"""Shared fixtures: threaded localhost servers for socket tests."""
+"""Shared fixtures: threaded localhost servers for socket tests, plus a
+HOME-isolation fixture.
 
+The autouse fixture isolates HOME for every test: the developer's real
+~/.env (HC3 credentials) and ~/.flua.lua must never leak into the suite —
+flua's CLI defaults to ONLINE mode when HC3 credentials exist in the
+environment, which would silently send plain tests at a production
+controller. Live-HC3 runs (HC3_TEST=1) keep the real environment.
+"""
+
+import os
 import socket
 import threading
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def _isolate_home(tmp_path, monkeypatch):
+    if os.environ.get("HC3_TEST") == "1":
+        yield
+        return
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    yield
 
 
 class EchoServer:

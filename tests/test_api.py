@@ -7,6 +7,7 @@ tests run QAs against the API through the engine, and a CLI test covers
 
 import asyncio
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -311,15 +312,21 @@ def test_cli_seed_offline(tmp_path) -> None:
 
 
 def test_cli_api_remote_rejected(tmp_path) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
     result = subprocess.run(
         [sys.executable, "-m", "flua", "--api", "remote", "-e", "exit(0)"],
+        env={
+            **{k: v for k, v in os.environ.items() if not k.startswith("HC3_")},
+            "HOME": str(home),
+        },
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
         timeout=60,
     )
     assert result.returncode == 2
-    assert "not implemented" in result.stderr
+    assert "HC3_URL" in result.stderr
 
 
 # -- M2: actions, events, scenes, alarms, refreshStates, profiles ---------------
@@ -328,15 +335,15 @@ def test_cli_api_remote_rejected(tmp_path) -> None:
 def test_device_action_emits(api: Api) -> None:
     api.register_qa(5000, "qa", None, {})
     assert api.dispatch("POST", "/devices/5000/action/turnOn", {"args": [1, 2]}) == (None, 202)
-    assert api.emitted == [
-        {"type": "deviceAction", "id": 5000, "action": "turnOn", "args": [1, 2]}
-    ]
+    assert api.emitted[0] == {"type": "deviceAction", "id": 5000, "action": "turnOn", "args": [1, 2]}
+    assert api.emitted[1]["type"] == "refreshStateEvent"
+    assert api.emitted[1]["event"]["type"] == "DeviceActionRanEvent"
 
 
 def test_device_action_without_args(api: Api) -> None:
     api.register_qa(5000, "qa", None, {})
     assert api.dispatch("POST", "/devices/5000/action/setValue") == (None, 202)
-    assert api.emitted[-1]["args"] == []
+    assert api.emitted[0]["args"] == []
 
 
 def test_device_action_missing_device(api: Api) -> None:
@@ -352,8 +359,8 @@ def test_group_action(api: Api) -> None:
     )
     assert status == 202
     assert data == {"devices": [5000, 5001]}
-    assert [m["id"] for m in api.emitted] == [5000, 5001]
-    assert all(m["action"] == "setValue" and m["args"] == [True] for m in api.emitted)
+    actions = [m for m in api.emitted if m["type"] == "deviceAction"]
+    assert [m["id"] for m in actions] == [5000, 5001]
 
 
 def test_custom_event(api: Api) -> None:
@@ -413,14 +420,35 @@ def test_refresh_states(api: Api) -> None:
     data, status = api.dispatch("GET", "/refreshStates")
     assert status == 200
     assert data["last"] == 1
-    assert data["changes"] == [{"id": 5000, "name": "value", "newValue": True, "oldValue": False}]
+    assert data["status"] == "IDLE"  # the real HC3's idle base shape
+    assert isinstance(data["date"], str) and isinstance(data["timestamp"], int)
+    assert isinstance(data["timestampMillis"], int)
+    # state updates are EVENTS on the real HC3 (changes is UI noise)
+    assert "changes" not in data
+    events = data["events"]
+    assert len(events) == 1
+    assert events[0]["type"] == "DevicePropertyUpdatedEvent"
+    assert events[0]["sourceType"] == "system"
+    assert events[0]["objects"] == [{"objectType": "device", "objectId": 5000}]
+    assert events[0]["data"] == {"id": 5000, "name": "value", "newValue": True, "oldValue": False}
+    assert isinstance(events[0]["created"], int) and isinstance(events[0]["createdMillis"], int)
+    # the same value again: no state change, no event (the user's rule)
+    api.dispatch("POST", "/plugins/updateProperty", {"deviceId": 5000, "propertyName": "value", "value": True})
     data, _ = api.dispatch("GET", "/refreshStates?last=1")
-    assert data["changes"] == [] and data["events"] == []
+    assert "events" not in data
+    data, _ = api.dispatch("GET", "/refreshStates?last=1")
+    assert "changes" not in data and "events" not in data  # nothing new: absent
     api.dispatch("POST", "/customEvents/x")
     data, _ = api.dispatch("GET", "/refreshStates?last=1")
     assert data["last"] == 2
     assert data["events"] == [{"type": "CustomEvent", "data": {"name": "x"}}]
     assert api.dispatch("GET", "/refreshStates?last=abc") == (None, 400)
+    # configuration updates (name etc.) are the "changes" feed
+    api.dispatch("PUT", "/devices/5000", {"name": "renamed"})
+    data, _ = api.dispatch("GET", "/refreshStates?last=2")
+    assert data["changes"] == [
+        {"id": 5000, "name": "name", "newValue": "renamed", "oldValue": "qa"}
+    ]
 
 
 def test_profiles(api: Api) -> None:

@@ -124,12 +124,22 @@ def install_bindings(engine: "LuaEngine") -> None:
     # HC3 REST bridge: api.get/post/put/delete -> (data, status). Synchronous
     # like the real HC3 builtins; offline it dispatches to the simulated HC3
     # (running QAs + seeded state), online mode will route to the real HC3.
-    def api_call(method: str, url: str, body: object) -> tuple[object, int]:
-        data, status = engine.api.dispatch(method, url, lua_to_python(body))
+    def api_call(method: str, url: str, body: object, qa_id: int | None = None) -> tuple[object, int]:
+        data, status = engine.api.dispatch(method, url, lua_to_python(body), qa_id=qa_id)
         if data is None:
             return None, status
         if not isinstance(data, (dict, list, tuple)):
             return data, status  # scalars cross the bridge natively
+        return lua.table_from(data, recursive=True), status
+
+    # api.hc3.*: the real HC3 directly (no hybrid dispatch) — callhc3 and
+    # test code; falls back to the local sim without a remote backend.
+    def api_hc3(method: str, url: str, body: object) -> tuple[object, int]:
+        data, status = engine.api.dispatch_hc3(method, url, lua_to_python(body))
+        if data is None:
+            return None, status
+        if not isinstance(data, (dict, list, tuple)):
+            return data, status
         return lua.table_from(data, recursive=True), status
 
     # Enriched device for a QA (type skeleton + config, registered by the
@@ -163,6 +173,7 @@ def install_bindings(engine: "LuaEngine") -> None:
     py["to_json"] = to_json
     py["parse_json"] = parse_json
     py["api"] = api_call
+    py["api_hc3"] = api_hc3
     py["device_for"] = device_for
     py["load_qa_file"] = load_qa_file
     py["qa_temp_file"] = qa_temp_file

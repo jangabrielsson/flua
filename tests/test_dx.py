@@ -254,3 +254,19 @@ def test_getenv_falls_back_to_process_env(tmp_path, monkeypatch) -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "PROC from-shell" in result.stdout
+
+
+# -- os.time integrity ---------------------------------------------------------
+
+
+def test_os_time_returns_whole_seconds(tmp_path) -> None:
+    # Lua's os.time() returns integer seconds — never the clock's fractions
+    script = tmp_path / "t.lua"
+    script.write_text(
+        "print('INT', os.time() % 1 == 0, type(os.time()))\n"
+        "setTimeout(function() print('INT2', os.time() % 1 == 0) end, 20)\n"
+    )
+    result = _run(str(script))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "INT true number" in result.stdout
+    assert "INT2 true" in result.stdout

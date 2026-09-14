@@ -142,6 +142,67 @@ def test_examples_qa_pair_calls_each_other() -> None:
     assert "qa3: turned off" in result.stdout
 
 
+def test_example_api_first_qa_gets_5000_and_getvalue() -> None:
+    # fibaro.getValue(self.id, "value") — the QA's OWN device, first QA = 5000
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "examples/api.lua"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "[api-demo5000]" in result.stdout
+    assert "Value: false" in result.stdout
+
+
+def test_mobdebug_e_bootstrap_does_not_consume_qa_id() -> None:
+    # the VS Code mobdebug extension launches interpreters as
+    # -l <package> -e "<debugger bootstrap>" <script> — the bootstrap must
+    # run as a main-state preamble, NOT as QA 5000, so the script keeps 5000
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "flua",
+            "-l",
+            "mobdebug",
+            "-e",
+            'require("mobdebug")',
+            "examples/api.lua",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "[api-demo5000]" in result.stdout
+    assert "api-demo5001" not in result.stdout
+
+
+@pytest.mark.asyncio
+async def test_fibaro_get_returns_value_and_modified(tmp_path, capsys) -> None:
+    script = tmp_path / "g.lua"
+    script.write_text(
+        "function QuickApp:onInit()\n"
+        "  local v, m = fibaro.get(self.id, 'value')\n"
+        "  print('GET', v, type(m) == 'number')\n"
+        "  print('GVAL', fibaro.getValue(self.id, 'value'))\n"
+        "end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await asyncio.sleep(0.3)
+        out = capsys.readouterr().out
+        assert "GET false true" in out
+        assert "GVAL false" in out
+    finally:
+        await engine.stop()
+
+
 # -- dynamic loading (loadQAfromFile / loadQAfromString) ------------------------
 
 

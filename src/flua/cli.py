@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__, messages
-from .config import parse_annotations, split_annotations
+from .config import parse_annotations, peek_offline, split_annotations
 from .clock import parse_start_time
 from .engine import LuaEngine
 
@@ -100,9 +100,10 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--api",
         choices=["local", "remote"],
-        default="local",
-        help="REST API backend: local = simulated HC3 in flua (default); "
-        "remote = the real HC3 (not implemented yet)",
+        default=None,
+        help="explicit REST API backend. Default: the main QA's --%%offline:true "
+        "selects offline; otherwise online when HC3 credentials exist in the "
+        "environment, else offline",
     )
     parser.add_argument(
         "--seed",
@@ -249,8 +250,6 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         return _check_cli(parser, args)
 
     speed, max_hours, start_epoch = _resolve_runtime(parser, args, global_config)
-    if args.api != "local":
-        parser.error("--api remote: not implemented yet (offline sim only)")
     seed: dict[str, Any] | None = None
     if args.seed:
         try:
@@ -261,14 +260,30 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             parser.error(f"invalid seed JSON: {exc}")
         if not isinstance(seed, dict):
             parser.error("seed file must contain a JSON object")
-    engine = LuaEngine(
+    try:
+        # plua behavior: PEEK at the main QA file's raw header for
+        # --%%offline:true (before the engine starts — the standard parse
+        # runs after); an explicit --api flag always wins. Without either,
+        # the engine resolves: online if HC3 credentials exist, else offline.
+        api_mode = args.api
+        if api_mode is None and qa_specs:
+            main_path, main_code, _ = qa_specs[0]
+            if main_path is not None and Path(main_path).exists():
+                main_source = Path(main_path).read_text(encoding="utf-8")
+            else:
+                main_source = main_code or ""
+            if peek_offline(main_source):
+                api_mode = "local"
+        engine = LuaEngine(
         start=start_epoch,
         speed=speed,
         config=global_config,
         color=args.color,
-        api_mode=args.api,
+        api_mode=api_mode,
         seed=seed,
-    )
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
     await engine.start()
     if not args.nogreet:
         # route the greeting through the message queue so it shares the
@@ -288,6 +303,15 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         env_port = os.environ.get("MOBDEBUG_PORT")
         if env_port:
             _start_debugger(engine, int(env_port))
+
+    # -e code that is a debugger bootstrap (the VS Code mobdebug extension
+    # launches interpreters with -l package -e "<bootstrap>") must NOT become
+    # a QA — otherwise the user's script would get QA id 5001 instead of 5000.
+    # It runs as a main-state preamble before the scripts.
+    preambles = [spec for spec in qa_specs if spec[0] is None and "mobdebug" in (spec[1] or "")]
+    qa_specs = [spec for spec in qa_specs if spec not in preambles]
+    for _path, code, _params in preambles:
+        engine.enqueue_outbound(messages.run_preamble(code or ""))
 
     watch_paths: dict[str, set[int]] = {}
     for path, code, local_params in qa_specs:

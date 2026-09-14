@@ -465,19 +465,13 @@ local listeners = {}
 -- Starts the refresh state subscriber
 ---@diagnostic disable-next-line: undefined-field
 function RefreshStateSubscriber:run()
-  function _PY.newRefreshStatesEvent(jsonevent)
-  --print("New jsonevent",jsonevent) -- jsonevent)
-  local event = json.decode(jsonevent)
-  for l,_ in pairs(listeners) do
-    pcall(l,event)
-  end
-end
-  fibaro.plua:startRefreshStatesPolling()
-  listeners[self.handle] = true
+  -- flua: events arrive through the message pump (handlers.refreshStateEvent)
+  -- instead of the plua _PY.newRefreshStatesEvent bridge hack
+  _FLUA.refreshStateListeners[self.handle] = true
 end
 
 -- Stops the refresh state subscriber
 ---@diagnostic disable-next-line: undefined-field
 function RefreshStateSubscriber:stop() 
-  listeners[self.handle] = nil
+  _FLUA.refreshStateListeners[self.handle] = nil
 end

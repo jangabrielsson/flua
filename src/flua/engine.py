@@ -41,6 +41,7 @@ from .config import parse_annotations, split_annotations
 from .environment import EnvChain
 from .devices import catalog_types
 from .http import http_call
+from .hc3 import Hc3Remote
 from .mqtt import MqttPool
 from .api.state import public
 from .sync_socket import SyncTCPSockets, SyncUDPSockets
@@ -58,26 +59,18 @@ _PROPERTY_DIRECTIVES = {
     "manufacturer": "manufacturer",
 }
 
-# .fqa export whitelist: the only device properties a real HC3 accepts in a
-# package. Everything else is dynamic (created by the system at device
-# creation) and must not travel.
+# .fqa export whitelist: the EXACT property set a real HC3 5.21x exports in
+# a package (verified against a live export). Everything else is dynamic and
+# must not travel.
 _EXPORT_PROPERTIES = frozenset(
     {
+        "viewLayout",
+        "uiView",
+        "useUiView",
         "uiCallbacks",
         "quickAppVariables",
-        "uiView",
-        "viewLayout",
-        "apiVersion",
-        "useEmbededView",
-        "manufacturer",
-        "useUiView",
-        "model",
-        "buildNumber",
-        "supportedDeviceRoles",
-        "userDescription",
         "typeTemplateInitialized",
-        "quickAppUuid",
-        "deviceRole",
+        "userDescription",
     }
 )
 
@@ -114,10 +107,32 @@ class LuaEngine:
         # Blocking LuaSocket-compatible sockets for mobdebug (main-thread,
         # loop-freezing by design — see sync_socket.py).
         self.sync_sockets = SyncTCPSockets()
-        # HC3 REST API: offline sim (running QAs + seeded state) today, the
-        # remote HC3 later. Dispatch never blocks the pump.
+        self._running = False
+        self._exit_code = 0
+        self._pump_task: asyncio.Task[None] | None = None
+        self.env = EnvChain()  # os.getenv chain: local .env > ~/.env > process env
+        # HC3 REST API: the offline sim by default, the real HC3 with
+        # --api remote (credentials from the environment chain).
+        if api_mode is None:
+            # no explicit flag: online when HC3 credentials are configured,
+            # offline otherwise
+            api_mode = "remote" if self._hc3_configured() else "local"
         if api_mode != "local":
-            raise ValueError(f"unsupported api mode {api_mode!r}: only 'local' is implemented")
+            base_url = self.env.get("HC3_URL")
+            host = self.env.get("HC3_HOST")
+            if not base_url and host:
+                base_url = f"http://{host}/"
+            if not base_url:
+                raise ValueError("--api remote requires HC3_URL (or HC3_HOST) in the environment")
+            self.hc3 = Hc3Remote(
+                base_url,
+                user=self.env.get("HC3_USER"),
+                password=self.env.get("HC3_PASSWORD"),
+                pin=self.env.get("HC3_PIN"),
+                on_auth_error=self._on_hc3_auth_error,
+            )
+        else:
+            self.hc3 = None
         self.api = Api(self, seed)
         self._handlers: dict[str, Callable[[dict[str, Any]], Any]] = {
             messages.SET_TIMEOUT: self._handle_set_timeout,
@@ -135,19 +150,16 @@ class LuaEngine:
             messages.MQTT_PUBLISH: self._handle_mqtt_publish,
             messages.MQTT_DISCONNECT: self._handle_mqtt_disconnect,
             messages.CLEAR_TIMEOUT: self._handle_clear_timeout,
+            messages.QA_VARS: self._handle_qa_vars,
             messages.LOG: self._handle_log,
             messages.EXIT: self._handle_exit,
             messages.QA_LOADED: self._handle_qa_loaded,
         }
-        self._running = False
-        self._exit_code = 0
-        self._pump_task: asyncio.Task[None] | None = None
         self._next_qa_id = 5000  # engine-assigned QA ids start at 5000
         self._qas: dict[int, dict[str, Any]] = {}  # QA directory (engine-owned)
         # temp files backing loadQAfromString QAs; deleted once the QA loads
         self._temp_qa_paths: set[str] = set()
         self._qa_file_dirs: set[str] = set()  # temp dirs for api-managed QA files
-        self.env = EnvChain()  # os.getenv chain: local .env > ~/.env > process env
         # in-flight net.HTTPClient tasks: they count as pending work, so the
         # CLI keeps running until responses are delivered
         self._http_tasks: set[asyncio.Task[None]] = set()
@@ -159,6 +171,47 @@ class LuaEngine:
         self._loop: asyncio.AbstractEventLoop | None = None
         self.qa_mqtt = MqttPool(self._on_mqtt_event)
         install_bindings(self)
+        # .flua.lua (local > home > legacy ~/.plua/config.lua)
+        self._load_lua_config()
+
+    def _hc3_configured(self) -> bool:
+        base = self.env.get("HC3_URL") or self.env.get("HC3_HOST")
+        return bool(base)
+
+    def qa_is_offline(self, qa_id: int | None) -> bool:
+        """--%%offline:true on a QA pins its api.* calls to the sim."""
+        if qa_id is None:
+            return False
+        info = self._qas.get(int(qa_id))
+        return bool(info and info.get("config", {}).get("offline"))
+
+    @staticmethod
+    def _find_lua_config() -> Path | None:
+        for path in (
+            Path.cwd() / ".flua.lua",
+            Path.home() / ".flua.lua",
+            Path.home() / ".plua" / "config.lua",
+        ):
+            if path.exists():
+                return path
+        return None
+
+    def _load_lua_config(self) -> None:
+        """Load the Lua config file into the Lua state as _FLUA.configFile.
+        Per-QA configs merge it at bootstrap (the file is the base, --%%
+        annotations win). The file must ``return { ... }`` — a bare table
+        is not a valid Lua chunk."""
+        path = self._find_lua_config()
+        if path is None:
+            return
+        source = path.read_text(encoding="utf-8")
+        try:
+            table = self._lua.execute(source)
+        except Exception as exc:
+            raise ValueError(f"error in Lua config {path}: {exc}") from exc
+        if lupa.lua_type(table) != "table":
+            raise ValueError(f"Lua config {path} must return a table")
+        self._lua.globals()["_FLUA"]["configFile"] = table
 
     # -- bridge surface (used by bindings.py) ---------------------------------
 
@@ -267,7 +320,7 @@ class LuaEngine:
         # plugin device exists before onInit executes, and onInit's own api
         # calls (internalStorage, updateProperty) must find it.
         self.api.register_qa(
-            qa_id, name, qa_config.get("type"), device_properties, qa_config.get("var")
+            qa_id, name, qa_config.get("type"), device_properties
         )
         return qa_id
 
@@ -376,6 +429,61 @@ class LuaEngine:
             Path(path).parent.rmdir()
 
     # -- quickApp files API (multi-file QAs + .fqa export) -----------------------
+
+    def _on_hc3_auth_error(self, status: int, url: str) -> None:
+        """The HC3 locks after 4 failed credential attempts — abort NOW and
+        never retry (this fires from the synchronous remote dispatch)."""
+        message = (
+            f"HC3 authentication failed (HTTP {status} for {url}): "
+            "check HC3_USER/HC3_PASSWORD in the environment — flua exits "
+            "immediately, the HC3 locks itself after 4 wrong attempts."
+        )
+        print(message, flush=True)
+        logger.error(message)
+        self._exit_code = 1
+        self._running = False
+
+    async def _hc3_poll(self) -> None:
+        """Long-poll the real HC3's refreshStates (online mode) and mirror
+        incoming events into the local buffer + the Lua
+        RefreshStateSubscribers. The HC3 returns immediately with events, or
+        after ~30s idle — then we simply retry."""
+        while self._running:
+            try:
+                query = {} if self._hc3_last is None else {"last": self._hc3_last}
+                data, status = await asyncio.to_thread(
+                    self.hc3.request,
+                    "GET",
+                    "/refreshStates",
+                    query,
+                    None,
+                    40.0,  # the HC3's long-poll blocks ~30s when idle
+                )
+                if status in (401, 403):
+                    # the auth guard has aborted the engine — stop polling
+                    # immediately: every retry is another attempt against the
+                    # HC3's 4-attempt lockout budget
+                    break
+                if status == 200 and isinstance(data, dict):
+                    self._hc3_last = int(data.get("last") or self._hc3_last)
+                    for entry in data.get("events") or []:
+                        self._mirror_event(entry)
+                    for entry in data.get("changes") or []:
+                        self._mirror_change(entry)
+            except Exception as exc:
+                logger.debug("hc3 refreshStates poll failed: %s", exc)
+                await asyncio.sleep(5)
+            # keep the retry tight; the HC3 itself holds the long poll open
+            await asyncio.sleep(1)
+
+    def _mirror_event(self, entry: dict[str, Any]) -> None:
+        """Into the local buffer (merged api.get feed) + the pump-delivered
+        subscriber message."""
+        self.api.state.mirror_event(entry)
+        self.enqueue_outbound(messages.refresh_state_event(entry))
+
+    def _mirror_change(self, entry: dict[str, Any]) -> None:
+        self.api.state.mirror_change(entry)
 
     def restart_qa(self, qa_id: int) -> None:
         """Re-run a QA's code (after a file change). Timers are cancelled,
@@ -540,12 +648,14 @@ class LuaEngine:
         properties["uiCallbacks"] = callbacks
         # the HC3 expects these five fields as JSON arrays, never objects
         for key in ("quickAppVariables", "uiView", "supportedDeviceRoles"):
+            if key not in properties:
+                continue  # filtered out by the whitelist (e.g. supportedDeviceRoles)
             value = properties.get(key)
             properties[key] = (
                 list(value.values()) if isinstance(value, dict) else (value if isinstance(value, list) else [])
             )
         interfaces = [i for i in (device.get("interfaces") or []) if i != "quickApp"]
-        return {
+        fqa = {
             "name": info["name"],
             "type": device.get("type") or "com.fibaro.binarySwitch",
             "apiVersion": "1.3",
@@ -556,12 +666,33 @@ class LuaEngine:
                     "name": f["name"],
                     "isMain": f["isMain"],
                     "isOpen": False,
-                    "type": "lua",
                     "content": f["source"],
                 }
                 for f in info["files"]
             ],
         }
+        return self._arrayify_fqa(fqa)
+
+
+    @staticmethod
+    def _arrayify_fqa(fqa: dict[str, Any]) -> dict[str, Any]:
+        """The HC3's import rejects empty JSON objects where its schema declares
+        arrays (empty Lua tables serialize ambiguously). Fix the known array
+        paths — the template's sections.items is the one that bit: the catalog
+        captured it as {}."""
+        properties = fqa.get("initialProperties")
+        if not isinstance(properties, dict):
+            return fqa
+        layout = properties.get("viewLayout")
+        if isinstance(layout, dict):
+            sections = (((layout.get("$jason") or {}).get("body") or {}).get("sections"))
+            if isinstance(sections, dict):
+                items = sections.get("items")
+                if isinstance(items, dict):
+                    sections["items"] = list(items.values()) if items else []
+                elif not isinstance(items, list):
+                    sections["items"] = []
+        return fqa
 
     def import_qa(self, fqa: dict[str, Any]) -> tuple[int | None, str | None]:
         """Install and run a QA from a .fqa package.
@@ -669,6 +800,10 @@ class LuaEngine:
             return
         self._running = True
         self._pump_task = asyncio.create_task(self._pump(), name="flua-pump")
+        if self.hc3 is not None:
+            # online mode: mirror the real HC3's refreshStates feed
+            self._hc3_last: int | None = None
+            self._poller_task = asyncio.create_task(self._hc3_poll(), name="flua-hc3-poll")
 
     async def stop(self) -> None:
         self._running = False
@@ -681,6 +816,9 @@ class LuaEngine:
             except asyncio.CancelledError:
                 pass
             self._pump_task = None
+        if self.hc3 is not None and self._poller_task is not None:
+            self._poller_task.cancel()
+            self._poller_task = None
         for path in list(self._temp_qa_paths):
             self._cleanup_temp_qa(path)
         for task in list(self._http_tasks):
@@ -756,6 +894,23 @@ class LuaEngine:
 
     def _handle_set_timeout(self, msg: dict[str, Any]) -> None:
         self._timers.set_timeout(int(msg["id"]), int(msg["delay"]), msg.get("qa"))
+
+    def _handle_qa_vars(self, msg: dict[str, Any]) -> None:
+        """Merge evaluated --%%var values into the QA device's variables."""
+        device = self.api.state.devices.get(int(msg["id"]))
+        if device is None:
+            return
+        properties = device.setdefault("properties", {})
+        existing = properties.get("quickAppVariables")
+        if not isinstance(existing, list):
+            existing = []
+        merged = {
+            v.get("name"): v for v in existing if isinstance(v, dict) and v.get("name")
+        }
+        for name, value in (msg.get("vars") or {}).items():
+            if str(name) not in merged:  # initializers never clobber runtime state
+                merged[str(name)] = {"name": str(name), "value": value}
+        properties["quickAppVariables"] = list(merged.values())
 
     def _handle_http_request(self, msg: dict[str, Any]) -> None:
         """Run a net.HTTPClient request in a worker thread (never blocks the pump)."""

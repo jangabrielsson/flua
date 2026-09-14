@@ -1,6 +1,8 @@
 exit=0
+--- stdout ---
 flua 0.1.1, Lua 5.5, Python 3.14.3
-[37m[13.09.2026][19:51:50][32m[DEBUG  ][37m[FLUA]: TOKEN secret-from-local-env[0m
-[37m[13.09.2026][19:51:50][32m[DEBUG  ][37m[FLUA]: PASS quoted value[0m
-[37m[13.09.2026][19:51:50][32m[DEBUG  ][37m[FLUA]: NONE[0m
+[37m[14.09.2026][11:33:58][32m[DEBUG  ][37m[api-demo5000]: QuickApp API demo initialized[0m
+[37m[14.09.2026][11:33:58][32m[DEBUG  ][37m[api-demo5000]: Value: false[0m
+
+--- stderr ---
 

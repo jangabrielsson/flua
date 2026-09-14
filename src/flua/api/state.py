@@ -11,6 +11,7 @@ above engine-assigned QA ids, so the namespaces never collide.
 from __future__ import annotations
 
 import copy
+import time
 from typing import Any
 
 from ..devices import DEFAULT_ROOM_ID, skeleton_for
@@ -42,6 +43,7 @@ class SimState:
 
     def __init__(self, seed: dict[str, Any] | None = None) -> None:
         self.devices: dict[int, dict[str, Any]] = {}
+        self.plugin_variables: dict[int, dict[str, dict[str, Any]]] = {}  # qa_id -> {name: var}
         self.rooms: dict[int, dict[str, Any]] = {}
         self.scenes: dict[int, dict[str, Any]] = {}
         self.global_variables: dict[str, dict[str, Any]] = {}
@@ -81,8 +83,7 @@ class SimState:
                 "roomID": 0,
                 "parentId": 0,
                 "interfaces": [],
-                "view": {},
-                "variables": {},
+                "view": [],
             }
             base.update({k: v for k, v in dev.items() if k not in ("id", "name", "type")})
             if isinstance(base.get("properties"), dict):
@@ -149,6 +150,70 @@ class SimState:
             )
         )
 
+    @staticmethod
+    def _envelope(event_type: str, now: float, source_type: str, device_id: int, data: dict[str, Any]) -> dict[str, Any]:
+        """The real HC3's event envelope: type/created/sourceType/objects/data."""
+        return {
+            "type": event_type,
+            "created": int(now),
+            "createdMillis": int(now * 1000),
+            "sourceType": source_type,
+            "sourceId": 0,
+            "objects": [{"objectType": "device", "objectId": int(device_id)}],
+            "data": data,
+        }
+
+    def record_property_event(
+        self, device_id: int, name: str, new_value: Any, old_value: Any, now: float
+    ) -> None:
+        """A device-state change — the interesting feed (events on the real
+        HC3, with the full envelope). Emitted only when the value actually
+        changes: updateProperty(v) with v already set is silent."""
+        if _lua_equal(new_value, old_value):
+            return None  # no state change, no event (Lua semantics: true ~= 1)
+        self._refresh_seq += 1
+        self.events.append(
+            (
+                self._refresh_seq,
+                self._envelope(
+                    "DevicePropertyUpdatedEvent",
+                    now,
+                    "system",
+                    device_id,
+                    {"id": int(device_id), "name": name, "newValue": new_value, "oldValue": old_value},
+                ),
+            )
+        )
+        return self.events[-1][1]
+
+    def record_action_event(self, device_id: int, action: str, args: list[Any], now: float) -> None:
+        """The DeviceActionRanEvent the real HC3 emits for every action."""
+        self._refresh_seq += 1
+        self.events.append(
+            (
+                self._refresh_seq,
+                self._envelope(
+                    "DeviceActionRanEvent",
+                    now,
+                    "user",
+                    device_id,
+                    {"id": int(device_id), "actionName": action, "args": list(args), "isSupportedByDevice": True},
+                ),
+            )
+        )
+        return self.events[-1][1]
+
+    def mirror_event(self, entry: dict[str, Any]) -> None:
+        """An event polled from the real HC3 (online mode): same content,
+        local sequence — so api.get('/refreshStates?last=N') serves the
+        merged feed."""
+        self._refresh_seq += 1
+        self.events.append((self._refresh_seq, entry))
+
+    def mirror_change(self, entry: dict[str, Any]) -> None:
+        self._refresh_seq += 1
+        self.changes.append((self._refresh_seq, entry))
+
     def record_event(self, name: str) -> None:
         self._refresh_seq += 1
         self.events.append((self._refresh_seq, {"type": "CustomEvent", "data": {"name": name}}))
@@ -162,7 +227,6 @@ class SimState:
         name: str,
         device_type: str | None,
         properties: Any,
-        variables: dict[str, Any] | None = None,
     ) -> None:
         """Register a running QA as a device (mirrors init.lua's dev table)."""
         dev = _device_skeleton(qa_id, name, device_type)
@@ -171,17 +235,7 @@ class SimState:
             merged = dict(dev.get("properties") or {})
             merged.update(properties)
             dev["properties"] = merged
-        if variables:
-            # --%%var initializers: merge into the device's quickAppVariables
-            existing = dev["properties"].get("quickAppVariables")
-            if not isinstance(existing, list):
-                existing = []
-            merged_vars = {
-                v["name"]: v for v in existing if isinstance(v, dict) and v.get("name")
-            }
-            for var_name, value in variables.items():
-                merged_vars[str(var_name)] = {"name": str(var_name), "value": value}
-            dev["properties"]["quickAppVariables"] = list(merged_vars.values())
+        dev["modified"] = int(time.time())  # fibaro.get's second return value
         self.devices[qa_id] = dev
 
     # -- entities ---------------------------------------------------------------
@@ -209,6 +263,17 @@ class SimState:
         except (TypeError, ValueError):
             return None
 
+    @staticmethod
+    def is_flua_id(device_id: Any) -> bool:
+        """Ids from 5000 up belong to flua (engine-assigned QAs and
+        runtime-created devices); lower ids are the HC3's namespace. This is
+        how the dispatcher decides whether a 404 is local or must be
+        forwarded."""
+        try:
+            return int(device_id) >= 5000
+        except (TypeError, ValueError):
+            return False
+
     def plugin(self, plugin_id: Any) -> dict[str, Any] | None:
         """A device that carries a quickApp-style interface (QA or child)."""
         dev = self.device(plugin_id)
@@ -220,3 +285,13 @@ class SimState:
     def is_plugin_device(dev: dict[str, Any]) -> bool:
         interfaces = dev.get("interfaces") or []
         return "quickApp" in interfaces or "quickAppChild" in interfaces
+
+
+def _lua_equal(a: Any, b: Any) -> bool:
+    """Lua's == semantics for event dedupe: numbers equal across int/float,
+    booleans only equal booleans, everything else by type and value."""
+    if isinstance(a, bool) or isinstance(b, bool):
+        return isinstance(a, bool) and isinstance(b, bool) and a == b
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return a == b
+    return type(a) is type(b) and a == b

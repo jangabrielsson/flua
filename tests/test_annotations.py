@@ -31,7 +31,7 @@ def test_instant_annotation_runs_hour_timer_instantly(tmp_path) -> None:
     )
     result = _run_flua(str(script))
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "DT 3600.0" in result.stdout
+    assert "DT 3600" in result.stdout
 
 
 def test_time_annotation_with_subparams(tmp_path) -> None:
@@ -43,26 +43,26 @@ def test_time_annotation_with_subparams(tmp_path) -> None:
     )
     result = _run_flua(str(script))
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "DT 3600.0" in result.stdout
+    assert "DT 3600" in result.stdout
 
 
 def test_cli_flag_overrides_annotation(tmp_path) -> None:
     script = tmp_path / "override.lua"
     script.write_text(
         "--%%instant:true\n"
-        "local t0 = os.time()\n"
+        "local t0 = _FLUA.millitime()\n"
         "setTimeout(function()\n"
-        "  print('DT', string.format('%.3f', os.time() - t0))\n"
+        "  print('DT', _FLUA.millitime() - t0)\n"
         "  exit(0)\n"
         "end, 200)\n"
     )
     # CLI --speed 2 wins: accelerated (0.2 virtual s), NOT instant
     result = _run_flua("--speed", "2", str(script))
     assert result.returncode == 0, result.stdout + result.stderr
-    match = re.search(r"DT ([\d.]+)", result.stdout)
+    match = re.search(r"DT (\d+)", result.stdout)
     assert match, result.stdout
     dt = float(match.group(1))
-    assert 0.15 < dt < 0.25
+    assert 150 < dt < 250  # 200 virtual ms, accelerated (not instant)
 
 
 def test_maxhours_annotation_stops_endless_interval(tmp_path) -> None:

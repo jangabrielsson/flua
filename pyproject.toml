@@ -55,3 +55,6 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "hc3: live tests against a real HC3 (opt-in: set HC3_TEST=1 and configure HC3 credentials in the environment)",
+]

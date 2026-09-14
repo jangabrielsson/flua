@@ -54,6 +54,7 @@ class Api:
 
     def __init__(self, engine: "LuaEngine | None" = None, seed: dict[str, Any] | None = None) -> None:
         self._engine = engine  # M2+: event enqueue (device actions); None in unit tests
+        self._remote = engine.hc3 if engine is not None else None  # M3: the real HC3
         self.state = SimState(seed)
         self.emitted: list[dict[str, Any]] = []  # every event enqueued (tests/introspection)
 
@@ -69,9 +70,8 @@ class Api:
         name: str,
         device_type: str | None,
         properties: Any,
-        variables: dict[str, Any] | None = None,
     ) -> None:
-        self.state.register_qa(qa_id, name, device_type, properties, variables)
+        self.state.register_qa(qa_id, name, device_type, properties)
 
     def dispatch(
         self,
@@ -101,6 +101,7 @@ class Api:
                 body=body,
                 path_params={name: match.group(index) for name, index in params.items()},
                 emit=self._emit,
+                clock=self._engine.clock if self._engine is not None else None,
                 qa_id=qa_id,
             )
             try:
@@ -108,9 +109,35 @@ class Api:
             except Exception:
                 logger.exception("api handler failed for %s %s", method, url)
                 return None, 500
+            offline = self._engine is not None and self._engine.qa_is_offline(req.qa_id)
+            flua_id = len(segments) >= 2 and segments[0] in ("devices", "plugins") and self.state.is_flua_id(segments[1])
+            if (
+                data is None
+                and status == 404
+                and self._remote is not None
+                and not offline
+                and not flua_id
+            ):
+                # the sim doesn't own this entity — ask the real HC3
+                return self._remote.request(method, path, query, body)
             return data, status
         logger.debug("no offline route for %s %s", method, url)
+        offline = self._engine is not None and self._engine.qa_is_offline(qa_id)
+        flua_id = len(segments) >= 2 and segments[0] in ("devices", "plugins") and self.state.is_flua_id(segments[1])
+        if self._remote is not None and not offline and not flua_id:
+            # online mode: anything the sim doesn't own goes to the real HC3
+            return self._remote.request(method, path, query, body)
         return None, 404
+
+    def dispatch_hc3(self, method: str, url: str, body: Any = None) -> tuple[Any, int]:
+        """api.hc3.*: force the REAL HC3, bypassing the hybrid dispatch —
+        used by fibaro.callhc3 and test code that wants ground-truth data.
+        Without a remote backend (local mode) the sim stands in."""
+        if self._remote is None:
+            return self.dispatch(method, url, body)
+        segments, query = parse_url(url)
+        path = "/" + "/".join(segments)
+        return self._remote.request(method, path, query, body)
 
     # -- /api/quickApp/* (multi-file QAs: files + export, offline) --------------
 

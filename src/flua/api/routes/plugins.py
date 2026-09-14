@@ -8,12 +8,18 @@ POSTs to create it), PUT on an existing one returns 204.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
+from ... import messages
 from ..request import ApiRequest
 from ..state import SimState, public
 
 logger = logging.getLogger(__name__)
+
+
+def _now(req: ApiRequest) -> float:
+    return req.clock.time if req.clock is not None else time.time()
 
 
 def plugins_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
@@ -26,15 +32,17 @@ def plugin_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     return (public(dev), 200) if dev is not None else (None, 404)
 
 
-def _variables(dev: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    return dev.setdefault("variables", {})
+def _variables(state: SimState, dev: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    # plugin variables live outside the device shape (the real HC3 has no
+    # top-level "variables" field — the compat oracle caught it)
+    return state.plugin_variables.setdefault(dev["id"], {})
 
 
 def variables_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     dev = state.plugin(req.path_params["id"])
     if dev is None:
         return None, 404
-    variables = sorted(_variables(dev).values(), key=lambda v: v["name"])
+    variables = sorted(_variables(state, dev).values(), key=lambda v: v["name"])
     return public(variables), 200
 
 
@@ -42,7 +50,7 @@ def variable_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     dev = state.plugin(req.path_params["id"])
     if dev is None:
         return None, 404
-    var = _variables(dev).get(req.path_params["key"])
+    var = _variables(state, dev).get(req.path_params["key"])
     return (public(var), 200) if var is not None else (None, 404)
 
 
@@ -63,14 +71,16 @@ def variable_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     dev = state.plugin(req.path_params["id"])
     if dev is None:
         return None, 404
-    variables = _variables(dev)
+    variables = _variables(state, dev)
     key = req.path_params["key"]
     if key not in variables:
         return None, 404  # drives quickapp.lua's PUT -> POST fallback
     spec = _var_from_body(req, default_name=key)
     if spec is None:
         return None, 400
-    state.record_change(dev["id"], key, spec["value"], variables[key].get("value"))
+    entry = state.record_property_event(dev["id"], key, spec["value"], variables[key].get("value"), _now(req))
+    if entry is not None and req.emit is not None:
+        req.emit(messages.refresh_state_event(entry))
     variables[key] = spec
     return None, 204
 
@@ -82,8 +92,10 @@ def variable_post(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     spec = _var_from_body(req)
     if spec is None:
         return None, 400
-    variables = _variables(dev)
-    state.record_change(dev["id"], spec["name"], spec["value"], variables.get(spec["name"], {}).get("value"))
+    variables = _variables(state, dev)
+    entry = state.record_property_event(dev["id"], spec["name"], spec["value"], variables.get(spec["name"], {}).get("value"), _now(req))
+    if entry is not None and req.emit is not None:
+        req.emit(messages.refresh_state_event(entry))
     variables[spec["name"]] = spec
     return public(spec), 201
 
@@ -92,7 +104,7 @@ def variable_delete(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     dev = state.plugin(req.path_params["id"])
     if dev is None:
         return None, 404
-    variables = _variables(dev)
+    variables = _variables(state, dev)
     key = req.path_params["key"]
     if key not in variables:
         return None, 404
@@ -104,7 +116,7 @@ def variables_clear(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     dev = state.plugin(req.path_params["id"])
     if dev is None:
         return None, 404
-    _variables(dev).clear()
+    _variables(state, dev).clear()
     return None, 204
 
 
@@ -129,7 +141,10 @@ def plugin_update_property(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     properties = dev.setdefault("properties", {})
     old = properties.get(name)
     properties[name] = req.body.get("value")
-    state.record_change(dev["id"], name, req.body.get("value"), old)
+    dev["modified"] = int(_now(req))
+    entry = state.record_property_event(dev["id"], name, req.body.get("value"), old, _now(req))
+    if entry is not None and req.emit is not None:
+        req.emit(messages.refresh_state_event(entry))
     return None, 204
 
 

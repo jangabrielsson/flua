@@ -34,6 +34,22 @@ def _is_eoh(line: str) -> bool:
     return bool(_EOH_RE.fullmatch(stripped[2:].strip()))
 
 
+_OFFLINE_RE = re.compile(r"^--%%offline\s*:\s*true\s*$")
+
+
+def peek_offline(source: str) -> bool:
+    """Peek at a QA file's raw header for --%%offline:true — plua behavior:
+    the engine mode is decided from this peek BEFORE the standard annotation
+    parse (which happens once the engine is running)."""
+    for line in source.splitlines():
+        stripped = line.strip()
+        if _is_eoh(stripped) or (stripped and not stripped.startswith("--")):
+            break  # end of the directive header
+        if _OFFLINE_RE.match(stripped):
+            return True
+    return False
+
+
 def parse_scalar(text: str) -> Any:
     text = text.strip()
     lowered = text.lower()
@@ -84,17 +100,17 @@ def parse_annotations(source: str) -> dict[str, Any]:
             existing.append(parse_scalar(value))
             config["file"] = existing
         elif name == "var":
-            # --%%var:name=value — QuickApp variable initializers. Values are
-            # literal strings (HC3 QA variables are strings); repeated
-            # directives merge, and several vars may share one line.
+            # --%%var:name=expr — QuickApp variable initializers. The value is
+            # a Lua expression, evaluated at bootstrap with {config, os} in
+            # scope (so tables like {a=1,b=2} are legal); repeated directives
+            # merge, one variable per line.
             sub = config.get("var")
             if not isinstance(sub, dict):
                 sub = {}
-            for part in value.split(","):
-                key, _, val = part.partition("=")
-                key = key.strip()
-                if key:
-                    sub[key] = val.strip()
+            key, _, val = value.partition("=")
+            key = key.strip()
+            if key:
+                sub[key] = val.strip()
             config["var"] = sub
         elif name == "property":
             # --%%property:name=value — raw device property initializers

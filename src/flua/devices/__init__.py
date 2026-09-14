@@ -64,7 +64,6 @@ def skeleton_for(device_type: str | None) -> dict[str, Any] | None:
     skeleton["enabled"] = True
     skeleton["visible"] = True
     skeleton["isPlugin"] = True
-    skeleton["variables"] = {}
     properties = skeleton.get("properties")
     if isinstance(properties, dict):
         for key in _SCRUB_PROPERTIES:
@@ -75,6 +74,28 @@ def skeleton_for(device_type: str | None) -> dict[str, Any] | None:
     if "quickApp" not in interfaces:
         interfaces = [*interfaces, "quickApp"]
     skeleton["interfaces"] = interfaces
+    # the catalog captured empty Lua tables as {} where the HC3 declares
+    # arrays — normalize the known array fields so the sim serves the same
+    # shapes as the real HC3 (and exports parse)
+    for key in ("categories", "initialInterfaces", "quickAppVariables", "uiCallbacks", "uiView", "supportedDeviceRoles"):
+        value = properties.get(key)
+        if isinstance(value, dict):
+            value = list(value.values()) if value else []
+        elif not isinstance(value, list):
+            value = []
+        properties[key] = value
+    layout = properties.get("viewLayout")
+    if isinstance(layout, dict):
+        sections = (((layout.get("$jason") or {}).get("body") or {}).get("sections"))
+        if isinstance(sections, dict):
+            items = sections.get("items")
+            if isinstance(items, dict):
+                sections["items"] = list(items.values()) if items else []
+            elif not isinstance(items, list):
+                sections["items"] = []
+    view = skeleton.get("view")
+    if not isinstance(view, list):
+        skeleton["view"] = []
     return skeleton
 
 

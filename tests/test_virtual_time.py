@@ -36,7 +36,7 @@ async def test_instant_mode_advances_virtual_time(capsys) -> None:
         start = time.monotonic()
         await wait_until(lambda: not engine.is_running())
         assert time.monotonic() - start < 2.0  # "instant"
-        assert "DT\t3600.0" in capsys.readouterr().out
+        assert "DT\t3600" in capsys.readouterr().out  # os.time() is integer seconds
     finally:
         await engine.stop()
 
@@ -65,10 +65,10 @@ async def test_accelerated_mode_fires_early_but_keeps_virtual_time(capsys) -> No
     try:
         start = time.monotonic()
         engine.execute(
-            "local t0 = os.time()\n"
+            "local t0 = _FLUA.millitime()\n"
             "setTimeout(function()\n"
             "  print('FAST')\n"
-            "  print('DT2', string.format('%.3f', os.time() - t0))\n"
+            "  print('DT2', _FLUA.millitime() - t0)\n"
             "  _FLUA.exit(0)\n"
             "end, 500)"
         )
@@ -77,9 +77,9 @@ async def test_accelerated_mode_fires_early_but_keeps_virtual_time(capsys) -> No
         assert real_elapsed < 0.4  # 500 virtual ms at 10x ≈ 50 real ms
         out = capsys.readouterr().out
         assert "FAST" in out
-        match = re.search(r"DT2\t([\d.]+)", out)
+        match = re.search(r"DT2\t(\d+)", out)
         assert match, out
         virtual_dt = float(match.group(1))
-        assert 0.3 < virtual_dt < 0.7  # virtual time still ran the full 0.5 s
+        assert 300 < virtual_dt < 700  # virtual time still ran the full 0.5 s
     finally:
         await engine.stop()

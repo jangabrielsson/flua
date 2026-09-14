@@ -42,7 +42,10 @@ TCP_RESULT = "tcpResult"        # {"id": int, "qa": int?, "ok": bool, "conn"?: i
 UDP_RESULT = "udpResult"        # {"id": int, "qa": int?, "ok": bool, "data"?: str, "err"?: str}
 WS_EVENT = "wsEvent"            # {"qa": int, "conn": int, "event": str, "data"?: str}
 MQTT_EVENT = "mqttEvent"        # {"qa": int, "conn": int, "event": str, "data"?: dict}
+REFRESH_STATE_EVENT = "refreshStateEvent"  # {"event": {...}}  pump-delivered to RefreshStateSubscribers
+RUN_PREAMBLE = "runPreamble"    # {"code": str}  -e bootstrap runs in the main Lua state
 RESTART_QA = "restartQA"        # {"id": int, "path": str, "config": dict, "files": [{name,path}], "arg0": str}
+QA_VARS = "qaVars"              # {"id": int, "vars": {name: value}}  evaluated --%%var values
 DEVICE_ACTION = "deviceAction"  # {"id": int, "action": str, "args": list}
 CUSTOM_EVENT = "customEvent"    # {"name": str}
 
@@ -179,6 +182,18 @@ def restart_qa_msg(qa_id: int, path: str, config: dict[str, Any], arg0: str) -> 
         "files": files,
         "arg0": arg0,
     }
+
+
+def refresh_state_event(entry: dict[str, Any]) -> dict[str, Any]:
+    """A refreshStates event for the Lua RefreshStateSubscribers (delivered
+    through the pump, not via direct bridge calls)."""
+    return {"type": REFRESH_STATE_EVENT, "event": entry}
+
+
+def run_preamble(code: str) -> dict[str, Any]:
+    """A -e debugger bootstrap: run in the MAIN Lua state (not as a QA), so
+    the VS Code mobdebug preamble does not consume a QA id."""
+    return {"type": RUN_PREAMBLE, "code": code}
 
 
 def device_action(device_id: int, action: str, args: list[Any] | None = None) -> dict[str, Any]:

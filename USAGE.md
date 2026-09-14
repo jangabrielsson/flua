@@ -10,19 +10,23 @@ The HC3 editor is tiny and debugging there means `print()` statements. flua
 exists so you can develop in your real editor, with real tooling, and upload
 when it works.
 
-- [Install](#install)
-- [Your first QuickApp](#your-first-quickapp)
-- [Running QAs](#running-qas)
-- [VS Code setup](#vs-code-setup)
-- [QA directives (`--%%`)](#qa-directives--)
-- [Multi-file QAs](#multi-file-qas)
-- [The offline HC3](#the-offline-hc3)
-- [Loading QAs at runtime](#loading-qas-at-runtime)
-- [Network clients](#network-clients)
-- [Deploying to the HC3](#deploying-to-the-hc3)
-- [Bringing an HC3 QA home](#bringing-an-hc3-qa-home)
-- [Static checks](#static-checks)
-- [flua extensions (`_FLUA`)](#flua-extensions-_flua)
+- [flua — user guide for QA developers](#flua--user-guide-for-qa-developers)
+  - [Install](#install)
+  - [Your first QuickApp](#your-first-quickapp)
+  - [Running QAs](#running-qas)
+  - [VS Code setup](#vs-code-setup)
+    - [Without the repo (pip install)](#without-the-repo-pip-install)
+  - [QA directives (`--%%`)](#qa-directives---)
+    - [The Lua config file](#the-lua-config-file)
+  - [Multi-file QAs](#multi-file-qas)
+  - [The offline HC3](#the-offline-hc3)
+    - [Online mode — the real HC3](#online-mode--the-real-hc3)
+  - [Loading QAs at runtime](#loading-qas-at-runtime)
+  - [Network clients](#network-clients)
+  - [Deploying to the HC3](#deploying-to-the-hc3)
+  - [Bringing an HC3 QA home](#bringing-an-hc3-qa-home)
+  - [Static checks](#static-checks)
+  - [flua extensions (`_FLUA`)](#flua-extensions-_flua)
 
 ## Install
 
@@ -109,6 +113,71 @@ The fastest loop for tinkering:
 flua restarts the QA whenever you save the file (or any `--%%file` file).
 Ctrl-C stops it. Works on top of the debugger too.
 
+### Without the repo (pip install)
+
+Installed from PyPI you don't have this checkout's `.vscode/` — drop these two
+files in your project. Extensions needed: **Python** (for run/debug via
+debugpy) and **Lua MobDebug** (`alexeymelnichuk.lua-mobdebug`).
+
+`.vscode/launch.json`:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flua: Run Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "flua",
+      "args": ["${relativeFile}"],
+      "console": "internalConsole",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
+    },
+    {
+      "name": "Flua: Run Current File (Terminal)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "flua",
+      "args": ["${relativeFile}"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
+    },
+    {
+      "name": "Flua: Debug Current File (mobdebug)",
+      "type": "luaMobDebug",
+      "request": "launch",
+      "workingDirectory": "${workspaceFolder}",
+      "sourceBasePath": "${workspaceFolder}",
+      "listenPort": 8172,
+      "stopOnEntry": false,
+      "sourceEncoding": "UTF-8",
+      "interpreter": "flua",
+      "arguments": ["${relativeFile}"],
+      "listenPublicly": true
+    }
+  ]
+}
+```
+
+`.luarc.json` (for the **Lua Language Server** extension, `sumneko.lua`) —
+the HC3 globals (`QuickApp`, `fibaro`, `api`, `net`, …) aren't type-annotated,
+so the language server would flood you with undefined-global warnings:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+  "runtime.version": "Lua 5.4",
+  "workspace.ignoreDir": [".venv", "node_modules"],
+  "diagnostics.disable": ["undefined-global", "lowercase-global", "undefined-field"]
+}
+```
+
+If you later add HC3 type stubs, you can re-enable `undefined-global` and
+point `workspace.library` at them instead.
+
 ## QA directives (`--%%`)
 
 Directives are ordinary Lua comments at the top of the file. flua parses them
@@ -127,7 +196,7 @@ Parsing stops at the end-of-header marker:
 | `--%%type:com.fibaro.binarySwitch` | device type (defaults to binarySwitch; unknown types are an error) |
 | `--%%properties:value=false` | default device properties (plural form) |
 | `--%%property:value=true` | raw property, scalar values; repeatable, merges |
-| `--%%var:name=value` | initializes a **QuickApp variable** (string values; `self:getVariable(name)`) |
+| `--%%var:name=expr` | initializes a **QuickApp variable**; `expr` is a Lua expression — `'text'`, `42`, `{a=1}`, `config.color`, `os.getenv("X")` (one per line) |
 | `--%%uid:...` | sets `quickAppUuid` |
 | `--%%description:...` | sets `userDescription` |
 | `--%%model:...` | sets `model` |
@@ -153,6 +222,28 @@ testing dates: leap years, DST switches, New Year logic. Combine with
 # or in the file: --%%time:start=2027/12/31 23:59:50,instant=true
 ```
 
+### The Lua config file
+
+`.flua.lua` (in the directory you run from, or `~/.flua.lua`; the legacy
+`~/.plua/config.lua` also works) is Lua data, loaded once and merged into
+`_FLUA.config` — handy for per-machine settings:
+
+```lua
+-- .flua.lua
+return {
+  user = "alice",
+  pwd = os.getenv("HC3_PASSWORD"),   -- reads the .env chain
+  colors = { "red", "green" },
+}
+```
+
+QA code sees it as `_FLUA.config.user`, and `--%%var` expressions can use it:
+`--%%var:color=config.colors[1]`. `--%%` annotations win over the file. A
+faulty `--%%var` expression (a syntax error, indexing a nil key) is a
+startup error — flua names the variable and exits 1 — but an expression
+that evaluates to nil (`config.foo`, `os.getenv("MISSING")`) simply leaves
+the variable unset.
+
 `os.getenv(name)` reads through flua's environment chain: the local `.env`
 in the directory you run from, then `~/.env`, then the shell environment.
 Files are plain `KEY=value` lines (comments and quotes supported) and are
@@ -176,6 +267,79 @@ to the main file's directory. See `examples/multifile.lua`. The HC3's file
 API works offline too (`api.get('/quickApp/' .. _FLUA.qaId .. '/files')` etc.).
 
 ## The offline HC3
+
+### Online mode — the real HC3
+
+The backend is picked like plua did — **peeking at the main QA file's raw
+header before the engine starts** (the standard annotation parse runs
+later):
+
+1. an explicit `--api local|remote` always wins;
+2. otherwise, `--%%offline:true` in the **main** QA's header selects the
+   offline sim;
+3. otherwise, online when HC3 credentials exist in the environment
+   (`HC3_URL`/`HC3_HOST`), offline when they don't.
+
+`--%%offline:true` on a *secondary* QA pins just that QA's `api.*` calls to
+the sim while the rest of the run stays online — handy for keeping test QAs
+sandboxed against a live controller.
+
+With `--api remote`, the `api` table talks to the real HC3: everything your
+flua QAs own (devices from 5000, seeded sim state) is served locally, and
+anything the sim doesn't know is forwarded to the controller over HTTP —
+the same Lua surface, hybrid routing. Credentials come from the .env chain:
+
+```bash
+# .env
+HC3_URL=http://192.168.1.10/
+HC3_USER=admin
+HC3_PASSWORD=your-password
+HC3_PIN=1111
+```
+
+```bash
+.venv/bin/flua --api remote script.lua
+```
+
+Remote calls are synchronous (like on the HC3) — each `api.get` blocks the
+QA for the HTTP round trip. **Credentials are never retried**: a 401/403
+stops flua immediately with a warning, because the HC3 locks itself after
+4 failed attempts. Wrong credentials = one attempt, then exit 1.
+
+`api.hc3.get/post/put/delete` always targets the **real HC3 directly**,
+bypassing the hybrid dispatch (this is what `fibaro.callhc3` uses, and it's
+handy in test code that wants ground-truth data). Offline it stands in for
+the simulated HC3.
+
+### Testing against the real HC3
+
+Two opt-in suites, gated so a plain `pytest` never touches the controller
+(set `HC3_TEST=1` and configure the credentials in the environment):
+
+```bash
+HC3_TEST=1 .venv/bin/pytest tests/test_hc3_live.py    # lifecycle: read-only + upload/call/delete
+HC3_TEST=1 .venv/bin/pytest tests/test_hc3_compat.py  # shape oracle: sim vs real HC3
+```
+
+The lifecycle suite is production-aware: read-only checks (settings,
+devices, globalVariables, refreshStates), one import of a test QA (its
+startup, `fibaro.call` round-trip, and its refreshStates change feed are
+verified), then deletion — only the test QA is ever touched. Wrong
+credentials cost exactly one attempt (the lockout guard).
+
+The compat suite runs the same requests through the offline sim and the
+real HC3 and diffs the response shapes: type mismatches and fields the sim
+serves that the HC3 doesn't are failures; fields the sim doesn't model yet
+are reported as gaps.
+
+`RefreshStateSubscriber` (the plua/refreshStates subscriber class) works in
+both modes: offline, sim state changes (property updates, actions) are
+emitted as real-shaped `DevicePropertyUpdatedEvent` /
+`DeviceActionRanEvent` events — `updateProperty` only emits when the value
+actually changes — and online, the poller long-polls the real HC3's
+refreshStates and mirrors its events into the same feed. Both arrive at
+subscribers through the message pump (plua's `_PY.newRefreshStatesEvent`
+bridge hack replaced by a `refreshStateEvent` message).
 
 `--seed` loads a simulated house (see `examples/house.json`):
 
@@ -261,5 +425,6 @@ stays portable:
 - `_FLUA.qa(id)` — another QA's QuickApp instance (lupa proxy)
 - `_FLUA.loadQAfromFile(path)` / `_FLUA.loadQAfromString(code)` — dynamic QA loading
 - `_FLUA.async.run(fn)` / `_FLUA.async.await(worker)` / `_FLUA.async.wait(ms)` — coroutine awaits
+- `_FLUA.millitime()` — virtual time in whole milliseconds (sub-second timing; `os.time()` is whole seconds, `os.clock()` is real CPU time)
 - `_FLUA.setTimeout(fn, ms, qaId)` — timer with explicit QA attribution
 - `if _FLUA then` — detect flua at runtime

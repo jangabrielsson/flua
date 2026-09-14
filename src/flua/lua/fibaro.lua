@@ -263,7 +263,13 @@ function fibaro.get(deviceId, prop)
   __assert_type(prop, "string")
   prop = __fibaro_get_device_property(deviceId, prop)
   if prop == nil then return end
-  return prop.value, prop.modified
+  if type(prop) == "table" then
+    return prop.value, prop.modified  -- tolerate the object form
+  end
+  -- the HC3 REST returns the raw property value: pair it with the device's
+  -- last-modified timestamp
+  local dev = __fibaro_get_device(deviceId)
+  return prop, dev and dev.modified
 end
 
 -- Gets a property value for a device.

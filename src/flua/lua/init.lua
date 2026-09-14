@@ -93,7 +93,7 @@ _FLUA.print = print
 local real_os_time, real_os_date, real_os_clock = os.time, os.date, os.clock
 
 os.time = function(tbl)
-  if tbl == nil then return _PY.vtime() end
+  if tbl == nil then return math.floor(_PY.vtime()) end
   return real_os_time(tbl)
 end
 
@@ -103,8 +103,14 @@ os.date = function(fmt, t)
   return real_os_date(fmt, t)
 end
 
-os.clock = function() return _PY.vclock() end
 os.getenv = function(name) return _PY.getenv(name) end
+
+-- _FLUA.millitime(): virtual time in whole milliseconds (flua extension) —
+-- os.time() is integer seconds and os.clock() is the real runtime clock,
+-- so sub-second virtual timing needs its own helper.
+function _FLUA.millitime()
+  return math.floor(_PY.vtime() * 1000)
+end
 
 local function traceback(err)
   postLog("error", tostring(err))
@@ -322,6 +328,8 @@ local qaInstances = {}  -- qaId -> QuickApp instance (registered by the bootstra
 _FLUA.netHandlers = {}
 -- mqtt.* response routing: mqtt.lua registers one handler per QA.
 _FLUA.mqttHandlers = {}
+-- RefreshStateSubscriber delivery: run() registers the instance handle here
+_FLUA.refreshStateListeners = {}
 
 -- HC3-style log lines for fibaro.debug/trace/warning/error, colored like
 -- plua: gray date and tag, level in its color (DEBUG=green, TRACE=cyan,
@@ -363,7 +371,7 @@ local function installQaGlobals(env)
   -- (running QAs plus seeded state); online mode will route to the real
   -- HC3. Contract: (data, status) — data is nil on errors.
   local function apiCall(method)
-    return function(url, body) return _PY.api(method, url, body) end
+    return function(url, body) return _PY.api(method, url, body, env._FLUA.qaId) end
   end
   env.api = {
     get = apiCall("GET"),
@@ -372,12 +380,17 @@ local function installQaGlobals(env)
     delete = apiCall("DELETE"),
   }
   -- api.hc3: the direct-HC3 namespace (fibaro.callhc3). Offline it is the
-  -- same simulated HC3 as api.
+  -- same simulated HC3 as api; with --api remote it bypasses the hybrid
+  -- dispatch and always talks to the real HC3 (useful in test code that
+  -- wants ground-truth data).
+  local function apiCallHC3(method)
+    return function(url, body) return _PY.api_hc3(method, url, body) end
+  end
   env.api.hc3 = {
-    get = apiCall("GET"),
-    post = apiCall("POST"),
-    put = apiCall("PUT"),
-    delete = apiCall("DELETE"),
+    get = apiCallHC3("GET"),
+    post = apiCallHC3("POST"),
+    put = apiCallHC3("PUT"),
+    delete = apiCallHC3("DELETE"),
   }
 end
 
@@ -461,6 +474,29 @@ local function bootstrapQa(env, qaId, config)
     type = cfg.type or "com.fibaro.binarySwitch",
     properties = cfg.properties or {},
   }
+  -- --%%var values (evaluated expressions) become QuickApp variables on the
+  -- instance before onInit runs, so self:getVariable sees them immediately
+  local varValues = cfg.var
+  if type(varValues) == "table" and next(varValues) ~= nil then
+    local props = dev.properties
+    if type(props) ~= "table" then props = {} end
+    local vars = props.quickAppVariables
+    if type(vars) ~= "table" then vars = {} end
+    for name, value in pairs(varValues) do
+      local found = false
+      for _, v in ipairs(vars) do
+        if v.name == name then
+          v.value = value
+          found = true
+        end
+      end
+      if not found then
+        vars[#vars + 1] = { name = name, value = value, isHidden = false }
+      end
+    end
+    props.quickAppVariables = vars
+    dev.properties = props
+  end
   local qa = env.QuickApp(dev)
   qaInstances[qaId] = qa
   return qa
@@ -478,6 +514,31 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
     config = config or {},
     arg = args,
   }, { __index = _FLUA })
+  -- merge the Lua config file (.flua.lua) into this QA's config: the file
+  -- is the base, --%% annotations win
+  for k, v in pairs(_FLUA.configFile or {}) do
+    if config[k] == nil then config[k] = v end
+  end
+  -- evaluate --%%var expressions exactly like the spec:
+  --   load("return " .. value, nil, "t", { config = config, os = os })()
+  -- so values may be Lua data (tables, numbers) or read from the config
+  -- file / os.getenv (the .env chain).
+  local varExprs = config.var
+  if type(varExprs) == "table" then
+    local vars = {}
+    for name, expr in pairs(varExprs) do
+      local ok, value = pcall(load("return " .. tostring(expr), nil, "t", { config = config, os = os }))
+      if not ok then
+        -- a faulty --%%var is a startup error: name the var and stop
+        print("error in --%%var:" .. tostring(name) .. ": " .. tostring(expr) .. " — " .. tostring(value))
+        _FLUA.exit(1)
+        return
+      end
+      vars[name] = value
+    end
+    config.var = vars
+    _PY.post{ type = "qaVars", id = qaId, vars = vars }
+  end
   installQaLibs(env)  -- class/quickapp/fibaro into this QA, before its code
   local chunk, err = loader()
   if not chunk then
@@ -661,6 +722,25 @@ handlers.mqttEvent = function(msg)
   if h then
     xpcall(function() h(msg) end, traceback)
   end
+end
+
+handlers.refreshStateEvent = function(msg)
+  -- pump-delivered (never direct bridge calls): sim events and mirrored
+  -- real-HC3 events reach every RefreshStateSubscriber the same way
+  for handle in pairs(_FLUA.refreshStateListeners) do
+    xpcall(function() handle(msg.event) end, traceback)
+  end
+end
+
+handlers.runPreamble = function(msg)
+  -- -e debugger bootstraps (VS Code mobdebug): run in the MAIN state, not as
+  -- a QA — so the preamble doesn't consume a QA id
+  local fn, err = load(msg.code, "=-e preamble")
+  if not fn then
+    postLog("warning", "error in -e preamble: " .. tostring(err))
+    return
+  end
+  xpcall(fn, traceback)
 end
 
 function _FLUA.dispatch(batch)
