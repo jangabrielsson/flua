@@ -9,4 +9,6 @@ function QuickApp:onInit()
 
   print(api.post("/globalVariables",{name='FLUA', value='1'}))
   print(fibaro.getGlobalVariable("FLUA"))
+  local b = fibaro.setGlobalVariable("FLUA","2")
+  print(fibaro.getGlobalVariable("FLUA"))
 end

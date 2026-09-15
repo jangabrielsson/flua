@@ -9,6 +9,10 @@ from ..request import ApiRequest
 from ..state import SimState, public
 
 
+def _now(req: ApiRequest) -> float:
+    return req.clock.time if req.clock is not None else time.time()
+
+
 def globals_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     variables = sorted(state.global_variables.values(), key=lambda v: v["name"])
     return public(variables), 200
@@ -27,7 +31,9 @@ def global_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     var = {
         "name": name,
         "value": "" if value is None else str(value),
-        "modified": int(req.body.get("modified", 0) or 0),
+        # modified is the sim's current time (os.time() in QA code), like the
+        # HC3 stamps writes with the controller clock
+        "modified": int(_now(req)),
     }
     state.global_variables[name] = var
     return public(var), 200
@@ -42,7 +48,7 @@ def globals_create(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     var = {
         "name": name,
         "value": "" if value is None else str(value),
-        "modified": int(req.body.get("modified", 0) or 0),
+        "modified": int(_now(req)),
     }
     state.global_variables[name] = var
     return public(var), 200

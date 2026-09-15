@@ -10,6 +10,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -252,6 +253,7 @@ def test_global_variable_create(api: Api) -> None:
     var, status = api.dispatch("POST", "/globalVariables", {"name": "FLUA", "value": "1"})
     assert status == 200
     assert var["name"] == "FLUA" and var["value"] == "1"
+    assert abs(var["modified"] - int(time.time())) <= 2  # stamped with now
     got, status = api.dispatch("GET", "/globalVariables/FLUA")
     assert status == 200 and got["value"] == "1"
     assert api.dispatch("POST", "/globalVariables", {"value": "1"})[1] == 400
@@ -267,6 +269,8 @@ async def test_print_of_api_error_shows_status(tmp_path, capsys) -> None:
     script.write_text(
         "print(api.post('/notAnEndpoint', {name='FLUA', value='1'}))\n"
         "print(api.post('/globalVariables', {name='FLUA', value='1'}))\n"
+        "local v = api.get('/globalVariables/FLUA')\n"
+        "print('MOD', v.modified == os.time())\n"  # stamped with virtual now
     )
     engine = LuaEngine()
     await engine.start()
@@ -278,6 +282,7 @@ async def test_print_of_api_error_shows_status(tmp_path, capsys) -> None:
     out = capsys.readouterr().out
     assert "nil 404" in out  # the error status is visible, not blanked
     assert " 200" in out  # the create call's status prints beside the table
+    assert "MOD true" in out  # modified == os.time() (the virtual clock)
 
 
 def test_rooms(api: Api) -> None:
