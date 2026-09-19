@@ -210,10 +210,42 @@ Parsing stops at the end-of-header marker:
 | `--%%maxhours:48` | stop after 48 virtual hours (global) |
 | `--%%time:speed=2,instant=true,hours=48,start=2027/10/6 12:00:20` | combined runtime settings (global) |
 | `--%%time:2027/10/6 12:00:20` | bare form: set the virtual start time |
+| `--%%u:{label="lbl",text="Status"}` | one UI row (see below); repeatable, order kept |
+| `--%%useUiView:false` | render the legacy `viewLayout` instead of the new `uiView` (default true) |
 
 Names follow plua: `--%%name:value` for scalars,
 `--%%name:sub1=val1,sub2=val2` for subparameters. A typo'd directive is
 silently ignored at runtime — run `flua --check` to catch those.
+
+### QuickApp UI (`--%%u`)
+
+Each `--%%u:` line defines one row of the QuickApp UI; several elements can
+share a row with `{{...},{...}}`. flua translates the rows into **both** UI
+property structures the HC3 understands — the legacy `viewLayout` and the
+new `uiView` — plus the `uiCallbacks` table that routes UI events to your
+QuickApp methods. `useUiView` (default `true`) selects the new format:
+
+```lua
+--%%u:{label="statusLbl",text="Status: Ready"}
+--%%u:{button="onBtn",text="Turn On",onReleased="turnOn"}
+--%%u:{switch="autoSwitch",text="Auto Mode",value="false",onReleased="handleSwitch"}
+--%%u:{slider="dimSlider",text="Brightness",min="0",max="100",value="50",onChanged="handleSlider"}
+--%%u:{select="modeSelect",text="Mode",value="1",onToggled="handleSelect",
+--      options={{type='option',text='Economy',value='1'},{type='option',text='Comfort',value='2'}}}
+--%%u:{multi="tagMulti",text="Tags",values={"1","3"},onToggled="handleMulti",
+--      options={{type='option',text='Tag A',value='1'}}}
+--%%u:{{button="onBtn",text="On",onReleased="turnOn"},{button="offBtn",text="Off",onReleased="turnOff"}}
+```
+
+Elements: `label`, `button`, `slider`, `switch`, `select`, `multi`. Callbacks
+(`onReleased`, `onChanged`, `onToggled`, …) name QuickApp methods; sliders
+take `min`/`max`/`step`/`value`, selects and multis take `options` (each
+`{type='option',text=…,value=…}`) plus `value`/`values`. Values in the
+directive are Lua literals — strings need quotes, numbers and `true`/`false`
+don't. Long rows may continue on following comment lines. At runtime the
+device's `properties.viewLayout`, `properties.uiView`, and
+`properties.uiCallbacks` hold the generated structures, and
+`self:updateView(elm, prop, value)` updates them.
 
 The virtual clock starts **now** unless you set a start time — handy for
 testing dates: leap years, DST switches, New Year logic. Combine with

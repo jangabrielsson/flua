@@ -1,6 +1,6 @@
 """Unit tests for --%% annotation parsing (no lupa needed)."""
 
-from flua.config import parse_annotations, parse_scalar, peek_offline
+from flua.config import parse_annotations, parse_lua_literal, parse_scalar, peek_offline
 
 
 def test_scalar_values() -> None:
@@ -100,3 +100,74 @@ def test_eoh_must_be_a_comment_line() -> None:
     # the marker inside a Lua string (not a comment) does not end the header
     source = '--%%name:outer\nprint("--- EOH ---")\n--%%speed:3\n'
     assert parse_annotations(source) == {"name": "outer", "speed": 3}
+
+
+# -- --%%u directives -----------------------------------------------------------
+
+
+def test_u_directives_collect_in_order() -> None:
+    source = '--%%u:{label="a",text="A"}\n--%%u:{button="b",text="B",onReleased="go"}\n'
+    cfg = parse_annotations(source)
+    assert cfg["u"] == [
+        {"label": "a", "text": "A"},
+        {"button": "b", "text": "B", "onReleased": "go"},
+    ]
+
+
+def test_u_row_with_multiple_elements() -> None:
+    source = '--%%u:{{button="on",text="On"},{button="off",text="Off"}}\n'
+    cfg = parse_annotations(source)
+    assert cfg["u"] == [[{"button": "on", "text": "On"}, {"button": "off", "text": "Off"}]]
+
+
+def test_u_multi_line_row_joins_continuation_lines() -> None:
+    source = (
+        '--%%u:{select="mode",text="Mode",onToggled="set",\n'
+        "--      options={{type='option',text='Off',value='Off'},"
+        "{type='option',text='On',value='On'}}}\n"
+    )
+    cfg = parse_annotations(source)
+    assert cfg["u"] == [
+        {
+            "select": "mode",
+            "text": "Mode",
+            "onToggled": "set",
+            "options": [
+                {"type": "option", "text": "Off", "value": "Off"},
+                {"type": "option", "text": "On", "value": "On"},
+            ],
+        }
+    ]
+
+
+def test_u_continuation_stops_at_eoh() -> None:
+    source = "--%%u:{select=\"mode\",\n-- --------------- EOH ---------------\nprint('hi')\n"
+    # the EOH comment is not absorbed as a continuation; the row is still
+    # unbalanced so parsing reports it clearly
+    import pytest
+
+    with pytest.raises(ValueError):
+        parse_annotations(source)
+
+
+def test_u_trailing_comment_is_stripped() -> None:
+    source = '--%%u:{label="lbl",text="Status"}  -- UI element (one per row)\n'
+    assert parse_annotations(source)["u"] == [{"label": "lbl", "text": "Status"}]
+
+
+def test_u_literal_values() -> None:
+    # numbers stay numbers, booleans parse, single-quoted strings work
+    source = '--%%u:{slider="s",min=5,max=100.5,value=50,visible=true}\n'
+    cfg = parse_annotations(source)
+    assert cfg["u"] == [{"slider": "s", "min": 5, "max": 100.5, "value": 50, "visible": True}]
+
+
+def test_u_literal_errors_are_clear() -> None:
+    import pytest
+
+    with pytest.raises(ValueError, match="unterminated string"):
+        parse_lua_literal('{label="a}')
+    with pytest.raises(ValueError, match="unexpected character"):
+        parse_lua_literal("{label=#a}")
+    with pytest.raises(ValueError, match="must be a table"):
+        parse_lua_literal('"not a table"')

@@ -47,6 +47,7 @@ from .http import http_call
 from .mqtt import MqttPool
 from .sync_socket import SyncTCPSockets, SyncUDPSockets
 from .timers import TimerManager
+from .ui import compile_ui
 from .websocket import WebSocketPool
 
 logger = logging.getLogger(__name__)
@@ -322,6 +323,15 @@ class LuaEngine:
         for directive, prop in _PROPERTY_DIRECTIVES.items():
             if qa_config.get(directive) is not None:
                 device_properties[prop] = qa_config[directive]
+        if qa_config.get("u"):
+            # --%%u rows -> the HC3's UI property structures (viewLayout =
+            # legacy $jason, uiView = the new component format, uiCallbacks =
+            # {name, eventType, callback} for UI event routing)
+            ui = compile_ui(qa_config["u"], qa_id)
+            device_properties["uiCallbacks"] = ui["uiCallbacks"]
+            device_properties["viewLayout"] = ui["viewLayout"]
+            device_properties["uiView"] = ui["uiView"]
+            device_properties["useUiView"] = bool(qa_config.get("useUiView", True))
         if path is not None:
             # --%%file paths resolve relative to the main file's directory
             base = Path(path).parent
