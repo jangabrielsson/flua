@@ -14,3 +14,4 @@ dev/
 # agent tooling state
 .deepseek/state/
 .codewhale/state/
+.codewhale/workflow-runs.jsonl
