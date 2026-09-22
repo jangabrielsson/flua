@@ -103,7 +103,9 @@ async def test_accelerated_mode_fires_early_but_keeps_virtual_time(capsys) -> No
 def test_run_for_negative_instant_stops_at_virtual_limit() -> None:
     # --instant --run-for -5: five simulated seconds — the 1000 ms interval
     # fires exactly five times and the process exits in milliseconds of wall
-    # time (this used to be 5 wall seconds of unbounded firing)
+    # time (this used to be 5 wall seconds of unbounded firing). Count the
+    # marker, not the payload "42": the QA log lines carry timestamps that
+    # can themselves contain "42" (e.g. runs spanning minute :42).
     start = time.monotonic()
     result = _run_cli(
         "--color",
@@ -112,11 +114,11 @@ def test_run_for_negative_instant_stops_at_virtual_limit() -> None:
         "--run-for",
         "-5",
         "-e",
-        "setInterval(function() print(42) end,1000)",
+        "setInterval(function() print('FIRE42') end,1000)",
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert time.monotonic() - start < 3.0  # instant, not 5 wall seconds
-    assert result.stdout.count("42") == 5  # exactly five virtual seconds
+    assert result.stdout.count("FIRE42") == 5  # exactly five virtual seconds
 
 
 def test_run_for_negative_speed_uses_virtual_seconds() -> None:
