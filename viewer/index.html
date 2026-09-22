@@ -209,6 +209,16 @@ function structureKey(device) {
   )));
 }
 
+// render + stamp the panel with its device id and structure key — every
+// replacement needs the stamp, or the cleanup loop below treats the fresh
+// panel as a device that vanished and removes it (the 1s blink)
+function freshPanel(device, key) {
+  const panel = renderDevice(device);
+  panel.dataset.key = device.id;
+  panel.dataset.struct = key;
+  return panel;
+}
+
 async function poll() {
   try {
     const devices = await json($("base").value.replace(/\/+$/, "") + "/devices");
@@ -218,16 +228,13 @@ async function poll() {
       const key = device.id + ":" + structureKey(device);
       let panel = root.querySelector('[data-key="' + CSS.escape(String(device.id)) + '"]');
       if (!panel || panel.dataset.struct !== key) {
-        const fresh = renderDevice(device);
-        fresh.dataset.key = device.id;
-        fresh.dataset.struct = key;
+        const fresh = freshPanel(device, key);
         if (panel) panel.replaceWith(fresh);
         else root.appendChild(fresh);
-        panel = fresh;
       } else {
         // refresh values only, unless the user is interacting with it
         if (!panel.contains(document.activeElement)) {
-          panel.replaceWith(renderDevice(device));
+          panel.replaceWith(freshPanel(device, key));
         }
       }
     }
