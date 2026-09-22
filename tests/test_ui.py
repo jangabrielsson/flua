@@ -4,6 +4,8 @@ Structural goldens mirror plua's src/lua/fibaro/ui.lua output, verified
 against the shapes the real HC3 stores in device properties.
 """
 
+import asyncio
+
 import pytest
 
 pytest.importorskip("lupa")
@@ -202,5 +204,65 @@ async def test_use_ui_view_false_directive(tmp_path) -> None:
         # both structures are still generated
         assert device["properties"]["viewLayout"]["$jason"]["head"]["title"]
         assert device["properties"]["uiView"][0]["components"][0]["type"] == "label"
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_ui_event_reaches_qa_callback(tmp_path, capsys) -> None:
+    # the examples/ui.lua flow: a generated uiCallbacks entry + UIAction
+    # routes a simulated UI event to the QuickApp method
+    script = tmp_path / "event.lua"
+    script.write_text(
+        '--%%u:{button="B1",text="Press me",onReleased="fopp"}\n'
+        "function QuickApp:onInit()\n"
+        '  setTimeout(function() self:UIAction("onReleased", "B1") end, 20)\n'
+        "end\n"
+        "function QuickApp:fopp() print('RELEASED') end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.load_qa_file(str(script))
+        await asyncio.sleep(0.4)
+        assert "RELEASED" in capsys.readouterr().out
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_ui_event_api_endpoint_reaches_callback(tmp_path, capsys) -> None:
+    # GET /plugins/callUIEvent (the real HC3 endpoint) delivers the same
+    # interaction as UIAction, including the event's value
+    script = tmp_path / "api_event.lua"
+    script.write_text(
+        '--%%u:{button="B1",text="Press me",onReleased="fopp"}\n'
+        '--%%u:{slider="s1",text="Slider",min="0",max="100",onChanged="slider"}\n'
+        '--%%u:{select="sel1",text="Select",value="11",onToggled="selectChanged",'
+        "options={{type='option',text='One',value='11'},{type='option',text='Two',value='12'}}}\n"
+        "function QuickApp:onInit()\n"
+        "  local self = self\n"
+        "  setTimeout(function()\n"
+        "    api.get('/plugins/callUIEvent?deviceID='..self.id"
+        "..'&elementName=B1&eventType=onReleased')\n"
+        "    api.get('/plugins/callUIEvent?deviceID='..self.id"
+        "..'&elementName=s1&eventType=onChanged&value=42')\n"
+        "    api.get('/plugins/callUIEvent?deviceID='..self.id"
+        "..'&elementName=sel1&eventType=onToggled&value=12')\n"
+        "  end, 20)\n"
+        "end\n"
+        "function QuickApp:fopp() print('RELEASED') end\n"
+        "function QuickApp:slider(e) print('VALUE', e.values[1]) end\n"
+        "function QuickApp:selectChanged(e) print('SEL', e.values[1]) end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.load_qa_file(str(script))
+        await asyncio.sleep(0.4)
+        out = capsys.readouterr().out
+        assert "RELEASED" in out
+        assert "VALUE 42" in out
+        assert "SEL 12" in out  # select's onToggled routes through uiCallbacks
     finally:
         await engine.stop()

@@ -659,6 +659,18 @@ handlers.deviceAction = function(msg)
   end
 end
 
+-- GET /plugins/callUIEvent — route the interaction through the QA's own
+-- UIAction, so uiCallbacks lookup, UIHandler override, and event values all
+-- behave exactly like a real UI tap.
+handlers.uiEvent = function(msg)
+  local qa = qaForDevice(msg.deviceId)
+  if qa and type(qa.UIAction) == "function" then
+    qa:UIAction(msg.eventType, msg.elementName, msg.value)
+  elseif qa == nil then
+    postLog("warning", "uiEvent for unknown device " .. tostring(msg.deviceId))
+  end
+end
+
 handlers.customEvent = function(msg)
   for _, qa in pairs(qaInstances) do
     local fn = qa.onCustomEvent

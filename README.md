@@ -46,6 +46,9 @@ Requires Python 3.11+. `lupa` is the only runtime dependency.
 # simulated HC3 (offline): seed the REST API with a house
 .venv/bin/flua --seed examples/house.json script.lua
 
+# UI viewer: serve the sim API for viewer/index.html (stays up until Ctrl-C)
+.venv/bin/flua --ui 8090 examples/ui.lua
+
 # develop: watch mode (restart on save), static checks, deploy artifacts
 .venv/bin/flua --watch script.lua
 .venv/bin/flua --check script.lua
@@ -62,8 +65,9 @@ Requires Python 3.11+. `lupa` is the only runtime dependency.
 
 With no `--run-for`, flua exits gracefully when no timers, messages, or open
 network connections are pending — a script with no timers just runs and exits,
-like the standard interpreter. On startup flua prints a greeting with the flua,
-Lua and Python versions (`--nogreet` to skip it).
+like the standard interpreter (`--ui` is the exception: it keeps the run alive
+until Ctrl-C so the viewer never loses its API). On startup flua prints a
+greeting with the flua, Lua and Python versions (`--nogreet` to skip it).
 
 Each file is started as a tracked `setTimeout` callback with delay 0, so it
 runs inside the engine's message pump.
@@ -154,6 +158,27 @@ state. Unknown paths return `(nil, 404)` like the HC3. Implemented:
 Seed a house with `--seed house.json` (devices, rooms, scenes,
 globalVariables, alarms, profiles). See `.github/skills/hc3-rest-api/` for the
 endpoint reference the sim mirrors.
+
+## UI viewer
+
+`viewer/index.html` is a standalone page that renders QuickApp UIs and injects
+interactions through the sim API — the same contract the real HC3 UI uses.
+Serve the channel and open the file in a browser:
+
+```bash
+.venv/bin/flua --ui 8090 examples/ui.lua   # then open viewer/index.html
+```
+
+- polls `GET /devices` every second and renders `properties.uiView` (live
+  state merged from `device.view` — `QuickApp:updateView` shows up without a
+  reload)
+- clicks, slides and toggles fire `GET /plugins/callUIEvent`, which delivers
+  the event through the QA's own `UIAction` exactly like a tap in the real UI
+- permissive CORS, so the page works straight from `file://`
+- with no `--run-for` the run stays up until Ctrl-C; an explicit `--run-for`
+  still bounds the session
+- the same page works against a real HC3: point it at the gateway's address
+  and fill in credentials
 
 ## Network clients
 

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>flua UI viewer</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px;
+    background: #14161a; color: #e6e6e6;
+    font: 14px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    padding: 10px; background: #1d2026; border-radius: 8px; margin-bottom: 16px;
+  }
+  header label { color: #9aa; font-size: 12px; margin-left: 8px; }
+  header input {
+    background: #14161a; color: #e6e6e6; border: 1px solid #3a3f4a;
+    border-radius: 4px; padding: 5px 8px;
+  }
+  #status { margin-left: auto; font-size: 12px; color: #9aa; }
+  #status.ok { color: #5c5; }
+  #status.err { color: #e55; }
+  .device {
+    background: #1d2026; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px;
+  }
+  .device h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
+  .device h2 small { color: #788; font-weight: 400; margin-left: 6px; }
+  .row { display: flex; gap: 12px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
+  .row > * { flex: 1 1 120px; }
+  .row > .component-label { flex: 0 0 auto; min-width: 90px; color: #9aa; }
+  button.ctl {
+    flex: 0 0 auto; background: #2d6cf0; border: none; color: #fff;
+    padding: 7px 16px; border-radius: 6px; cursor: pointer; font: inherit;
+  }
+  button.ctl:hover { background: #3d7cff; }
+  button.ctl:active { background: #1d5ce0; }
+  input[type=range] { width: 100%; }
+  input[type=checkbox] { width: 18px; height: 18px; flex: 0 0 auto; }
+  select { background: #14161a; color: #e6e6e6; border: 1px solid #3a3f4a; border-radius: 4px; padding: 5px; }
+  .value { color: #7aa; font-size: 12px; flex: 0 0 auto; min-width: 40px; text-align: right; }
+  .hint { color: #667; font-size: 12px; margin-top: 16px; }
+  code { background: #111; padding: 1px 5px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<header>
+  <label>API</label>
+  <input id="base" value="http://127.0.0.1:8090" size="26">
+  <label>user</label>
+  <input id="user" size="10" placeholder="(real HC3)">
+  <label>pass</label>
+  <input id="pass" type="password" size="10" placeholder="(real HC3)">
+  <label>poll</label>
+  <input id="poll" type="number" min="0.2" step="0.1" value="1" size="4"> s
+  <button class="ctl" id="connect">Connect</button>
+  <span id="status"></span>
+</header>
+<div id="devices"></div>
+<p class="hint">
+  flua UI viewer — polls <code>GET /devices</code>, renders
+  <code>properties.uiView</code> (live state merged from <code>device.view</code>,
+  the target of <code>QuickApp:updateView</code>), and injects interactions via
+  <code>GET /plugins/callUIEvent</code> — the same contract the real HC3 UI uses.
+  Point it at a real HC3 with credentials and it works there too.
+</p>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let timer = null;
+
+function authHeaders() {
+  const user = $("user").value, pass = $("pass").value;
+  return user ? { Authorization: "Basic " + btoa(user + ":" + pass) } : {};
+}
+
+function setStatus(text, cls) {
+  const el = $("status");
+  el.textContent = text;
+  el.className = cls || "";
+}
+
+async function json(url, options) {
+  const res = await fetch(url, { headers: authHeaders(), ...options });
+  if (!res.ok) throw new Error("HTTP " + res.status + " for " + url);
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+async function uiEvent(deviceId, element, eventType, value) {
+  let url = $("base").value.replace(/\/+$/, "") +
+    "/plugins/callUIEvent?deviceID=" + encodeURIComponent(deviceId) +
+    "&elementName=" + encodeURIComponent(element) +
+    "&eventType=" + encodeURIComponent(eventType);
+  if (value !== undefined) url += "&value=" + encodeURIComponent(value);
+  await json(url);
+}
+
+// pick the interaction event from the component's eventBinding keys
+function eventFor(component) {
+  const b = component.eventBinding || {};
+  if (b.onReleased) return "onReleased";
+  if (b.onToggled) return "onToggled";
+  if (b.onChanged) return "onChanged";
+  return null;
+}
+
+function liveState(device, component) {
+  return (device.view && device.view[component.name]) || {};
+}
+
+function renderComponent(device, component) {
+  const wrap = document.createElement("div");
+  wrap.className = "row";
+  const name = document.createElement("span");
+  name.className = "component-label";
+  name.textContent = component.text || component.name;
+  wrap.appendChild(name);
+
+  const live = liveState(device, component);
+  const text = live.text !== undefined ? live.text : component.text;
+  const value = live.value !== undefined ? live.value : component.value;
+  const event = eventFor(component);
+  if (component.visible === false) wrap.style.display = "none";
+
+  const t = component.type;
+  if (t === "label") {
+    name.textContent = text || component.name;
+  } else if (t === "button") {
+    const btn = document.createElement("button");
+    btn.className = "ctl";
+    btn.textContent = text || component.name;
+    btn.onclick = () => event && uiEvent(device.id, component.name, event);
+    wrap.appendChild(btn);
+  } else if (t === "slider") {
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.min = component.min ?? "0";
+    slider.max = component.max ?? "100";
+    slider.step = component.step ?? "1";
+    slider.value = value ?? slider.min;
+    const val = document.createElement("span");
+    val.className = "value";
+    val.textContent = slider.value;
+    slider.oninput = () => (val.textContent = slider.value);
+    slider.onchange = () => event && uiEvent(device.id, component.name, event, slider.value);
+    wrap.appendChild(slider);
+    wrap.appendChild(val);
+  } else if (t === "switch") {
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.checked = String(value) === "true";
+    box.onchange = () =>
+      event && uiEvent(device.id, component.name, event, box.checked ? "true" : "false");
+    wrap.appendChild(box);
+  } else if (t === "select") {
+    const sel = document.createElement("select");
+    sel.multiple = component.selectionType === "multi";
+    for (const opt of component.options || []) {
+      const o = document.createElement("option");
+      o.value = opt.value;
+      o.textContent = opt.text ?? opt.value;
+      if (String(opt.value) === String(value)) o.selected = true;
+      sel.appendChild(o);
+    }
+    sel.onchange = () => event && uiEvent(device.id, component.name, event, sel.value);
+    wrap.appendChild(sel);
+  }
+  return wrap;
+}
+
+function renderDevice(device) {
+  const panel = document.createElement("div");
+  panel.className = "device";
+  const title = document.createElement("h2");
+  title.textContent = device.name || ("Device " + device.id);
+  const small = document.createElement("small");
+  small.textContent = "id " + device.id;
+  title.appendChild(small);
+  panel.appendChild(title);
+
+  const props = device.properties || {};
+  if (!props.uiView) {
+    const note = document.createElement("div");
+    note.className = "hint";
+    note.textContent = props.viewLayout
+      ? "Legacy viewLayout ($jason) — not rendered yet by the viewer."
+      : "No UI definition (no --%%u directives).";
+    panel.appendChild(note);
+    return panel;
+  }
+  for (const row of props.uiView) {
+    for (const component of row.components || []) {
+      panel.appendChild(renderComponent(device, component));
+    }
+  }
+  return panel;
+}
+
+// structure key: re-render the panel only when the UI shape changes,
+// otherwise refresh values in place (keeps slider drags stable)
+function structureKey(device) {
+  const props = device.properties || {};
+  return JSON.stringify(((props.uiView || []).map((row) =>
+    (row.components || []).map((c) => [c.type, c.name, c.options || null])
+  )));
+}
+
+async function poll() {
+  try {
+    const devices = await json($("base").value.replace(/\/+$/, "") + "/devices");
+    const root = $("devices");
+    const qas = devices.filter((d) => d.properties && (d.properties.uiView || d.properties.viewLayout));
+    for (const device of qas) {
+      const key = device.id + ":" + structureKey(device);
+      let panel = root.querySelector('[data-key="' + CSS.escape(String(device.id)) + '"]');
+      if (!panel || panel.dataset.struct !== key) {
+        const fresh = renderDevice(device);
+        fresh.dataset.key = device.id;
+        fresh.dataset.struct = key;
+        if (panel) panel.replaceWith(fresh);
+        else root.appendChild(fresh);
+        panel = fresh;
+      } else {
+        // refresh values only, unless the user is interacting with it
+        if (!panel.contains(document.activeElement)) {
+          panel.replaceWith(renderDevice(device));
+        }
+      }
+    }
+    // drop panels for devices that are gone
+    const live = new Set(qas.map((d) => String(d.id)));
+    for (const panel of root.querySelectorAll(".device")) {
+      if (!live.has(panel.dataset.key)) panel.remove();
+    }
+    setStatus(qas.length ? qas.length + " QA(s)" : "no QAs with UI", "ok");
+  } catch (err) {
+    setStatus(err.message, "err");
+  }
+}
+
+function start() {
+  if (timer) clearInterval(timer);
+  poll();
+  timer = setInterval(poll, Math.max(0.2, parseFloat($("poll").value) || 1) * 1000);
+}
+
+$("connect").onclick = start;
+start();
+</script>
+</body>
+</html>

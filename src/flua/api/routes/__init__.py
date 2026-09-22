@@ -41,6 +41,7 @@ from .plugins import (
     plugin_update_property,
     plugin_update_view,
     plugins_list,
+    ui_event_call,
     variable_delete,
     variable_get,
     variable_post,
@@ -80,6 +81,7 @@ ROUTES: list[tuple[str, str, Handler]] = [
     ("POST", "/devices/groupAction/{action}", group_action),
     # -- plugins ---------------------------------------------------------------
     ("GET", "/plugins", plugins_list),
+    ("GET", "/plugins/callUIEvent", ui_event_call),  # before /plugins/{id}: patterns overlap
     ("GET", "/plugins/{id}", plugin_get),
     ("GET", "/plugins/{id}/variables", variables_list),
     ("GET", "/plugins/{id}/variables/{key}", variable_get),

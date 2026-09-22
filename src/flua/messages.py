@@ -66,6 +66,7 @@ RESTART_QA = (
 )
 QA_VARS = "qaVars"  # {"id": int, "vars": {name: value}}  evaluated --%%var values
 DEVICE_ACTION = "deviceAction"  # {"id": int, "action": str, "args": list}
+UI_EVENT = "uiEvent"  # {"deviceId": int, "elementName": str, "eventType": str, "value"?: str}
 CUSTOM_EVENT = "customEvent"  # {"name": str}
 
 
@@ -228,3 +229,19 @@ def device_action(device_id: int, action: str, args: list[Any] | None = None) ->
 def custom_event(name: str) -> dict[str, Any]:
     """Deliver a custom event to QAs that define onCustomEvent."""
     return {"type": CUSTOM_EVENT, "name": name}
+
+
+def ui_event(
+    device_id: int, element_name: str, event_type: str, value: str | None = None
+) -> dict[str, Any]:
+    """Deliver a UI interaction to a QA device — the message behind the
+    real HC3's GET /plugins/callUIEvent endpoint."""
+    msg: dict[str, Any] = {
+        "type": UI_EVENT,
+        "deviceId": int(device_id),
+        "elementName": element_name,
+        "eventType": event_type,
+    }
+    if value is not None:
+        msg["value"] = value
+    return msg

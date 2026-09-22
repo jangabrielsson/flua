@@ -195,3 +195,23 @@ def plugin_restart(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     # restart is not implemented yet — accept and note it.
     logger.warning("plugin restart requested for %r: simulated (QA keeps running)", req.body)
     return None, 204
+
+
+def ui_event_call(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    """GET /plugins/callUIEvent — deliver a UI interaction to a QA device.
+
+    Mirrors the real HC3 endpoint (query params deviceID/elementName/
+    eventType/value) and pumps a ``uiEvent`` message to the QA, which routes
+    it through the QA's uiCallbacks like a tap on the real UI would.
+    """
+    try:
+        device_id = int(req.query.get("deviceID", ""))
+    except ValueError:
+        return None, 400
+    element_name = req.query.get("elementName")
+    event_type = req.query.get("eventType")
+    if not element_name or not event_type:
+        return None, 400
+    if req.emit is not None:
+        req.emit(messages.ui_event(device_id, element_name, event_type, req.query.get("value")))
+    return None, 200

@@ -28,6 +28,7 @@ from . import __version__, messages
 from .clock import parse_start_time
 from .config import parse_annotations, peek_offline, split_annotations
 from .engine import LuaEngine
+from .http_server import ApiServer
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +124,17 @@ def _build_parser() -> argparse.ArgumentParser:
         "--watch",
         action="store_true",
         help="restart QAs when their files change (mtime polling, no dependencies)",
+    )
+    parser.add_argument(
+        "--ui",
+        nargs="?",
+        const=8090,
+        type=int,
+        default=None,
+        metavar="PORT",
+        help="serve the simulated HC3 API over HTTP for the UI viewer (default "
+        "port 8090). With no --run-for the run stays up until Ctrl-C, so the "
+        "viewer keeps its API even after the QA's timers drain",
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="enable debug logging")
     parser.add_argument("--version", action="version", version=f"flua {__version__}")
@@ -225,12 +237,15 @@ def _keep_running(
     run_for: float | None,
     start: float,
     max_virtual_seconds: float | None,
+    ui_keepalive: bool = False,
 ) -> bool:
     if not engine.is_running():
         return False
     if max_virtual_seconds is not None and engine.clock.elapsed() >= max_virtual_seconds:
         return False  # virtual time limit reached
     if run_for is None:
+        if ui_keepalive:
+            return True  # interactive UI session: run until interrupted (Ctrl-C)
         return engine.has_pending_work()  # graceful: exit when all work is done
     if run_for == 0:
         return True  # run until exit()
@@ -289,6 +304,19 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
     except ValueError as exc:
         parser.error(str(exc))
     await engine.start()
+    ui_server: ApiServer | None = None
+    if args.ui is not None:
+        # the UI viewer's channel: serve the sim API over HTTP (viewer polls
+        # /devices and fires /plugins/callUIEvent — the HC3's own contract).
+        # The server never counts as pending work; this task owns it.
+        ui_server = ApiServer(engine.api, port=args.ui)
+        await ui_server.start()
+        engine.post(
+            messages.log(
+                "info",
+                f"flua: UI API on http://127.0.0.1:{ui_server.port} — open viewer/index.html",
+            )
+        )
     if not args.nogreet:
         # route the greeting through the message queue so it shares the
         # pump's FIFO with all QA output — guaranteed to appear first
@@ -367,11 +395,15 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
     if horizon is not None:
         engine.limit_run(horizon)
     try:
-        while _keep_running(engine, args.run_for, start, max_virtual_seconds):
+        while _keep_running(
+            engine, args.run_for, start, max_virtual_seconds, ui_server is not None
+        ):
             await asyncio.sleep(0.05)
     finally:
         with contextlib.suppress(asyncio.CancelledError):
             await engine.stop()
+        if ui_server is not None:
+            await ui_server.stop()
     if max_virtual_seconds is not None and engine.clock.elapsed() >= max_virtual_seconds:
         print(f"flua: virtual time limit reached ({max_hours}h)", file=sys.stderr)
     return engine.exit_code

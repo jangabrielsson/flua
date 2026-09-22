@@ -420,6 +420,36 @@ def test_custom_event(api: Api) -> None:
     assert data["events"] == [{"type": "CustomEvent", "data": {"name": "wakeup"}}]
 
 
+def test_call_ui_event(api: Api) -> None:
+    # GET /plugins/callUIEvent (the real HC3 endpoint): query-param driven
+    # UI interaction delivered to the QA as a uiEvent message
+    url = "/plugins/callUIEvent?deviceID=5000&elementName=B1&eventType=onReleased&value=42"
+    assert api.dispatch("GET", url) == (None, 200)
+    assert api.emitted == [
+        {
+            "type": "uiEvent",
+            "deviceId": 5000,
+            "elementName": "B1",
+            "eventType": "onReleased",
+            "value": "42",
+        }
+    ]
+    # value is optional; deviceID/elementName/eventType are required
+    api.emitted.clear()
+    url = "/plugins/callUIEvent?deviceID=5000&elementName=B1&eventType=onReleased"
+    assert api.dispatch("GET", url) == (None, 200)
+    assert api.emitted == [
+        {"type": "uiEvent", "deviceId": 5000, "elementName": "B1", "eventType": "onReleased"}
+    ]
+    assert api.dispatch("GET", "/plugins/callUIEvent?deviceID=5000") == (None, 400)
+    assert api.dispatch(
+        "GET", "/plugins/callUIEvent?deviceID=abc&elementName=B1&eventType=onReleased"
+    ) == (None, 400)
+    assert api.emitted == [
+        {"type": "uiEvent", "deviceId": 5000, "elementName": "B1", "eventType": "onReleased"}
+    ]
+
+
 def test_scenes(api: Api) -> None:
     data, status = api.dispatch("GET", "/scenes")
     assert status == 200
