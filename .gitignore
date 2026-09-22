@@ -10,3 +10,7 @@ build/
 .env
 fibaro_api_docs/
 dev/
+
+# agent tooling state
+.deepseek/state/
+.codewhale/state/
