@@ -662,10 +662,34 @@ end
 -- GET /plugins/callUIEvent — route the interaction through the QA's own
 -- UIAction, so uiCallbacks lookup, UIHandler override, and event values all
 -- behave exactly like a real UI tap.
+local function isMultiSelect(qa, elementName)
+  local uiView = (qa.properties or {}).uiView or {}
+  for _, row in pairs(uiView) do
+    for _, component in pairs(row.components or {}) do
+      if component.name == elementName then
+        return component.selectionType == "multi"
+      end
+    end
+  end
+  return false
+end
+
 handlers.uiEvent = function(msg)
   local qa = qaForDevice(msg.deviceId)
   if qa and type(qa.UIAction) == "function" then
-    qa:UIAction(msg.eventType, msg.elementName, msg.value)
+    local value = msg.value
+    -- multi selects arrive as a comma-joined list through the single value
+    -- param (the real HC3 contract); restore the list so the QA sees
+    -- event.values = {each selected value}
+    if value and isMultiSelect(qa, msg.elementName) then
+      local values = {}
+      for v in string.gmatch(value, "[^,]+") do
+        values[#values + 1] = v
+      end
+      qa:UIAction(msg.eventType, msg.elementName, values)
+    else
+      qa:UIAction(msg.eventType, msg.elementName, value)
+    end
   elseif qa == nil then
     postLog("warning", "uiEvent for unknown device " .. tostring(msg.deviceId))
   end

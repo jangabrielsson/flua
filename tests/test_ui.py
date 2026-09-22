@@ -266,3 +266,34 @@ async def test_ui_event_api_endpoint_reaches_callback(tmp_path, capsys) -> None:
         assert "SEL 12" in out  # select's onToggled routes through uiCallbacks
     finally:
         await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_multi_ui_event_delivers_value_list(tmp_path, capsys) -> None:
+    # a multi select sends every selected value comma-joined through the
+    # single value param (the callUIEvent contract); the sim restores the
+    # list so the QA sees event.values = {each selected value}
+    script = tmp_path / "multi_event.lua"
+    script.write_text(
+        '--%%u:{multi="m1",text="Pick",onToggled="multiChanged",values={\'11\'},'
+        "options={{type='option',text='One',value='11'},{type='option',text='Two',value='12'}}}"
+        "\n"
+        "function QuickApp:onInit()\n"
+        "  local self = self\n"
+        "  setTimeout(function()\n"
+        "    api.get('/plugins/callUIEvent?deviceID='..self.id"
+        "..'&elementName=m1&eventType=onToggled&value=11%2C12')\n"
+        "  end, 20)\n"
+        "end\n"
+        "function QuickApp:multiChanged(e)\n"
+        "  print('MULTI', e.values[1], e.values[2], #e.values)\n"
+        "end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.load_qa_file(str(script))
+        await asyncio.sleep(0.4)
+        assert "MULTI 11 12 2" in capsys.readouterr().out
+    finally:
+        await engine.stop()

@@ -397,14 +397,19 @@ end
 -- Programmatically triggers a UI action for testing purposes
 -- @param eventType - The type of UI event to trigger
 -- @param elementName - The name of the UI element
--- @param arg - Optional argument value for the event
+-- @param arg - Optional argument value for the event; a list means the event
+--   carries those values (multi selects deliver every selected value)
 function QuickAppBase:UIAction(eventType, elementName, arg)
   local event = {
     deviceId = self.id,
     eventType = eventType,
     elementName = elementName
   }
-  event.values = arg ~= nil and  { arg } or json.util.InitArray({})
+  if type(arg) == "table" then
+    event.values = arg
+  else
+    event.values = arg ~= nil and  { arg } or json.util.InitArray({})
+  end
   onUIEvent(self.id, event)
 end
 

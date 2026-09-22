@@ -112,6 +112,29 @@ function liveState(device, component) {
   return (device.view && device.view[component.name]) || {};
 }
 
+// UI elements keep the user's last interaction locally, like the real HC3 UI
+// layer: updateView (device.view) overrides it, the local value otherwise
+// wins over the static directive value — so a slider drag or select choice
+// survives the poll rebuilds (the QA is not expected to echo it back).
+const uiValues = {}; // deviceId -> { componentName: value }
+
+function componentValue(device, component) {
+  const live = liveState(device, component);
+  if (live.value !== undefined) {
+    // server state wins; drop any stale user override
+    if (uiValues[device.id]) delete uiValues[device.id][component.name];
+    return live.value;
+  }
+  const local = uiValues[device.id] && uiValues[device.id][component.name];
+  if (local !== undefined) return local;
+  // multi selects carry a values list, everything else a scalar value
+  return component.values !== undefined ? component.values : component.value;
+}
+
+function setComponentValue(device, component, value) {
+  (uiValues[device.id] = uiValues[device.id] || {})[component.name] = value;
+}
+
 function renderComponent(device, component) {
   const wrap = document.createElement("div");
   wrap.className = "row";
@@ -122,7 +145,7 @@ function renderComponent(device, component) {
 
   const live = liveState(device, component);
   const text = live.text !== undefined ? live.text : component.text;
-  const value = live.value !== undefined ? live.value : component.value;
+  const value = componentValue(device, component);
   const event = eventFor(component);
   if (component.visible === false) wrap.style.display = "none";
 
@@ -146,28 +169,61 @@ function renderComponent(device, component) {
     val.className = "value";
     val.textContent = slider.value;
     slider.oninput = () => (val.textContent = slider.value);
-    slider.onchange = () => event && uiEvent(device.id, component.name, event, slider.value);
+    slider.onchange = () => {
+      setComponentValue(device, component, slider.value);
+      if (event) uiEvent(device.id, component.name, event, slider.value);
+    };
     wrap.appendChild(slider);
     wrap.appendChild(val);
   } else if (t === "switch") {
     const box = document.createElement("input");
     box.type = "checkbox";
     box.checked = String(value) === "true";
-    box.onchange = () =>
-      event && uiEvent(device.id, component.name, event, box.checked ? "true" : "false");
+    box.onchange = () => {
+      const v = box.checked ? "true" : "false";
+      setComponentValue(device, component, v);
+      if (event) uiEvent(device.id, component.name, event, v);
+    };
     wrap.appendChild(box);
   } else if (t === "select") {
     const sel = document.createElement("select");
-    sel.multiple = component.selectionType === "multi";
+    const isMulti = component.selectionType === "multi";
+    sel.multiple = isMulti;
+    if (isMulti) sel.size = 1; // compact dropdown; the popup lists checkboxes
+    const chosen = value === undefined ? [] : Array.isArray(value) ? value : [value];
     for (const opt of component.options || []) {
       const o = document.createElement("option");
       o.value = opt.value;
       o.textContent = opt.text ?? opt.value;
-      if (String(opt.value) === String(value)) o.selected = true;
+      if (chosen.some((v) => String(v) === String(opt.value))) o.selected = true;
       sel.appendChild(o);
     }
-    sel.onchange = () => event && uiEvent(device.id, component.name, event, sel.value);
-    wrap.appendChild(sel);
+    if (isMulti) {
+      const count = document.createElement("span");
+      count.className = "value";
+      const updateCount = () => {
+        count.textContent = sel.selectedOptions.length
+          ? sel.selectedOptions.length + " selected"
+          : "";
+      };
+      updateCount();
+      sel.onchange = () => {
+        // send every selected value, comma-joined (the single callUIEvent
+        // value param); the sim restores the list for the QA
+        const vals = Array.from(sel.selectedOptions).map((o) => o.value);
+        setComponentValue(device, component, vals);
+        updateCount();
+        if (event) uiEvent(device.id, component.name, event, vals.join(","));
+      };
+      wrap.appendChild(sel);
+      wrap.appendChild(count);
+    } else {
+      sel.onchange = () => {
+        setComponentValue(device, component, sel.value);
+        if (event) uiEvent(device.id, component.name, event, sel.value);
+      };
+      wrap.appendChild(sel);
+    }
   }
   return wrap;
 }
