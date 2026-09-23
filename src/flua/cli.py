@@ -134,7 +134,9 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="PORT",
         help="serve the simulated HC3 API over HTTP for the UI viewer (default "
         "port 8090). With no --run-for the run stays up until Ctrl-C, so the "
-        "viewer keeps its API even after the QA's timers drain",
+        "viewer keeps its API even after the QA's timers drain. A busy port "
+        "falls back to the next free one (the effective port is printed at "
+        "startup)",
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="enable debug logging")
     parser.add_argument("--version", action="version", version=f"flua {__version__}")
@@ -310,7 +312,10 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         # /devices and fires /plugins/callUIEvent — the HC3's own contract).
         # The server never counts as pending work; this task owns it.
         ui_server = ApiServer(engine.api, port=args.ui)
-        await ui_server.start()
+        try:
+            await ui_server.start()
+        except (OSError, RuntimeError) as exc:
+            parser.error(f"cannot serve the UI API on port {args.ui}: {exc}")
         engine.post(
             messages.log(
                 "info",

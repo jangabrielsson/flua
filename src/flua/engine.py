@@ -44,7 +44,9 @@ from .devices import catalog_types
 from .environment import EnvChain
 from .hc3 import Hc3Remote
 from .http import http_call
+from .http_server import ApiServer
 from .mqtt import MqttPool
+from .proxy import PROXY_PORT_DEFAULT, connect_proxy, local_ip, resolve_proxy
 from .sync_socket import SyncTCPSockets, SyncUDPSockets
 from .timers import TimerManager
 from .ui import compile_ui
@@ -179,6 +181,10 @@ class LuaEngine:
         self.qa_websockets = WebSocketPool(self._on_ws_event)
         self._loop: asyncio.AbstractEventLoop | None = None
         self.qa_mqtt = MqttPool(self._on_mqtt_event)
+        # Proxy mode (--%%proxy:true): the callback server the HC3 proxy
+        # posts actions/UI events to, plus the in-flight CONNECT tasks.
+        self._proxy_server: ApiServer | None = None
+        self._proxy_tasks: set[asyncio.Task[None]] = set()
         install_bindings(self)
         # .flua.lua (local > home > legacy ~/.plua/config.lua)
         self._load_lua_config()
@@ -197,14 +203,16 @@ class LuaEngine:
     def _keep_alive_active(self) -> bool:
         """Any loaded QA with --%%keep-alive:true that hasn't exited keeps the
         online engine (and the HC3 poller's long poll) alive past idle — like
-        a QA on the real HC3, which runs forever. Offline there is no poller
-        to feed, so the directive has no effect there."""
+        a QA on the real HC3, which runs forever. Proxy-mode QAs (--%%proxy:true)
+        imply the same: the emulator must stay up to serve the HC3 proxy's
+        callbacks. Offline there is no poller to feed, so the directive has no
+        effect there."""
         if self.hc3 is None:
             return False
         return any(
             info.get("loaded")
             and info.get("exited") is None
-            and bool(info.get("config", {}).get("keep-alive"))
+            and bool(info.get("config", {}).get("keep-alive") or info.get("proxy"))
             for info in self._qas.values()
         )
 
@@ -304,16 +312,28 @@ class LuaEngine:
         qa_config: dict[str, Any],
         arg0: str,
     ) -> int:
-        """Assign a QA id, resolve its name, register it in the sim directory."""
-        qa_id = self._next_qa_id
-        self._next_qa_id += 1
+        """Assign a QA id, resolve its name, register it in the sim directory.
+
+        Proxy mode (--%%proxy:true, online only) resolves the proxy device on
+        the HC3 FIRST, before the id is assigned: the emulated QA runs under
+        the proxy's HC3 id, so the two are treated as one device (plua caveat 2).
+        """
         qa_config = dict(qa_config)
         name = qa_config.get("name")
         if name is None:
             # names need not be unique: config name, else the script's
             # basename without path/suffix, else QA<id>
-            name = Path(arg0).stem if arg0.endswith(".lua") else f"QA{qa_id}"
+            name = Path(arg0).stem if arg0.endswith(".lua") else f"QA{self._next_qa_id}"
             qa_config["name"] = name
+        # Proxy mode needs the real HC3; offline it degrades to a plain QA
+        # with a warning (plua: "Offline mode, proxy disabled").
+        proxy_enabled = bool(qa_config.get("proxy"))
+        if proxy_enabled and self.hc3 is None:
+            logger.warning(
+                "--%%proxy:true needs online mode (HC3 credentials) — proxy disabled for %s",
+                name,
+            )
+            proxy_enabled = False
         self._normalize_files(qa_config)
         # Device properties: skeleton defaults < --%%properties < --%%property
         # and the named directives (--%%uid/description/model/build/
@@ -326,8 +346,10 @@ class LuaEngine:
         if qa_config.get("u"):
             # --%%u rows -> the HC3's UI property structures (viewLayout =
             # legacy $jason, uiView = the new component format, uiCallbacks =
-            # {name, eventType, callback} for UI event routing)
-            ui = compile_ui(qa_config["u"], qa_id)
+            # {name, eventType, callback} for UI event routing). The layout
+            # title embeds the preliminary engine id; the HC3 rewrites titles
+            # at device creation (same as the .fqa export path).
+            ui = compile_ui(qa_config["u"], self._next_qa_id)
             device_properties["uiCallbacks"] = ui["uiCallbacks"]
             device_properties["viewLayout"] = ui["viewLayout"]
             device_properties["uiView"] = ui["uiView"]
@@ -338,6 +360,22 @@ class LuaEngine:
             for entry in qa_config.get("files") or []:
                 if entry.get("path") and not Path(entry["path"]).is_absolute():
                     entry["path"] = str(base / entry["path"])
+        if proxy_enabled:
+            # reuse or deploy the proxy FIRST: its HC3 id becomes the QA's id
+            proxy_device = resolve_proxy(
+                self,
+                name,
+                qa_config.get("type"),
+                device_properties,
+                qa_config.get("useUiView"),  # None unless --%%useUiView is declared
+            )
+            qa_id = int(proxy_device["id"])
+        else:
+            qa_id = self._next_qa_id
+            self._next_qa_id += 1
+            while qa_id in self._qas or qa_id in self.api.state.devices:
+                qa_id = self._next_qa_id
+                self._next_qa_id += 1
         self._qas[qa_id] = {
             "name": name,
             "path": path,
@@ -346,12 +384,17 @@ class LuaEngine:
             "type": qa_config.get("type"),
             "properties": device_properties,
             "config": qa_config,  # resolved copy (name/type/properties filled in)
+            "proxy": proxy_enabled,
         }
         self._qas[qa_id]["files"] = self._build_files(path, code, qa_config)
         # Register the QA as a device before its code runs: on the HC3 the
         # plugin device exists before onInit executes, and onInit's own api
         # calls (internalStorage, updateProperty) must find it.
         self.api.register_qa(qa_id, name, qa_config.get("type"), device_properties)
+        if proxy_enabled:
+            # the sim only shadows the HC3's device from here on
+            self.api.state.mark_proxy(qa_id)
+            self._schedule_proxy_connect(qa_id, name)
         return qa_id
 
     @staticmethod
@@ -438,7 +481,10 @@ class LuaEngine:
         config = dict(self.config)
         config.update(global_params)
         config.update(local_params)
-        qa_id = self._prepare_qa(path, None, config, path)
+        try:
+            qa_id = self._prepare_qa(path, None, config, path)
+        except ValueError as exc:
+            return None, str(exc)  # bad device type, proxy deploy failure, ...
         resolved = self._qas[qa_id]["config"]  # files normalized inside _prepare_qa
         self.enqueue_outbound(messages.start_qa_msg(qa_id, path, resolved, path))
         return qa_id, None
@@ -533,11 +579,88 @@ class LuaEngine:
     def _mirror_event(self, entry: dict[str, Any]) -> None:
         """Into the local buffer (merged api.get feed) + the pump-delivered
         subscriber message."""
+        # Keep local shadows of registered devices (proxy-mode QAs) in sync:
+        # the HC3 owns the device, so its events update the mirror too.
+        if entry.get("type") == "DevicePropertyUpdatedEvent" and isinstance(
+            entry.get("data"), dict
+        ):
+            data = entry["data"]
+            try:
+                device = self.api.state.devices.get(int(data.get("id")))
+            except (TypeError, ValueError):
+                device = None
+            if device is not None and data.get("name"):
+                properties = device.setdefault("properties", {})
+                properties[str(data["name"])] = data.get("newValue")
         self.api.state.mirror_event(entry)
         self.enqueue_outbound(messages.refresh_state_event(entry))
 
     def _mirror_change(self, entry: dict[str, Any]) -> None:
         self.api.state.mirror_change(entry)
+
+    # -- proxy mode (--%%proxy:true) ---------------------------------------------
+
+    def _schedule_proxy_connect(self, qa_id: int, name: str) -> None:
+        """Arm the callback server and tell the HC3 proxy where the emulator
+        listens. Runs on the event loop: the server must bind first so the
+        CONNECT carries the real port (busy ports fall back)."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return  # no running loop (proxy needs online mode, so never here)
+        task = loop.create_task(self._connect_proxy(qa_id, name))
+        self._proxy_tasks.add(task)
+        task.add_done_callback(self._proxy_tasks.discard)
+
+    async def _ensure_proxy_server(self) -> ApiServer:
+        """The HTTP server the HC3 proxy calls back into (0.0.0.0 so the
+        controller can reach it). One per engine, port from FLUA_PROXY_PORT
+        (default 8080); busy ports fall back like the --ui server."""
+        if self._proxy_server is None:
+            try:
+                port = int(self.env.get("FLUA_PROXY_PORT") or PROXY_PORT_DEFAULT)
+            except ValueError:
+                port = PROXY_PORT_DEFAULT
+            self._proxy_server = ApiServer(self.api, host="0.0.0.0", port=port)
+            await self._proxy_server.start()
+        return self._proxy_server
+
+    async def _connect_proxy(self, qa_id: int, name: str) -> None:
+        """CONNECT the proxy to the emulator (async: bind first, then post)."""
+        try:
+            server = await self._ensure_proxy_server()
+        except (OSError, RuntimeError) as exc:
+            logger.warning("cannot start the proxy callback server: %s", exc)
+            return
+        ip = local_ip()
+        port = server.port
+        loop = asyncio.get_running_loop()
+
+        def worker() -> None:
+            # blocking urllib on a daemon thread: a hung HC3 must never delay
+            # Ctrl-C or exit (same policy as the refreshStates poller)
+            _data, status = connect_proxy(self, qa_id, ip, port)
+            try:
+                loop.call_soon_threadsafe(self._proxy_connect_done, qa_id, name, ip, port, status)
+            except RuntimeError:
+                pass  # loop closed — the process is exiting
+
+        threading.Thread(target=worker, name="flua-proxy-connect", daemon=True).start()
+
+    def _proxy_connect_done(self, qa_id: int, name: str, ip: str, port: int, status: int) -> None:
+        if status in (200, 202):
+            self.post(
+                messages.log(
+                    "info",
+                    f"flua: proxy connected — {name}_Proxy ({qa_id}) sends "
+                    f"actions and UI events to http://{ip}:{port}",
+                )
+            )
+        else:
+            logger.warning(
+                "proxy CONNECT failed (HTTP %s): the HC3 proxy cannot reach the emulator",
+                status,
+            )
 
     def restart_qa(self, qa_id: int) -> None:
         """Re-run a QA's code (after a file change). Timers are cancelled,
@@ -884,6 +1007,12 @@ class LuaEngine:
         if self.hc3 is not None and self._poller_task is not None:
             self._poller_task.cancel()
             self._poller_task = None
+        for task in list(self._proxy_tasks):
+            task.cancel()
+        self._proxy_tasks.clear()
+        if self._proxy_server is not None:
+            await self._proxy_server.stop()
+            self._proxy_server = None
         for path in list(self._temp_qa_paths):
             self._cleanup_temp_qa(path)
         for task in list(self._http_tasks):
@@ -971,7 +1100,21 @@ class LuaEngine:
         for name, value in (msg.get("vars") or {}).items():
             if str(name) not in merged:  # initializers never clobber runtime state
                 merged[str(name)] = {"name": str(name), "value": value}
-        properties["quickAppVariables"] = list(merged.values())
+        variables = list(merged.values())
+        properties["quickAppVariables"] = variables
+        # proxy mode: the HC3 owns the device — push the evaluated variables
+        # to the proxy so its UI reflects them (the HC3 emits the event)
+        info = self._qas.get(int(msg["id"]))
+        if info and info.get("proxy") and self.hc3 is not None:
+            self.api.dispatch_hc3(
+                "POST",
+                "/plugins/updateProperty",
+                {
+                    "deviceId": int(msg["id"]),
+                    "propertyName": "quickAppVariables",
+                    "value": variables,
+                },
+            )
 
     def _handle_http_request(self, msg: dict[str, Any]) -> None:
         """Run a net.HTTPClient request in a worker thread (never blocks the pump)."""

@@ -6,7 +6,7 @@ import time
 from typing import Any
 
 from ... import messages
-from ..request import ApiRequest
+from ..request import ApiRequest, forward_to_proxy
 from ..state import SimState, public
 
 
@@ -47,11 +47,17 @@ def device_update(state: SimState, req: ApiRequest) -> tuple[Any, int]:
         return None, 404
     if not isinstance(req.body, dict):
         return None, 400
+    proxy = state.is_proxy(dev["id"])
     for key in ("name", "enabled", "visible", "roomID"):
         if key in req.body:
             old = dev.get(key)
             dev[key] = req.body[key]
-            state.record_change(dev["id"], key, req.body[key], old)
+            if not proxy:
+                state.record_change(dev["id"], key, req.body[key], old)
+    if proxy:
+        # the HC3 owns the device: mirror the update there; its change feed
+        # comes back through the refreshStates poll
+        forward_to_proxy(req, True)
     return None, 204
 
 
@@ -85,6 +91,11 @@ def action_device(state: SimState, req: ApiRequest) -> tuple[Any, int]:
         return None, 400
     if req.emit is not None:
         req.emit(messages.device_action(int(dev["id"]), req.path_params["action"], list(args)))
+    # Actions arriving from a proxy callback were already recorded by the
+    # real HC3 (DeviceActionRanEvent) — the poll mirrors that event, so the
+    # sim must not emit a duplicate.
+    if req.external and state.is_proxy(dev["id"]):
+        return None, 202
     entry = state.record_action_event(
         int(dev["id"]), req.path_params["action"], list(args), _now(req)
     )

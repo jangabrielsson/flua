@@ -29,10 +29,30 @@ class ApiRequest:
     path_params: dict[str, str] = field(default_factory=dict)
     qa_id: int | None = None
     clock: Any = None  # the engine's virtual clock (refreshStates timestamps)
+    # True when the request arrived over HTTP from outside the emulator
+    # (the UI viewer, or a proxy device calling back). The real HC3 already
+    # recorded events for those — the sim must not double them.
+    external: bool = False
+    # Filled by Api.dispatch when a remote HC3 is configured: mirrors the
+    # call to the real controller. Handlers use it (via forward_to_proxy)
+    # for proxy-mode devices, which the HC3 owns.
+    remote: Callable[[str, str, Any], tuple[Any, int]] | None = None
     # Filled by Api.dispatch: handlers call this to hand an event to the
     # engine's outbound queue (device actions, custom events). None when a
     # handler is invoked outside dispatch.
     emit: Callable[[dict[str, Any]], None] | None = None
+
+    @property
+    def path(self) -> str:
+        """The request path (query string excluded)."""
+        return "/" + "/".join(self.segments)
+
+
+def forward_to_proxy(req: ApiRequest, is_proxy: bool) -> None:
+    """Mirror a mutating call to the real HC3 when the target device is a
+    proxy (the HC3 owns the device; the sim only shadows it)."""
+    if is_proxy and req.remote is not None:
+        req.remote(req.method, req.path, req.body)
 
 
 def parse_url(url: str) -> tuple[list[str], dict[str, str]]:

@@ -15,6 +15,7 @@ used to call urlopen directly and hung the suite.
 
 import asyncio
 import json
+import re
 import socket
 import subprocess
 import sys
@@ -217,6 +218,63 @@ def test_ui_flag_keeps_api_alive_after_qa_drains(tmp_path) -> None:
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/devices", timeout=2) as res:
             assert json.loads(res.read())
     finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=10)
+
+
+def test_ui_port_busy_falls_back_to_next_free_port(tmp_path) -> None:
+    # parallel runs and quick restarts must not collide: when the requested
+    # port is busy, flua serves on the next free port and announces the
+    # effective URL (a second `flua --ui 8090` while the first runs used to
+    # die with an OSError traceback)
+    busy = socket.socket()
+    busy.bind(("127.0.0.1", 0))
+    busy.listen(1)  # keep the port occupied for the whole test
+    port = busy.getsockname()[1]
+
+    script = tmp_path / "ui.lua"
+    script.write_text(
+        '--%%u:{button="B1",text="Press me",onReleased="go"}\n'
+        "function QuickApp:go() end\n"
+    )
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "flua", "--ui", str(port), str(script)],
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    try:
+        announce_re = re.compile(r"UI API on http://127\.0\.0\.1:(\d+)")
+        served_port = None
+        output = ""
+        deadline = time.monotonic() + 15.0
+        while time.monotonic() < deadline and proc.poll() is None:
+            line = proc.stdout.readline()
+            if not line:
+                time.sleep(0.05)
+                continue
+            output += line
+            match = announce_re.search(line)
+            if match:
+                served_port = int(match.group(1))
+                break
+        assert proc.poll() is None, "flua --ui exited early: " + output
+        assert served_port is not None, "flua --ui never announced its port: " + output
+        assert served_port != port, "flua served on the busy port"
+        assert served_port > port, "fallback moved backwards: " + output
+        assert f"port {port} busy" in output, "no busy-port notice: " + output
+        # the fallback listener actually serves the sim API
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{served_port}/devices", timeout=2
+        ) as res:
+            assert json.loads(res.read())
+    finally:
+        busy.close()
         proc.terminate()
         try:
             proc.wait(timeout=10)

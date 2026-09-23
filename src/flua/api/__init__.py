@@ -74,14 +74,29 @@ class Api:
     ) -> None:
         self.state.register_qa(qa_id, name, device_type, properties)
 
+    def _remote_hook(self, method: str, path: str, body: Any) -> tuple[Any, int]:
+        """Forward a sim-handled call to the real HC3 (proxy mode): handlers
+        use this so the controller stays in sync with the shadow device."""
+        if self._remote is None:
+            return None, 404
+        segments, query = parse_url(path)
+        remote_path = "/" + "/".join(segments)
+        return self._remote.request(method, remote_path, query, body)
+
     def dispatch(
         self,
         method: str,
         url: str,
         body: Any = None,
         qa_id: int | None = None,
+        external: bool = False,
     ) -> tuple[Any, int]:
-        """Route one REST call; returns (data, status) with data=None on failures."""
+        """Route one REST call; returns (data, status) with data=None on failures.
+
+        ``external`` marks requests that arrived over HTTP from outside the
+        emulator (viewer, proxy callbacks): the real HC3 recorded their
+        events already, so handlers must not emit duplicates.
+        """
         method = method.upper()
         segments, query = parse_url(url)
         if segments[:1] == ["quickApp"]:
@@ -104,6 +119,8 @@ class Api:
                 emit=self._emit,
                 clock=self._engine.clock if self._engine is not None else None,
                 qa_id=qa_id,
+                external=external,
+                remote=self._remote_hook if self._remote is not None else None,
             )
             try:
                 data, status = handler(self.state, req)

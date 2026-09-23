@@ -82,6 +82,7 @@ ROUTES: list[tuple[str, str, Handler]] = [
     # -- plugins ---------------------------------------------------------------
     ("GET", "/plugins", plugins_list),
     ("GET", "/plugins/callUIEvent", ui_event_call),  # before /plugins/{id}: patterns overlap
+    ("POST", "/plugins/callUIEvent", ui_event_call),  # proxy devices POST their UI events
     ("GET", "/plugins/{id}", plugin_get),
     ("GET", "/plugins/{id}/variables", variables_list),
     ("GET", "/plugins/{id}/variables/{key}", variable_get),

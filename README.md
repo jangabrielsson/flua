@@ -46,7 +46,8 @@ Requires Python 3.11+. `lupa` is the only runtime dependency.
 # simulated HC3 (offline): seed the REST API with a house
 .venv/bin/flua --seed examples/house.json script.lua
 
-# UI viewer: serve the sim API for viewer/index.html (stays up until Ctrl-C)
+# UI viewer: serve the sim API for viewer/index.html (stays up until Ctrl-C,
+# busy ports fall back to the next free one)
 .venv/bin/flua --ui 8090 examples/ui.lua
 
 # develop: watch mode (restart on save), static checks, deploy artifacts
@@ -174,6 +175,8 @@ Serve the channel and open the file in a browser:
   reload)
 - clicks, slides and toggles fire `GET /plugins/callUIEvent`, which delivers
   the event through the QA's own `UIAction` exactly like a tap in the real UI
+- a busy port falls back to the next free one, so parallel runs and quick
+  restarts never collide — the effective port is printed at startup
 - permissive CORS, so the page works straight from `file://`
 - with no `--run-for` the run stays up until Ctrl-C; an explicit `--run-for`
   still bounds the session

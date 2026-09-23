@@ -20,6 +20,7 @@ Design notes:
 from __future__ import annotations
 
 import asyncio
+import errno
 import json
 import logging
 from typing import Any
@@ -27,6 +28,9 @@ from typing import Any
 from .api import Api
 
 logger = logging.getLogger(__name__)
+
+# How many ports to try before giving up when the requested one is busy.
+_PORT_ATTEMPTS = 10
 
 _CORS = {
     "Access-Control-Allow-Origin": "*",
@@ -45,9 +49,30 @@ class ApiServer:
         self._server: asyncio.Server | None = None
 
     async def start(self) -> None:
-        """Bind the listener; with port 0 the OS picks one (``self.port``)."""
-        self._server = await asyncio.start_server(self._handle, self.host, self.port)
-        if self.port == 0 and self._server.sockets:
+        """Bind the listener; with port 0 the OS picks one (``self.port``).
+
+        When an explicit port is busy the next free port is tried instead
+        (up to ``_PORT_ATTEMPTS``), so parallel flua runs and quick restarts
+        never collide. The effective port is always reflected in
+        ``self.port``; the CLI announces it at startup.
+        """
+        first = self.port
+        last_error: OSError | None = None
+        for _ in range(_PORT_ATTEMPTS):
+            try:
+                self._server = await asyncio.start_server(self._handle, self.host, self.port)
+                break
+            except OSError as exc:
+                if self.port == 0 or exc.errno != errno.EADDRINUSE:
+                    raise
+                last_error = exc
+                logger.info("UI server: port %d busy, trying %d", self.port, self.port + 1)
+                self.port += 1
+        else:
+            raise RuntimeError(
+                f"ports {first}..{self.port} are busy (last error: {last_error})"
+            ) from last_error
+        if first == 0 and self._server.sockets:
             self.port = self._server.sockets[0].getsockname()[1]
 
     async def stop(self) -> None:
@@ -68,9 +93,17 @@ class ApiServer:
                 _respond(writer, 204, None, extra=_CORS)
                 return
             path, _, query = target.partition("?")
+            if path.startswith("/api/"):
+                # the HC3 REST prefix — proxy devices on the HC3 post their
+                # callbacks to http://ip:port/api/...; the sim routes the
+                # bare paths (viewer convention)
+                path = path[4:]
             if query:
                 path = f"{path}?{query}"
-            data, status = self.api.dispatch(method, path, body)
+            # Requests arriving over HTTP are external (viewer, proxy
+            # callbacks): the real HC3 recorded their events already, so the
+            # sim must not emit duplicates for proxy devices.
+            data, status = self.api.dispatch(method, path, body, external=True)
             _respond(writer, status, data, extra=_CORS)
         except (ConnectionError, asyncio.IncompleteReadError):
             pass  # the viewer moved on mid-request
@@ -127,9 +160,7 @@ def _respond(
         status = 500
     if status == 204:
         body = b""  # 204 responses carry no body
-    reason = {200: "OK", 204: "No Content", 400: "Bad Request", 404: "Not Found"}.get(
-        status, "OK"
-    )
+    reason = {200: "OK", 204: "No Content", 400: "Bad Request", 404: "Not Found"}.get(status, "OK")
     head = [f"HTTP/1.1 {status} {reason}", "Content-Type: application/json"]
     head.append(f"Content-Length: {len(body)}")
     head.append("Connection: close")

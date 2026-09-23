@@ -55,6 +55,10 @@ class SimState:
         self._refresh_seq = 0
         self.custom_events: list[dict[str, Any]] = []  # POST /customEvents history
         self._next_id = FIRST_RUNTIME_ID
+        # Proxy mode (--%%proxy:true): ids of devices the real HC3 owns and
+        # this sim only shadows. Updates on them are forwarded to the HC3
+        # and never emit local refresh events (the HC3 emits them).
+        self.proxy_ids: set[int] = set()
         if seed:
             self.apply_seed(seed)
         # The HC3 always has a partition and a profile; the sim does too
@@ -249,6 +253,32 @@ class SimState:
             dev["properties"] = merged
         dev["modified"] = int(time.time())  # fibaro.get's second return value
         self.devices[qa_id] = dev
+
+    # -- proxy mode -------------------------------------------------------------
+
+    def mark_proxy(self, device_id: Any) -> None:
+        """Mark a device as owned by the real HC3 (a proxy-mode QA/child)."""
+        self.proxy_ids.add(int(device_id))
+
+    def is_proxy(self, device_id: Any) -> bool:
+        try:
+            return int(device_id) in self.proxy_ids
+        except (TypeError, ValueError):
+            return False
+
+    def register_proxy_child(self, child: dict[str, Any]) -> dict[str, Any]:
+        """Register a child device created on the real HC3 (proxy mode): the
+        HC3 assigns the id, the sim shadows it under that same id."""
+        child_id = int(child["id"])
+        entry = dict(child)
+        interfaces = entry.get("interfaces")
+        if not isinstance(interfaces, list) or "quickAppChild" not in interfaces:
+            entry["interfaces"] = [i for i in (interfaces or []) if i != "quickApp"] + [
+                "quickAppChild"
+            ]
+        self.devices[child_id] = entry
+        self.mark_proxy(child_id)
+        return entry
 
     # -- entities ---------------------------------------------------------------
 

@@ -331,6 +331,7 @@ KNOWN_DIRECTIVES = frozenset(
         "property",
         "var",
         "file",
+        "proxy",
         "uid",
         "description",
         "model",

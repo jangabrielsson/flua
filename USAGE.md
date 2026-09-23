@@ -212,6 +212,7 @@ Parsing stops at the end-of-header marker:
 | `--%%time:2027/10/6 12:00:20` | bare form: set the virtual start time |
 | `--%%u:{label="lbl",text="Status"}` | one UI row (see below); repeatable, order kept |
 | `--%%useUiView:false` | render the legacy `viewLayout` instead of the new `uiView` (default true) |
+| `--%%proxy:true` | proxy mode: mirror this QA onto the HC3 (online only, see below) |
 
 Names follow plua: `--%%name:value` for scalars,
 `--%%name:sub1=val1,sub2=val2` for subparameters. A typo'd directive is
@@ -344,6 +345,55 @@ stops flua immediately with a warning, because the HC3 locks itself after
 bypassing the hybrid dispatch (this is what `fibaro.callhc3` uses, and it's
 handy in test code that wants ground-truth data). Offline it stands in for
 the simulated HC3.
+
+### Proxy mode (`--%%proxy:true`)
+
+To test a QA against its real UI in the phone app — or against scenes and
+other QAs on the controller — flua can deploy a **proxy QuickApp** on the
+HC3 (plua's proxy concept). The QA keeps running in the emulator while a
+proxy device named `<name>_Proxy` (same device type, same UI) runs on the
+HC3, and the two are treated as one device:
+
+```lua
+--%%proxy:true
+```
+
+- The emulated QA runs with the **proxy's HC3 id** — actions and UI events
+  aimed at the proxy land in the emulator.
+- The proxy funnels everything back: device actions are forwarded to
+  `http://<your-ip>:<port>/api/devices/<id>/action/<name>` and UI events to
+  `http://<your-ip>:<port>/api/plugins/callUIEvent`; the emulator runs them
+  through the QA's `callAction`/UI callbacks exactly like a tap in the real
+  UI.
+- When the QA updates a property or a UI element (`self:updateProperty`,
+  `self:updateView`, `self:setVariable`), flua pushes the same update to the
+  HC3, so the proxy always reflects the emulated state.
+- Property changes produce **one** refreshStates event: the HC3 proxy emits
+  it and the poller mirrors it back — flua does not generate a second, local
+  event.
+- Children (`self:createChildDevice`) are created on the HC3 and shadowed
+  under the HC3-assigned ids, so their callbacks route too.
+
+An existing `<name>_Proxy` is reused (duplicates are deleted, the newest
+wins; a proxy of the wrong device type is deleted and recreated). On reuse
+flua refreshes the proxy's `viewLayout`/`uiView`/`uiCallbacks` from the QA's
+current `--%%u` directives, so UI edits between runs show up on the
+controller. `useUiView` is only pushed when the QA declares
+`--%%useUiView` — otherwise the proxy keeps whatever you configured on the
+HC3 (the legacy `viewLayout` still has features the new `uiView` lacks), and
+a fresh proxy defaults to `true`. On startup flua tells the proxy where to
+listen back through a `CONNECT` action, so an existing proxy always points
+at the current emulator.
+
+Proxy mode only works **online**: without HC3 credentials flua logs
+`proxy disabled` and runs the QA offline as usual. A proxy QA also keeps
+flua alive past idle (like `--%%keep-alive:true`) — it must stay up to serve
+the proxy's callbacks.
+
+The emulator listens for callbacks on all interfaces, port 8080 by default
+(`FLUA_PROXY_PORT` in the .env chain overrides it; busy ports fall back to
+the next free one). Your machine and the HC3 must be on the same network,
+and your firewall must let the controller reach that port.
 
 ### Testing against the real HC3
 
