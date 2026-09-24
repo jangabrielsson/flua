@@ -158,6 +158,31 @@ def child_device_create(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     return dev, 201
 
 
+def child_device_remove(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    """DELETE /plugins/removeChildDevice/{id}: remove a QA's child device.
+
+    Proxy mode: the HC3 owns the child — the delete is mirrored there and
+    the local shadow is dropped (plua: Emu.DIR[id]=nil + hc3api.delete).
+    Unknown ids 404; the dispatcher forwards those to the real HC3 online
+    (a child created there outside the emulator). Non-children 501, like
+    plua's NOT_IMPLEMENTED.
+    """
+    dev = state.device(req.path_params["id"])
+    if dev is None:
+        return None, 404
+    interfaces = dev.get("interfaces") or []
+    if "quickAppChild" not in interfaces:
+        return None, 501
+    child_id = int(req.path_params["id"])
+    proxy = state.is_proxy(child_id)
+    del state.devices[child_id]
+    state.proxy_ids.discard(child_id)
+    state.plugin_variables.pop(child_id, None)
+    if proxy:
+        forward_to_proxy(req, True)
+    return None, 204
+
+
 def plugin_update_property(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     if not isinstance(req.body, dict):
         return None, 400

@@ -35,6 +35,7 @@ from .devices import (
 )
 from .plugins import (
     child_device_create,
+    child_device_remove,
     plugin_get,
     plugin_restart,
     plugin_update_interfaces,
@@ -91,6 +92,7 @@ ROUTES: list[tuple[str, str, Handler]] = [
     ("DELETE", "/plugins/{id}/variables/{key}", variable_delete),
     ("DELETE", "/plugins/{id}/variables", variables_clear),
     ("POST", "/plugins/createChildDevice", child_device_create),
+    ("DELETE", "/plugins/removeChildDevice/{id}", child_device_remove),
     ("POST", "/plugins/updateProperty", plugin_update_property),
     ("POST", "/plugins/updateView", plugin_update_view),
     ("POST", "/plugins/interfaces", plugin_update_interfaces),

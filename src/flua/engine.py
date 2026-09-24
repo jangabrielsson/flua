@@ -589,9 +589,9 @@ class LuaEngine:
                 device = self.api.state.devices.get(int(data.get("id")))
             except (TypeError, ValueError):
                 device = None
-            if device is not None and data.get("name"):
+            if device is not None and data.get("property"):
                 properties = device.setdefault("properties", {})
-                properties[str(data["name"])] = data.get("newValue")
+                properties[str(data["property"])] = data.get("newValue")
         self.api.state.mirror_event(entry)
         self.enqueue_outbound(messages.refresh_state_event(entry))
 

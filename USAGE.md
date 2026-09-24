@@ -371,8 +371,13 @@ HC3, and the two are treated as one device:
 - Property changes produce **one** refreshStates event: the HC3 proxy emits
   it and the poller mirrors it back — flua does not generate a second, local
   event.
-- Children (`self:createChildDevice`) are created on the HC3 and shadowed
-  under the HC3-assigned ids, so their callbacks route too.
+- Children: `self:createChildDevice` creates them on the HC3, and children
+  an existing proxy already has are shadowed in the emulator under their HC3
+  ids at startup — the QA's `initChildDevices()` finds them, their property
+  updates are stored locally and forwarded, and their actions/UI events route
+  back through the proxy like the parent's. `api.delete(
+  '/plugins/removeChildDevice/' .. id)` deletes a child on the HC3 and drops
+  its emulated shadow (offline it just removes the local child).
 
 An existing `<name>_Proxy` is reused (duplicates are deleted, the newest
 wins; a proxy of the wrong device type is deleted and recreated). On reuse

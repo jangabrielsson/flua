@@ -89,7 +89,13 @@ class _MockHc3(BaseHTTPRequestHandler):
             return
         if path == "/api/devices":
             name = query.get("name")
-            found = [d for d in type(self).devices.values() if d["name"] == name]
+            parent = query.get("parentId")
+            found = [
+                d
+                for d in type(self).devices.values()
+                if (name is None or d["name"] == name)
+                and (parent is None or str(d.get("parentId")) == parent)
+            ]
             self._send_json(sorted(found, key=lambda d: d["id"]))
             return
         if path.startswith("/api/devices/"):
@@ -148,7 +154,7 @@ class _MockHc3(BaseHTTPRequestHandler):
                     "objects": [{"objectType": "device", "objectId": device_id}],
                     "data": {
                         "id": device_id,
-                        "name": body.get("propertyName"),
+                        "property": body.get("propertyName"),
                         "newValue": body.get("value"),
                         "oldValue": None,
                     },
@@ -206,6 +212,11 @@ class _MockHc3(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         type(self).requests.append((self.command, path, None))
         if path.startswith("/api/devices/"):
+            device_id = int(path.rsplit("/", 1)[1])
+            type(self).devices.pop(device_id, None)
+            self._send_json(None, 204)
+            return
+        if path.startswith("/api/plugins/removeChildDevice/"):
             device_id = int(path.rsplit("/", 1)[1])
             type(self).devices.pop(device_id, None)
             self._send_json(None, 204)
@@ -431,6 +442,115 @@ async def test_proxy_existing_gets_current_ui_synced(tmp_path, mock_hc3, monkeyp
     assert properties["uiView"][0]["components"][0]["name"] == "btn"
     assert properties["uiCallbacks"][0]["name"] == "btn"
     assert properties["viewLayout"]["$jason"]
+
+
+@pytest.mark.asyncio
+async def test_proxy_existing_children_are_shadowed(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # reusing a proxy that already has children on the HC3: the emulator
+    # shadows them under their HC3 ids, so the QA's initChildDevices finds
+    # them, property updates land somewhere, and callbacks route by id
+    set_hc3_env(monkeypatch, tmp_path, mock_hc3)
+    add_existing_proxy(57, "sw_Proxy", "com.fibaro.binarySwitch")
+    _MockHc3.devices[58] = {
+        "id": 58,
+        "name": "c1",
+        "type": "com.fibaro.binarySwitch",
+        "parentId": 57,
+        "interfaces": ["quickAppChild"],
+        "properties": {"value": False},
+    }
+    script = tmp_path / "kids.lua"
+    script.write_text(
+        "--%%name:sw\n--%%proxy:true\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickAppChild:turnOn(event) print('CHILD-ON', self.id, tostring(event)) end\n"
+        "function QuickApp:onInit()\n"
+        "  self:initChildDevices()\n"
+        "  local kids = api.get('/devices?parentId='..self.id)\n"
+        "  print('KIDS', #kids, kids[1] and kids[1].id, kids[1] and kids[1].name)\n"
+        "  setTimeout(function() self.childDevices[58]:updateProperty('value', true) end, 20)\n"
+        "end\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        qa_id, err = engine.load_qa_file(str(script))
+        assert err is None, err
+        assert qa_id == 57
+        out = await wait_for_output(capsys, "KIDS")
+        assert "KIDS 1 58 c1" in out  # the QA found the shadowed HC3 child
+        # the shadow is proxy-marked and lives under the HC3's id
+        assert engine.api.state.devices[58]["parentId"] == 57
+        assert engine.api.state.is_proxy(58)
+        # the child's updateProperty forwards to the HC3 (not just locally)
+        await wait_until(
+            lambda: any(
+                u[2] == {"deviceId": 58, "propertyName": "value", "value": True}
+                for u in _MockHc3.seen("POST", "/api/plugins/updateProperty")
+            )
+        )
+        # a child action callback routes to the child's QuickAppChild method
+        await wait_until(lambda: _MockHc3.seen("POST", "/api/devices/57/action/CONNECT"))
+        server = engine._proxy_server
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{server.port}/api/devices/58/action/turnOn",
+            data=json.dumps({"args": [9]}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with await asyncio.to_thread(urllib.request.urlopen, request, timeout=5) as response:
+            assert response.status == 202
+        out = await wait_for_output(capsys, "CHILD-ON")
+        assert "CHILD-ON 58 9" in out
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_proxy_child_device_remove_deletes_on_hc3(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # api.delete("/plugins/removeChildDevice/"..id) on a proxy child mirrors
+    # the delete to the HC3 and drops the local shadow
+    set_hc3_env(monkeypatch, tmp_path, mock_hc3)
+    add_existing_proxy(57, "sw_Proxy", "com.fibaro.binarySwitch")
+    _MockHc3.devices[58] = {
+        "id": 58,
+        "name": "c1",
+        "type": "com.fibaro.binarySwitch",
+        "parentId": 57,
+        "interfaces": ["quickAppChild"],
+        "properties": {"value": False},
+    }
+    script = tmp_path / "kids.lua"
+    script.write_text(
+        "--%%name:sw\n--%%proxy:true\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit()\n"
+        "  self:initChildDevices()\n"
+        "  local stat = select(2, api.delete('/plugins/removeChildDevice/58'))\n"
+        "  print('DELETED', stat)\n"
+        "  local kids = api.get('/devices?parentId='..self.id)\n"
+        "  print('LEFT', #kids)\n"
+        "end\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        qa_id, err = engine.load_qa_file(str(script))
+        assert err is None, err
+        assert qa_id == 57
+        out = await wait_for_output(capsys, "LEFT")
+        assert "DELETED 204" in out
+        assert "LEFT 0" in out  # the shadow is gone from the emulator
+        # the delete was mirrored to the HC3, which owns the child
+        assert _MockHc3.seen("DELETE", "/api/plugins/removeChildDevice/58")
+        assert 58 not in engine.api.state.devices
+        assert not engine.api.state.is_proxy(58)
+    finally:
+        await engine.stop()
 
 
 @pytest.mark.asyncio

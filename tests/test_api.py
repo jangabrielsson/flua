@@ -511,7 +511,12 @@ def test_refresh_states(api: Api) -> None:
     assert events[0]["type"] == "DevicePropertyUpdatedEvent"
     assert events[0]["sourceType"] == "system"
     assert events[0]["objects"] == [{"objectType": "device", "objectId": 5000}]
-    assert events[0]["data"] == {"id": 5000, "name": "value", "newValue": True, "oldValue": False}
+    assert events[0]["data"] == {
+        "id": 5000,
+        "property": "value",
+        "newValue": True,
+        "oldValue": False,
+    }
     assert isinstance(events[0]["created"], int) and isinstance(events[0]["createdMillis"], int)
     # the same value again: no state change, no event (the user's rule)
     api.dispatch(

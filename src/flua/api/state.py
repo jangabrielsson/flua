@@ -188,7 +188,7 @@ class SimState:
                     device_id,
                     {
                         "id": int(device_id),
-                        "name": name,
+                        "property": name,
                         "newValue": new_value,
                         "oldValue": old_value,
                     },

@@ -1,0 +1,475 @@
+{
+  "$comment": "The original HC3 refreshStates events. Real events carry type, data, created and createdMillis — the sourceType, sourceId and objects fields also exist on the HC3 but are omitted here (the emulator does not use them). Entries with 'observed: true' carry real sample data from events.log (captured by examples/refreshState2.lua); the rest list the data fields the sourceTrigger transform reads, with null values. 'note' explains special payloads.",
+  "events": [
+    {
+      "type": "AlarmPartitionArmedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "armed": null,
+        "partitionId": null
+      }
+    },
+    {
+      "type": "AlarmPartitionBreachedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "breached": null,
+        "partitionId": null
+      }
+    },
+    {
+      "type": "AlarmPartitionModifiedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {},
+      "note": "the transform does nothing with this event"
+    },
+    {
+      "type": "HomeArmStateChangedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "newValue": null
+      }
+    },
+    {
+      "type": "HomeDisarmStateChangedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "newValue": null
+      }
+    },
+    {
+      "type": "HomeBreachedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "breached": null
+      }
+    },
+    {
+      "type": "WeatherChangedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "change": null,
+        "newValue": null,
+        "oldValue": null
+      }
+    },
+    {
+      "type": "GlobalVariableChangedEvent",
+      "created": 1790230744,
+      "createdMillis": 1790230744513,
+      "data": {
+        "variableName": "Kalle",
+        "oldValue": "test2",
+        "newValue": "test28"
+      },
+      "observed": true
+    },
+    {
+      "type": "GlobalVariableAddedEvent",
+      "created": 1790230712,
+      "createdMillis": 1790230712634,
+      "data": {
+        "variableName": "hjkkk",
+        "value": "hhh"
+      },
+      "observed": true
+    },
+    {
+      "type": "DevicePropertyUpdatedEvent",
+      "created": 1790230617,
+      "createdMillis": 1790230617991,
+      "data": {
+        "property": "position",
+        "id": 809,
+        "newValue": "D",
+        "oldValue": "C"
+      },
+      "observed": true
+    },
+    {
+      "type": "CentralSceneEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "deviceId": null,
+        "id": null,
+        "keyAttribute": null,
+        "keyId": null
+      }
+    },
+    {
+      "type": "SceneActivationEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "deviceId": null,
+        "id": null,
+        "sceneId": null
+      }
+    },
+    {
+      "type": "AccessControlEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "id": null
+      },
+      "note": "payload passed through whole by the transform; fields not enumerated"
+    },
+    {
+      "type": "CustomEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "name": null
+      }
+    },
+    {
+      "type": "PluginChangedViewEvent",
+      "created": 1790230774,
+      "createdMillis": 1790230774984,
+      "data": {
+        "propertyName": "text",
+        "newValue": "Temperature: 9.2 °C",
+        "deviceId": 4212,
+        "componentName": "tempLbl"
+      },
+      "observed": true
+    },
+    {
+      "type": "WizardStepStateChangedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {},
+      "note": "payload passed through whole by the transform; fields not enumerated"
+    },
+    {
+      "type": "UpdateReadyEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {},
+      "note": "payload passed through whole by the transform; fields not enumerated"
+    },
+    {
+      "type": "DeviceRemovedEvent",
+      "created": 1790230807,
+      "createdMillis": 1790230807226,
+      "data": {
+        "type": "com.fibaro.alarmPartition",
+        "sectionName": "Default Section",
+        "roomName": "Default Room",
+        "id": 4333,
+        "deviceName": "kkkk",
+        "roomId": 219
+      },
+      "observed": true
+    },
+    {
+      "type": "DeviceChangedRoomEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "id": null
+      }
+    },
+    {
+      "type": "DeviceCreatedEvent",
+      "created": 1790230799,
+      "createdMillis": 1790230799880,
+      "data": {
+        "id": 4333
+      },
+      "observed": true
+    },
+    {
+      "type": "DeviceModifiedEvent",
+      "created": 1790230799,
+      "createdMillis": 1790230799982,
+      "data": {
+        "id": 4333
+      },
+      "observed": true
+    },
+    {
+      "type": "PluginProcessCrashedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "deviceId": null,
+        "error": null
+      }
+    },
+    {
+      "type": "SceneStartedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "id": null
+      }
+    },
+    {
+      "type": "SceneFinishedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "id": null
+      }
+    },
+    {
+      "type": "SceneRunningInstancesEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "id": null
+      },
+      "note": "payload passed through whole by the transform; fields not enumerated"
+    },
+    {
+      "type": "SceneRemovedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "id": null
+      }
+    },
+    {
+      "type": "SceneModifiedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "id": null
+      }
+    },
+    {
+      "type": "SceneCreatedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "id": null
+      }
+    },
+    {
+      "type": "OnlineStatusUpdatedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "online": null
+      }
+    },
+    {
+      "type": "ActiveProfileChangedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "newActiveProfile": null,
+        "oldActiveProfile": null
+      }
+    },
+    {
+      "type": "ClimateZoneChangedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "changes": null,
+        "id": null
+      },
+      "note": "changes is a list of per-zone change entries"
+    },
+    {
+      "type": "ClimateZoneSetpointChangedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {},
+      "note": "payload passed through whole by the transform; fields not enumerated"
+    },
+    {
+      "type": "NotificationCreatedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "id": null
+      }
+    },
+    {
+      "type": "NotificationRemovedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "id": null
+      }
+    },
+    {
+      "type": "NotificationUpdatedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "id": null
+      }
+    },
+    {
+      "type": "RoomCreatedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "id": null
+      }
+    },
+    {
+      "type": "RoomRemovedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "id": null
+      }
+    },
+    {
+      "type": "RoomModifiedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "id": null
+      }
+    },
+    {
+      "type": "SectionCreatedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "id": null
+      }
+    },
+    {
+      "type": "SectionRemovedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "id": null
+      }
+    },
+    {
+      "type": "SectionModifiedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "id": null
+      }
+    },
+    {
+      "type": "QuickAppFilesChangedEvent",
+      "created": 1790230799,
+      "createdMillis": 1790230799722,
+      "data": {
+        "id": 4333
+      },
+      "observed": true
+    },
+    {
+      "type": "ZwaveDeviceParametersChangedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {},
+      "note": "ignored by the sourceTrigger transform"
+    },
+    {
+      "type": "ZwaveNodeAddedEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {},
+      "note": "ignored by the sourceTrigger transform"
+    },
+    {
+      "type": "RefreshRequiredEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {},
+      "note": "ignored by the sourceTrigger transform"
+    },
+    {
+      "type": "DeviceFirmwareUpdateEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {},
+      "note": "ignored by the sourceTrigger transform"
+    },
+    {
+      "type": "GeofenceEvent",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "geofenceAction": null,
+        "locationId": null,
+        "timestamp": null,
+        "userId": null
+      }
+    },
+    {
+      "type": "DeviceActionRanEvent",
+      "created": 1790230617,
+      "createdMillis": 1790230617967,
+      "data": {
+        "isSupportedByDevice": true,
+        "id": 809,
+        "actionName": "turnOff",
+        "args": {}
+      },
+      "observed": true
+    },
+    {
+      "type": "DeviceNotificationState",
+      "created": null,
+      "createdMillis": null,
+      "data": {
+        "id": null,
+        "notificationType": null,
+        "value": null
+      }
+    },
+    {
+      "type": "AlarmPartitionCreatedEvent",
+      "created": 1790230799,
+      "createdMillis": 1790230799968,
+      "data": {
+        "partitionId": 12
+      },
+      "observed": true,
+      "note": "observed on the HC3; not handled by the sourceTrigger transform"
+    },
+    {
+      "type": "AlarmPartitionDeletedEvent",
+      "created": 1790230807,
+      "createdMillis": 1790230807264,
+      "data": {
+        "partitionId": 12
+      },
+      "observed": true,
+      "note": "observed on the HC3; not handled by the sourceTrigger transform"
+    },
+    {
+      "type": "DeviceInterfacesUpdatedEvent",
+      "created": 1790230799,
+      "createdMillis": 1790230799733,
+      "data": {
+        "id": 4333
+      },
+      "observed": true,
+      "note": "observed on the HC3; not handled by the sourceTrigger transform"
+    },
+    {
+      "type": "GlobalVariableRemovedEvent",
+      "created": 1790230730,
+      "createdMillis": 1790230730452,
+      "data": {
+        "variableName": "HH"
+      },
+      "observed": true,
+      "note": "observed on the HC3; not handled by the sourceTrigger transform"
+    }
+  ]
+}

@@ -87,7 +87,7 @@ class _MockHc3(BaseHTTPRequestHandler):
                                 "sourceType": "system",
                                 "sourceId": 0,
                                 "objects": [{"objectType": "device", "objectId": 45}],
-                                "data": {"id": 45, "name": "value", "newValue": True},
+                                "data": {"id": 45, "property": "value", "newValue": True},
                             }
                         ],
                     }

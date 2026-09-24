@@ -146,3 +146,38 @@ async def test_qa_instance_built_from_type_skeleton(tmp_path, capsys) -> None:
     out = capsys.readouterr().out
     assert "IF true com.fibaro.remoteColorController" in out
     assert "CTRL 2" in out
+
+
+@pytest.mark.asyncio
+async def test_qa_remove_child_device(tmp_path, capsys) -> None:
+    # the HC3 lifecycle: createChildDevice then
+    # api.delete("/plugins/removeChildDevice/"..id) drops the child locally
+    # (offline there is no HC3 to mirror to)
+    script = tmp_path / "kids.lua"
+    script.write_text(
+        "function QuickApp:onInit()\n"
+        "  local c = self:createChildDevice({name='c1', type='com.fibaro.binarySwitch'})\n"
+        "  print('CREATED', c.id)\n"
+        "  local stat = select(2, api.delete('/plugins/removeChildDevice/'..c.id))\n"
+        "  print('DELETED', stat)\n"
+        "  local kids = api.get('/devices?parentId='..self.id)\n"
+        "  print('LEFT', #kids)\n"
+        "  local gone = select(2, api.delete('/plugins/removeChildDevice/'..c.id))\n"
+        "  print('AGAIN', gone)\n"
+        "  local parent = select(2, api.delete('/plugins/removeChildDevice/'..self.id))\n"
+        "  print('PARENT', parent)\n"
+        "end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await asyncio.sleep(0.3)
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "CREATED" in out
+    assert "DELETED 204" in out  # the child was removed
+    assert "LEFT 0" in out  # and no longer listed under the parent
+    assert "AGAIN 404" in out  # unknown ids 404
+    assert "PARENT 501" in out  # the QA itself is not a child

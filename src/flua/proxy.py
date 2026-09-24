@@ -285,6 +285,35 @@ def sync_proxy_ui(
         )
 
 
+def register_proxy_children(engine: LuaEngine, device_id: int) -> None:
+    """Shadow an existing proxy's HC3 children in the sim under their HC3 ids.
+
+    Fibaro's design routes every child action/UI event through the parent
+    (our proxy), which funnels them back to the emulator. The emulated QA
+    finds its children with ``api.get("/devices?parentId="..self.id)`` and
+    builds QuickAppChild instances for them, so shadow children must exist
+    locally with the same deviceIds (plua's existingProxy child loop) — they
+    are pure data: the place property updates land and callbacks route to.
+    """
+    children, status = engine.api.dispatch_hc3("GET", f"/devices?parentId={int(device_id)}")
+    if status != 200 or not isinstance(children, list):
+        logger.warning(
+            "cannot list proxy children (HTTP %s): the emulated QA will not see them",
+            status,
+        )
+        return
+    for child in children:
+        if not isinstance(child, dict) or child.get("id") is None:
+            continue
+        engine.api.state.register_proxy_child(child)
+        engine.post(
+            messages.log(
+                "info",
+                f"flua: existing child proxy found: {child.get('id')} {child.get('name')}",
+            )
+        )
+
+
 def resolve_proxy(
     engine: LuaEngine,
     name: str,
@@ -309,6 +338,9 @@ def resolve_proxy(
         # deployed — refresh its viewLayout/uiView/uiCallbacks (useUiView only
         # when the QA declares it, so the HC3's own setting is respected)
         sync_proxy_ui(engine, device["id"], device_properties, use_ui_view)
+        # shadow the proxy's existing children before the QA boots, so
+        # api.get("/devices?parentId=...") finds them under their HC3 ids
+        register_proxy_children(engine, device["id"])
         engine.post(messages.log("info", f"flua: proxy UI synced: {device.get('id')} {proxy_name}"))
     return device
 
