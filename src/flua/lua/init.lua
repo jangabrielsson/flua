@@ -7,7 +7,7 @@
 -- Outbound (Python -> Lua): _PY.dispatch(batch)   -- the ONLY entry point
 -- Python uses to call into Lua. Called from the pump task, never nested.
 
-local _PY = _PY or {}
+_PY = _PY or {}
 
 -- The engine's Lua-side API lives in _FLUA (config, timers, async, exit,
 -- QA support). The bare globals below are convenience aliases for it.
@@ -763,6 +763,27 @@ end
 handlers.refreshStateEvent = function(msg)
   -- pump-delivered (never direct bridge calls): sim events and mirrored
   -- real-HC3 events reach every RefreshStateSubscriber the same way
+  -- --%%debug:refreshState=true logs each event in a short form, cut at
+  -- --%%loglength characters (default 120)
+  local cfg = _FLUA.config
+  local flags = cfg and cfg.debug
+  if type(flags) == "table" and flags.refreshState then
+    local limit = tonumber(cfg.loglength) or 120
+    local e = msg.event or {}
+    local d = e.data or {}
+    local parts = { "refreshState", e.type or "Event" }
+    for _, key in ipairs({ "id", "deviceId", "name", "property", "value", "newValue" }) do
+      local v = d[key]
+      if v ~= nil then
+        parts[#parts + 1] = key .. "=" .. tostring(v)
+      end
+    end
+    local line = table.concat(parts, " ")
+    if #line > limit then
+      line = line:sub(1, limit) .. "..."
+    end
+    postLog("debug", line)
+  end
   for handle in pairs(_FLUA.refreshStateListeners) do
     xpcall(function() handle(msg.event) end, traceback)
   end

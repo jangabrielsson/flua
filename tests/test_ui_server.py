@@ -182,7 +182,7 @@ def test_ui_flag_keeps_api_alive_after_qa_drains(tmp_path) -> None:
         "function QuickApp:go() end\n"
     )
     proc = subprocess.Popen(
-        [sys.executable, "-m", "flua", "--ui", str(port), str(script)],
+        [sys.executable, "-m", "flua", "--api", "local", "--ui", str(port), str(script)],
         cwd=REPO_ROOT,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -242,7 +242,7 @@ def test_ui_port_busy_falls_back_to_next_free_port(tmp_path) -> None:
         "function QuickApp:go() end\n"
     )
     proc = subprocess.Popen(
-        [sys.executable, "-m", "flua", "--ui", str(port), str(script)],
+        [sys.executable, "-m", "flua", "--api", "local", "--ui", str(port), str(script)],
         cwd=REPO_ROOT,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,

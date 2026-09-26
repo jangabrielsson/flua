@@ -7,7 +7,6 @@
 ---- QuickApp lifecycle management
 ---- Device and UI interaction
 ---- Logging and event handling
-_PY = _PY or {}
 _FLUA = _FLUA or {}
 
 local fmt = string.format
@@ -74,7 +73,6 @@ function QuickAppBase:__init(dev)
   self.roomID = dev.roomID
   self.properties = dev.properties
   self.interfaces = dev.interfaces
-  self.properties = table.copy(dev.properties)
   self.uiCallbacks = {}
   -- (the engine's bootstrap registers the instance; see _FLUA.qa)
 end
@@ -140,7 +138,7 @@ function QuickAppBase:updateProperty(name,value)
   api.post("/plugins/updateProperty",{
     deviceId=self.id,
     propertyName=name,
-    value=table.copy(value)
+    value=value
   })
 end
 
@@ -292,7 +290,7 @@ function QuickApp:__init(dev)
   self.childsInitialized = false
   self:setupUICallbacks()
   if self.onInit then self:onInit() end
-  -- if not self.childsInitialized then self:initChildDevices() end
+  if not self.childsInitialized then self:initChildDevices() end
 end
 
 -- Initializes child devices for this QuickApp

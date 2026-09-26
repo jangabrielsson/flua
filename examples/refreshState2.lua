@@ -1,9 +1,12 @@
 --%%name:refresh-state-demo
+--%%mode:online
+--%%debug:refreshState=true
 
 local events = {}
 
 local function dumpevents()
   local f = io.open("events.log", "w+")
+  if not f then return end
   for k,v in pairs(events) do
     f:write(json.encode(v) .. "\n")
   end
@@ -15,7 +18,7 @@ subscriber:subscribe(
   function(event) return true end, 
   function(event) 
     if not events[event.type] then
-      print("Received refresh state event:", event.type) 
+      --print("Received refresh state event:", event.type) 
       events[event.type] = event
       dumpevents()
     end

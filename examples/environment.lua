@@ -1,3 +1,6 @@
+--%name:Environment
+-- %mode:offline
+
 for k,v in pairs(_FLUA) do
   print(k,v)
   if type(v) == 'table' then

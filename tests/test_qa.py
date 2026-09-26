@@ -108,7 +108,7 @@ def test_cli_runs_multiple_qas_isolated(tmp_path) -> None:
         "setTimeout(function() print('B', x, _FLUA.config.name); exit(0) end, 3600000)\n"
     )
     result = subprocess.run(
-        [sys.executable, "-m", "flua", str(a), str(b)],
+        [sys.executable, "-m", "flua", "--api", "local", str(a), str(b)],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -123,7 +123,7 @@ def test_examples_qa_pair_calls_each_other() -> None:
     # examples/qa3.lua + qa4.lua: QAs find each other by name and drive each
     # other through fibaro.call (device actions via the pump).
     result = subprocess.run(
-        [sys.executable, "-m", "flua", "examples/qa3.lua", "examples/qa4.lua"],
+        [sys.executable, "-m", "flua", "--api", "local", "examples/qa3.lua", "examples/qa4.lua"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -140,7 +140,7 @@ def test_examples_qa_pair_calls_each_other() -> None:
 def test_example_api_first_qa_gets_5000_and_getvalue() -> None:
     # fibaro.getValue(self.id, "value") — the QA's OWN device, first QA = 5000
     result = subprocess.run(
-        [sys.executable, "-m", "flua", "examples/api.lua"],
+        [sys.executable, "-m", "flua", "--api", "local", "examples/api.lua"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -160,6 +160,8 @@ def test_mobdebug_e_bootstrap_does_not_consume_qa_id() -> None:
             sys.executable,
             "-m",
             "flua",
+            "--api",
+            "local",
             "-l",
             "mobdebug",
             "-e",
@@ -174,6 +176,34 @@ def test_mobdebug_e_bootstrap_does_not_consume_qa_id() -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     assert "[api-demo5000]" in result.stdout
     assert "api-demo5001" not in result.stdout
+
+
+def test_mobdebug_bootstrap_does_not_hide_main_script_mode(tmp_path) -> None:
+    # the injected -e bootstrap is the first spec, but the engine mode still
+    # follows the MAIN SCRIPT's --%%mode directive (the peek must skip the
+    # bootstrap) — without HC3 credentials a missed peek would exit with the
+    # HC3_URL error instead of running offline
+    script = tmp_path / "main.lua"
+    script.write_text("--%%mode:offline\nprint('RAN')\n")
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "flua",
+            "-l",
+            "mobdebug",
+            "-e",
+            'require("mobdebug")',
+            str(script),
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "mode offline" in result.stdout
+    assert "RAN" in result.stdout
 
 
 @pytest.mark.asyncio
@@ -313,7 +343,7 @@ async def test_dynamic_load_missing_file(tmp_path, capsys) -> None:
 
 def test_example_dynamic_loading() -> None:
     result = subprocess.run(
-        [sys.executable, "-m", "flua", "examples/dynamic.lua"],
+        [sys.executable, "-m", "flua", "--api", "local", "examples/dynamic.lua"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -337,7 +367,7 @@ def test_fibaro_log_lines_are_hc3_styled(tmp_path) -> None:
         "exit(0)\n"
     )
     result = subprocess.run(
-        [sys.executable, "-m", "flua", str(script)],
+        [sys.executable, "-m", "flua", "--api", "local", str(script)],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -360,7 +390,7 @@ def test_fibaro_log_lines_are_hc3_styled(tmp_path) -> None:
 
     # --color never produces plain output
     plain = subprocess.run(
-        [sys.executable, "-m", "flua", "--color", "never", str(script)],
+        [sys.executable, "-m", "flua", "--api", "local", "--color", "never", str(script)],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -376,7 +406,7 @@ def test_print_binary_string_does_not_crash(tmp_path) -> None:
     # hex-escapes invalid UTF-8 instead of raising during lupa's strict
     # decode (regression: UnicodeDecodeError -> exit code 1).
     result = subprocess.run(
-        [sys.executable, "-m", "flua", "-e", "print(utf8.charpattern)"],
+        [sys.executable, "-m", "flua", "--api", "local", "-e", "print(utf8.charpattern)"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -392,20 +422,21 @@ def test_startup_greeting(tmp_path) -> None:
     script = tmp_path / "greet.lua"
     script.write_text("exit(0)\n")
     result = subprocess.run(
-        [sys.executable, "-m", "flua", str(script)],
+        [sys.executable, "-m", "flua", "--api", "local", str(script)],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
         timeout=60,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert re.search(r"flua \d+\.\d+\.\d+", result.stdout)
-    assert re.search(r"Lua 5\.\d+", result.stdout)
-    assert re.search(r"Python 3\.\d+", result.stdout)
+    assert re.search(
+        r"flua \d+\.\d+\.\d+ \(Lua 5\.\d+, Python 3\.\d+\.\d+\), mode offline",
+        result.stdout,
+    )
 
     # --nogreet suppresses the greeting
     quiet = subprocess.run(
-        [sys.executable, "-m", "flua", "--nogreet", str(script)],
+        [sys.executable, "-m", "flua", "--api", "local", "--nogreet", str(script)],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -421,6 +452,8 @@ def test_example_qa_pair_runs_together() -> None:
             sys.executable,
             "-m",
             "flua",
+            "--api",
+            "local",
             str(REPO_ROOT / "examples" / "qa1.lua"),
             str(REPO_ROOT / "examples" / "qa2.lua"),
         ],
@@ -449,7 +482,7 @@ def test_exit_terminates_only_the_calling_qa(tmp_path) -> None:
     b = tmp_path / "b.lua"
     b.write_text("setTimeout(function() print('B_DONE'); exit(0) end, 200)\n")
     result = subprocess.run(
-        [sys.executable, "-m", "flua", str(a), str(b)],
+        [sys.executable, "-m", "flua", "--api", "local", str(a), str(b)],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -467,7 +500,7 @@ def test_exit_code_from_failing_qa_becomes_engine_exit_code(tmp_path) -> None:
     script = tmp_path / "failing.lua"
     script.write_text("setTimeout(function() exit(7) end, 10)\n")
     result = subprocess.run(
-        [sys.executable, "-m", "flua", str(script)],
+        [sys.executable, "-m", "flua", "--api", "local", str(script)],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -496,7 +529,7 @@ def test_flua_table_is_per_qa(tmp_path) -> None:
         "end, 30)\n"
     )
     result = subprocess.run(
-        [sys.executable, "-m", "flua", str(a), str(b)],
+        [sys.executable, "-m", "flua", "--api", "local", str(a), str(b)],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

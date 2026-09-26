@@ -1,4 +1,6 @@
 --%%name:api-demo
+--%%type:com.fibaro.multilevelSwitch
+--%%debug:refreshState=true
 
 function QuickApp:onInit()
   print("QuickApp API demo initialized")
@@ -11,4 +13,9 @@ function QuickApp:onInit()
   print(fibaro.getGlobalVariable("FLUA"))
   local b = fibaro.setGlobalVariable("FLUA","2")
   print(fibaro.getGlobalVariable("FLUA"))
+
+  setInterval(function() 
+    self:updateProperty("value",os.time())
+  end, 1000)
 end
+

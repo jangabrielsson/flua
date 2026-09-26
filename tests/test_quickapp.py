@@ -209,7 +209,7 @@ async def test_quickapp_export_filters_and_arrayifies(tmp_path, capsys) -> None:
 def test_example_multifile_runs() -> None:
     # fully deterministic: the extra file loads and the helper answers
     result = subprocess.run(
-        [sys.executable, "-m", "flua", "examples/multifile.lua"],
+        [sys.executable, "-m", "flua", "--api", "local", "examples/multifile.lua"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

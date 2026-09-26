@@ -101,7 +101,7 @@ def test_export_and_unpack_roundtrip(tmp_path) -> None:
     assert "print('RUNS', LIB)" in header  # main content follows the header
 
     # the unpacked project runs as a normal flua project
-    result = _run(str(target / "main.lua"))
+    result = _run("--api", "local", str(target / "main.lua"))
     assert result.returncode == 0, result.stdout + result.stderr
     assert "RUNS ok" in result.stdout
 
@@ -131,7 +131,7 @@ def test_watch_restarts_on_change(tmp_path) -> None:
     main = tmp_path / "main.lua"
     main.write_text("setTimeout(function() print('REV 1') end, 20)\n")
     proc = subprocess.Popen(
-        [*FLOA, "--watch", str(main)],
+        [*FLOA, "--api", "local", "--watch", str(main)],
         cwd=REPO_ROOT,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -160,7 +160,7 @@ def test_house_seed_runs(tmp_path) -> None:
         "  print('SCENES', #api.get('/scenes'))\n"
         "end, 20)\n"
     )
-    result = _run("--seed", "examples/house.json", str(script))
+    result = _run("--api", "local", "--seed", "examples/house.json", str(script))
     assert result.returncode == 0, result.stdout + result.stderr
     assert "ROOM1 2" in result.stdout
     assert "NIGHT false" in result.stdout
@@ -180,7 +180,7 @@ def test_start_time_crosses_new_year_instantly(tmp_path) -> None:
         "print('T0', os.date('%Y/%m/%d %H:%M:%S'))\n"
         "setTimeout(function() print('T1', os.date('%Y/%m/%d %H:%M:%S')) end, 20000)\n"
     )
-    result = _run(str(script))
+    result = _run("--api", "local", str(script))
     assert result.returncode == 0, result.stdout + result.stderr
     assert "T0 2027/12/31 23:59:50" in result.stdout
     assert "T1 2028/01/01 00:00:10" in result.stdout
@@ -194,7 +194,7 @@ def test_start_time_bare_form(tmp_path) -> None:
         "-- --------------- EOH ---------------\n"
         "print('WHEN', os.date('%Y/%m/%d %H:%M:%S'))\n"
     )
-    result = _run(str(script))
+    result = _run("--api", "local", str(script))
     assert result.returncode == 0, result.stdout + result.stderr
     assert "WHEN 2027/10/06 12:00:20" in result.stdout
 
@@ -206,7 +206,7 @@ def test_start_flag_wins_over_directive(tmp_path) -> None:
         "-- --------------- EOH ---------------\n"
         "print('WHEN', os.date('%Y/%m/%d %H:%M:%S'))\n"
     )
-    result = _run("--start", "2027/10/6 12:00:20", str(script))
+    result = _run("--api", "local", "--start", "2027/10/6 12:00:20", str(script))
     assert result.returncode == 0, result.stdout + result.stderr
     assert "WHEN 2027/10/06 12:00:20" in result.stdout
     assert "WHEN 2020/1/1" not in result.stdout
@@ -231,7 +231,7 @@ def test_getenv_reads_local_dotenv(tmp_path) -> None:
         "print('TOKEN', os.getenv('API_TOKEN'))\nprint('MISSING', os.getenv('NOPE'))\n"
     )
     result = subprocess.run(
-        [*FLOA, str(script)],
+        [*FLOA, "--api", "local", str(script)],
         cwd=tmp_path,  # the local .env lives here
         capture_output=True,
         text=True,
@@ -247,7 +247,7 @@ def test_getenv_falls_back_to_process_env(tmp_path, monkeypatch) -> None:
     script = tmp_path / "env.lua"
     script.write_text("print('PROC', os.getenv('FROM_PROCESS'))\n")
     result = subprocess.run(
-        [*FLOA, str(script)],
+        [*FLOA, "--api", "local", str(script)],
         cwd=tmp_path,
         capture_output=True,
         text=True,
@@ -255,6 +255,101 @@ def test_getenv_falls_back_to_process_env(tmp_path, monkeypatch) -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "PROC from-shell" in result.stdout
+
+
+# -- .directives defaults -------------------------------------------------------
+
+
+def test_directives_file_supplies_main_qa_defaults(tmp_path) -> None:
+    # a .directives file in the working directory is read as defaults for the
+    # MAIN QA: the engine follows its mode (offline here) and the QA sees
+    # the default name
+    (tmp_path / ".directives").write_text("--%%name:Default\n--%%mode:offline\n")
+    script = tmp_path / "main.lua"
+    script.write_text("print('NAME', _FLUA.config.name)\n")
+    result = subprocess.run(
+        [*FLOA, str(script)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "mode offline" in result.stdout  # the file's mode picked the sim
+    assert "NAME Default" in result.stdout
+
+
+def test_directives_file_qa_overrides_defaults(tmp_path) -> None:
+    # the QA's own directives override the file's; the mode family overrides
+    # as a whole, so an explicit opt-out beats the file's offline default
+    (tmp_path / ".directives").write_text("--%%mode:offline\n")
+    script = tmp_path / "main.lua"
+    script.write_text("--%%name:Mine\n--%%offline:false\nprint('RAN')\n")
+    result = subprocess.run(
+        [*FLOA, str(script)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    # opting out of the file's offline default -> online, which needs HC3
+    # credentials — the loud error proves the override took effect
+    assert result.returncode == 2
+    assert "HC3_URL" in result.stderr
+
+
+def test_directives_file_applies_to_main_qa_only(tmp_path) -> None:
+    # secondary QAs do not inherit the file's defaults
+    (tmp_path / ".directives").write_text("--%%name:Default\n--%%mode:offline\n")
+    a = tmp_path / "a.lua"
+    a.write_text("print('A', _FLUA.config.name)\n")
+    b = tmp_path / "b.lua"
+    b.write_text("print('B', _FLUA.config.name)\n")
+    result = subprocess.run(
+        [*FLOA, str(a), str(b)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "A Default" in result.stdout  # the main QA got the file's name
+    assert "B b" in result.stdout  # the secondary QA kept its own name
+
+
+# -- debug directives ------------------------------------------------------------
+
+
+def test_debug_directive_logs_events_and_api_calls(tmp_path) -> None:
+    # --%%debug:refreshState logs events in a short form (cut at
+    # --%%loglength), --%%debug:api logs the QA's api.* calls
+    script = tmp_path / "dbg.lua"
+    script.write_text(
+        "--%%debug:refreshState=true,api=true\n"
+        "--%%loglength:90\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit()\n"
+        "  self:updateProperty('value', 'a-very-long-property-value-to-force-a-cut')\n"
+        "  local _, s = api.get('/devices/' .. self.id)\n"
+        "  print('DONE', s)\n"
+        "end\n"
+    )
+    result = subprocess.run(
+        [*FLOA, "--api", "local", str(script)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    # the refreshStates event, in the short form with the data fields
+    assert "refreshState DevicePropertyUpdatedEvent" in result.stdout
+    assert "property=value" in result.stdout
+    assert "newValue=a-very-long" in result.stdout  # the value made it in
+    assert "..." in result.stdout  # ... and the line was cut at 90 chars
+    # the api call
+    assert "api GET /devices/5000" in result.stdout
+    assert "DONE 200" in result.stdout
 
 
 # -- os.time integrity ---------------------------------------------------------
@@ -267,7 +362,7 @@ def test_os_time_returns_whole_seconds(tmp_path) -> None:
         "print('INT', os.time() % 1 == 0, type(os.time()))\n"
         "setTimeout(function() print('INT2', os.time() % 1 == 0) end, 20)\n"
     )
-    result = _run(str(script))
+    result = _run("--api", "local", str(script))
     assert result.returncode == 0, result.stdout + result.stderr
     assert "INT true number" in result.stdout
     assert "INT2 true" in result.stdout

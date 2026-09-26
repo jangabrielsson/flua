@@ -22,7 +22,7 @@ EXCLUDED = {"helpers.lua", ARGS_SCRIPT}
 
 def _run(script: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, "-m", "flua", str(script), *args],
+        [sys.executable, "-m", "flua", "--api", "local", str(script), *args],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

@@ -20,8 +20,12 @@ drives the engine's runtime settings and is also exposed to Lua as
 ``_PY.config``.
 """
 
+import logging
 import re
+from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 _EOH_RE = re.compile(r"-+\s*EOH\s*-+")
 
@@ -34,20 +38,47 @@ def _is_eoh(line: str) -> bool:
     return bool(_EOH_RE.fullmatch(stripped[2:].strip()))
 
 
-_OFFLINE_RE = re.compile(r"^--%%offline\s*:\s*true\s*$")
+_DIRECTIVES_FILE = ".directives"
+
+# --%%mode and its legacy aliases form one directive family: a QA that says
+# anything about its mode replaces the defaults' mode entirely.
+_MODE_KEYS = ("mode", "offline", "proxy")
 
 
-def peek_offline(source: str) -> bool:
-    """Peek at a QA file's raw header for --%%offline:true — plua behavior:
-    the engine mode is decided from this peek BEFORE the standard annotation
-    parse (which happens once the engine is running)."""
-    for line in source.splitlines():
-        stripped = line.strip()
-        if _is_eoh(stripped) or (stripped and not stripped.startswith("--")):
-            break  # end of the directive header
-        if _OFFLINE_RE.match(stripped):
-            return True
-    return False
+def merge_directives(defaults: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    """QA directives override the ``.directives`` defaults.
+
+    Per-key override (a QA's --%%u/--%%var/--%%name replaces the file's whole
+    value); the mode family (--%%mode/--%%offline/--%%proxy) is treated as
+    one directive, so a QA that says anything about its mode replaces the
+    file's mode default entirely.
+    """
+    merged = dict(defaults)
+    if any(key in override for key in _MODE_KEYS):
+        for key in _MODE_KEYS:
+            merged.pop(key, None)
+    merged.update(override)
+    return _apply_mode(merged)
+
+
+def load_directives_file(directory: str | Path) -> dict[str, Any]:
+    """Defaults from a ``.directives`` file in ``directory``.
+
+    Same ``--%%`` directive syntax as a QA header (end-of-header stops
+    parsing); full-line ``#`` comments are ignored. A missing file yields
+    {}. The file supplies DEFAULTS for the main QA — the QA's own directives
+    override them (see merge_directives).
+    """
+    path = Path(directory) / _DIRECTIVES_FILE
+    if not path.exists():
+        return {}
+    try:
+        source = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        logger.warning("cannot read %s: %s", path, exc)
+        return {}
+    lines = [line for line in source.splitlines() if not line.strip().startswith("#")]
+    return parse_annotations("\n".join(lines))
 
 
 def parse_scalar(text: str) -> Any:
@@ -232,11 +263,14 @@ def _join_ui_continuations(source: str) -> str:
     return "\n".join(out)
 
 
-def parse_annotations(source: str) -> dict[str, Any]:
+def parse_annotations(source: str, warn_unknown: bool = True) -> dict[str, Any]:
     """Extract ``--%%`` annotations; later lines override earlier ones.
 
     A parameter whose value contains ``=`` becomes a dict of subparameters
     (``key=value`` pairs, comma-separated); otherwise the value is a scalar.
+
+    Unknown directive names log a warning (pass ``warn_unknown=False`` to
+    silence — ``flua --check`` reports them itself in its findings format).
     """
     source = _join_ui_continuations(source)
     config: dict[str, Any] = {}
@@ -254,6 +288,9 @@ def parse_annotations(source: str) -> dict[str, Any]:
         value = value.strip()
         if not value:
             continue
+        if warn_unknown and name not in KNOWN_DIRECTIVES:
+            # a typo like --%%instnat:true silently changes behavior — say so
+            logger.warning("unknown --%% directive: " + stripped)
         if name == "file":
             # --%%file:path,name — declarations load in order, so collect
             # repeated file directives into an ordered list (later lines do
@@ -312,16 +349,43 @@ def parse_annotations(source: str) -> dict[str, Any]:
             config[name] = sub
         else:
             config[name] = parse_scalar(value)
+    return _apply_mode(config)
+
+
+_MODE_VALUES = ("online", "offline", "proxy")
+
+
+def _apply_mode(config: dict[str, Any]) -> dict[str, Any]:
+    """Resolve --%%mode:online|offline|proxy into the engine's flags.
+
+    The single mode directive; the legacy --%%offline:true / --%%proxy:true
+    map onto it (an explicit --%%mode wins over both). "offline" pins the
+    QA's api.* calls to the sim, "proxy" arms proxy mode (online only), and
+    "online" is the plain online behavior. Idempotent — engine callers also
+    apply it, so raw config dicts behave like parsed annotations.
+    """
+    mode = config.get("mode")
+    if mode not in _MODE_VALUES:
+        mode = None
+        if config.get("offline") is True:
+            mode = "offline"
+        elif config.get("proxy") is True:
+            mode = "proxy"
+    if mode is not None:
+        config["mode"] = mode
+        config["offline"] = mode == "offline"
+        config["proxy"] = mode == "proxy"
     return config
 
 
 # Parameter names that belong to the global (shared) config. When a QA file
 # sets one of these, it is copied up to the global config — the last file
 # that sets it wins. Everything else stays local to the QA's config copy.
-GLOBAL_PARAMS = frozenset({"speed", "instant", "maxhours", "time"})
+GLOBAL_PARAMS = frozenset({"speed", "instant", "maxhours", "time", "debug", "loglength"})
 
 # Every --%% directive flua understands (globals + locals). --check flags
-# anything else — a typo like --%%instnat:true is silently ignored today.
+# anything else, and the runtime parser warns about it too — a typo like
+# --%%instnat:true no longer goes silently unnoticed.
 KNOWN_DIRECTIVES = frozenset(
     GLOBAL_PARAMS
     | {
@@ -331,7 +395,11 @@ KNOWN_DIRECTIVES = frozenset(
         "property",
         "var",
         "file",
-        "proxy",
+        "mode",
+        "offline",  # legacy alias for --%%mode:offline
+        "proxy",  # legacy alias for --%%mode:proxy
+        "debug",  # --%%debug:refreshState=true,api=true,http=true
+        "loglength",  # --%%loglength:120 — debug line length
         "uid",
         "description",
         "model",

@@ -72,7 +72,7 @@ def _free_port() -> int:
 
 def _run_flua(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, "-m", "flua", *args],
+        [sys.executable, "-m", "flua", "--api", "local", *args],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

@@ -1,4 +1,4 @@
-"""Proxy mode (--%%proxy:true): mirror a QA onto the real HC3.
+"""Proxy mode (--%%mode:proxy): mirror a QA onto the real HC3.
 
 Tests run against a local mock HC3 (a threaded HTTP server), never a real
 controller. The mock plays both sides: it answers the controller-side REST
@@ -9,6 +9,10 @@ callback server.
 
 import asyncio
 import json
+import os
+import re
+import subprocess
+import sys
 import threading
 import time
 import urllib.request
@@ -21,6 +25,8 @@ import pytest
 pytest.importorskip("lupa")
 
 from flua.engine import LuaEngine  # noqa: E402
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 class _MockHc3(BaseHTTPRequestHandler):
@@ -253,7 +259,7 @@ def add_existing_proxy(proxy_id: int, name: str, device_type: str) -> None:
 
 
 PROXY_SCRIPT = """--%%name:sw
---%%proxy:true
+--%%mode:proxy
 --%%u:{button="btn",text="Go",onReleased="turnOn"}
 -- --------------- EOH ---------------
 function QuickApp:onInit()
@@ -337,6 +343,40 @@ async def test_proxy_fresh_deploy_reuses_id_and_connects(
     assert connects, "proxy was never told where the emulator listens"
     args = connects[0][2]["args"]
     assert args and args[0]["ip"] and args[0]["port"] > 0
+
+
+def test_cli_greeting_shows_proxy_mode_and_id(tmp_path, mock_hc3) -> None:
+    # the one-line CLI greeting carries the resolved mode and, in proxy
+    # mode, the proxy's HC3 id
+    script = tmp_path / "sw.lua"
+    script.write_text(
+        "--%%name:sw\n--%%mode:proxy\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit()\n"
+        "  setTimeout(function() exit(0) end, 50)\n"
+        "end\n"
+    )
+    home = tmp_path / "home"
+    home.mkdir()
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", str(script)],
+        env={
+            **{k: v for k, v in os.environ.items() if not k.startswith("HC3_")},
+            "HOME": str(home),
+            "HC3_URL": mock_hc3,
+            "HC3_USER": "admin",
+            "HC3_PASSWORD": "secret",
+        },
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert re.search(
+        r"flua \d+\.\d+\.\d+ \(Lua 5\.\d+, Python 3\.\d+\.\d+\), mode proxy:100",
+        result.stdout,
+    )
 
 
 @pytest.mark.asyncio
@@ -463,7 +503,7 @@ async def test_proxy_existing_children_are_shadowed(
     }
     script = tmp_path / "kids.lua"
     script.write_text(
-        "--%%name:sw\n--%%proxy:true\n"
+        "--%%name:sw\n--%%mode:proxy\n"
         "-- --------------- EOH ---------------\n"
         "function QuickAppChild:turnOn(event) print('CHILD-ON', self.id, tostring(event)) end\n"
         "function QuickApp:onInit()\n"
@@ -526,7 +566,7 @@ async def test_proxy_child_device_remove_deletes_on_hc3(
     }
     script = tmp_path / "kids.lua"
     script.write_text(
-        "--%%name:sw\n--%%proxy:true\n"
+        "--%%name:sw\n--%%mode:proxy\n"
         "-- --------------- EOH ---------------\n"
         "function QuickApp:onInit()\n"
         "  self:initChildDevices()\n"
@@ -571,7 +611,8 @@ async def test_proxy_use_ui_view_respects_hc3_unless_declared(
         await engine.stop()
     puts = [r for r in _MockHc3.requests if r[0] == "PUT" and r[1] == "/api/devices/57"]
     assert puts and "useUiView" not in puts[0][2]["properties"]
-    # now the QA declares the legacy view: the directive is pushed through
+    # now the QA declares the legacy view: the directive is pushed through.
+    # (This half also exercises the legacy --%%proxy:true alias end to end.)
     _MockHc3.reset()
     add_existing_proxy(57, "sw_Proxy", "com.fibaro.binarySwitch")
     script.write_text(
@@ -686,7 +727,7 @@ async def test_proxy_create_child_device_uses_hc3_id(
     # HC3-assigned id
     script = tmp_path / "kids.lua"
     script.write_text(
-        "--%%name:kids\n--%%proxy:true\n"
+        "--%%name:kids\n--%%mode:proxy\n"
         "-- --------------- EOH ---------------\n"
         "function QuickApp:onInit()\n"
         "  local child = self:createChildDevice({name='c', type='com.fibaro.binarySwitch'})\n"
@@ -719,7 +760,7 @@ async def test_proxy_offline_is_disabled_with_warning(
     engine = LuaEngine()  # api_mode local: no HC3
     await engine.start()
     try:
-        qa_id = engine.start_qa(str(script), None, {"proxy": True}, str(script))
+        qa_id = engine.start_qa(str(script), None, {"mode": "proxy"}, str(script))
         assert qa_id == 5000  # engine id: no proxy involved
         await wait_until(lambda: not engine.has_pending_work())
     finally:

@@ -80,7 +80,7 @@ def test_cli_unknown_type_is_an_error(tmp_path) -> None:
     script = tmp_path / "bad.lua"
     script.write_text("--%%type:com.no.such.type\nprint('x')\n")
     result = subprocess.run(
-        [sys.executable, "-m", "flua", str(script)],
+        [sys.executable, "-m", "flua", "--api", "local", str(script)],
         cwd=Path(__file__).resolve().parent.parent,
         capture_output=True,
         text=True,

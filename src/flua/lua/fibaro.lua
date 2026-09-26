@@ -1,7 +1,7 @@
 fibaro = fibaro or {}
 local fmt = string.format
+_PY = _PY or {}
 __TAG = __TAG or "FLUA"
---_PY = _PY or {}
 
 -- A simple ternary operator implementation.
 -- @param c - The condition.

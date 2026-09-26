@@ -140,7 +140,7 @@ def test_http_keeps_process_alive_until_response(tmp_path, http_server: str) -> 
         "end, 20)\n"
     )
     result = subprocess.run(
-        [sys.executable, "-m", "flua", str(script)],
+        [sys.executable, "-m", "flua", "--api", "local", str(script)],
         cwd=Path(__file__).resolve().parent.parent,
         capture_output=True,
         text=True,
@@ -150,12 +150,39 @@ def test_http_keeps_process_alive_until_response(tmp_path, http_server: str) -> 
     assert "ALIVE 200" in result.stdout
 
 
+def test_http_debug_flag_logs_client_requests(tmp_path, http_server: str) -> None:
+    # --%%debug:http=true logs user net.HTTPClient traffic — and only that,
+    # never the api.* calls (which have their own --%%debug:api flag)
+    script = tmp_path / "dbg.lua"
+    script.write_text(
+        "--%%debug:http=true\n"
+        "-- --------------- EOH ---------------\n"
+        "setTimeout(function()\n"
+        "  net.HTTPClient():request('" + http_server + "/get', {\n"
+        "    success = function(resp) print('OK', resp.status) end,\n"
+        "    error = function(err) print('ERR', err) end,\n"
+        "  })\n"
+        "end, 20)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--api", "local", str(script)],
+        cwd=Path(__file__).resolve().parent.parent,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "http GET " + http_server + "/get" in result.stdout
+    assert "api GET" not in result.stdout  # http does not cover api calls
+    assert "OK 200" in result.stdout
+
+
 def test_example_http_runs_cleanly() -> None:
     # examples/http.lua hits httpbin.org, so the suite must not depend on the
     # network: assert the deterministic parts — clean exit, the refused
     # connection reported through the error callback, no traceback.
     result = subprocess.run(
-        [sys.executable, "-m", "flua", "examples/http.lua"],
+        [sys.executable, "-m", "flua", "--api", "local", "examples/http.lua"],
         cwd=Path(__file__).resolve().parent.parent,
         capture_output=True,
         text=True,

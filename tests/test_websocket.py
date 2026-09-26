@@ -190,7 +190,7 @@ def test_example_websocket_runs_cleanly() -> None:
     # assert only the deterministic parts: clean exit, no traceback, and one
     # of the two outcome markers (connected+echo, or a reported error).
     result = subprocess.run(
-        [sys.executable, "-m", "flua", "examples/websocket.lua"],
+        [sys.executable, "-m", "flua", "--api", "local", "examples/websocket.lua"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

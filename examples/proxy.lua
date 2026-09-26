@@ -7,7 +7,7 @@
 --%%u:{select='sel1',text='Select an option',onToggled='selectChanged',value='11',options={{type='option',text='Option 1',value='11'},{type='option',text='Option 2',value='12'}}}
 --%%u:{multi='m1',text='Select an option',onToggled='multiChanged',values={'11'},options={{type='option',text='Option 1',value='11'},{type='option',text='Option 2',value='12'}}}
 
---%%proxy:true 
+--%%mode:proxy
 
 function QuickApp:onInit()
   print("Proxy test initialized")

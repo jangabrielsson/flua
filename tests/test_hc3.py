@@ -456,7 +456,7 @@ def test_cli_defaults_to_online_with_hc3_env(tmp_path, mock_hc3) -> None:
     result = subprocess.run(
         [sys.executable, "-m", "flua", str(script)],
         env=_hc3_env(mock_hc3, str(home)),
-        cwd=REPO_ROOT,
+        cwd=tmp_path,  # isolated from the developer's .directives
         capture_output=True,
         text=True,
         timeout=60,
@@ -478,7 +478,7 @@ def test_ctrl_c_terminates_promptly_mid_long_poll(tmp_path, mock_hc3) -> None:
     proc = subprocess.Popen(
         [sys.executable, "-m", "flua", str(script)],
         env=_hc3_env(mock_hc3, str(home)),
-        cwd=REPO_ROOT,
+        cwd=tmp_path,  # isolated from the developer's .directives
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
@@ -523,6 +523,55 @@ def test_cli_main_file_offline_directive_forces_sim(tmp_path, mock_hc3) -> None:
     assert not any(r.startswith("/api/devices/45") for r in _MockHc3.requests_seen)
 
 
+def test_cli_main_file_mode_offline_forces_sim(tmp_path, mock_hc3) -> None:
+    # the MAIN QA's --%%mode:offline (peeked before the engine starts)
+    # selects offline mode even with HC3 credentials present
+    script = tmp_path / "main.lua"
+    script.write_text(
+        "--%%mode:offline\n"
+        "-- --------------- EOH ---------------\n"
+        "setTimeout(function()\n"
+        "  local d, s = api.get('/devices/45')\n"
+        "  print('MODE', s)\n"
+        "end, 20)\n"
+    )
+    home = tmp_path / "home"
+    home.mkdir()
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", str(script)],
+        env=_hc3_env(mock_hc3, str(home)),
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "MODE 404" in result.stdout  # served by the sim, never forwarded
+    assert not any(r.startswith("/api/devices/45") for r in _MockHc3.requests_seen)
+
+
+def test_cli_main_file_mode_online_forces_remote_without_credentials(tmp_path) -> None:
+    # the MAIN QA's --%%mode:online selects the real HC3 — without HC3
+    # credentials the engine refuses to start (like --api remote)
+    home = tmp_path / "home"
+    home.mkdir()
+    script = tmp_path / "main.lua"
+    script.write_text("--%%mode:online\nprint('x')\n")
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", str(script)],
+        env={
+            **{k: v for k, v in os.environ.items() if not k.startswith("HC3_")},
+            "HOME": str(home),
+        },
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 2
+    assert "HC3_URL" in result.stderr
+
+
 @pytest.mark.asyncio
 async def test_offline_directive_pins_secondary_qa_to_sim(
     tmp_path, capsys, mock_hc3, monkeypatch
@@ -554,6 +603,64 @@ async def test_offline_directive_pins_secondary_qa_to_sim(
     out = capsys.readouterr().out
     assert "A 200 hc3-device" in out  # the online QA reaches the mock HC3
     assert "B 404" in out  # the pinned QA stays in the sim
+
+
+@pytest.mark.asyncio
+async def test_mode_directive_pins_secondary_qa_to_sim(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # like test_offline_directive_pins_secondary_qa_to_sim, but with the
+    # canonical --%%mode:offline
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    a = tmp_path / "a.lua"
+    a.write_text(
+        "setTimeout(function() local d, s = api.get('/devices/45'); "
+        "print('A', s, d and d.name) end, 20)\n"
+    )
+    b = tmp_path / "b.lua"
+    b.write_text(
+        "--%%mode:offline\n"
+        "-- --------------- EOH ---------------\n"
+        "setTimeout(function() local d, s = api.get('/devices/45'); print('B', s) end, 30)\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        engine.load_qa_file(str(a))
+        engine.load_qa_file(str(b))
+        await asyncio.sleep(0.5)
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "A 200 hc3-device" in out  # the online QA reaches the mock HC3
+    assert "B 404" in out  # the pinned QA stays in the sim
+
+
+def test_cli_default_mode_is_online(tmp_path, monkeypatch) -> None:
+    # no --api flag and no --%%mode directive: ONLINE is the default — with
+    # no HC3 credentials the engine refuses to start (offline is opt-in)
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.delenv("HC3_URL", raising=False)
+    monkeypatch.delenv("HC3_HOST", raising=False)
+    script = tmp_path / "x.lua"
+    script.write_text("print('x')\n")
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", str(script)],
+        env={
+            **{k: v for k, v in os.environ.items() if not k.startswith("HC3_")},
+            "HOME": str(home),
+        },
+        cwd=tmp_path,  # isolated from the developer's .directives
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 2
+    assert "HC3_URL" in result.stderr
 
 
 def test_cli_remote_requires_hc3_url(tmp_path, monkeypatch) -> None:

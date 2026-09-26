@@ -267,7 +267,7 @@ def test_example_mqtt_runs_cleanly() -> None:
     # dependent, so assert only the deterministic parts: clean exit, no
     # traceback, and one of the two outcome markers.
     result = subprocess.run(
-        [sys.executable, "-m", "flua", "examples/mqtt.lua"],
+        [sys.executable, "-m", "flua", "--api", "local", "examples/mqtt.lua"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

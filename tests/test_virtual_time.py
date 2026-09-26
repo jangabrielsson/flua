@@ -18,7 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 def _run_cli(*args: str, timeout: int = 30) -> "subprocess.CompletedProcess[str]":
     return subprocess.run(
-        [sys.executable, "-m", "flua", *args],
+        [sys.executable, "-m", "flua", "--api", "local", *args],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

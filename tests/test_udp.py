@@ -99,7 +99,7 @@ def test_example_udp_runs_cleanly() -> None:
     # broadcast send succeeds without a listener; the receive then times out
     # cleanly — fully deterministic offline.
     result = subprocess.run(
-        [sys.executable, "-m", "flua", "examples/udp.lua"],
+        [sys.executable, "-m", "flua", "--api", "local", "examples/udp.lua"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

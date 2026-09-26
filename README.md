@@ -30,6 +30,10 @@ Requires Python 3.11+. `lupa` is the only runtime dependency.
 .venv/bin/flua examples/timers.lua
 .venv/bin/flua examples/qa3.lua examples/qa4.lua
 
+# ONLINE is the default (HC3 credentials from the .env chain); for the
+# simulated HC3 pass --api local, or set --%%mode:offline in the QA header
+.venv/bin/flua --api local examples/timers.lua
+
 # one-liner
 .venv/bin/flua -e 'setTimeout(function() print("hi") end, 100)'
 
@@ -68,7 +72,9 @@ With no `--run-for`, flua exits gracefully when no timers, messages, or open
 network connections are pending — a script with no timers just runs and exits,
 like the standard interpreter (`--ui` is the exception: it keeps the run alive
 until Ctrl-C so the viewer never loses its API). On startup flua prints a
-greeting with the flua, Lua and Python versions (`--nogreet` to skip it).
+one-line greeting with the versions and the resolved mode —
+`flua 0.1.1 (Lua 5.5, Python 3.14.3), mode online` (offline / `proxy:<id>`
+in the other modes; `--nogreet` to skip it).
 
 Each file is started as a tracked `setTimeout` callback with delay 0, so it
 runs inside the engine's message pump.

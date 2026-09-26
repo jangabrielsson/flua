@@ -212,11 +212,35 @@ Parsing stops at the end-of-header marker:
 | `--%%time:2027/10/6 12:00:20` | bare form: set the virtual start time |
 | `--%%u:{label="lbl",text="Status"}` | one UI row (see below); repeatable, order kept |
 | `--%%useUiView:false` | render the legacy `viewLayout` instead of the new `uiView` (default true) |
-| `--%%proxy:true` | proxy mode: mirror this QA onto the HC3 (online only, see below) |
+| `--%%mode:offline` | pin this QA to the simulated HC3 (see below) |
+| `--%%mode:online` | force this QA online against the real HC3 |
+| `--%%mode:proxy` | proxy mode: mirror this QA onto the HC3 (online only, see below) |
+| `--%%debug:refreshState=true,api=true,http=true` | debug logging: refreshStates events / `api.*` calls / `net.HTTPClient` requests (global) |
+| `--%%loglength:120` | debug line length cap (default 120) |
+
+The legacy `--%%offline:true` and `--%%proxy:true` still work as aliases for
+`--%%mode:offline` and `--%%mode:proxy` (an explicit `--%%mode` wins when
+both appear).
 
 Names follow plua: `--%%name:value` for scalars,
 `--%%name:sub1=val1,sub2=val2` for subparameters. A typo'd directive is
-silently ignored at runtime — run `flua --check` to catch those.
+reported at runtime (a `unknown --%% directive` warning) and `flua --check`
+flags it too.
+
+### Debug logging
+
+`--%%debug:refreshState=true,api=true,http=true` turns on per-category debug
+logging (any subset; it is a global directive, so `.directives` can carry it):
+
+- `refreshState=true` logs every refreshStates event flua sees in a short
+  form — the event type plus the `id`/`deviceId`/`name`/`property`/`value`/
+  `newValue` data fields that are present;
+- `api=true` logs the QA's `api.*` and `api.hc3.*` calls as
+  `api GET /devices/...`;
+- `http=true` logs user `net.HTTPClient` requests — not the `api.*` calls.
+
+`--%%loglength:120` caps the debug line length (default 120; a cut line ends
+with `...`).
 
 ### QuickApp UI (`--%%u`)
 
@@ -285,6 +309,26 @@ Files are plain `KEY=value` lines (comments and quotes supported) and are
 re-read when they change — handy for API tokens and per-machine settings
 that don't belong in the QA code.
 
+### The `.directives` defaults file
+
+A `.directives` file in the directory you run from is read in as **defaults
+for the main QA file**: the same `--%%` directive syntax as a QA header
+(`-- --------------- EOH ---------------` stops parsing, full-line `#`
+comments are ignored). A directive set in the QA itself overrides the file's
+value — the `mode` family (`--%%mode`/`--%%offline`/`--%%proxy`) overrides
+as a whole, so a QA can opt out of a default too.
+
+```
+# .directives — defaults for the main QA
+--%%mode:offline      # this project normally runs offline
+--%%description:local playground QA
+```
+
+This is the place for per-project defaults: run offline by default (and
+override with `--%%mode:online` in a QA when you want the HC3), shared
+names/descriptions, and log/trace defaults via `--%%debug`/`--%%loglength`.
+Unknown directives in the file warn at runtime, like typos in QA headers.
+
 ## Multi-file QAs
 
 On the HC3 a QA is a set of named Lua files — one is `main`. flua keeps your
@@ -305,19 +349,20 @@ API works offline too (`api.get('/quickApp/' .. _FLUA.qaId .. '/files')` etc.).
 
 ### Online mode — the real HC3
 
-The backend is picked like plua did — **peeking at the main QA file's raw
-header before the engine starts** (the standard annotation parse runs
-later):
+The backend is picked from the **main QA's directives — its header merged
+over the `.directives` defaults** (see below), before the engine starts:
 
 1. an explicit `--api local|remote` always wins;
-2. otherwise, `--%%offline:true` in the **main** QA's header selects the
-   offline sim;
-3. otherwise, online when HC3 credentials exist in the environment
-   (`HC3_URL`/`HC3_HOST`), offline when they don't.
+2. otherwise, `--%%mode:offline` in the **main** QA's directives selects
+   the offline sim, `--%%mode:online`/`--%%mode:proxy` selects the real HC3;
+3. otherwise, **online** — the default, which requires HC3 credentials in
+   the environment (`HC3_URL`/`HC3_HOST`); without them flua exits with an
+   error. The simulated HC3 is opt-in: `--api local` or `--%%mode:offline`.
 
-`--%%offline:true` on a *secondary* QA pins just that QA's `api.*` calls to
+`--%%mode:offline` on a *secondary* QA pins just that QA's `api.*` calls to
 the sim while the rest of the run stays online — handy for keeping test QAs
-sandboxed against a live controller.
+sandboxed against a live controller. The legacy `--%%offline:true` is an
+alias for `--%%mode:offline`.
 
 With `--api remote`, the `api` table talks to the real HC3: everything your
 flua QAs own (devices from 5000, seeded sim state) is served locally, and
@@ -346,7 +391,7 @@ bypassing the hybrid dispatch (this is what `fibaro.callhc3` uses, and it's
 handy in test code that wants ground-truth data). Offline it stands in for
 the simulated HC3.
 
-### Proxy mode (`--%%proxy:true`)
+### Proxy mode (`--%%mode:proxy`)
 
 To test a QA against its real UI in the phone app — or against scenes and
 other QAs on the controller — flua can deploy a **proxy QuickApp** on the
@@ -355,7 +400,7 @@ proxy device named `<name>_Proxy` (same device type, same UI) runs on the
 HC3, and the two are treated as one device:
 
 ```lua
---%%proxy:true
+--%%mode:proxy
 ```
 
 - The emulated QA runs with the **proxy's HC3 id** — actions and UI events

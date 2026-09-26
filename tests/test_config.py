@@ -1,6 +1,13 @@
 """Unit tests for --%% annotation parsing (no lupa needed)."""
 
-from flua.config import parse_annotations, parse_lua_literal, parse_scalar, peek_offline
+from flua.config import (
+    _apply_mode,
+    load_directives_file,
+    merge_directives,
+    parse_annotations,
+    parse_lua_literal,
+    parse_scalar,
+)
 
 
 def test_scalar_values() -> None:
@@ -76,13 +83,105 @@ def test_property_directives_merge_with_scalar_values() -> None:
     assert parse_annotations(source) == {"property": {"value": True, "delay": 30, "x": 1, "y": 2}}
 
 
-def test_peek_offline_true_forms() -> None:
-    assert peek_offline("--%%offline:true\nprint('x')\n")
-    assert peek_offline("--%%name:x\n--%%offline:true\n")
-    assert not peek_offline("--%%offline:false\n")
-    assert not peek_offline("print('x')\n")  # not a directive header
-    # after EOH the header is over: not a directive
-    assert not peek_offline("-- --------------- EOH ---------------\n--%%offline:true\n")
+def test_directives_file_provides_defaults(tmp_path) -> None:
+    (tmp_path / ".directives").write_text(
+        "--%%name:Default\n--%%mode:offline\n--%%u:{label=\"d\",text=\"D\"}\n"
+    )
+    assert load_directives_file(tmp_path) == {
+        "name": "Default",
+        "mode": "offline",
+        "offline": True,
+        "proxy": False,
+        "u": [{"label": "d", "text": "D"}],
+    }
+    assert load_directives_file(tmp_path / "missing") == {}
+
+
+def test_merge_directives_qa_overrides_defaults() -> None:
+    defaults = _apply_mode({"mode": "offline", "name": "Default"})
+    # a QA directive overrides the file's value for that key
+    merged = merge_directives(defaults, {"name": "Mine"})
+    assert merged == {"mode": "offline", "offline": True, "proxy": False, "name": "Mine"}
+    # the mode family overrides as a whole: any QA mode directive replaces
+    # the file's mode default — even an explicit opt-out
+    merged = merge_directives(defaults, {"offline": False})
+    assert "mode" not in merged and merged["offline"] is False
+    merged = merge_directives(defaults, {"mode": "proxy"})
+    assert merged == {"mode": "proxy", "offline": False, "proxy": True, "name": "Default"}
+
+
+def test_mode_directive_normalizes_flags() -> None:
+    # --%%mode:offline -> offline flag; proxy/online likewise
+    assert _apply_mode({"mode": "offline"}) == {
+        "mode": "offline",
+        "offline": True,
+        "proxy": False,
+    }
+    assert _apply_mode({"mode": "proxy"}) == {
+        "mode": "proxy",
+        "offline": False,
+        "proxy": True,
+    }
+    assert _apply_mode({"mode": "online"}) == {
+        "mode": "online",
+        "offline": False,
+        "proxy": False,
+    }
+    assert _apply_mode({"mode": "bogus", "offline": True}) == {
+        "mode": "offline",  # unknown mode falls back to the legacy flag
+        "offline": True,
+        "proxy": False,
+    }
+
+
+def test_mode_directive_parsed_with_legacy_aliases() -> None:
+    assert parse_annotations("--%%mode:offline\n") == {
+        "mode": "offline",
+        "offline": True,
+        "proxy": False,
+    }
+    # legacy directives map onto mode
+    assert parse_annotations("--%%offline:true\n") == {
+        "mode": "offline",
+        "offline": True,
+        "proxy": False,
+    }
+    assert parse_annotations("--%%proxy:true\n") == {
+        "mode": "proxy",
+        "offline": False,
+        "proxy": True,
+    }
+    # an explicit --%%mode wins over legacy directives
+    assert parse_annotations("--%%mode:offline\n--%%proxy:true\n") == {
+        "mode": "offline",
+        "offline": True,
+        "proxy": False,
+    }
+
+
+def test_debug_directive_parses_subflags() -> None:
+    config = parse_annotations(
+        "--%%debug:refreshState=true,api=true,http=true\n--%%loglength:60\n"
+    )
+    assert config == {
+        "debug": {"refreshState": True, "api": True, "http": True},
+        "loglength": 60,
+    }
+
+
+def test_parse_annotations_warns_on_unknown_directive(caplog) -> None:
+    import logging
+
+    with caplog.at_level(logging.WARNING):
+        assert parse_annotations("--%%instnat:true\n") == {"instnat": True}
+    assert "unknown --%% directive: --%%instnat:true" in caplog.text
+    # known directives stay quiet
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        parse_annotations(
+            "--%%name:x\n--%%mode:offline\n--%%speed:2\n--%%u:{label=\"a\"}\n"
+        )
+    assert "unknown --%%" not in caplog.text
 
 
 def test_eoh_stops_parsing() -> None:

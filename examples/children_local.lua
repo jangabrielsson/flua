@@ -1,13 +1,18 @@
 --%%name:ChildrenLocal
 --%%type:com.fibaro.binarySwitch
 
---%%offline:true
+--%%debug:api=true
+--%%mode:offline
 
 function QuickApp:onInit()
   print("ChildrenLocal initialized")
   self:checkChildren()
   self:createChildren()
   self:checkChildren()
+  local d = api.get("/devices")
+  for _, device in ipairs(d) do
+    print("Found device: "..(device.name or "unknown"))
+  end
   self:deleteChildren()
   self:checkChildren()
 end

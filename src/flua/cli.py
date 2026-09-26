@@ -26,7 +26,12 @@ from typing import Any
 
 from . import __version__, messages
 from .clock import parse_start_time
-from .config import parse_annotations, peek_offline, split_annotations
+from .config import (
+    load_directives_file,
+    merge_directives,
+    parse_annotations,
+    split_annotations,
+)
 from .engine import LuaEngine
 from .http_server import ApiServer
 
@@ -101,9 +106,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--api",
         choices=["local", "remote"],
         default=None,
-        help="explicit REST API backend. Default: the main QA's --%%offline:true "
-        "selects offline; otherwise online when HC3 credentials exist in the "
-        "environment, else offline",
+        help="explicit REST API backend. Default: the main QA's "
+        "--%%mode:offline selects offline, --%%mode:online|proxy selects "
+        "online; otherwise ONLINE (the default — requires HC3 credentials "
+        "in the environment). Use --api local or --%%mode:offline for the "
+        "simulated HC3",
     )
     parser.add_argument(
         "--seed",
@@ -157,6 +164,14 @@ def _load_qas(
     """
     global_config: dict[str, Any] = {}
     specs: list[tuple[str | None, str | None, dict[str, Any]]] = []
+    # .directives in the working directory: defaults for the MAIN QA (the
+    # first file spec — pure -e runs get none). The QA's own directives
+    # override them (mode as a whole).
+    try:
+        defaults = load_directives_file(Path.cwd())
+    except ValueError as exc:
+        parser.error(f"error in .directives: {exc}")
+    main_index = 1 if args.code is not None else 0  # the first script
     if args.code is not None:
         global_params, local_params = split_annotations(parse_annotations(args.code))
         global_config.update(global_params)
@@ -166,7 +181,10 @@ def _load_qas(
         if not path.exists():
             parser.error(f"cannot open {script}: no such file")
         source = path.read_text(encoding="utf-8")
-        global_params, local_params = split_annotations(parse_annotations(source))
+        annotations = parse_annotations(source)
+        if len(specs) == main_index:
+            annotations = merge_directives(defaults, annotations)
+        global_params, local_params = split_annotations(annotations)
         global_config.update(global_params)  # last file wins
         specs.append((str(path.resolve()), None, local_params))
     if not specs:
@@ -265,10 +283,12 @@ def _keep_running(
 
 
 async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
-    global_config, qa_specs = _load_qas(parser, args)
-
     if args.check:
+        # static checks only: skip the QA load entirely (its annotation parse
+        # would log the runtime warnings --check reports itself)
         return _check_cli(parser, args)
+
+    global_config, qa_specs = _load_qas(parser, args)
 
     speed, max_hours, start_epoch = _resolve_runtime(parser, args, global_config)
     seed: dict[str, Any] | None = None
@@ -282,19 +302,27 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         if not isinstance(seed, dict):
             parser.error("seed file must contain a JSON object")
     try:
-        # plua behavior: PEEK at the main QA file's raw header for
-        # --%%offline:true (before the engine starts — the standard parse
-        # runs after); an explicit --api flag always wins. Without either,
-        # the engine resolves: online if HC3 credentials exist, else offline.
+        # The engine mode follows the MAIN QA's merged directives (its
+        # header over the .directives defaults) — --%%mode:offline selects
+        # the sim, --%%mode:online|proxy the HC3. An explicit --api flag
+        # always wins, and the default (no directive anywhere) is ONLINE —
+        # offline is opt-in, like plua's --offline flag.
         api_mode = args.api
         if api_mode is None and qa_specs:
-            main_path, main_code, _ = qa_specs[0]
-            if main_path is not None and Path(main_path).exists():
-                main_source = Path(main_path).read_text(encoding="utf-8")
-            else:
-                main_source = main_code or ""
-            if peek_offline(main_source):
-                api_mode = "local"
+            # the FIRST spec may be an injected -e bootstrap (the mobdebug
+            # extension launches -e "<bootstrap>" <script>): skip to the main
+            # file spec
+            for main_path, _main_code, main_params in qa_specs:
+                if main_path is None:
+                    continue
+                mode = main_params.get("mode")
+                if mode == "offline":
+                    api_mode = "local"
+                elif mode in ("online", "proxy"):
+                    api_mode = "remote"
+                break
+        if api_mode is None:
+            api_mode = "remote"  # default: online (requires HC3 credentials)
         engine = LuaEngine(
             start=start_epoch,
             speed=speed,
@@ -322,15 +350,6 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
                 f"flua: UI API on http://127.0.0.1:{ui_server.port} — open viewer/index.html",
             )
         )
-    if not args.nogreet:
-        # route the greeting through the message queue so it shares the
-        # pump's FIFO with all QA output — guaranteed to appear first
-        engine.post(
-            messages.log(
-                "info",
-                f"flua {__version__}, {engine.lua_version()}, Python {sys.version.split()[0]}",
-            )
-        )
     if args.debugger is not None:
         _start_debugger(engine, args.debugger)
     else:
@@ -350,6 +369,7 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         engine.enqueue_outbound(messages.run_preamble(code or ""))
 
     watch_paths: dict[str, set[int]] = {}
+    main_qa_id: int | None = None
     for path, code, local_params in qa_specs:
         qa_config = dict(global_config)
         qa_config.update(local_params)
@@ -358,11 +378,31 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             qa_id = engine.start_qa(path, code, qa_config, arg0)
         except ValueError as exc:
             parser.error(str(exc))
+        if main_qa_id is None:
+            main_qa_id = qa_id
         if args.watch:
             info = engine.qa_info(qa_id)
             for f in info["files"] if info else []:
                 if f.get("path"):
                     watch_paths.setdefault(f["path"], set()).add(qa_id)
+
+    if not args.nogreet:
+        # one line, posted AFTER the QAs are prepared: the mode (and the
+        # proxy's HC3 id in proxy mode) is only known once the proxies are
+        # resolved. It still rides the pump's FIFO ahead of the QAs' own
+        # output — the QAs boot as 0 ms timers, delivered after this log.
+        mode = "offline" if api_mode == "local" else "online"
+        if main_qa_id is not None:
+            info = engine.qa_info(main_qa_id)
+            if info and info.get("proxy"):
+                mode = f"proxy:{main_qa_id}"
+        engine.post(
+            messages.log(
+                "info",
+                f"flua {__version__} ({engine.lua_version()}, "
+                f"Python {sys.version.split()[0]}), mode {mode}",
+            )
+        )
 
     if args.watch:
         args.run_for = 0  # stay alive until exit() or Ctrl-C

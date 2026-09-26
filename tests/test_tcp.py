@@ -159,7 +159,7 @@ def test_example_tcp_runs_cleanly() -> None:
     # No echo service on 7777 in CI: the example must exit 0 and print its
     # instructions. Either marker proves the script ran without errors.
     result = subprocess.run(
-        [sys.executable, "-m", "flua", "examples/tcp.lua"],
+        [sys.executable, "-m", "flua", "--api", "local", "examples/tcp.lua"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

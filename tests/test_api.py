@@ -345,7 +345,7 @@ def test_cli_seed_offline(tmp_path) -> None:
     seed = tmp_path / "seed.json"
     seed.write_text(json.dumps({"globalVariables": {"night": "false"}}))
     result = subprocess.run(
-        [sys.executable, "-m", "flua", "--seed", str(seed), str(script)],
+        [sys.executable, "-m", "flua", "--api", "local", "--seed", str(seed), str(script)],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

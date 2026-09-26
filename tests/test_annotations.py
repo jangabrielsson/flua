@@ -14,7 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 def _run_flua(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, "-m", "flua", *args],
+        [sys.executable, "-m", "flua", "--api", "local", *args],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -87,3 +87,13 @@ def test_config_exposed_to_lua(tmp_path) -> None:
     result = _run_flua(str(script))
     assert result.returncode == 0, result.stdout + result.stderr
     assert "CFG 7 hello" in result.stdout
+
+
+def test_unknown_directive_warns_at_runtime(tmp_path) -> None:
+    # a typo'd --%% directive is reported at runtime, not just by --check
+    script = tmp_path / "typo.lua"
+    script.write_text("--%%instnat:true\nprint('RAN')\n")
+    result = _run_flua(str(script))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "unknown --%% directive: --%%instnat:true" in result.stderr
+    assert "RAN" in result.stdout  # the warning does not stop the QA

@@ -39,7 +39,7 @@ from .api import Api
 from .api.state import public
 from .bindings import install_bindings
 from .clock import VirtualClock
-from .config import parse_annotations, split_annotations
+from .config import _apply_mode, parse_annotations, split_annotations
 from .devices import catalog_types
 from .environment import EnvChain
 from .hc3 import Hc3Remote
@@ -122,19 +122,22 @@ class LuaEngine:
         self._exit_code = 0
         self._pump_task: asyncio.Task[None] | None = None
         self.env = EnvChain()  # os.getenv chain: local .env > ~/.env > process env
-        # HC3 REST API: the offline sim by default, the real HC3 with
-        # --api remote (credentials from the environment chain).
+        # HC3 REST API: the offline sim with api_mode="local" (the explicit
+        # constructor default), the real HC3 otherwise — and with None (no
+        # flag at all) the default is ONLINE, so a missing HC3_URL is a loud
+        # error rather than a silent fallback to the sim.
         if api_mode is None:
-            # no explicit flag: online when HC3 credentials are configured,
-            # offline otherwise
-            api_mode = "remote" if self._hc3_configured() else "local"
+            api_mode = "remote"  # default: online (requires HC3 credentials)
         if api_mode != "local":
             base_url = self.env.get("HC3_URL")
             host = self.env.get("HC3_HOST")
             if not base_url and host:
                 base_url = f"http://{host}/"
             if not base_url:
-                raise ValueError("--api remote requires HC3_URL (or HC3_HOST) in the environment")
+                raise ValueError(
+                    "online mode requires HC3_URL (or HC3_HOST) in the environment "
+                    "— run with --api local or --%%mode:offline for the simulated HC3"
+                )
             self.hc3 = Hc3Remote(
                 base_url,
                 user=self.env.get("HC3_USER"),
@@ -181,7 +184,7 @@ class LuaEngine:
         self.qa_websockets = WebSocketPool(self._on_ws_event)
         self._loop: asyncio.AbstractEventLoop | None = None
         self.qa_mqtt = MqttPool(self._on_mqtt_event)
-        # Proxy mode (--%%proxy:true): the callback server the HC3 proxy
+        # Proxy mode (--%%mode:proxy): the callback server the HC3 proxy
         # posts actions/UI events to, plus the in-flight CONNECT tasks.
         self._proxy_server: ApiServer | None = None
         self._proxy_tasks: set[asyncio.Task[None]] = set()
@@ -189,12 +192,9 @@ class LuaEngine:
         # .flua.lua (local > home > legacy ~/.plua/config.lua)
         self._load_lua_config()
 
-    def _hc3_configured(self) -> bool:
-        base = self.env.get("HC3_URL") or self.env.get("HC3_HOST")
-        return bool(base)
-
     def qa_is_offline(self, qa_id: int | None) -> bool:
-        """--%%offline:true on a QA pins its api.* calls to the sim."""
+        """--%%mode:offline (legacy --%%offline:true) on a QA pins its api.*
+        calls to the sim."""
         if qa_id is None:
             return False
         info = self._qas.get(int(qa_id))
@@ -203,7 +203,7 @@ class LuaEngine:
     def _keep_alive_active(self) -> bool:
         """Any loaded QA with --%%keep-alive:true that hasn't exited keeps the
         online engine (and the HC3 poller's long poll) alive past idle — like
-        a QA on the real HC3, which runs forever. Proxy-mode QAs (--%%proxy:true)
+        a QA on the real HC3, which runs forever. Proxy-mode QAs (--%%mode:proxy)
         imply the same: the emulator must stay up to serve the HC3 proxy's
         callbacks. Offline there is no poller to feed, so the directive has no
         effect there."""
@@ -255,6 +255,17 @@ class LuaEngine:
         and logging, never Lua state — so it works inside debugger-stepped
         code, where the pump is frozen)."""
         self._handle_log({"type": messages.LOG, "level": level, "text": text})
+
+    def debug_log(self, text: str) -> None:
+        """Print a --%%debug line, cut short after --%%loglength characters
+        (default 120; "..." marks the cut)."""
+        try:
+            limit = int(self.config.get("loglength") or 120)
+        except (TypeError, ValueError):
+            limit = 120
+        if len(text) > limit:
+            text = text[:limit] + "..."
+        self.log_line("debug", text)
 
     def enqueue_outbound(self, msg: dict[str, Any]) -> None:
         """Queue a Python -> Lua message for the pump to deliver."""
@@ -314,11 +325,11 @@ class LuaEngine:
     ) -> int:
         """Assign a QA id, resolve its name, register it in the sim directory.
 
-        Proxy mode (--%%proxy:true, online only) resolves the proxy device on
+        Proxy mode (--%%mode:proxy, online only) resolves the proxy device on
         the HC3 FIRST, before the id is assigned: the emulated QA runs under
         the proxy's HC3 id, so the two are treated as one device (plua caveat 2).
         """
-        qa_config = dict(qa_config)
+        qa_config = _apply_mode(dict(qa_config))  # mode/offline/proxy -> flags
         name = qa_config.get("name")
         if name is None:
             # names need not be unique: config name, else the script's
@@ -330,7 +341,7 @@ class LuaEngine:
         proxy_enabled = bool(qa_config.get("proxy"))
         if proxy_enabled and self.hc3 is None:
             logger.warning(
-                "--%%proxy:true needs online mode (HC3 credentials) — proxy disabled for %s",
+                "--%%mode:proxy needs online mode (HC3 credentials) — proxy disabled for %s",
                 name,
             )
             proxy_enabled = False
@@ -598,7 +609,7 @@ class LuaEngine:
     def _mirror_change(self, entry: dict[str, Any]) -> None:
         self.api.state.mirror_change(entry)
 
-    # -- proxy mode (--%%proxy:true) ---------------------------------------------
+    # -- proxy mode (--%%mode:proxy) ---------------------------------------------
 
     def _schedule_proxy_connect(self, qa_id: int, name: str) -> None:
         """Arm the callback server and tell the HC3 proxy where the emulator
@@ -1119,6 +1130,9 @@ class LuaEngine:
     def _handle_http_request(self, msg: dict[str, Any]) -> None:
         """Run a net.HTTPClient request in a worker thread (never blocks the pump)."""
         logger.debug("http request id=%s %s %s", msg["id"], msg.get("method"), msg["url"])
+        if bool((self.config.get("debug") or {}).get("http")):
+            # user net.HTTPClient traffic only — api.* calls are the "api" flag
+            self.debug_log(f"http {msg.get('method') or 'GET'} {msg.get('url')}")
         task = asyncio.create_task(self._run_http_request(msg), name="flua-http")
         self._http_tasks.add(task)
         task.add_done_callback(self._http_tasks.discard)

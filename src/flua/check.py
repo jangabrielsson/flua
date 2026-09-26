@@ -3,8 +3,9 @@
 Three layers, all without running the QA:
 
 1. Syntax — the file is compiled through the engine's Lua state.
-2. Directives — unknown ``--%%`` names are flagged (they are silently
-   ignored at runtime, so a typo costs a debugging session).
+2. Directives — unknown ``--%%`` names are flagged (the runtime logs a
+   warning for them too; --check adds the file context, so a typo costs
+   neither a debugging session nor a --check run).
 3. Deprecated REST endpoints — matched against the official swagger docs
    in fibaro_api_docs/ (e.g. GET /quickApp/export is deprecated).
 """
@@ -31,7 +32,7 @@ def check_source(source: str, name: str, lua: Any) -> list[str]:
     except Exception as exc:
         findings.append(f"{name}: error: syntax: {exc}")
         return findings
-    for key in parse_annotations(source):
+    for key in parse_annotations(source, warn_unknown=False):
         if key not in KNOWN_DIRECTIVES:
             findings.append(f"{name}: warning: unknown directive --%%{key}")
     for method, prefix, advice in DEPRECATED_API:

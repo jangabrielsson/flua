@@ -1,6 +1,6 @@
 """Proxy mode: mirror a flua QA onto the real HC3 (plua's ``proxy.lua`` in Python).
 
-When a QA carries ``--%%proxy:true`` (online mode only), flua deploys a proxy
+When a QA carries ``--%%mode:proxy`` (online mode only), flua deploys a proxy
 QuickApp on the HC3 named ``<QA name>_Proxy`` with the same device type as the
 emulated QA. The proxy funnels every device action and UI event back to the
 emulator over plain HTTP, and flua pushes property/view updates to the proxy so
@@ -44,7 +44,7 @@ PROXY_PORT_DEFAULT = 8080
 # The QuickApp code installed on the HC3 proxy device. Standard plua proxy:
 # the only device-specific bits are the name and the type, which live in the
 # .fqa envelope, not in this code.
-PROXY_LUA = r"""-- flua proxy QuickApp (installed by --%%proxy:true)
+PROXY_LUA = r"""-- flua proxy QuickApp (installed by --%%mode:proxy)
 local ip, port = nil, nil
 local actionUrl, uiUrl = "", ""
 

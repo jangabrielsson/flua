@@ -131,6 +131,8 @@ def install_bindings(engine: "LuaEngine") -> None:
     def api_call(
         method: str, url: str, body: object, qa_id: int | None = None
     ) -> tuple[object, int]:
+        if bool((engine.config.get("debug") or {}).get("api")):
+            engine.debug_log(f"api {method.upper()} {url}")
         data, status = engine.api.dispatch(method, url, lua_to_python(body), qa_id=qa_id)
         if data is None:
             return None, status
@@ -141,6 +143,8 @@ def install_bindings(engine: "LuaEngine") -> None:
     # api.hc3.*: the real HC3 directly (no hybrid dispatch) — callhc3 and
     # test code; falls back to the local sim without a remote backend.
     def api_hc3(method: str, url: str, body: object) -> tuple[object, int]:
+        if bool((engine.config.get("debug") or {}).get("api")):
+            engine.debug_log(f"api.hc3 {method.upper()} {url}")
         data, status = engine.api.dispatch_hc3(method, url, lua_to_python(body))
         if data is None:
             return None, status
