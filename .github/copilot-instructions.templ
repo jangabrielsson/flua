@@ -1,24 +1,25 @@
 <!-- 
-  TEMPLATE for QuickApp development workspaces using plua.
+  TEMPLATE for QuickApp development workspaces using flua.
   Copy this file to your workspace as .github/copilot-instructions.md
   Also copy .github/skills/ and .github/instructions/ folders.
 -->
 
-# QuickApp Development with plua
+# QuickApp Development with flua
 
-You are helping develop Fibaro HC3 **QuickApps** using **plua** as the local Lua interpreter and emulator.
+You are helping develop Fibaro HC3 **QuickApps** using **flua** as the local Lua engine and emulator.
 
-## What is plua?
+## What is flua?
 
-plua is a Lua interpreter written in Python (using Lupa) that emulates the Fibaro HC3 QuickApp environment locally. It lets you write, run, and debug QuickApps on your machine without needing a physical HC3.
+flua is a Lua engine for Fibaro HC3 QuickApps (Python + Lupa) that emulates the HC3 locally. It lets you write, run, and debug QuickApps on your machine without needing a physical HC3 — and it can also run online against the real controller, or in proxy mode (`--%%mode:proxy`) where a mirror QA on the HC3 funnels its actions and UI events back to the emulator.
 
-**Install:** `pip install plua`
+**Install:** `pip install fibaro-flua`
 
 **Run a QuickApp:**
 ```bash
-plua --fibaro myQuickApp.lua          # run with Fibaro SDK
-plua --fibaro --run-for 0 myQA.lua   # run indefinitely (Ctrl+C to stop)
-plua --fibaro --nodebugger myQA.lua  # run without debugger (terminal testing)
+flua myQuickApp.lua                      # online by default (HC3 creds from .env)
+flua --api local myQuickApp.lua          # offline sim
+flua --api remote myQuickApp.lua         # the real HC3
+flua --run-for 0 myQA.lua                # run indefinitely (Ctrl+C to stop)
 ```
 
 **Execution control (`--run-for`):**
@@ -27,82 +28,38 @@ plua --fibaro --nodebugger myQA.lua  # run without debugger (terminal testing)
 - `--run-for -30` — run for exactly 30 seconds regardless of timers
 - default — run until no active timers/callbacks remain
 
+## Modes
+
+One directive decides how the emulator talks to the HC3: `--%%mode:online|offline|proxy` (in the QA header, or as a default in a `.directives` file in the working directory). Resolution: an explicit `--api local|remote` flag → the main QA's directives → default online.
+
 ## VS Code Integration
 
-Add this to `.vscode/launch.json` for F5 debugging:
+Use the launch configurations from the flua repo's `.vscode/launch.json` (`Flua: Run Current File`, `Flua: Run Current File (Terminal)`, `Flua: Debug Current File (mobdebug)`). The mobdebug configuration injects a `-e` bootstrap before the script — flua skips it when resolving the main QA's mode, so a `--%%mode:offline` header still wins.
 
-```json
-{
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "Plua: Current Fibaro File",
-      "type": "luaMobDebug",
-      "request": "launch",
-      "workingDirectory": "${workspaceFolder}",
-      "sourceBasePath": "${workspaceFolder}",
-      "listenPort": 8172,
-      "stopOnEntry": false,
-      "sourceEncoding": "UTF-8",
-      "interpreter": "plua",
-      "arguments": ["--fibaro", "--run-for", "0", "${relativeFile}"],
-      "listenPublicly": true
-    }
-  ]
-}
-```
-
-Requires the **LuaMobDebug** VS Code extension.
-
-## QuickApp File Structure
-
-A QuickApp is a single `.lua` file with `--%%` headers at the top:
+## QA file headers
 
 ```lua
 --%%name:My QuickApp
 --%%type:com.fibaro.binarySwitch
---%%var:interval=30
---%%debug:true
---%%desktop:true
-
-function QuickApp:onInit()
-    self:debug(self.name, self.id)
-end
-
-function QuickApp:turnOn()
-    self:updateProperty("value", true)
-end
-
-function QuickApp:turnOff()
-    self:updateProperty("value", false)
-end
+--%%mode:offline              -- offline | online (default) | proxy
+--%%var:count=10              -- QuickApp variable (a Lua expression)
+--%%u:{label="lbl",text="Status"}
+--%%u:{button="btn",text="Go",onReleased="handleBtn"}
+--%%debug:refreshState=true,api=true,http=true
+--%%loglength:120
 ```
 
-## Uploading to a Real HC3
-
-```bash
-plua --tool uploadQA myQuickApp.lua   # upload as new QA
-plua --tool updateQA myQuickApp.lua   # update existing QA (uses --%%project: header)
-```
-
-Requires HC3 connection configured in plua settings.
-
----
+A typo'd directive warns at runtime; `flua --check` reports it with the file context.
 
 ## Skills
 
-Skills are defined as SKILL.md directories in `.github/skills/` and are auto-discovered by VS Code Copilot — no manual registration needed. Type a slash command in chat to load a skill:
+Type a slash command in chat to load detailed reference (see `.github/skills/`):
+`/quickapp-api` · `/quickapp-types` · `/quickapp-patterns` · `/hc3-rest-api` · `/lua-basics` · `/flua-troubleshooting` · `/flua-setup` · `/quickapp-troubleshooting` · `/qwikchild`
 
-- `/quickapp-api` — full fibaro.\*, QuickApp methods, net.HTTPClient, timers
-- `/quickapp-types` — all 40+ device types, UI headers, starter templates
-- `/quickapp-patterns` — timer loops, refreshStates, HTTP, children, state persistence
-- `/hc3-rest-api` — HC3 REST endpoints with examples
-- `/lua-basics` — Lua language reference for non-Lua developers
-- `/plua-troubleshooting` — port conflicts, debugger warnings, common runtime errors
-- `/plua-setup` — install, HC3 credentials, --init-qa, VS Code integration, CLI flags, Lua.diagnostics.globals
-- `/quickapp-troubleshooting` — HTML in labels, UI callbacks, property persistence, HC3 vs plua differences
-- `/hc3vfs` — editing QA files in the VS Code hc3:// virtual filesystem (requires hc3-vfs extension)
-- `/qwikchild` — QwikAppChild library: UID-based children, declarative initChildren, per-child UI, UI event routing
-- `/skill-creator` — create, improve, and evaluate skills
+## Key rules
 
-To use these skills in your workspace, copy `.github/skills/` and `.github/instructions/` from the plua repo. The `instructions/quickapp-dev.instructions.md` file is auto-applied to all `*.lua` files (no registration needed).
+- `self:getVariable()` returns `""` not `nil` when missing
+- `self:updateView()` values must be strings — use `tostring(n)`
+- Never use `fibaro.sleep` — it blocks everything; use `setTimeout`/`setInterval`
+- Online runs exit when idle — use `--%%keep-alive:true` (or proxy mode) to stay alive waiting for HC3 events
+- The QA ids the emulator assigns start at 5000; in proxy mode the QA runs under the proxy's HC3 id

@@ -469,7 +469,6 @@ local listeners = {}
 ---@diagnostic disable-next-line: undefined-field
 function RefreshStateSubscriber:run()
   -- flua: events arrive through the message pump (handlers.refreshStateEvent)
-  -- instead of the plua _PY.newRefreshStatesEvent bridge hack
   _FLUA.refreshStateListeners[self.handle] = true
 end
 

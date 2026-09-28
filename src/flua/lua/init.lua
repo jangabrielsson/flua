@@ -193,7 +193,7 @@ end
 package.preload["mobdebug"] = loadRuntimeMobdebug
 package.preload["vscode-mobdebug"] = loadRuntimeMobdebug
 
--- mobdebug startup, plua-style: opt-in from the CLI (--debugger PORT or
+-- mobdebug startup: opt-in from the CLI (--debugger PORT or
 -- MOBDEBUG_PORT), started before the QAs run so a listening IDE (the VS Code
 -- mobdebug extension) can attach. Failures are non-fatal: without an IDE the
 -- program just runs.
@@ -306,10 +306,10 @@ end
 -- printErr) and a minimal api stub. This gives QA code QuickApp,
 -- QuickAppBase, fibaro, plugin, hub and the fibaro print behavior without
 -- leaking any of it into other QAs. (quickapp.lua defines its own class
--- function per QA; plua needed a separate class.lua for its global
--- emulator code, flua does not.)
+-- function per QA; no separate class file needed for the global
+-- emulator code.
 
--- plua-compatible table helpers used by quickapp.lua
+-- table helpers used by quickapp.lua
 table.copy = function(t)
   if type(t) ~= "table" then return t end
   local r = {}
@@ -331,8 +331,8 @@ _FLUA.mqttHandlers = {}
 -- RefreshStateSubscriber delivery: run() registers the instance handle here
 _FLUA.refreshStateListeners = {}
 
--- HC3-style log lines for fibaro.debug/trace/warning/error, colored like
--- plua: gray date and tag, level in its color (DEBUG=green, TRACE=cyan,
+-- HC3-style log lines for fibaro.debug/trace/warning/error, colored:
+-- gray date and tag, level in its color (DEBUG=green, TRACE=cyan,
 -- WARNING=orange, ERROR=red), plain message.
 --   [dd.mm.yyyy][hh:mm:ss][LEVEL  ][TAG]: message
 -- The timestamp comes from os.date, which reads the engine's virtual clock.

@@ -23,10 +23,10 @@ Full reference for Energy (25), Consumption (6), Climate Panel (7), Humidity Pan
 Terminal examples:
 ```bash
 # Summary for today (shows HTTP status too)
-plua --fibaro --nodebugger -e "json.encodeFormated({api.get('/energy/consumption/summary?period=2026-03-27')})"
+flua --api remote -e "print(json.encode({api.get('/energy/consumption/summary?period=2026-03-27')}))"
 
 # Detail for device 42 on a specific date
-plua --fibaro --nodebugger -e "json.encodeFormated((api.get('/energy/consumption/device/42/detail?period=2026-03-27')))"
+flua --api remote -e "print(json.encode(api.get('/energy/consumption/device/42/detail?period=2026-03-27')))"
 ```
 
 ### Billing Management

@@ -7,8 +7,8 @@ skeleton flua runs **real QuickApps offline** — a simulated HC3 REST API, the
 HC3 runtime libraries, and the full HC3 network surface (HTTP, TCP, UDP,
 WebSocket, MQTT) — all with `lupa` as the only runtime dependency.
 
-A smaller, more targeted rewrite of [plua](https://github.com/jangabrielsson/plua)
-with the architecture lessons from it baked in.
+It grew out of an earlier emulator prototype; flua stands on its own —
+the same file runs in the emulator and on a real HC3.
 
 **QA developers start at [USAGE.md](USAGE.md)** — install, VS Code setup,
 directives, multi-file QAs, the offline HC3, and deploying to the HC3.
@@ -44,7 +44,7 @@ Requires Python 3.11+. `lupa` is the only runtime dependency.
 .venv/bin/flua --run-for -3 script.lua   # exactly 3 virtual s
 
 # ANSI colors on QA log lines (debug=green, trace=cyan, warning=orange,
-# error=red — plua style): always (default), auto, never
+# error=red): always (default), auto, never
 .venv/bin/flua --color always script.lua
 
 # simulated HC3 (offline): seed the REST API with a house
@@ -109,7 +109,7 @@ Every Lua file is a QuickApp, like on the HC3 — it gets the real `QuickApp`/
   on that QA's own `_FLUA.config` — so `--%%name:qa1` appears as
   `_FLUA.config.name` for that QA only, stable even in deferred reads.
   Directives form a header; parsing stops at the end-of-header comment
-  `-- --------------- EOH ---------------` (plua convention), so `--%%`
+  `-- --------------- EOH ---------------` convention, so `--%%`
   lines later in the file (e.g. inside inline QA code) are ignored.
 - **Dynamic loading.** A QA can install and run another QA at runtime —
   handy from VS Code, where you only launch one QA:
@@ -305,7 +305,7 @@ pump. The only deliberately blocking main-thread calls are the debugger's
 sockets — that is what makes debugger pauses freeze time.
 
 Everything else is cooperative: timer callbacks run on the event loop, so a
-long-running callback delays everything else, exactly like plua and like the
+long-running callback delays everything else, exactly like the
 Fibaro QuickApp model.
 
 ## Files
@@ -477,17 +477,15 @@ These calls run on the main thread and may block the asyncio loop — that is
 the one deliberate exception to flua's message-passing model, and it is what
 makes debugger pauses freeze time. All other I/O stays on the message model.
 
-## Differences from plua
+## Design notes
 
 - No FastAPI subprocess and no telnet/REPL — the offline HC3 API is served
   by the same in-process dispatch the QAs use (an external HTTP server can
   be added later as a second transport over the same layer).
-- No third-party network dependencies — plua used aiohttp/aiomqtt; flua
-  implements HTTP (urllib), RFC 6455 WebSockets, and MQTT 3.1.1 over
-  stdlib sockets in worker threads.
-- plua calls `_PY.timerExpired(id)` directly from timer callbacks; flua
-  delivers a `timerExpired` message through the pump instead. The call shape
-  is identical but the entry is single and the protocol is serializable.
+- No third-party network dependencies — HTTP (urllib), RFC 6455
+  WebSockets, and MQTT 3.1.1 run over stdlib sockets in worker threads.
+- Timer completion is delivered as a `timerExpired` message through the
+  pump — a single entry point, and the protocol is serializable.
 - Timer IDs are Lua callback IDs (integers), not UUIDs.
 - Keep-alive is computed entirely on the Python side
   (`engine.has_pending_work()`), not by Lua-side counters.

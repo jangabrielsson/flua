@@ -11,45 +11,48 @@ Condensed reference for the most-used Fibaro HC3 REST API endpoints. In QuickApp
 
 ## Querying the live HC3 from the terminal
 
-Use `plua --fibaro -e "..."` to run one-off API queries against the real HC3 without writing a script. Credentials are taken from plua's existing HC3 configuration.
+Use `flua --api remote -e "..."` to run one-off API queries against the
+real HC3 without writing a script. Credentials come from the .env chain.
 
-Two patterns for handling `api.get`'s two return values (data, httpStatus):
+`api.get` returns two values (data, httpStatus); passing it straight to
+`json.encode` keeps the data (the first value):
 
 ```bash
-# Pattern 1: ((...)) — discard HTTP status, clean JSON output
-plua --fibaro --nodebugger -e "json.encodeFormated((api.get('/devices/45')))"
+# Pattern 1: clean JSON output
+flua --api remote -e "print(json.encode(api.get('/devices/45')))"
 
-# Pattern 2: {...} — include HTTP status as second element (useful for debugging)
-plua --fibaro --nodebugger -e "json.encodeFormated({api.get('/devices/45')})"
+# Pattern 2: include the HTTP status as the second element (useful for debugging)
+flua --api remote -e "print(json.encode({api.get('/devices/45')}))"
 # Output: [ <data>, 200 ]
 ```
 
-Use Pattern 2 when you want to confirm the endpoint succeeded (status 200) vs returned an error.
+Use Pattern 2 when you want to confirm the endpoint succeeded (status 200)
+vs returned an error.
 
 ```bash
 # List all QuickApps
-plua --fibaro --nodebugger -e "json.encodeFormated((api.get('/devices?interface=quickApp')))"
+flua --api remote -e "print(json.encode(api.get('/devices?interface=quickApp')))"
 
 # List all devices of a specific type
-plua --fibaro --nodebugger -e "json.encodeFormated((api.get('/devices?type=com.fibaro.binarySwitch')))"
+flua --api remote -e "print(json.encode(api.get('/devices?type=com.fibaro.binarySwitch')))"
 
 # Get a specific device property
-plua --fibaro --nodebugger -e "json.encodeFormated((api.get('/devices/45/properties/value')))"
+flua --api remote -e "print(json.encode(api.get('/devices/45/properties/value')))"
 
 # Get all QA variables for device 45
-plua --fibaro --nodebugger -e "json.encodeFormated((api.get('/plugins/45/variables')))"
+flua --api remote -e "print(json.encode(api.get('/plugins/45/variables')))"
 
 # Get a global variable
-plua --fibaro --nodebugger -e "json.encodeFormated((api.get('/globalVariables/myVar')))"
+flua --api remote -e "print(json.encode(api.get('/globalVariables/myVar')))"
 
 # Energy consumption summary (period is a date: YYYY-MM-DD)
-plua --fibaro --nodebugger -e "json.encodeFormated({api.get('/energy/consumption/summary?period=2026-03-27')})"
+flua --api remote -e "print(json.encode({api.get('/energy/consumption/summary?period=2026-03-27')}))"
 
 # List all rooms
-plua --fibaro --nodebugger -e "json.encodeFormated((api.get('/rooms')))"
+flua --api remote -e "print(json.encode(api.get('/rooms')))"
 
 # List all scenes
-plua --fibaro --nodebugger -e "json.encodeFormated((api.get('/scenes')))"
+flua --api remote -e "print(json.encode(api.get('/scenes')))"
 ```
 
 Use this to inspect real device structures before writing code that reads or updates them.

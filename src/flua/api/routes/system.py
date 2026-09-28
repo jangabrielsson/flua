@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from ... import messages
 from ..request import ApiRequest
 from ..state import SimState, public
 
@@ -27,15 +28,20 @@ def global_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     if not isinstance(req.body, dict) or "value" not in req.body:
         return None, 400
     name = req.path_params["name"]
-    value = req.body["value"]
+    value = "" if req.body["value"] is None else str(req.body["value"])
+    existing = state.global_variables.get(name)
+    old_value = existing.get("value") if existing is not None else None
     var = {
         "name": name,
-        "value": "" if value is None else str(value),
+        "value": value,
         # modified is the sim's current time (os.time() in QA code), like the
         # HC3 stamps writes with the controller clock
         "modified": int(_now(req)),
     }
     state.global_variables[name] = var
+    entry = state.record_global_changed(name, value, old_value, _now(req))
+    if entry is not None and req.emit is not None:
+        req.emit(messages.refresh_state_event(entry))
     return public(var), 200
 
 
@@ -51,7 +57,22 @@ def globals_create(state: SimState, req: ApiRequest) -> tuple[Any, int]:
         "modified": int(_now(req)),
     }
     state.global_variables[name] = var
+    entry = state.record_global_added(name, var["value"], _now(req))
+    if req.emit is not None:
+        req.emit(messages.refresh_state_event(entry))
     return public(var), 200
+
+
+def global_delete(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # DELETE /globalVariables/{name} — fibaro.deleteGlobalVariable
+    name = req.path_params["name"]
+    var = state.global_variables.pop(name, None)
+    if var is None:
+        return None, 404
+    entry = state.record_global_removed(name, _now(req))
+    if req.emit is not None:
+        req.emit(messages.refresh_state_event(entry))
+    return None, 204
 
 
 def rooms_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:

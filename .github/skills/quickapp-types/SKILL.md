@@ -1,22 +1,22 @@
 ---
 name: quickapp-types
-description: All Fibaro device types (40+ types: switches, sensors, climate, covers, controllers), plua file headers (--%%name, --%%type, --%%var, --%%u:, --%%debug, etc.), UI element syntax (label, button, slider, switch, select, multi), and minimal starter templates for each device category. USE FOR: creating a new QuickApp, choosing the right device type (e.g. "what type for a temperature sensor?"), defining UI elements, understanding required actions per device type.
+description: All Fibaro device types (40+ types: switches, sensors, climate, covers, controllers), flua file headers (--%%name, --%%type, --%%var, --%%u:, --%%debug, etc.), UI element syntax (label, button, slider, switch, select, multi), and minimal starter templates for each device category. USE FOR: creating a new QuickApp, choosing the right device type (e.g. "what type for a temperature sensor?"), defining UI elements, understanding required actions per device type.
 ---
 
 # QuickApp Device Types and Headers
 
-Reference for all plua QuickApp file headers and the complete set of Fibaro device types.
+Reference for all flua QuickApp file headers and the complete set of Fibaro device types.
 
 Starter Lua templates are in the [`templates/`](./templates/) directory — reference them when the user needs a working skeleton for a specific device type.
 
 ---
 
-## plua Header Syntax
+## flua Header Syntax
 
 ```lua
 --%%key:value
 ```
-Headers are Lua comments processed by plua before execution. All headers must appear before any Lua code.
+Headers are Lua comments processed by flua before execution. All headers must appear before any Lua code.
 
 ---
 
@@ -52,7 +52,7 @@ Headers are Lua comments processed by plua before execution. All headers must ap
 ```lua
 --%%file:./lib/utils.lua,utils   -- include external Lua file (path, module name)
 ```
-To include a plua library file, use `--%%file:$fibaro.lib.libraryName,alias` (e.g. `--%%file:$fibaro.lib.qwikchild,qwikchild`)
+To include a library file, use `--%%file:$fibaro.lib.libraryName,alias` (e.g. `--%%file:$fibaro.lib.qwikchild,qwikchild`)
 
 ## Development & Debug Headers
 

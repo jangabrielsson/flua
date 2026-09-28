@@ -275,7 +275,7 @@ function MyChild:doSomething()
 end
 ```
 
-> **For more advanced child management** — UID-based addressing, declarative `initChildren`, per-child UI, and `internalStorage` per child — use the plua **QwikAppChild** library. Ask `/qwikchild` for full details.
+> **For more advanced child management** — UID-based addressing, declarative `initChildren`, per-child UI, and `internalStorage` per child — use the **QwikAppChild** library. Ask `/qwikchild` for full details.
 
 ---
 

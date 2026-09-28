@@ -104,6 +104,11 @@ class Api:
             # (they mutate the running QAs, not the static sim state)
             return self._quickapp(method, segments, body)
         path = "/" + "/".join(segments)
+        # A QA pinned offline (--%%mode:offline) never sees the HC3: its
+        # remote hook is None, so handlers (list unions, proxy forwarding)
+        # and the 404 fallback all stay in the sim.
+        offline = self._engine is not None and self._engine.qa_is_offline(qa_id)
+        remote_hook = self._remote_hook if (self._remote is not None and not offline) else None
         for route_method, regex, params, handler in _COMPILED:
             if route_method != method:
                 continue
@@ -120,37 +125,29 @@ class Api:
                 clock=self._engine.clock if self._engine is not None else None,
                 qa_id=qa_id,
                 external=external,
-                remote=self._remote_hook if self._remote is not None else None,
+                remote=remote_hook,
             )
             try:
                 data, status = handler(self.state, req)
             except Exception:
                 logger.exception("api handler failed for %s %s", method, url)
                 return None, 500
-            offline = self._engine is not None and self._engine.qa_is_offline(req.qa_id)
             flua_id = (
                 len(segments) >= 2
                 and segments[0] in ("devices", "plugins")
                 and self.state.is_flua_id(segments[1])
             )
-            if (
-                data is None
-                and status == 404
-                and self._remote is not None
-                and not offline
-                and not flua_id
-            ):
+            if data is None and status == 404 and remote_hook is not None and not flua_id:
                 # the sim doesn't own this entity — ask the real HC3
                 return self._remote.request(method, path, query, body)
             return data, status
         logger.debug("no offline route for %s %s", method, url)
-        offline = self._engine is not None and self._engine.qa_is_offline(qa_id)
         flua_id = (
             len(segments) >= 2
             and segments[0] in ("devices", "plugins")
             and self.state.is_flua_id(segments[1])
         )
-        if self._remote is not None and not offline and not flua_id:
+        if remote_hook is not None and not flua_id:
             # online mode: anything the sim doesn't own goes to the real HC3
             return self._remote.request(method, path, query, body)
         return None, 404

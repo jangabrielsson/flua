@@ -2,63 +2,37 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Plua, upload current file as QA to HC3-",
+      "label": "flua, check current file",
       "type": "shell",
-      "command": "./run.sh",
+      "command": "flua",
       "args": [
-        "--tool",
-        "uploadQA",
+        "--check",
         "${relativeFile}"
       ],
       "group": "build"
     },
     {
-      "label": "Plua, update single file (part of .project)",
+      "label": "flua, run current file (offline)",
       "type": "shell",
-      "command": "plua",
+      "command": "flua",
       "args": [
-        "--tool",
-        "updateFile",
+        "--api",
+        "local",
         "${relativeFile}"
       ],
       "group": "build"
     },
     {
-      "label": "Plua, update QA (defined in .project)",
+      "label": "flua, export current file as .fqa",
       "type": "shell",
-      "command": "plua",
+      "command": "flua",
       "args": [
-        "--tool",
-        "updateQA",
-        "${relativeFile}"
+        "export",
+        "${relativeFile}",
+        "-o",
+        "${relativeFileDirname}/${relativeFileBasenameNoExtension}.fqa"
       ],
       "group": "build"
-    },
-    {
-      "label": "Plua, Download and unpack from HC3",
-      "type": "shell",
-      "command": "plua",
-      "args": [
-        "--tool",
-        "downloadQA",
-        "${input:QA_id}",
-        "${input:path_id}",
-      ],
-      "group": "build"
-    }
-  ],
-  "inputs": [
-    {
-      "type": "promptString",
-      "id": "QA_id",
-      "description": "deviceId of QA from HC3 you want to download?",
-      "default": "-"
-    },
-    {
-      "type": "promptString",
-      "id": "path_id",
-      "description": "path where to store the QA",
-      "default": "dev"
     }
   ]
 }

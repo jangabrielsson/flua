@@ -7,8 +7,8 @@ while paused at a breakpoint, no timer callbacks fire and time effectively
 stops for Lua. This is the one documented exception to flua's message-passing
 model (direct calls that may block the loop).
 
-Single-threaded by design: no locks, no cross-thread plumbing (unlike plua's
-version, which carries a threading lock it never actually needs).
+Single-threaded by design: no locks, no cross-thread plumbing (unlike the
+earlier version, which carried a threading lock it never actually needed).
 """
 
 import logging

@@ -162,10 +162,10 @@ def child_device_remove(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     """DELETE /plugins/removeChildDevice/{id}: remove a QA's child device.
 
     Proxy mode: the HC3 owns the child — the delete is mirrored there and
-    the local shadow is dropped (plua: Emu.DIR[id]=nil + hc3api.delete).
+    the local shadow is dropped.
     Unknown ids 404; the dispatcher forwards those to the real HC3 online
     (a child created there outside the emulator). Non-children 501, like
-    plua's NOT_IMPLEMENTED.
+    NOT_IMPLEMENTED on the HC3.
     """
     dev = state.device(req.path_params["id"])
     if dev is None:
@@ -199,7 +199,7 @@ def plugin_update_property(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     if state.is_proxy(dev["id"]):
         # the HC3 owns the device: push the update there and DON'T emit a
         # local refresh event — the HC3 proxy emits DevicePropertyUpdatedEvent
-        # and the poll mirrors it back (plua caveat 1: exactly one event)
+        # and the poll mirrors it back (caveat 1: exactly one event)
         forward_to_proxy(req, True)
         return None, 204
     entry = state.record_property_event(dev["id"], name, req.body.get("value"), old, _now(req))

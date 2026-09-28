@@ -244,10 +244,10 @@ def _resolve_runtime(
 def _start_debugger(engine: LuaEngine, port: int) -> None:
     """Attach mobdebug before the QAs run. Failures are non-fatal.
 
-    The Lua-side pattern lives in lua/init.lua (`_FLUA.startDebugger`,
-    plua-style). While the debugger is paused at a breakpoint, its blocking
-    socket receive freezes the asyncio loop, so Lua timers stop — time stands
-    still until the debugger resumes the program.
+    The Lua-side pattern lives in lua/init.lua (`_FLUA.startDebugger`). While
+    the debugger is paused at a breakpoint, its blocking socket receive
+    freezes the asyncio loop, so Lua timers stop — time stands still until
+    the debugger resumes the program.
     """
     engine.execute(f"_FLUA.startDebugger('localhost', {int(port)})")
 
@@ -306,7 +306,7 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         # header over the .directives defaults) — --%%mode:offline selects
         # the sim, --%%mode:online|proxy the HC3. An explicit --api flag
         # always wins, and the default (no directive anywhere) is ONLINE —
-        # offline is opt-in, like plua's --offline flag.
+        # offline is opt-in.
         api_mode = args.api
         if api_mode is None and qa_specs:
             # the FIRST spec may be an injected -e bootstrap (the mobdebug
@@ -399,7 +399,7 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         engine.post(
             messages.log(
                 "info",
-                f"flua {__version__} ({engine.lua_version()}, "
+                f"🚀 flua {__version__} ({engine.lua_version()}, "
                 f"Python {sys.version.split()[0]}), mode {mode}",
             )
         )

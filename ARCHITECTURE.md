@@ -200,7 +200,8 @@ carry generated `--%%` headers, so imports load like any other QA.
 
 `Hc3Remote` (stdlib urllib) speaks basic auth and the **raw-body import
 transport** (`POST /quickApp/` with the fqa JSON string — the swagger's
-multipart description is misleading; plua verified the real transport).
+multipart description is misleading; the real transport was verified against a
+live HC3).
 Two safety rules:
 
 - **The lockout guard**: any 401/403 aborts flua immediately and is never

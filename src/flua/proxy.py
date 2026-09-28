@@ -1,13 +1,14 @@
-"""Proxy mode: mirror a flua QA onto the real HC3 (plua's ``proxy.lua`` in Python).
+"""Proxy mode: mirror a flua QA onto the real HC3 (the proxy concept, implemented in Python).
 
 When a QA carries ``--%%mode:proxy`` (online mode only), flua deploys a proxy
 QuickApp on the HC3 named ``<QA name>_Proxy`` with the same device type as the
 emulated QA. The proxy funnels every device action and UI event back to the
 emulator over plain HTTP, and flua pushes property/view updates to the proxy so
 it always reflects the emulated QA's state. The emulated QA runs with the
-proxy's HC3 device id, so the two are treated as one device (plua caveat 2).
+proxy's HC3 device id, so the two are treated as one device (caveat 2: same
+deviceID).
 
-The HC3 side is the standard plua proxy QuickApp (``PROXY_LUA``): a CONNECT
+The HC3 side is a small proxy QuickApp (``PROXY_LUA``): a CONNECT
 action stores the emulator's ip:port (in internal storage, so it survives
 proxy restarts), an actionHandler forwards every action to
 ``http://ip:port/api/devices/<id>/action/<name>``, a UIHandler forwards UI
@@ -41,7 +42,7 @@ logger = logging.getLogger(__name__)
 # Overridable through the environment chain: FLUA_PROXY_PORT.
 PROXY_PORT_DEFAULT = 8080
 
-# The QuickApp code installed on the HC3 proxy device. Standard plua proxy:
+# The QuickApp code installed on the HC3 proxy device:
 # the only device-specific bits are the name and the type, which live in the
 # .fqa envelope, not in this code.
 PROXY_LUA = r"""-- flua proxy QuickApp (installed by --%%mode:proxy)
@@ -118,7 +119,7 @@ function QuickApp:initChildDevices(_) end
 
 
 def local_ip() -> str:
-    """The LAN address the HC3 proxy should call back to (plua's get_local_ip).
+    """The LAN address the HC3 proxy should call back to.
 
     UDP-connects to a public address to learn the outbound interface, then
     falls back to the hostname, then loopback. Never sends actual data.
@@ -207,7 +208,7 @@ def deploy_proxy(
     device, status = engine.api.dispatch_hc3("POST", "/quickApp", {"file": encoded})
     if status not in (200, 201) or not isinstance(device, dict):
         return None
-    device["id"] = int(device["id"])  # plua: math.floor(device.id)
+    device["id"] = int(device["id"])
     return device
 
 
@@ -256,8 +257,8 @@ def sync_proxy_ui(
 
     The user may have edited the --%%u directives since the proxy was
     deployed, so every connect refreshes the HC3 device's UI properties —
-    plua's updateQAparts/UI mechanism, applied always instead of behind a
-    --%%proxyupdate flag. One PUT /devices/{id} with the properties object;
+    applied always instead of behind a --%%proxyupdate flag. One
+    PUT /devices/{id} with the properties object;
     the HC3 emits the property events and the poll mirrors them back
     (caveat 1: no local duplicates).
 
@@ -292,7 +293,7 @@ def register_proxy_children(engine: LuaEngine, device_id: int) -> None:
     (our proxy), which funnels them back to the emulator. The emulated QA
     finds its children with ``api.get("/devices?parentId="..self.id)`` and
     builds QuickAppChild instances for them, so shadow children must exist
-    locally with the same deviceIds (plua's existingProxy child loop) — they
+    locally with the same deviceIds — they
     are pure data: the place property updates land and callbacks route to.
     """
     children, status = engine.api.dispatch_hc3("GET", f"/devices?parentId={int(device_id)}")

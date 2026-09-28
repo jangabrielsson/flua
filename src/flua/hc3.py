@@ -71,7 +71,7 @@ class Hc3Remote:
         payload = None
         if body is not None:
             if isinstance(body, str):
-                # raw string bodies go verbatim — plua's api.post data path
+                # raw string bodies go verbatim — the api.post data path
                 # (httpx content=); no Content-Type, like httpx.
                 payload = body.encode("utf-8")
             elif (
@@ -82,7 +82,7 @@ class Hc3Remote:
             ):
                 # flua's offline convention {file = base64, roomId}: the real
                 # HC3 takes the .fqa as the raw JSON body (verified against
-                # plua's uploadFQA: api.hc3.post("/quickApp/", fqaString)).
+                # the uploadFQA call: api.hc3.post("/quickApp/", fqaString)).
                 # roomId rides the query string.
                 try:
                     raw = str(body["file"])

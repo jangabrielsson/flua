@@ -6,7 +6,7 @@ Format (valid Lua comments, so the file still runs anywhere):
     --%%name:sub1=val1,sub2=val2,...
 
 Directives form a header at the top of the file. Parsing stops at the
-end-of-header comment (the plua convention), so ``--%%`` lines that appear
+end-of-header comment (the EOH convention), so ``--%%`` lines that appear
 later in the file — e.g. inside inline QA code passed to
 ``_FLUA.loadQAfromString`` — are not picked up:
 
@@ -15,7 +15,7 @@ later in the file — e.g. inside inline QA code passed to
     local inner = [[ --%%name:inner ]]
 
 Values may be booleans (true/false), numbers, nil, quoted strings, or bare
-strings. Parsed here in Python (unlike plua, which parses in Lua); the result
+strings. Parsed here in Python; the result
 drives the engine's runtime settings and is also exposed to Lua as
 ``_PY.config``.
 """
@@ -109,7 +109,7 @@ def parse_lua_literal(text: str) -> Any:
 
     ``{key=value,...}`` becomes a dict, ``{a,b,...}`` a list. Values may be
     quoted strings (``'..'`` or ``".."``), numbers, true/false/nil, nested
-    tables, or bare identifiers (kept as strings — plua's Lua evaluation
+    tables, or bare identifiers (kept as strings — a Lua evaluation
     would silently turn them into nil). This is deliberately NOT a full Lua
     expression evaluator: no function calls, operators, or env lookups.
     """
@@ -236,7 +236,7 @@ def _brace_balance(text: str) -> int:
 
 def _join_ui_continuations(source: str) -> str:
     """Merge multi-line ``--%%u`` directives: while the directive's table is
-    brace-unbalanced, absorb the following plain comment lines (plua-style
+    brace-unbalanced, absorb the following plain comment lines
     continuations like ``--      options={...}``) into the value."""
     lines = source.splitlines()
     out: list[str] = []
@@ -277,7 +277,7 @@ def parse_annotations(source: str, warn_unknown: bool = True) -> dict[str, Any]:
     for line in source.splitlines():
         stripped = line.strip()
         if _is_eoh(stripped):
-            break  # end of the --%% header (plua EOH convention)
+            break  # end of the --%% header (EOH convention)
         if not stripped.startswith("--%%"):
             continue
         body = stripped[4:].strip()
@@ -330,7 +330,7 @@ def parse_annotations(source: str, warn_unknown: bool = True) -> dict[str, Any]:
             # --%%u:{element...} — one UI row per directive; repeated
             # directives collect in order (like --%%file). The value is a Lua
             # table literal; multi-line rows were joined upstream. A trailing
-            # " -- comment" is stripped (plua behavior).
+            # " -- comment" is stripped.
             match = re.match(r"^(.*)\s+--\s+(.*)$", value)
             if match:
                 value = match.group(1).rstrip()

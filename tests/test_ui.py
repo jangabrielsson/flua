@@ -1,6 +1,6 @@
 """The --%%u translator: rows -> uiCallbacks + viewLayout + uiView.
 
-Structural goldens mirror plua's src/lua/fibaro/ui.lua output, verified
+Structural goldens mirror the UI compiler's output, verified
 against the shapes the real HC3 stores in device properties.
 """
 

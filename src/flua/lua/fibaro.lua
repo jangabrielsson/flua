@@ -406,6 +406,14 @@ function fibaro.setGlobalVariable(name, value)
   return api.put("/globalVariables/"..name, {value=tostring(value), invokeScenes=true})
 end
 
+-- Deletes a global variable.
+-- @param name - The name of the global variable.
+-- @return The result of the API call.
+function fibaro.deleteGlobalVariable(name)
+  __assert_type(name, 'string')
+  return api.delete("/globalVariables/"..name)
+end
+
 -- Executes or kills scenes.
 -- @param action - The action to perform ("execute" or "kill").
 -- @param ids - A table of scene IDs.

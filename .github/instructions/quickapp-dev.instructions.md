@@ -4,20 +4,20 @@ applyTo: "**/*.lua"
 
 # QuickApp Development — Quick Reference
 
-You are helping develop Fibaro HC3 QuickApps run under **plua** (a Lua interpreter written in Python).
+You are helping develop Fibaro HC3 QuickApps run under **flua** (a Lua engine for QuickApps, emulating the HC3 locally and online).
 
 ## File headers (must be at top of file)
 ```lua
 --%%name:My QuickApp          -- device display name
 --%%type:com.fibaro.binarySwitch  -- Fibaro device type
+--%%mode:offline              -- offline | online (default) | proxy
 --%%var:myKey="myValue"       -- QuickApp variable (value is Lua: strings need quotes)
 --%%var:count=10              -- numbers work without quotes
 --%%u:{label="lbl",text="Status"}  -- UI element (one per row)
 --%%u:{button="btn",text="Go",onReleased="handleBtn"}
 --%%u:{slider="s1",text="",min="0",max="100",value="50",onChanged="handleSlider"}
---%%debug:true                -- verbose debug
---%%desktop:true              -- open UI window
---%%offline:true              -- no HC3 connection needed
+--%%debug:refreshState=true,api=true,http=true  -- debug logging categories
+--%%loglength:120             -- debug line length cap
 ```
 
 ## QuickApp skeleton
@@ -75,19 +75,21 @@ json.encode(table)  /  json.decode(string)
 `com.fibaro.doorSensor` · `com.fibaro.deviceController` · `com.fibaro.thermostat`
 
 ## Querying live HC3 state
-Use `plua --fibaro -e "..."` in the terminal to inspect the real HC3 — credentials are already configured. The double parentheses prevent the HTTP status code from being passed as a second argument to `json.encodeFormated`.
+Use `flua --api remote -e "..."` in the terminal to inspect the real HC3 —
+credentials come from the .env chain. `api.get` returns (data, status);
+passing it to `json.encode` keeps the data (the first value).
 ```bash
 # Get a device's full structure
-plua --fibaro -e "json.encodeFormated((api.get('/devices/45')))"
+flua --api remote -e "print(json.encode(api.get('/devices/45')))"
 # List all QuickApps
-plua --fibaro -e "json.encodeFormated((api.get('/devices?interface=quickApp')))"
+flua --api remote -e "print(json.encode(api.get('/devices?interface=quickApp')))"
 # Get a global variable
-plua --fibaro -e "json.encodeFormated((api.get('/globalVariables/myVar')))"
+flua --api remote -e "print(json.encode(api.get('/globalVariables/myVar')))"
 # Get QA variables for device 45
-plua --fibaro -e "json.encodeFormated((api.get('/plugins/45/variables')))"
+flua --api remote -e "print(json.encode(api.get('/plugins/45/variables')))"
 ```
 Run these to understand the actual structure before writing code that reads or updates it.
 
 ## Available skills
 Type a slash command in chat to load detailed reference:
-`/quickapp-api` · `/quickapp-types` · `/quickapp-patterns` · `/hc3-rest-api` · `/lua-basics` · `/plua-troubleshooting` · `/plua-setup` · `/quickapp-troubleshooting`
+`/quickapp-api` · `/quickapp-types` · `/quickapp-patterns` · `/hc3-rest-api` · `/lua-basics` · `/flua-troubleshooting` · `/flua-setup` · `/quickapp-troubleshooting`

@@ -235,6 +235,48 @@ class SimState:
         self.events.append((self._refresh_seq, {"type": "CustomEvent", "data": {"name": name}}))
         self.custom_events.append({"name": name})
 
+    # -- global variables --------------------------------------------------------
+
+    def record_global_event(
+        self, event_type: str, data: dict[str, Any], now: float
+    ) -> dict[str, Any]:
+        """A global-variable event (Added/Changed/Removed): the real HC3
+        carries a lighter envelope for these — no objects/sourceId, like the
+        samples captured from a live controller."""
+        self._refresh_seq += 1
+        entry = {
+            "type": event_type,
+            "created": int(now),
+            "createdMillis": int(now * 1000),
+            "sourceType": "system",
+            "data": data,
+        }
+        self.events.append((self._refresh_seq, entry))
+        return entry
+
+    def record_global_added(self, name: str, value: Any, now: float) -> dict[str, Any]:
+        return self.record_global_event(
+            "GlobalVariableAddedEvent", {"variableName": name, "value": value}, now
+        )
+
+    def record_global_changed(
+        self, name: str, new_value: Any, old_value: Any, now: float
+    ) -> dict[str, Any] | None:
+        """GlobalVariableChangedEvent — emitted only when the value actually
+        changes (Lua equality, like device property events)."""
+        if _lua_equal(new_value, old_value):
+            return None
+        return self.record_global_event(
+            "GlobalVariableChangedEvent",
+            {"variableName": name, "oldValue": old_value, "newValue": new_value},
+            now,
+        )
+
+    def record_global_removed(self, name: str, now: float) -> dict[str, Any]:
+        return self.record_global_event(
+            "GlobalVariableRemovedEvent", {"variableName": name}, now
+        )
+
     # -- QA registration --------------------------------------------------------
 
     def register_qa(

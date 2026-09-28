@@ -137,10 +137,20 @@ def test_examples_qa_pair_calls_each_other() -> None:
     assert "qa3: turned off" in result.stdout
 
 
-def test_example_api_first_qa_gets_5000_and_getvalue() -> None:
-    # fibaro.getValue(self.id, "value") — the QA's OWN device, first QA = 5000
+def test_example_api_first_qa_gets_5000_and_getvalue(tmp_path) -> None:
+    # fibaro.getValue(self.id, "value") — the QA's OWN device, first QA = 5000.
+    # Self-contained script (examples/api.lua is a run-forever demo now, and
+    # shared example files must not couple the suite to their lifetime).
+    script = tmp_path / "api-demo.lua"
+    script.write_text(
+        "--%%name:api-demo\n"
+        "--%%type:com.fibaro.multilevelSwitch\n"
+        "function QuickApp:onInit()\n"
+        "  print('Value:', fibaro.getValue(self.id, 'value'))\n"
+        "end\n"
+    )
     result = subprocess.run(
-        [sys.executable, "-m", "flua", "--api", "local", "examples/api.lua"],
+        [sys.executable, "-m", "flua", "--api", "local", str(script)],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -148,13 +158,17 @@ def test_example_api_first_qa_gets_5000_and_getvalue() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "[api-demo5000]" in result.stdout
-    assert "Value: false" in result.stdout
+    assert "Value: 0" in result.stdout  # the multilevelSwitch skeleton default
 
 
-def test_mobdebug_e_bootstrap_does_not_consume_qa_id() -> None:
+def test_mobdebug_e_bootstrap_does_not_consume_qa_id(tmp_path) -> None:
     # the VS Code mobdebug extension launches interpreters as
     # -l <package> -e "<debugger bootstrap>" <script> — the bootstrap must
     # run as a main-state preamble, NOT as QA 5000, so the script keeps 5000
+    script = tmp_path / "api-demo.lua"
+    script.write_text(
+        "--%%name:api-demo\nfunction QuickApp:onInit() print('BOOT') end\n"
+    )
     result = subprocess.run(
         [
             sys.executable,
@@ -166,7 +180,7 @@ def test_mobdebug_e_bootstrap_does_not_consume_qa_id() -> None:
             "mobdebug",
             "-e",
             'require("mobdebug")',
-            "examples/api.lua",
+            str(script),
         ],
         cwd=REPO_ROOT,
         capture_output=True,
@@ -294,7 +308,7 @@ async def test_dynamic_load_from_string(tmp_path, capsys) -> None:
 @pytest.mark.asyncio
 async def test_inline_qa_directives_do_not_leak(tmp_path, capsys) -> None:
     # --%% lines inside an inline QA string must not bleed into the outer
-    # QA's config; the EOH comment ends the outer header (plua convention).
+    # QA's config; the EOH comment ends the outer header.
     loader = tmp_path / "loader.lua"
     loader.write_text(
         "--%%name:outer\n"
@@ -380,7 +394,7 @@ def test_fibaro_log_lines_are_hc3_styled(tmp_path) -> None:
     assert re.search(stamp + r"\[TRACE  \]\[TAG\]: Test trace", plain_text)
     assert re.search(stamp + r"\[WARNING\]\[TAG\]: Test warning", plain_text)
     assert re.search(stamp + r"\[ERROR  \]\[TAG\]: Test error", plain_text)
-    # plua-style palette: green DEBUG, cyan TRACE, orange WARNING, red ERROR,
+    # the palette: green DEBUG, cyan TRACE, orange WARNING, red ERROR,
     # gray date/tag — colors are on by default
     assert "\x1b[32m" in result.stdout
     assert "\x1b[36m" in result.stdout

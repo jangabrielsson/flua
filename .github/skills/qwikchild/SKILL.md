@@ -5,7 +5,7 @@ description: How to use the QwikAppChild library (--%%file:$fibaro.lib.qwikchild
 
 # QwikAppChild Library
 
-`QwikAppChild` is a plua built-in library that extends Fibaro's `QuickAppChild` with UID-based child management, declarative child definitions, per-child UI support, and automatic UI event routing.
+`QwikAppChild` is a built-in library that extends Fibaro's `QuickAppChild` with UID-based child management, declarative child definitions, per-child UI support, and automatic UI event routing.
 
 ## Include It
 
@@ -287,5 +287,5 @@ end
 - **`quickApp = self`** must be set at the top of `onInit` — the library internally references the `quickApp` global.
 - **`function self.initChildDevices() end`** — always suppress the default Fibaro child init to prevent double-init when using this library.
 - **`initChildren` recreates children** — it deletes any child with a matching UID and creates a fresh one. On a real HC3, child device IDs change on recreation. Use `loadExistingChildren` if you want to preserve IDs between restarts.
-- **plua offline mode warning** — `initChildren` prints a warning if running in plua without a state file, because children are re-created on every run (IDs change). Use `--%%save:state.json` to persist state.
+- **flua offline mode warning** — `initChildren` prints a warning if running in flua without a state file, because children are re-created on every run (IDs change). Use `--%%save:state.json` to persist state.
 - **UID uniqueness** — UIDs must be unique within a parent QA. The library uses them as stable identifiers; duplicate UIDs cause the old child to be deleted.

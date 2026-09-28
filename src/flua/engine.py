@@ -327,7 +327,8 @@ class LuaEngine:
 
         Proxy mode (--%%mode:proxy, online only) resolves the proxy device on
         the HC3 FIRST, before the id is assigned: the emulated QA runs under
-        the proxy's HC3 id, so the two are treated as one device (plua caveat 2).
+        the proxy's HC3 id, so the two are treated as one device (caveat 2: same
+        deviceID).
         """
         qa_config = _apply_mode(dict(qa_config))  # mode/offline/proxy -> flags
         name = qa_config.get("name")
@@ -337,7 +338,7 @@ class LuaEngine:
             name = Path(arg0).stem if arg0.endswith(".lua") else f"QA{self._next_qa_id}"
             qa_config["name"] = name
         # Proxy mode needs the real HC3; offline it degrades to a plain QA
-        # with a warning (plua: "Offline mode, proxy disabled").
+        # with a warning ("Offline mode, proxy disabled").
         proxy_enabled = bool(qa_config.get("proxy"))
         if proxy_enabled and self.hc3 is None:
             logger.warning(
@@ -821,7 +822,7 @@ class LuaEngine:
 
         Only whitelisted properties travel: the system fills dynamic
         properties at device creation and a real HC3 rejects packages that
-        carry them (the set plua verified against real HC3s)."""
+        carry them (the set verified against real HC3s)."""
         info = self._qas.get(int(qa_id))
         if info is None:
             return None
@@ -831,7 +832,7 @@ class LuaEngine:
             for key, value in (device.get("properties") or {}).items()
             if key in _EXPORT_PROPERTIES
         }
-        # private (__-prefixed) UI callbacks never travel (plua behavior)
+        # private (__-prefixed) UI callbacks never travel
         callbacks = [
             c
             for c in (properties.get("uiCallbacks") or [])

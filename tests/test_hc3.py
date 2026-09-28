@@ -13,6 +13,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -56,6 +57,20 @@ class _MockHc3(BaseHTTPRequestHandler):
                 self._send_json({"error": "unauthorized"}, 401)
                 return
             self._send_json({"id": 45, "name": "hc3-device", "type": "com.fibaro.binarySwitch"})
+            return
+        if self.path == "/api/devices" or self.path.startswith("/api/devices?"):
+            if not self._authed():
+                self._send_json({"error": "unauthorized"}, 401)
+                return
+            query = urllib.parse.parse_qs(self.path.partition("?")[2])
+            parent = query.get("parentId", [None])[0]
+            devices = [
+                {"id": 45, "name": "hc3-device", "type": "com.fibaro.binarySwitch"},
+                {"id": 46, "name": "hc3-other", "type": "com.fibaro.binarySwitch"},
+            ]
+            if parent is not None:
+                devices = [d for d in devices if str(d.get("parentId", 0)) == parent]
+            self._send_json(devices)
             return
         if self.path.startswith("/api/settings/info"):
             self._send_json({"serialNumber": "HC3-00000422", "softVersion": "5.210.12"})
@@ -199,7 +214,7 @@ async def test_auth_failure_aborts_immediately(
     assert len(records) == 1  # logged once (stderr in a real CLI run)
     assert "locks itself after 4 wrong attempts" in records[0].getMessage()
     assert engine.exit_code == 1
-    device_requests = [r for r in _MockHc3.requests_seen if r.startswith("/api/devices/45")]
+    device_requests = [r for r in _MockHc3.requests_seen if r.startswith("/api/devices")]
     assert len(device_requests) == 1  # never retried
 
 
@@ -292,7 +307,7 @@ async def test_api_hc3_falls_back_to_sim_offline(tmp_path, capsys, monkeypatch) 
 @pytest.mark.asyncio
 async def test_refresh_state_subscriber_receives_sim_events(tmp_path, capsys, monkeypatch) -> None:
     # a QA's RefreshStateSubscriber gets pump-delivered events for sim state
-    # changes (the plua bridge hack replaced by a message)
+    # changes (the old bridge hack replaced by a message)
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     script = tmp_path / "sub.lua"
     script.write_text(
@@ -443,7 +458,7 @@ def _hc3_env(mock_url: str, home: str) -> dict[str, str]:
 
 def test_cli_defaults_to_online_with_hc3_env(tmp_path, mock_hc3) -> None:
     # no --api flag, no --%%offline: the engine picks online because the
-    # environment carries HC3 credentials (plua behavior)
+    # environment carries HC3 credentials (default-online behavior)
     script = tmp_path / "main.lua"
     script.write_text(
         "setTimeout(function()\n"
@@ -661,6 +676,47 @@ def test_cli_default_mode_is_online(tmp_path, monkeypatch) -> None:
     )
     assert result.returncode == 2
     assert "HC3_URL" in result.stderr
+
+
+@pytest.mark.asyncio
+async def test_devices_list_is_union_of_sim_and_hc3(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # online: api.get('/devices') serves the UNION of the emulated QAs and
+    # the HC3's devices — the developer feels at home on the controller.
+    # An offline-pinned QA always sees the sim only.
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    a = tmp_path / "a.lua"
+    a.write_text(
+        "setTimeout(function()\n"
+        "  local ds = api.get('/devices')\n"
+        "  print('A', #ds, ds[1].name, ds[2].name, ds[3].name)\n"
+        "end, 20)\n"
+    )
+    b = tmp_path / "b.lua"
+    b.write_text(
+        "--%%mode:offline\n"
+        "-- --------------- EOH ---------------\n"
+        "setTimeout(function()\n"
+        "  local ds = api.get('/devices')\n"
+        "  print('B', #ds)\n"
+        "end, 30)\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        engine.load_qa_file(str(a))
+        engine.load_qa_file(str(b))
+        await asyncio.sleep(0.5)
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "A 4" in out  # QA a + QA b + the two HC3 devices
+    assert "hc3-device" in out and "hc3-other" in out
+    assert "B 2" in out  # the offline-pinned QA sees the sim only (a + b)
 
 
 def test_cli_remote_requires_hc3_url(tmp_path, monkeypatch) -> None:

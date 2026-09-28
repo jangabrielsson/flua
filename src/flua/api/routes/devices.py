@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+import urllib.parse
 from typing import Any
 
 from ... import messages
@@ -33,6 +34,18 @@ def _matches(dev: dict[str, Any], query: dict[str, str]) -> bool:
 
 def devices_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     devices = [d for d in state.devices.values() if _matches(d, req.query)]
+    if req.remote is not None:
+        # online: the developer should feel at home on the HC3 — serve the
+        # union of the emulated devices and the controller's (the same query
+        # is forwarded). Emulated devices win on id clashes, so a proxy QA
+        # and its HC3 twin (same deviceID) count once.
+        query_string = urllib.parse.urlencode(req.query)
+        path = "/devices" + (f"?{query_string}" if query_string else "")
+        remote_devices, status = req.remote("GET", path, None)
+        if status == 200 and isinstance(remote_devices, list):
+            merged = {int(device["id"]): device for device in remote_devices}
+            merged.update({int(device["id"]): device for device in devices})
+            devices = list(merged.values())
     return public(sorted(devices, key=lambda d: d["id"])), 200
 
 

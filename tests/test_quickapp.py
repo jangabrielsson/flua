@@ -569,8 +569,8 @@ async def test_lua_config_merges_into_flua_config(tmp_path, capsys, monkeypatch)
 
 
 @pytest.mark.asyncio
-async def test_legacy_plua_config(tmp_path, capsys, monkeypatch) -> None:
-    # ~/.plua/config.lua still works when no .flua.lua exists anywhere
+async def test_legacy_config_path(tmp_path, capsys, monkeypatch) -> None:
+    # the legacy config path still works when no .flua.lua exists anywhere
     home = tmp_path / "home"
     legacy = home / ".plua"
     legacy.mkdir(parents=True)

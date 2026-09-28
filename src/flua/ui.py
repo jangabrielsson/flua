@@ -1,8 +1,8 @@
 """QuickApp UI: ``--%%u`` rows -> uiCallbacks + viewLayout + uiView.
 
-Faithful Python port of plua's ``src/lua/fibaro/ui.lua``
-(extendUI/UI2uiCallbacks/mkViewLayout/UI2NewUiView). The row format is the
-same plua one: one directive per row, one dict per element
+Port of the QuickApp UI compiler
+(extendUI/UI2uiCallbacks/mkViewLayout/UI2NewUiView). The row format: one
+directive per row, one dict per element
 (``{button="name", text=...}``, ``{slider=...}``, ``{label=...}``,
 ``{switch=...}``, ``{select=...}``, ``{multi=...}``), or a list of element
 dicts for several elements on one row.
@@ -21,7 +21,7 @@ sets it true by default, ``--%%useUiView:false`` forces the legacy layout.
 
 from typing import Any
 
-# Per-element weight by row size in the uiView format (plua's exact table).
+# Per-element weight by row size in the uiView format (the exact table).
 _UI_VIEW_WEIGHTS = {1: "1.0", 2: "0.5", 3: "0.25", 4: "0.33", 5: "0.20"}
 
 _ELEMENT_KEYS = ("button", "slider", "label", "select", "switch", "multi")
@@ -176,7 +176,7 @@ def _layout_row(row: list[dict[str, Any]]) -> dict[str, Any]:
     if len(row) > 1:
         width = f"{1 / len(row):.2f}"
         if width.endswith(".00"):
-            width = width[:-3]  # plua: strip a trailing ".00"
+            width = width[:-3]  # strip a trailing ".00"
         inner = [_layout_element(el, width) for el in row]
         components.append({"components": inner, "style": {"weight": "1.2"}, "type": "horizontal"})
     else:
@@ -247,7 +247,7 @@ def _ui_view(rows: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
                 component["value"] = el["value"]
             if typ in ("select", "multi"):
                 component["options"] = list(el.get("options") or [])
-                if typ == "select" and el.get("value"):  # plua: "" value is omitted
+                if typ == "select" and el.get("value"):  # "" value is omitted
                     component["value"] = el["value"]
                 if typ == "multi":
                     component["values"] = list(el.get("values") or [])

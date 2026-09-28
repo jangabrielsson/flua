@@ -77,21 +77,21 @@ return table.concat(rows, "\n")
 --%%var:city=London         -- WRONG: evaluates global 'London' → nil
 ```
 
-### Using `~/.plua/config.lua` to keep secrets out of source code
+### Using `.flua.lua` to keep secrets out of source code
 
-Because `--%%var:` values are evaluated as Lua expressions at startup, you can reference any global that is already defined — including values loaded from `~/.plua/config.lua`, which plua loads automatically before running any script.
+Because `--%%var:` values are evaluated as Lua expressions at startup, you can reference fields of the config table that flua loads before running any script (`.flua.lua` in the directory you run from, `~/.flua.lua`, or the legacy `~/.plua/config.lua`).
 
 This lets you store API tokens, IPs, and passwords in one place on the developer machine and reference them by name in the QA header, so secrets never appear in source code or version control:
 
 ```lua
--- ~/.plua/config.lua
+-- ~/.flua.lua
 return {
     Hue_user = "AqlHjZVly4IRgcDmzr5YfJh...",
     Hue_ip   = "192.168.50.56",
     myApiKey = "sk-proj-...",
 }
 
--- In your QA file header (config fields are globals inside plua)
+-- In your QA file header (config fields are exposed as `config`)
 --%%var:HueUser=config.Hue_user
 --%%var:HueIP=config.Hue_ip
 --%%var:ApiKey=config.myApiKey
@@ -102,7 +102,7 @@ The child QA then reads them normally:
 self.hueUser = self:getVariable("HueUser")
 ```
 
-> **Note:** This trick only works when running under plua locally. When the QA is uploaded to a real HC3, the variables are baked in with the resolved values at upload time — so the HC3 device will have the correct values without needing access to `config.lua`.
+> **Note:** This trick only works when running under flua locally. When the QA is uploaded to a real HC3, the variables are baked in with the resolved values at upload time — so the HC3 device will have the correct values without needing access to the config file.
 
 ---
 
@@ -110,7 +110,7 @@ self.hueUser = self:getVariable("HueUser")
 
 ### `self:getVariable()` returns `""` for undeclared variables — never `nil`
 
-`self:getVariable()` always returns `""` (empty string) when the variable is not declared — both on a real HC3 and in plua offline mode. It never returns `nil`.
+`self:getVariable()` always returns `""` (empty string) when the variable is not declared — both on a real HC3 and in flua offline mode. It never returns `nil`.
 
 **Common mistake:** checking `if val == nil` — this is always false.
 
@@ -195,9 +195,9 @@ api.post("/plugins/updateProperty", { deviceId = self.id, propertyName = "value"
 
 ---
 
-## plua-specific Differences from a Real HC3
+## flua-specific Differences from a Real HC3
 
-| Behaviour | Real HC3 | plua emulation |
+| Behaviour | Real HC3 | flua emulation |
 |-----------|----------|----------------|
 | `self:getVariable()` on undeclared var | Returns `""` | Returns `""` — same behaviour |
 | `fibaro.sleep()` | Supported | Not recommended; use `setTimeout` |
@@ -211,15 +211,16 @@ api.post("/plugins/updateProperty", { deviceId = self.id, propertyName = "value"
 
 ### `string.sub`, `#str`, `//` truncate inside multi-byte characters
 
-**Symptom:** A QA that handles non-ASCII text (Polish `ł`, German `ü`, accented French, Cyrillic, emoji, etc.) works on a real HC3 but fails in plua with errors like:
+**Symptom:** A QA that handles non-ASCII text (Polish `ł`, German `ü`, accented French, Cyrillic, emoji, etc.) works on a real HC3 but fails in flua with errors like:
 
 ```
 invalid UTF-8 code
 attempt to ... (a nil value)
-[plua] WARNING: invalid UTF-8 in error message -- replaced N byte(s) with '?'.
-First bad lead byte 0xC4 at position 4 (run length=1). Likely cause: a string was
-sliced mid-codepoint (string.sub byte vs char).
 ```
+
+flua hex-escapes invalid UTF-8 in bridge messages instead of crashing, so a
+sliced string shows up in logs and API payloads as `\xNN` sequences — that
+escaping is the tell that a string was cut mid-codepoint.
 
 **Cause:** Lua's `string` library is **byte-based**, not character-based:
 
@@ -265,7 +266,10 @@ local nchars = utf8.len(label)
 
 **Tip:** When `utf8.codes(s)` itself throws on `s`, pass the lax flag to skip validation: `utf8.codes(s, true)`. This is fine for read-only iteration but does not fix the underlying truncation — track it down at the point where the string was sliced.
 
-**plua diagnostic:** plua's `error()` shim sanitises invalid UTF-8 in error messages and prints a `[plua] WARNING: invalid UTF-8 in error message …` line that includes the position and lead byte of the first bad sequence. Use that hint to find the slice site in your code (often a `string.sub` call computing widths or wrapping lines).
+**flua diagnostic:** the bridge hex-escapes invalid UTF-8 (`\xNN`), so the
+bad bytes appear verbatim in the log line — that is your hint to find the
+slice site in your code (often a `string.sub` call computing widths or
+wrapping lines).
 
 ### `%S` / `%s` truncates UTF-8 strings — `gmatch("%S+")` returns a half character
 
@@ -298,5 +302,5 @@ for part in line:gmatch("[^ \t\r\n\f\v]+") do ... end  -- safe
 
 **Rule of thumb:** In any pattern that runs over text that may contain non-ASCII characters, prefer explicit byte sets (`[^ \t\r\n]`, `[%w_]` is usually OK because `0x80+` rarely matches `isalnum`, but verify) over the shortcut classes `%s`, `%S`, `%a`, `%A`, `%w`, `%W`, `%p`, `%P`. The `%d` / `%D` and `%x` / `%X` classes are safe — they are not locale-dependent.
 
-**plua diagnostic:** because the broken token only shows the problem when it crosses a UTF-8 boundary (print, JSON, HTTP), the `[plua] WARNING: invalid UTF-8 …` line described above will fire. The "lead byte" it reports (e.g. `0xC4` for `ą`, `0xC5` for `ł`) plus the position is your fastest route to the offending pattern.
+**flua diagnostic:** because the broken token only shows the problem when it crosses a UTF-8 boundary (print, JSON, HTTP), the hex-escaped `\xNN` bytes described above will appear (e.g. `\xC4` for `ą`, `\xC5` for `ł`) — that is your fastest route to the offending pattern.
 

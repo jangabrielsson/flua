@@ -58,6 +58,7 @@ from .scenes import (
     scenes_list,
 )
 from .system import (
+    global_delete,
     global_get,
     global_put,
     globals_create,
@@ -116,6 +117,7 @@ ROUTES: list[tuple[str, str, Handler]] = [
     ("POST", "/globalVariables", globals_create),
     ("GET", "/globalVariables/{name}", global_get),
     ("PUT", "/globalVariables/{name}", global_put),
+    ("DELETE", "/globalVariables/{name}", global_delete),
     ("GET", "/refreshStates", refresh_states),
     ("GET", "/profiles", profiles_list),
     ("POST", "/profiles/activeProfile/{id}", profile_activate),

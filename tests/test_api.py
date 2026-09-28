@@ -261,6 +261,57 @@ def test_global_variable_create(api: Api) -> None:
     assert [v["name"] for v in data] == ["FLUA", "night", "plain"]
 
 
+def test_global_variable_events(api: Api) -> None:
+    # create/change/delete emit the corresponding refreshStates events (the
+    # real HC3's GlobalVariableAdded/Changed/RemovedEvent shapes) — and an
+    # unchanged PUT stays silent, like device property events
+    api.dispatch("POST", "/globalVariables", {"name": "GV", "value": "1"})
+    api.dispatch("PUT", "/globalVariables/GV", {"value": "2"})
+    api.dispatch("PUT", "/globalVariables/GV", {"value": "2"})  # no change
+    assert api.dispatch("DELETE", "/globalVariables/missing")[1] == 404
+    api.dispatch("DELETE", "/globalVariables/GV")
+    events = [entry for _, entry in api.state.events]
+    assert [e["type"] for e in events] == [
+        "GlobalVariableAddedEvent",
+        "GlobalVariableChangedEvent",
+        "GlobalVariableRemovedEvent",
+    ]
+    assert events[0]["data"] == {"variableName": "GV", "value": "1"}
+    assert events[1]["data"] == {"variableName": "GV", "oldValue": "1", "newValue": "2"}
+    assert events[2]["data"] == {"variableName": "GV"}
+    for entry in events:
+        # the lighter global-event envelope: no objects/sourceId
+        assert entry["sourceType"] == "system"
+        assert "objects" not in entry and "sourceId" not in entry
+
+
+@pytest.mark.asyncio
+async def test_global_variable_events_reach_subscribers(tmp_path, capsys) -> None:
+    # the events ride the pump: a RefreshStateSubscriber sees them
+    script = tmp_path / "gv.lua"
+    script.write_text(
+        "local sub = RefreshStateSubscriber()\n"
+        "sub:subscribe(function(e) return true end, "
+        "function(e) print('EV', e.type, e.data and e.data.variableName) end)\n"
+        "sub:run()\n"
+        "function QuickApp:onInit()\n"
+        "  fibaro.setGlobalVariable('SUBGV', 'x')\n"
+        "  fibaro.setGlobalVariable('SUBGV', 'y')\n"
+        "  fibaro.deleteGlobalVariable('SUBGV')\n"
+        "end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await asyncio.sleep(0.3)
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "EV GlobalVariableChangedEvent SUBGV" in out
+    assert "EV GlobalVariableRemovedEvent SUBGV" in out
+
+
 @pytest.mark.asyncio
 async def test_print_of_api_error_shows_status(tmp_path, capsys) -> None:
     # print(api.post(...)) on an unknown endpoint returns (nil, status); a nil

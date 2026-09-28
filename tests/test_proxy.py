@@ -311,7 +311,7 @@ async def test_proxy_fresh_deploy_reuses_id_and_connects(
     tmp_path, capsys, mock_hc3, monkeypatch
 ) -> None:
     # no proxy on the HC3 -> flua uploads one, and the emulated QA runs
-    # under the HC3-assigned id (plua caveat 2)
+    # under the HC3-assigned id (caveat 2)
     set_hc3_env(monkeypatch, tmp_path, mock_hc3)
     script = write_script(tmp_path)
     engine = LuaEngine(api_mode="remote")
@@ -454,6 +454,38 @@ async def test_proxy_existing_reused_and_wrong_type_replaced(
     assert qa_id == 100  # the fresh proxy's id
     assert _MockHc3.seen("DELETE", "/api/devices/57")
     assert len(_MockHc3.uploaded) == 1
+
+
+@pytest.mark.asyncio
+async def test_devices_list_has_no_proxy_doublets(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # the proxy QA and its HC3 twin share a deviceID — api.get('/devices')
+    # serves them ONCE, and the emulated shadow wins
+    set_hc3_env(monkeypatch, tmp_path, mock_hc3)
+    add_existing_proxy(57, "sw_Proxy", "com.fibaro.binarySwitch")
+    script = tmp_path / "sw.lua"
+    script.write_text(
+        "--%%name:sw\n--%%mode:proxy\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit()\n"
+        "  local found, name = 0, nil\n"
+        "  for _, d in ipairs(api.get('/devices')) do\n"
+        "    if d.id == self.id then found = found + 1; name = d.name end\n"
+        "  end\n"
+        "  print('DOUBLET', found, name)\n"
+        "end\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        qa_id, err = engine.load_qa_file(str(script))
+        assert err is None, err
+        assert qa_id == 57
+        out = await wait_for_output(capsys, "DOUBLET")
+        assert "DOUBLET 1 sw" in out  # counted once, with the shadow's name
+    finally:
+        await engine.stop()
 
 
 @pytest.mark.asyncio

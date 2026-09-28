@@ -133,7 +133,7 @@ def test_import_invalid_fqa_is_rejected_without_harm(tmp_path: Path) -> None:
     before, _ = client.request("GET", "/devices")
     before_ids = {d["id"] for d in before}
 
-    # semantically invalid (valid JSON, no main file) — plua's transport:
+    # semantically invalid (valid JSON, no main file) — the transport:
     # POST /quickApp/ with the raw fqa string as the body
     garbage = json.dumps({"files": []})
     _data, status = client.request("POST", "/quickApp/", body=garbage)
@@ -148,7 +148,7 @@ def test_import_call_and_delete(tmp_path: Path) -> None:
     client = _client()
     name = f"flua-live-{int(time.time())}"
     fqa = _test_fqa(tmp_path, name)
-    payload = json.dumps(fqa)  # the raw .fqa JSON string, like plua's uploadFQA
+    payload = json.dumps(fqa)  # the raw .fqa JSON string, like uploadFQA
 
     # the HC3's import can be slow to recover between attempts — retry with
     # backoff instead of hammering a production controller
