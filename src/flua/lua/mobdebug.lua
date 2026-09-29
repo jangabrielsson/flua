@@ -1,3 +1,4 @@
+---@diagnostic disable: deprecated, undefined-field
 -- VENDORED THIRD-PARTY LIBRARY — DO NOT MODIFY
 -- Upstream: https://github.com/pkulchenko/MobDebug
 -- License:  MIT (see file)
@@ -19,6 +20,7 @@ local table = table or require "table"
 local string = string or require "string"
 local coroutine = coroutine or require "coroutine"
 local debug = debug or require "debug"
+winapi = winapi
 
 -- io library does not requreds by debugger itself and may be not accessable
 local io = io or prequire "io"
@@ -41,11 +43,11 @@ local HOOKMASK = "lcr"
 local error = error
 local getfenv = getfenv
 local setfenv = setfenv
-local loadstring = loadstring or load -- "load" replaced "loadstring" in Lua 5.2
+local loadstring = load -- "load" replaced "loadstring" in Lua 5.2
 local pairs = pairs
 local setmetatable = setmetatable
 local tonumber = tonumber
-local unpack = table.unpack or unpack
+local unpack = table.unpack --or unpack
 local rawget = rawget
 local string_format = string.format
 local string_sub = string.sub
@@ -1442,6 +1444,7 @@ function mobdebug_debugger.loop(sev, svars, sfile, sline)
       if stream and mode and stream == "stdout" then
         -- assign "print" in the global environment
         local default = mode == 'd'
+---@diagnostic disable-next-line: inject-field
         genv.print = default and iobase.print or corowrap(function()
           -- wrapping into coroutine.wrap protects this function from
           -- being stepped through in the debugger.
@@ -1851,7 +1854,7 @@ function vscode_debugger.loop(sev, svars, sfile, sline)
       if not state.seen_hook then
         vscode_debugger.send_success(req, {variables = {}})
       else
-        local ref, result, vars = args.variablesReference, {}
+        local ref, result, vars = args.variablesReference, {}, nil
         local is_scope = ref > vscode_scope_offset
         if is_scope then
           local ev, frames = coroyield("stack")
@@ -2268,7 +2271,7 @@ local function handle(params, client, options)
   -- when `options.verbose` is not provided, use normal `print`; verbose output can be
   -- disabled (`options.verbose == false`) or redirected (`options.verbose == function()...end`)
   local verbose = not options or options.verbose ~= nil and options.verbose
-  local print = verbose and (type(verbose) == "function" and verbose or print) or function() end
+  local print = verbose and (type(verbose) == "function" and verbose or print) or function(...) end
   local file, line, watch_idx
   local _, _, command = string_find(params, "^([a-z]+)")
   if command == "run" or command == "step" or command == "out"
@@ -2712,6 +2715,7 @@ local function coro()
     return cocreate(function(...)
       mobdebug.on()
       return f(...)
+---@diagnostic disable-next-line: redundant-parameter
     end, ...)
   end
 end
