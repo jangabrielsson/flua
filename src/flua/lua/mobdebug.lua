@@ -960,6 +960,7 @@ local function debug_hook(event, line)
     -- when luajit is compiled with LUAJIT_ENABLE_LUA52COMPAT,
     -- coroutine.running() returns non-nil for the main thread.
     local coro, main = coroutine.running()
+---@diagnostic disable-next-line: cast-local-type
     if not coro or main then coro = 'main' end
     local disabled = coroutines[coro] == false
       or coroutines[coro] == nil and coro ~= (coro_debugee or 'main')
@@ -1289,6 +1290,7 @@ function mobdebug_debugger.loop(sev, svars, sfile, sline)
     elseif command == "EXEC" then
       -- extract any optional parameters
       local chunk, params = mobdebug_debugger.parse_exec_command(line)
+      assert(type(params) == "table", "Expected params to be a table")
       if chunk then
         local func, res = mobdebug.loadstring(chunk)
         local status
@@ -1530,7 +1532,7 @@ end
 
 local vscode_debugger = {} do
 
-local json = prequire'json'
+local json = prequire'json' assert(json, "Failed to load JSON module")
 
 local vscode_message_size = nil
 local vscode_thread_id    = 0
@@ -1561,6 +1563,7 @@ end
 -- and convert `~/projects/some_library` to `/var/lib/some_library` when set breakpoints
 local fix_file_name do
   local function isSameAs(f1, f2)
+---@diagnostic disable-next-line: undefined-global
     return f1 == f2 or iscaseinsensitive and string_lower(f1) == string_lower(f2)
   end
 
@@ -1729,7 +1732,7 @@ function vscode_debugger.loop(sev, svars, sfile, sline)
       end
     end
     if server.settimeout then server:settimeout() end -- back to blocking
-
+    assert(req, "Failed to receive debugger message")
     command, args = req.command, req.arguments or {}
     Log.format('New command: %s', tostring(command))
 
@@ -1923,6 +1926,7 @@ function vscode_debugger.loop(sev, svars, sfile, sline)
         if status then
           Log.table('res', res)
           -- TODO multiple values
+          assert(res, "Evaluation result is nil")
           if res.n == 0 then
             vscode_debugger.send_success(req, {})
           else
@@ -2228,6 +2232,7 @@ local function on()
   -- main is set to true under Lua5.2 for the "main" chunk.
   -- Lua5.1 returns co as `nil` in that case.
   local co, main = coroutine.running()
+---@diagnostic disable-next-line: cast-local-type
   if main then co = nil end
   if co then
     coroutines[co] = true
@@ -2244,6 +2249,7 @@ local function off()
   -- main is set to true under Lua5.2 for the "main" chunk.
   -- Lua5.1 returns co as `nil` in that case.
   local co, main = coroutine.running()
+---@diagnostic disable-next-line: cast-local-type
   if main then co = nil end
 
   -- don't remove coroutine hook under LuaJIT as there is only one (global) hook
@@ -2680,6 +2686,7 @@ local function listen(host, port)
   print("Run the program you wish to debug")
 
   local server = socket.bind(host, port)
+  assert(server, "Failed to bind server socket")
   local client = server:accept()
 
   client:send("STEP\n")
