@@ -241,10 +241,10 @@ def test_global_variables(api: Api) -> None:
         "PUT", "/globalVariables/night", {"value": True, "invokeScenes": True}
     )
     assert status == 200 and var["value"] == "True"
-    var, status = api.dispatch("PUT", "/globalVariables/new", {"value": 42})
-    assert status == 200 and var["value"] == "42"
+    # the real HC3 404s a PUT on a missing variable — create is a POST
+    assert api.dispatch("PUT", "/globalVariables/new", {"value": 42}) == (None, 404)
     data, _ = api.dispatch("GET", "/globalVariables")
-    assert [v["name"] for v in data] == ["new", "night", "plain"]
+    assert [v["name"] for v in data] == ["night", "plain"]
 
 
 def test_global_variable_create(api: Api) -> None:
@@ -257,6 +257,10 @@ def test_global_variable_create(api: Api) -> None:
     got, status = api.dispatch("GET", "/globalVariables/FLUA")
     assert status == 200 and got["value"] == "1"
     assert api.dispatch("POST", "/globalVariables", {"value": "1"})[1] == 400
+    # creating over an existing variable is a conflict — and the value stays
+    assert api.dispatch("POST", "/globalVariables", {"name": "FLUA", "value": "2"})[1] == 409
+    got, _ = api.dispatch("GET", "/globalVariables/FLUA")
+    assert got["value"] == "1"
     data, _ = api.dispatch("GET", "/globalVariables")
     assert [v["name"] for v in data] == ["FLUA", "night", "plain"]
 
@@ -295,6 +299,7 @@ async def test_global_variable_events_reach_subscribers(tmp_path, capsys) -> Non
         "function(e) print('EV', e.type, e.data and e.data.variableName) end)\n"
         "sub:run()\n"
         "function QuickApp:onInit()\n"
+        "  api.post('/globalVariables', {name='SUBGV', value='0'})\n"
         "  fibaro.setGlobalVariable('SUBGV', 'x')\n"
         "  fibaro.setGlobalVariable('SUBGV', 'y')\n"
         "  fibaro.deleteGlobalVariable('SUBGV')\n"

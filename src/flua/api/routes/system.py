@@ -28,9 +28,13 @@ def global_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     if not isinstance(req.body, dict) or "value" not in req.body:
         return None, 400
     name = req.path_params["name"]
-    value = "" if req.body["value"] is None else str(req.body["value"])
     existing = state.global_variables.get(name)
-    old_value = existing.get("value") if existing is not None else None
+    if existing is None:
+        # the real HC3 404s a PUT on a missing variable — create goes
+        # through POST /globalVariables
+        return None, 404
+    value = "" if req.body["value"] is None else str(req.body["value"])
+    old_value = existing.get("value")
     var = {
         "name": name,
         "value": value,
@@ -50,6 +54,9 @@ def globals_create(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     if not isinstance(req.body, dict) or not req.body.get("name"):
         return None, 400
     name = str(req.body["name"])
+    if name in state.global_variables:
+        # creating over an existing variable is a conflict — the value stays
+        return None, 409
     value = req.body.get("value")
     var = {
         "name": name,
