@@ -134,6 +134,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="skip the startup greeting line",
     )
     parser.add_argument(
+        "--examples",
+        action="store_true",
+        help="print the installed examples directory and exit",
+    )
+    parser.add_argument(
         "--check",
         action="store_true",
         help="static checks only (syntax, --%%%% directives, deprecated APIs); do not run",
@@ -550,6 +555,21 @@ def _normalize_debugger_argv(argv: list[str]) -> list[str]:
     return out + moved
 
 
+def _examples_dir() -> Path:
+    """The installed examples directory: the wheel ships examples/ as the
+    flua.examples package; an editable install or checkout resolves to the
+    repo's own examples/."""
+    try:
+        import flua.examples as examples_pkg
+
+        location = getattr(examples_pkg, "__file__", None)
+        if location:
+            return Path(location).resolve().parent
+    except ImportError:
+        pass
+    return Path(__file__).resolve().parent.parent.parent / "examples"
+
+
 def main(argv: list[str] | None = None) -> int:
     raw = sys.argv[1:] if argv is None else argv
     # Tool commands get their own parsers — argparse subparsers would swallow
@@ -562,6 +582,9 @@ def main(argv: list[str] | None = None) -> int:
         return _tool_main(raw)
     parser = _build_parser()
     args = parser.parse_args(_normalize_debugger_argv(raw))
+    if args.examples:
+        print(_examples_dir())
+        return 0
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(levelname)s %(name)s: %(message)s",

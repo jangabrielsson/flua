@@ -186,11 +186,12 @@ receive).
 ## 9. Config pipeline
 
 ```
-  raw file header  ->  peek_offline()        (mode decision, pre-engine)
-  full source      ->  parse_annotations()   (post-engine, per QA)
-  per-QA config    <-  CLI flags + globals + locals + .flua.lua base
-  --%%var:name=expr   ->  evaluated in Lua with {config, os} in scope
-  os.getenv(name)     ->  EnvChain: local .env > ~/.env > process env
+  .directives file  ->  defaults for the MAIN QA (QA header overrides)
+  raw file header   ->  parse_annotations()  (--%% directives, EOH header)
+  --%%mode:...      ->  mode decision: --api flag > main QA's merged mode > online
+  per-QA config     <-  CLI flags + globals + locals + .flua.lua base
+  --%%var:name=expr    ->  evaluated in Lua with {config, os} in scope
+  os.getenv(name)      ->  EnvChain: local .env > ~/.env > process env
 ```
 
 The `.fqa` export/import round-trip reuses the pipeline: unpacked files
@@ -201,7 +202,9 @@ carry generated `--%%` headers, so imports load like any other QA.
 `Hc3Remote` (stdlib urllib) speaks basic auth and the **raw-body import
 transport** (`POST /quickApp/` with the fqa JSON string — the swagger's
 multipart description is misleading; the real transport was verified against a
-live HC3).
+live HC3). The endpoints' structural reference (paths, parameters, response
+codes, schema fields) is `docs/specs/hc3-api.json`, distilled from the
+official swagger, which itself is Fibaro's property and not distributed.
 Two safety rules:
 
 - **The lockout guard**: any 401/403 aborts flua immediately and is never

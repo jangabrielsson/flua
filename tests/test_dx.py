@@ -69,6 +69,20 @@ def test_check_syntax_error_exits_1() -> None:
         assert "error: syntax" in result.stdout
 
 
+# -- --examples -----------------------------------------------------------------
+
+
+def test_examples_flag_prints_installed_examples_dir() -> None:
+    # pip users get the examples through the wheel (flua.examples package
+    # data); --examples tells them where they are installed
+    result = _run("--examples")
+    assert result.returncode == 0, result.stdout + result.stderr
+    directory = Path(result.stdout.strip())
+    assert directory.name == "examples"
+    assert (directory / "timers.lua").is_file()
+    assert (directory / "house.json").is_file()
+
+
 # -- export / unpack ------------------------------------------------------------
 
 

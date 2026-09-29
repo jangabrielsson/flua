@@ -36,6 +36,14 @@ Python 3.11+. lupa (which bundles Lua) is the only runtime dependency.
 pip install fibaro-flua        # from PyPI — installs the flua command
 ```
 
+The PyPI page carries this guide in full. The wheel also ships the
+`examples/` QuickApps — find where they are installed with:
+
+```bash
+flua --examples               # prints the directory; copy the examples out
+flua --api local $(flua --examples)/timers.lua   # ...or run one in place
+```
+
 From a checkout (development):
 
 ```bash

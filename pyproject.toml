@@ -26,6 +26,11 @@ dependencies = [
     "lupa>=2.4",            # 2.4+ bundles Lua 5.4 and supports Python 3.13
 ]
 
+[project.urls]
+Repository = "https://github.com/jangabrielsson/flua"
+Documentation = "https://github.com/jangabrielsson/flua/blob/main/USAGE.md"
+Issues = "https://github.com/jangabrielsson/flua/issues"
+
 [project.scripts]
 flua = "flua.cli:main"
 
@@ -36,14 +41,23 @@ dev = [
     "ruff>=0.6.0",
 ]
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
 [tool.setuptools]
 license-files = ["LICENSE"]
 
+[tool.setuptools.packages.find]
+# flua.examples maps onto the repo's examples/ directory (package-dir), so
+# the wheel ships the QuickApp examples without duplicating them — pip users
+# find them through `flua --examples`.
+where = ["src", "examples"]
+include = ["flua*"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+"flua.examples" = "examples"
+
 [tool.setuptools.package-data]
 flua = ["lua/*.lua", "devices/*.json"]
+"flua.examples" = ["*.lua", "house.json", "multifile/*.lua"]
 
 [tool.ruff]
 line-length = 100
