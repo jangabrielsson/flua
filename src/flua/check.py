@@ -6,8 +6,9 @@ Three layers, all without running the QA:
 2. Directives — unknown ``--%%`` names are flagged (the runtime logs a
    warning for them too; --check adds the file context, so a typo costs
    neither a debugging session nor a --check run).
-3. Deprecated REST endpoints — matched against the official swagger docs
-   in fibaro_api_docs/ (e.g. GET /quickApp/export is deprecated).
+3. Deprecated REST endpoints — a hardcoded list, derived from the API
+   reference in docs/specs/hc3-api.json (itself distilled from the official
+   swagger; e.g. GET /quickApp/export is deprecated).
 """
 
 from __future__ import annotations
@@ -18,7 +19,8 @@ from typing import Any
 
 from .config import KNOWN_DIRECTIVES, parse_annotations
 
-# (http method, path prefix, advice) — from fibaro_api_docs/*.json.
+# (http method, path prefix, advice) — derived from the distilled API
+# reference, docs/specs/hc3-api.json.
 DEPRECATED_API = [
     ("GET", "/quickApp/export/", "use POST /quickApp/export/{id} instead"),
 ]

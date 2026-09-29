@@ -624,6 +624,19 @@ and one file per QA file, ready for editing and debugging.
 Checks syntax, unknown `--%%` directives (typos), and deprecated API calls.
 Warnings don't fail the run; syntax errors exit 1. Good in CI.
 
+## The HC3 REST API reference
+
+`docs/specs/hc3-api.json` is the checked-in structural reference of the HC3
+REST API — endpoints (method, path, parameters with types, request-body
+schemas, response status codes) and schema field names/types. It is
+distilled from the official swagger, which is Fibaro's property and not
+distributed: the local copy (`fibaro_api_docs/`, gitignored) is only needed
+when regenerating the reference:
+
+```bash
+.venv/bin/python scripts/extract_hc3_api.py
+```
+
 ## flua extensions (`_FLUA`)
 
 Everything HC3-compatible is a plain global (`QuickApp`, `fibaro`, `api`,

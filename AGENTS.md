@@ -17,7 +17,9 @@ against a real HC3, or in proxy mode (a mirror QA on the HC3).
 - **Examples**: `examples/` — runnable QuickApps; the test suite treats them
   as living fixtures, so keep them terminating unless their purpose is to run
   forever.
-- **Specs/references**: `fibaro_api_docs/` (official swagger), `docs/specs/`.
+- **Specs/references**: `docs/specs/` — including `hc3-api.json`, the
+  checked-in structural reference of the HC3 REST API (endpoints, parameters,
+  response codes, schema fields) distilled from the official swagger.
 
 ## Commands
 
