@@ -257,3 +257,151 @@ def _ui_view(rows: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
             components.append(component)
         out.append({"style": {"weight": "1.0"}, "type": "horizontal", "components": components})
     return out
+
+
+# -- the inverse: HC3 UI structures -> --%%u rows ---------------------------------
+
+
+def lua_literal(value: Any) -> str:
+    """Serialize a JSON-compatible value as a Lua literal (the ``--%%u`` and
+    ``--%%var`` value format)."""
+    if value is None:
+        return "nil"
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, str):
+        escaped = value.replace("\\", "\\\\").replace("'", "\\'")
+        return f"'{escaped}'"
+    if isinstance(value, list):
+        return "{" + ",".join(lua_literal(item) for item in value) + "}"
+    if isinstance(value, dict):
+        return "{" + ",".join(f"{key}={lua_literal(val)}" for key, val in value.items()) + "}"
+    return lua_literal(str(value))
+
+
+def _callback_map(ui_callbacks: Any) -> dict[str, dict[str, str]]:
+    """uiCallbacks ({name, eventType, callback} entries) ->
+    {name: {eventType: callback}}."""
+    callbacks: dict[str, dict[str, str]] = {}
+    entries = ui_callbacks if isinstance(ui_callbacks, list) else []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("name")
+        callback = entry.get("callback")
+        if name and callback:
+            callbacks.setdefault(str(name), {})[str(entry.get("eventType") or "")] = str(
+                callback
+            )
+    return callbacks
+
+
+def _element(component: dict[str, Any], callbacks: dict[str, dict[str, str]]) -> dict[str, Any]:
+    """One UI component (uiView or legacy viewLayout shape) -> one --%%u
+    element dict."""
+    name = str(component.get("name") or "")
+    text = str(component.get("text") or "")
+    events = callbacks.get(name, {})
+    typ = str(component.get("type") or "")
+    if typ == "button":
+        element: dict[str, Any] = {"button": name, "text": text}
+        for event in ("onReleased", "onLongPressDown", "onLongPressReleased"):
+            if events.get(event):
+                element[event] = events[event]
+    elif typ == "switch":
+        element = {"switch": name, "text": text, "value": str(component.get("value", "false"))}
+        if events.get("onReleased"):
+            element["onReleased"] = events["onReleased"]
+    elif typ == "slider":
+        element = {
+            "slider": name,
+            "text": text,
+            "min": str(component.get("min", "0")),
+            "max": str(component.get("max", "100")),
+            "step": str(component.get("step", "1")),
+            "value": str(component.get("value", "0")),
+        }
+        if events.get("onChanged"):
+            element["onChanged"] = events["onChanged"]
+    elif typ == "select":
+        multi = component.get("selectionType") == "multi"
+        key = "multi" if multi else "select"
+        options = [
+            {
+                "type": "option",
+                "text": str(option.get("text", "")),
+                "value": str(option.get("value", "")),
+            }
+            for option in (component.get("options") or [])
+            if isinstance(option, dict)
+        ]
+        element = {key: name, "text": text, "options": options}
+        if multi:
+            element["values"] = [str(value) for value in (component.get("values") or [])]
+        elif component.get("value"):
+            element["value"] = str(component["value"])
+        if events.get("onToggled"):
+            element["onToggled"] = events["onToggled"]
+    else:
+        # unknown component kinds degrade to a label
+        element = {"label": name, "text": text}
+    return element
+
+
+def _rows_from_view_layout(
+    items: Any, callbacks: dict[str, dict[str, str]]
+) -> list[list[dict[str, Any]]]:
+    """The legacy $jason section items -> --%%u rows (one list of elements
+    per vertical row, descending into horizontal containers)."""
+    rows: list[list[dict[str, Any]]] = []
+
+    def collect(component: dict[str, Any]) -> list[dict[str, Any]]:
+        typ = str(component.get("type") or "")
+        if typ in ("horizontal", "vertical"):
+            elements: list[dict[str, Any]] = []
+            for inner in component.get("components") or []:
+                if isinstance(inner, dict):
+                    elements.extend(collect(inner))
+            return elements
+        if typ == "space":
+            return []
+        return [_element(component, callbacks)]
+
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        elements = collect(item)
+        if elements:
+            rows.append(elements)
+    return rows
+
+
+def ui_to_u_rows(
+    ui_view: Any = None, view_layout: Any = None, ui_callbacks: Any = None
+) -> list[str]:
+    """The inverse of compile_ui: translate the HC3's UI property structures
+    back into ``--%%u`` row literals (uiView preferred, the legacy
+    viewLayout as fallback; callback names come from uiCallbacks). Used when
+    a QA is downloaded from the HC3 so its UI directives are regenerated."""
+    callbacks = _callback_map(ui_callbacks)
+    rows: list[list[dict[str, Any]]] = []
+    if isinstance(ui_view, list) and ui_view:
+        for row in ui_view:
+            if not isinstance(row, dict):
+                continue
+            components = [
+                component
+                for component in (row.get("components") or [])
+                if isinstance(component, dict)
+            ]
+            elements = [_element(component, callbacks) for component in components]
+            if elements:
+                rows.append(elements)
+    elif isinstance(view_layout, dict):
+        items = ((view_layout.get("$jason") or {}).get("body") or {}).get("sections") or {}
+        rows = _rows_from_view_layout(items.get("items"), callbacks)
+    return [lua_literal(row[0] if len(row) == 1 else row) for row in rows]

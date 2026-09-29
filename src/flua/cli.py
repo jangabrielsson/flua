@@ -34,6 +34,8 @@ from .config import (
 )
 from .engine import LuaEngine
 from .http_server import ApiServer
+from .tools import run_tool
+from .tools.common import build_fqa
 
 logger = logging.getLogger(__name__)
 
@@ -107,15 +109,24 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=["local", "remote"],
         default=None,
         help="explicit REST API backend. Default: the main QA's "
-        "--%%mode:offline selects offline, --%%mode:online|proxy selects "
+        "--%%%%mode:offline selects offline, --%%%%mode:online|proxy selects "
         "online; otherwise ONLINE (the default — requires HC3 credentials "
-        "in the environment). Use --api local or --%%mode:offline for the "
+        "in the environment). Use --api local or --%%%%mode:offline for the "
         "simulated HC3",
     )
     parser.add_argument(
         "--seed",
         metavar="FILE",
         help="JSON file seeding the simulated HC3: devices, rooms, scenes, globalVariables",
+    )
+    parser.add_argument(
+        "--tool",
+        "-t",
+        dest="tool",
+        metavar="TOOL",
+        help="run a tool command instead of QAs: downloadQA <id>, "
+        "uploadQA <name|main.lua>, updateQA <id> <script> (HC3 credentials "
+        "required); a bare --tool lists the installed tools",
     )
     parser.add_argument(
         "--nogreet",
@@ -125,7 +136,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--check",
         action="store_true",
-        help="static checks only (syntax, --%% directives, deprecated APIs); do not run",
+        help="static checks only (syntax, --%%%% directives, deprecated APIs); do not run",
     )
     parser.add_argument(
         "--watch",
@@ -479,13 +490,10 @@ def _check_cli(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
 def _export_cli(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     """flua export script.lua -o out.fqa — the deploy artifact, without running."""
     path = Path(args.script)
-    if not path.exists():
-        parser.error(f"cannot open {args.script}: no such file")
-    source = path.read_text(encoding="utf-8")
-    _, local_params = split_annotations(parse_annotations(source))
-    engine = LuaEngine()
-    qa_id = engine._prepare_qa(str(path.resolve()), None, local_params, str(path.resolve()))
-    fqa = engine.qa_export(qa_id)
+    try:
+        fqa, _ = build_fqa(args.script)
+    except (FileNotFoundError, ValueError) as exc:
+        parser.error(str(exc))
     output = Path(args.output) if args.output else path.with_suffix(".fqa")
     output.write_text(json.dumps(fqa, indent=2) + "\n", encoding="utf-8")
     print(f"exported {len(fqa['files'])} files to {output}")
@@ -544,8 +552,12 @@ def _normalize_debugger_argv(argv: list[str]) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     raw = sys.argv[1:] if argv is None else argv
-    # Tool commands (flua export/unpack) get their own parsers — argparse
-    # subparsers would swallow the run mode's first positional script.
+    # Tool commands get their own parsers — argparse subparsers would swallow
+    # the run mode's first positional script. --tool/-t (downloadQA, uploadQA,
+    # updateQA) is scanned before anything else, so it can sit anywhere.
+    tool, rest = _find_tool(raw)
+    if tool is not None:
+        return _hc3_tool_main(tool, rest)
     if raw and raw[0] in ("export", "unpack"):
         return _tool_main(raw)
     parser = _build_parser()
@@ -594,6 +606,31 @@ def _tool_main(raw: list[str]) -> int:
     if command == "export":
         return _export_cli(tool, args)
     return _unpack_cli(tool, args)
+
+
+# -- --tool/-t: HC3 file transfer tools -----------------------------------------
+
+
+def _find_tool(raw: list[str]) -> tuple[str | None, list[str]]:
+    """Extract --tool NAME / -t NAME / --tool=NAME / -tNAME from argv; the
+    remaining arguments continue to the tool's own parser. A bare --tool/-t
+    (no name) returns "", which lists the installed tools."""
+    for i, arg in enumerate(raw):
+        if arg in ("--tool", "-t"):
+            if i + 1 >= len(raw):
+                return "", raw[:i] + raw[i + 1 :]
+            return raw[i + 1], raw[:i] + raw[i + 2 :]
+        for prefix in ("--tool=", "-t"):
+            if arg.startswith(prefix) and len(arg) > len(prefix):
+                return arg[len(prefix) :], raw[:i] + raw[i + 1 :]
+    return None, raw
+
+
+def _hc3_tool_main(name: str, rest: list[str]) -> int:
+    """Dispatch a --tool command: the tools package builds the parser from
+    the tool's own module (one file per tool, auto-discovered)."""
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    return run_tool(name, rest)
 
 
 if __name__ == "__main__":

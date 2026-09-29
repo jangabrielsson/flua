@@ -93,10 +93,10 @@ def test_export_and_unpack_roundtrip(tmp_path) -> None:
     result = _run("unpack", str(package), "-d", str(target))
     assert result.returncode == 0, result.stdout + result.stderr
     assert (target / "main.lua").exists()
-    assert (target / "lib").exists()
+    assert (target / "lib.lua").exists()  # extras get .lua for editability
     header = (target / "main.lua").read_text()
     assert "--%%name:packaged" in header
-    assert "--%%file:lib,lib" in header
+    assert "--%%file:lib.lua,lib" in header
     assert "EOH" in header
     assert "print('RUNS', LIB)" in header  # main content follows the header
 

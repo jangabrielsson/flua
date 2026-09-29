@@ -36,6 +36,19 @@ class _MockHc3(BaseHTTPRequestHandler):
     refresh_polls = 0
     auth_all = False  # when set, every endpoint requires valid basic auth
     hold_refresh = 0.0  # hold the refreshStates response this many seconds (SIGINT tests)
+    uploaded: list[dict] = []  # decoded .fqa packages (POST /quickApp)
+    file_updates: list[tuple[int, list]] = []  # (qa_id, files) for PUT /quickApp/{id}/files
+    export_post_rejects = False  # bodyless export POSTs get 400 (real-HC3 behavior)
+
+    def _read_body(self):
+        length = int(self.headers.get("Content-Length") or 0)
+        raw = self.rfile.read(length) if length else b""
+        if not raw:
+            return None
+        try:
+            return json.loads(raw)
+        except ValueError:
+            return raw.decode()
 
     def _send_json(self, data, status: int = 200) -> None:
         payload = json.dumps(data).encode()
@@ -71,6 +84,26 @@ class _MockHc3(BaseHTTPRequestHandler):
             if parent is not None:
                 devices = [d for d in devices if str(d.get("parentId", 0)) == parent]
             self._send_json(devices)
+            return
+        if self.path.startswith("/api/quickApp/export/"):
+            self._send_json(
+                {
+                    "name": "downloaded",
+                    "type": "com.fibaro.binarySwitch",
+                    "files": [
+                        {
+                            "name": "main",
+                            "isMain": True,
+                            "content": "--%%name:downloaded\nprint('MAIN')\n",
+                        },
+                        {
+                            "name": "lib",
+                            "isMain": False,
+                            "content": "function helper() return 42 end\n",
+                        },
+                    ],
+                }
+            )
             return
         if self.path.startswith("/api/settings/info"):
             self._send_json({"serialNumber": "HC3-00000422", "softVersion": "5.210.12"})
@@ -120,6 +153,92 @@ class _MockHc3(BaseHTTPRequestHandler):
             return
         self._send_json({"error": "not found"}, 404)
 
+    def do_POST(self):
+        body = self._read_body()
+        path = self.path.split("?")[0]
+        if path.startswith("/api/quickApp/export/"):
+            # some firmware versions reject the export POST altogether (a
+            # bodyless one is always a 400 on the real HC3); the deprecated
+            # GET still works — the tool falls back to it
+            if type(self).export_post_rejects:
+                self._send_json({"error": "bad body"}, 400)
+                return
+            self._send_json(
+                {
+                    "name": "downloaded",
+                    "type": "com.fibaro.binarySwitch",
+                    "initialProperties": {
+                        "uiView": [
+                            {
+                                "type": "horizontal",
+                                "components": [
+                                    {"type": "label", "name": "lbl", "text": "Status"},
+                                    {"type": "button", "name": "goBtn", "text": "Go"},
+                                ],
+                            },
+                            {
+                                "type": "horizontal",
+                                "components": [
+                                    {
+                                        "type": "slider",
+                                        "name": "dim",
+                                        "text": "Brightness",
+                                        "min": "0",
+                                        "max": "100",
+                                        "step": "1",
+                                        "value": "50",
+                                    }
+                                ],
+                            },
+                        ],
+                        "uiCallbacks": [
+                            {"name": "goBtn", "eventType": "onReleased", "callback": "goNow"},
+                            {"name": "dim", "eventType": "onChanged", "callback": "dimChanged"},
+                        ],
+                        "quickAppVariables": [{"name": "speed", "value": "42"}],
+                    },
+                    "files": [
+                        {
+                            "name": "main",
+                            "isMain": True,
+                            "content": (
+                                "--%%name:OLD\n"
+                                "--%%mode:offline\n"
+                                "-- --------------- EOH ---------------\n"
+                                "print('MAIN')\n"
+                            ),
+                        },
+                        {
+                            "name": "lib",
+                            "isMain": False,
+                            "content": "function helper() return 42 end\n",
+                        },
+                    ],
+                }
+            )
+            return
+        if path == "/api/quickApp":
+            # the flua client decodes the base64 envelope and sends the raw
+            # .fqa JSON body (the real HC3's upload contract)
+            fqa = body if isinstance(body, dict) and isinstance(body.get("files"), list) else None
+            if fqa is None:
+                self._send_json({"error": "bad fqa"}, 400)
+                return
+            type(self).uploaded.append(fqa)
+            self._send_json({"id": 300, "name": fqa["name"]})
+            return
+        self._send_json({"error": "not found"}, 404)
+
+    def do_PUT(self):
+        body = self._read_body()
+        path = self.path.split("?")[0]
+        if path.startswith("/api/quickApp/") and path.endswith("/files"):
+            qa_id = int(path.split("/")[3])
+            type(self).file_updates.append((qa_id, body))
+            self._send_json(None, 204)
+            return
+        self._send_json({"error": "not found"}, 404)
+
     def log_message(self, *args):  # silence
         pass
 
@@ -131,6 +250,9 @@ def mock_hc3() -> str:
     _MockHc3.refresh_polls = 0
     _MockHc3.auth_all = False
     _MockHc3.hold_refresh = 0.0
+    _MockHc3.uploaded = []
+    _MockHc3.file_updates = []
+    _MockHc3.export_post_rejects = False
     server = ThreadingHTTPServer(("127.0.0.1", 0), _MockHc3)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{server.server_port}"
@@ -739,3 +861,207 @@ def test_cli_remote_requires_hc3_url(tmp_path, monkeypatch) -> None:
     )
     assert result.returncode == 2
     assert "HC3_URL" in result.stderr
+
+
+# -- --tool/-t: HC3 file transfer tools ------------------------------------------
+
+
+def _tool_project(tmp_path, name: str = "Proj") -> tuple[Path, Path]:
+    main = tmp_path / "main.lua"
+    main.write_text(
+        f"--%%name:{name}\n"
+        "--%%type:com.fibaro.binarySwitch\n"
+        "--%%file:lib.lua,lib\n"
+        "-- --------------- EOH ---------------\n"
+        "print(helper())\n"
+    )
+    lib = tmp_path / "lib.lua"
+    lib.write_text("function helper() return 42 end\n")
+    return main, lib
+
+
+def test_tool_download_qa_unpacks_to_directory(tmp_path, mock_hc3) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    target = tmp_path / "out"
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--tool", "downloadQA", "45", "-d", str(target)],
+        env=_hc3_env(mock_hc3, str(home)),
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    main = (target / "downloaded_main_45.lua").read_text(encoding="utf-8")
+    assert "--%%name:downloaded" in main
+    assert "--%%file:downloaded_lib_45.lua,lib" in main
+    assert "print('MAIN')" in main
+    # the UI structures translate back to --%%u rows, with callback names
+    assert (
+        "--%%u:{{label='lbl',text='Status'},{button='goBtn',text='Go',onReleased='goNow'}}"
+    ) in main
+    assert (
+        "--%%u:{slider='dim',text='Brightness',min='0',max='100',step='1',"
+        "value='50',onChanged='dimChanged'}"
+    ) in main
+    # QuickApp variables roundtrip as --%%var lines
+    assert "--%%var:speed='42'" in main
+    # the QA's old --%% header is dropped (could be outdated)
+    assert "--%%name:OLD" not in main
+    assert "--%%mode:offline" not in main
+    # extras are namespaced <name>_<file>_<id>.lua, so several downloads can
+    # share a directory
+    assert "function helper() return 42 end" in (
+        target / "downloaded_lib_45.lua"
+    ).read_text(encoding="utf-8")
+
+
+def test_tool_download_qa_falls_back_to_get_export(tmp_path, mock_hc3) -> None:
+    # some firmware 400s the export POST altogether; the tool falls back to
+    # the deprecated-but-working GET
+    _MockHc3.export_post_rejects = True
+    home = tmp_path / "home"
+    home.mkdir()
+    target = tmp_path / "out"
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--tool", "downloadQA", "45", "-d", str(target)],
+        env=_hc3_env(mock_hc3, str(home)),
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (target / "downloaded_main_45.lua").exists()
+    assert (target / "downloaded_lib_45.lua").exists()  # fetched through the GET fallback
+
+
+def test_tool_upload_qa_posts_packaged_fqa(tmp_path, mock_hc3) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    main, _lib = _tool_project(tmp_path)
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "-t", "uploadQA", str(main), "--room", "7"],
+        env=_hc3_env(mock_hc3, str(home)),
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "uploaded Proj — HC3 device id 300" in result.stdout
+    assert len(_MockHc3.uploaded) == 1
+    fqa = _MockHc3.uploaded[0]
+    assert fqa["name"] == "Proj"
+    assert fqa["type"] == "com.fibaro.binarySwitch"
+    assert [f["name"] for f in fqa["files"]] == ["main", "lib"]
+    assert "print(helper())" in fqa["files"][0]["content"]
+    assert "function helper()" in fqa["files"][1]["content"]
+
+
+def _downloaded_project(tmp_path, name: str = "downloaded", qa_id: int = 45) -> Path:
+    # a downloadQA-shaped project: <name>_main_<id>.lua + namespaced extras
+    main = tmp_path / f"{name}_main_{qa_id}.lua"
+    main.write_text(
+        f"--%%name:{name}\n"
+        "--%%type:com.fibaro.binarySwitch\n"
+        f"--%%file:{name}_lib_{qa_id}.lua,lib\n"
+        "-- --------------- EOH ---------------\n"
+        "print(helper())\n"
+    )
+    (tmp_path / f"{name}_lib_{qa_id}.lua").write_text(
+        "function helper() return 42 end\n"
+    )
+    return main
+
+
+def test_tool_upload_qa_updates_id_from_qualified_main(tmp_path, mock_hc3) -> None:
+    # a downloaded <Name>_main_<id>.lua carries the HC3 id — uploadQA updates
+    # that QA instead of creating a new one
+    home = tmp_path / "home"
+    home.mkdir()
+    main = _downloaded_project(tmp_path)
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--tool", "uploadQA", str(main)],
+        env=_hc3_env(mock_hc3, str(home)),
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "updated QA 45 from downloaded (2 files)" in result.stdout
+    assert _MockHc3.uploaded == []  # no new QA was created
+    assert len(_MockHc3.file_updates) == 1
+    qa_id, files = _MockHc3.file_updates[0]
+    assert qa_id == 45
+    assert [f["name"] for f in files] == ["main", "lib"]
+
+
+def test_tool_upload_qa_resolves_qa_name_in_cwd(tmp_path, mock_hc3) -> None:
+    # a bare QA name finds <sanitized>_main_<id>.lua in the current directory
+    home = tmp_path / "home"
+    home.mkdir()
+    _downloaded_project(tmp_path)
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--tool", "uploadQA", "downloaded"],
+        env=_hc3_env(mock_hc3, str(home)),
+        cwd=tmp_path,  # the project files live here
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "updated QA 45 from downloaded (2 files)" in result.stdout
+    assert len(_MockHc3.file_updates) == 1
+
+
+def test_tool_update_qa_puts_all_files(tmp_path, mock_hc3) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    main, _lib = _tool_project(tmp_path, name="Upd")
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--tool=updateQA", "45", str(main)],
+        env=_hc3_env(mock_hc3, str(home)),
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "updated QA 45 (2 files)" in result.stdout
+    assert len(_MockHc3.file_updates) == 1
+    qa_id, files = _MockHc3.file_updates[0]
+    assert qa_id == 45
+    assert [f["name"] for f in files] == ["main", "lib"]
+    assert files[0]["isMain"] is True and files[1]["isMain"] is False
+    assert files[0]["type"] == "lua" and files[1]["type"] == "lua"
+
+
+def test_tool_unknown_command(tmp_path) -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--tool", "bogus"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 2
+    assert "unknown tool" in result.stderr
+
+
+def test_cli_tool_listing(tmp_path) -> None:
+    # a bare --tool (or --tool help, or -t) lists the installed tools
+    for args in (["--tool"], ["--tool", "help"], ["-t"]):
+        result = subprocess.run(
+            [sys.executable, "-m", "flua", *args],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        for tool in ("downloadQA", "updateQA", "uploadQA"):
+            assert tool in result.stdout
+        assert "flua --tool <name> --help" in result.stdout

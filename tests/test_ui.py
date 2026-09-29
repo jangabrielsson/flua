@@ -11,7 +11,84 @@ import pytest
 pytest.importorskip("lupa")
 
 from flua.engine import LuaEngine  # noqa: E402
-from flua.ui import compile_ui  # noqa: E402
+from flua.ui import compile_ui, ui_to_u_rows  # noqa: E402
+
+
+def test_ui_to_u_rows_roundtrip() -> None:
+    # compile -> translate back: the element kinds, names and callback
+    # methods survive the roundtrip
+    rows = [
+        {"label": "lbl", "text": "Status"},
+        {"button": "btn", "text": "Go", "onReleased": "turnOn"},
+        {"switch": "sw", "text": "Auto", "value": "false", "onReleased": "handleSwitch"},
+        {
+            "slider": "dim",
+            "text": "Brightness",
+            "min": "0",
+            "max": "100",
+            "value": "50",
+            "onChanged": "handleSlider",
+        },
+        {
+            "select": "sel",
+            "text": "Mode",
+            "value": "1",
+            "onToggled": "handleSelect",
+            "options": [
+                {"type": "option", "text": "Economy", "value": "1"},
+                {"type": "option", "text": "Comfort", "value": "2"},
+            ],
+        },
+        {
+            "multi": "m1",
+            "text": "Tags",
+            "values": ["1"],
+            "onToggled": "handleMulti",
+            "options": [{"type": "option", "text": "Tag A", "value": "1"}],
+        },
+    ]
+    ui = compile_ui(rows, 5000)
+    from flua.config import parse_lua_literal
+
+    out = ui_to_u_rows(
+        ui_view=ui["uiView"], ui_callbacks=ui["uiCallbacks"]
+    )
+    assert len(out) == len(rows)
+    parsed = [parse_lua_literal(row) for row in out]
+    assert [list(p)[0] for p in parsed] == [
+        "label",
+        "button",
+        "switch",
+        "slider",
+        "select",
+        "multi",
+    ]
+    assert parsed[1]["button"] == "btn" and parsed[1]["onReleased"] == "turnOn"
+    assert parsed[2]["switch"] == "sw" and parsed[2]["onReleased"] == "handleSwitch"
+    assert parsed[3]["slider"] == "dim" and parsed[3]["onChanged"] == "handleSlider"
+    assert parsed[4]["select"] == "sel" and parsed[4]["onToggled"] == "handleSelect"
+    assert parsed[4]["options"] == [
+        {"type": "option", "text": "Economy", "value": "1"},
+        {"type": "option", "text": "Comfort", "value": "2"},
+    ]
+    assert parsed[5]["multi"] == "m1" and parsed[5]["values"] == ["1"]
+
+
+def test_ui_to_u_rows_legacy_viewlayout() -> None:
+    # QAs with only the legacy viewLayout translate through that format
+    rows = [
+        {"button": "on", "text": "On", "onReleased": "turnOn"},
+        {"slider": "dim", "text": "Brightness", "min": "0", "max": "100", "value": "50"},
+    ]
+    ui = compile_ui(rows, 5000)
+    from flua.config import parse_lua_literal
+
+    out = ui_to_u_rows(
+        view_layout=ui["viewLayout"], ui_callbacks=ui["uiCallbacks"]
+    )
+    parsed = [parse_lua_literal(row) for row in out]
+    assert [list(p)[0] for p in parsed] == ["button", "slider"]
+    assert parsed[0]["button"] == "on" and parsed[0]["onReleased"] == "turnOn"
 
 
 def test_label_row() -> None:

@@ -22,6 +22,7 @@ import asyncio
 import contextlib
 import logging
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -39,7 +40,7 @@ from .api import Api
 from .api.state import public
 from .bindings import install_bindings
 from .clock import VirtualClock
-from .config import _apply_mode, parse_annotations, split_annotations
+from .config import _apply_mode, _is_eoh, parse_annotations, split_annotations
 from .devices import catalog_types
 from .environment import EnvChain
 from .hc3 import Hc3Remote
@@ -49,7 +50,7 @@ from .mqtt import MqttPool
 from .proxy import PROXY_PORT_DEFAULT, connect_proxy, local_ip, resolve_proxy
 from .sync_socket import SyncTCPSockets, SyncUDPSockets
 from .timers import TimerManager
-from .ui import compile_ui
+from .ui import compile_ui, lua_literal, ui_to_u_rows
 from .websocket import WebSocketPool
 
 logger = logging.getLogger(__name__)
@@ -88,6 +89,13 @@ _PUMP_POLL = 0.01
 # default executor, so an abandoned poll can't delay Ctrl-C or exit —
 # asyncio.run would otherwise wait for the executor worker at shutdown.
 _HC3_POLL_TIMEOUT = 40.0
+
+
+def sanitize_filename(text: str) -> str:
+    """A filename-safe QA name: runs of non-alphanumerics collapse to ``_``
+    (used for the downloaded project file names)."""
+    sanitized = re.sub(r"[^A-Za-z0-9]+", "_", str(text)).strip("_")
+    return sanitized or "qa"
 
 
 class LuaEngine:
@@ -929,11 +937,28 @@ class LuaEngine:
             return "nil"
         return str(value)
 
-    def fqa_to_files(self, fqa: dict[str, Any], directory: str) -> tuple[str | None, str | None]:
+    def fqa_to_files(
+        self,
+        fqa: dict[str, Any],
+        directory: str,
+        device_id: int | None = None,
+        strip_header: bool = False,
+    ) -> tuple[str | None, str | None]:
         """Unpack a .fqa package into ``directory``: the generated main file
-        carries --%% directives (name, type, files, scalar initialProperties),
+        carries --%% directives (name, type, properties, --%%u UI rows, files),
         the extras keep their assigned names. The result loads as a normal
-        flua project (this is also what import_qa uses internally)."""
+        flua project (this is also what import_qa uses internally).
+
+        With ``device_id`` (the downloadQA case) every file is named
+        ``<sanitized-QA-name>_<file>_<id>.lua`` — several downloaded QAs can
+        share one directory without colliding, and the file names carry the
+        HC3 id back for later updates. Without it (plain unpack), the extras
+        get a .lua extension and the main stays ``main.lua``.
+
+        ``strip_header`` drops a leading --%% header from the main's content
+        before the regenerated one is prepended (downloaded QAs may carry
+        outdated directives).
+        """
         files = fqa.get("files")
         if not isinstance(files, list) or not files:
             return None, "fqa package has no files"
@@ -949,6 +974,22 @@ class LuaEngine:
             for key, value in initial.items():
                 if isinstance(value, (str, int, float, bool)) or value is None:
                     header.append(f"--%%property:{key}={self._lua_scalar(value)}")
+            variables = initial.get("quickAppVariables")
+            if isinstance(variables, list):
+                for var in variables:
+                    if isinstance(var, dict) and var.get("name"):
+                        header.append(
+                            f"--%%var:{var['name']}={lua_literal(var.get('value'))}"
+                        )
+            if initial.get("useUiView") is False:
+                header.append("--%%useUiView:false")
+            for row in ui_to_u_rows(
+                ui_view=initial.get("uiView"),
+                view_layout=initial.get("viewLayout"),
+                ui_callbacks=initial.get("uiCallbacks"),
+            ):
+                header.append(f"--%%u:{row}")
+        prefix = sanitize_filename(str(fqa.get("name") or "QuickApp"))
         for entry in files:
             if entry is main:
                 continue
@@ -956,15 +997,40 @@ class LuaEngine:
                 name = self._safe_file_name(str(entry.get("name") or ""))
             except ValueError as exc:
                 return None, str(exc)
-            path = os.path.join(directory, name)
+            if device_id is not None:
+                disk_name = f"{prefix}_{name}_{device_id}.lua"
+            else:
+                disk_name = f"{name}.lua"
+            path = os.path.join(directory, disk_name)
             with open(path, "w", encoding="utf-8") as handle:
                 handle.write(str(entry.get("content") or ""))
-            header.append(f"--%%file:{name},{name}")
+            header.append(f"--%%file:{disk_name},{name}")
         header.append("-- --------------- EOH ---------------")
-        main_path = os.path.join(directory, "main.lua")
+        content = str(main.get("content") or "")
+        if strip_header:
+            content = self._strip_directive_header(content)
+        if device_id is not None:
+            main_name = f"{prefix}_main_{device_id}.lua"
+        else:
+            main_name = "main.lua"
+        main_path = os.path.join(directory, main_name)
         with open(main_path, "w", encoding="utf-8") as handle:
-            handle.write("\n".join(header) + "\n" + str(main.get("content") or ""))
+            handle.write("\n".join(header) + "\n" + content)
         return main_path, None
+
+    @staticmethod
+    def _strip_directive_header(content: str) -> str:
+        """Drop a leading --%% header (with EOH markers and blank lines) from
+        QA content — the regenerated header replaces it; old directives from
+        the HC3 may be outdated."""
+        lines = content.splitlines()
+        while lines:
+            stripped = lines[0].strip()
+            if stripped.startswith("--%%") or _is_eoh(stripped) or not stripped:
+                lines.pop(0)
+            else:
+                break
+        return "\n".join(lines)
 
     # -- QA directory -----------------------------------------------------------
 

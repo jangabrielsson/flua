@@ -60,6 +60,11 @@ Requires Python 3.11+. `lupa` is the only runtime dependency.
 .venv/bin/flua export script.lua -o script.fqa
 .venv/bin/flua unpack script.fqa -d project/
 
+# HC3 file tools: upload/update/download QAs as unpacked projects
+.venv/bin/flua --tool uploadQA script.lua
+.venv/bin/flua --tool updateQA 123 script.lua
+.venv/bin/flua --tool downloadQA 123 -d project/
+
 # virtual time: accelerated or instant simulation
 .venv/bin/flua --speed 60 script.lua     # 60x faster
 .venv/bin/flua --instant script.lua      # timers fire now, time jumps ahead

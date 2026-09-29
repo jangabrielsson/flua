@@ -569,6 +569,41 @@ Upload `myqa.fqa` through the HC3 web UI (Create QuickApp → import). The
 package follows the HC3's schema — only the properties the HC3 accepts
 travel; dynamic properties are left out.
 
+Or let flua talk to the HC3 directly with the `--tool` (alias `-t`)
+commands — they package/unpack for you, so you develop in the unpacked
+format (individual `.lua` files) and only the HC3 sees `.fqa`:
+
+```bash
+# upload an unpacked project (main file + --%%file extras) as a new QA
+.venv/bin/flua --tool uploadQA script.lua            # --room ID to place it
+
+# update an existing QA's files from the unpacked project
+.venv/bin/flua --tool updateQA 123 script.lua
+
+# download a QA from the HC3 and unpack it into individual .lua files
+.venv/bin/flua --tool downloadQA 123 -d project/     # -d DIR (default: QA name)
+
+# list the installed tools (a bare --tool, or --tool help)
+.venv/bin/flua --tool
+```
+
+A download names every file `<QA-name>_<file>_<id>.lua` (the QA name is
+sanitized for the file system) — `My QA_main_123.lua` for the main,
+`My_QA_lib_123.lua` for extras — so several QAs can live in one directory
+without colliding, and the HC3 id travels with the files. The generated main
+regenerates the QA's header from the package: its UI comes back as `--%%u`
+rows (translated from `uiView`/`viewLayout`/`uiCallbacks`), variables as
+`--%%var` lines — and any old `--%%` directives in the downloaded code are
+dropped, since they may be outdated. `uploadQA` then takes either the QA
+name (it finds the project in the current directory) or the fully qualified
+`<QA-name>_main_<id>.lua` and updates that QA on the HC3; a plain
+`main.lua` uploads as a new QA.
+
+The tools need HC3 credentials (the `.env` chain, like online mode).
+`uploadQA` prints the new device id; `updateQA` puts all files at once;
+`downloadQA` writes a `main.lua` with the QA's directives plus the extra
+files — a normal flua project.
+
 ## Bringing an HC3 QA home
 
 Export the QA from the HC3 UI (`.fqa`), then:

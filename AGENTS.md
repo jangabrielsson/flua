@@ -59,6 +59,9 @@ Python 3.11+. `lupa` is the only runtime dependency.
 - `src/flua/lua/` — the HC3 runtime in Lua: `init.lua` (pump handlers, timers,
   per-QA environments), `quickapp.lua`, `fibaro.lua`, `net.lua`, `mqtt.lua`.
 - `src/flua/cli.py` — the `flua` command.
+- `src/flua/tools/` — the `--tool` commands (downloadQA/uploadQA/updateQA):
+  one module per tool, auto-discovered by the package registry; shared
+  helpers live in `tools/common.py`.
 - `src/flua/config.py` — `--%%` directive parsing, `.directives` defaults,
   mode normalization (`--%%mode:online|offline|proxy`).
 - `src/flua/proxy.py` — proxy mode: proxy QA deployment on the HC3, state
