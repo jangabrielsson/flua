@@ -313,6 +313,56 @@ async def test_global_variable_events_reach_subscribers(tmp_path, capsys) -> Non
 
 
 @pytest.mark.asyncio
+async def test_warn_directive_logs_api_error_codes(tmp_path, capsys) -> None:
+    # --%%warn:true: api error codes are easy to ignore — the emulator logs
+    # them so the developer notices
+    script = tmp_path / "w.lua"
+    script.write_text(
+        "--%%warn:true\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit()\n"
+        "  api.get('/notAnEndpoint')\n"
+        "  api.post('/alsoMissing', {name='x'})\n"
+        "  print('DONE')\n"
+        "end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        qa_id, err = engine.load_qa_file(str(script))
+        assert err is None, err
+        await asyncio.sleep(0.3)
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "api GET /notAnEndpoint -> 404 (w)" in out
+    assert "api POST /alsoMissing -> 404 (w)" in out
+    assert "DONE" in out  # warnings don't stop the QA
+
+
+@pytest.mark.asyncio
+async def test_warn_directive_off_by_default(tmp_path, capsys) -> None:
+    # without --%%warn the error codes stay silent, like on the HC3
+    script = tmp_path / "w.lua"
+    script.write_text(
+        "function QuickApp:onInit()\n"
+        "  api.get('/notAnEndpoint')\n"
+        "  print('DONE')\n"
+        "end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await asyncio.sleep(0.3)
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "-> 404" not in out
+    assert "DONE" in out
+
+
+@pytest.mark.asyncio
 async def test_print_of_api_error_shows_status(tmp_path, capsys) -> None:
     # print(api.post(...)) on an unknown endpoint returns (nil, status); a nil
     # first arg must not blank the QA log message (logStr used to drop it)

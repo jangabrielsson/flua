@@ -128,12 +128,28 @@ def install_bindings(engine: "LuaEngine") -> None:
     # HC3 REST bridge: api.get/post/put/delete -> (data, status). Synchronous
     # like the real HC3 builtins; offline it dispatches to the simulated HC3
     # (running QAs + seeded state), online mode will route to the real HC3.
+    def warn_api(method: str, url: str, status: int, qa_id: int | None) -> None:
+        """--%%warn:true: error status codes are easy to miss (most QA code
+        ignores them) — the HC3 stays silent, the emulator can shout."""
+        enabled = bool(engine.config.get("warn"))
+        name = ""
+        if qa_id is not None:
+            info = engine.qa_info(int(qa_id))
+            if info is not None:
+                enabled = enabled or bool(info.get("config", {}).get("warn"))
+                name = f" ({info['name']})"
+        if enabled and (status >= 300 or status <= 0):
+            engine.log_line(
+                "warning", f"api {method.upper()} {url} -> {status}{name}"
+            )
+
     def api_call(
         method: str, url: str, body: object, qa_id: int | None = None
     ) -> tuple[object, int]:
         if bool((engine.config.get("debug") or {}).get("api")):
             engine.debug_log(f"api {method.upper()} {url}")
         data, status = engine.api.dispatch(method, url, lua_to_python(body), qa_id=qa_id)
+        warn_api(method, url, status, qa_id)
         if data is None:
             return None, status
         if not isinstance(data, (dict, list, tuple)):
@@ -146,6 +162,7 @@ def install_bindings(engine: "LuaEngine") -> None:
         if bool((engine.config.get("debug") or {}).get("api")):
             engine.debug_log(f"api.hc3 {method.upper()} {url}")
         data, status = engine.api.dispatch_hc3(method, url, lua_to_python(body))
+        warn_api(method, url, status, None)
         if data is None:
             return None, status
         if not isinstance(data, (dict, list, tuple)):

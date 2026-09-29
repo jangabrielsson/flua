@@ -381,7 +381,9 @@ def _apply_mode(config: dict[str, Any]) -> dict[str, Any]:
 # Parameter names that belong to the global (shared) config. When a QA file
 # sets one of these, it is copied up to the global config — the last file
 # that sets it wins. Everything else stays local to the QA's config copy.
-GLOBAL_PARAMS = frozenset({"speed", "instant", "maxhours", "time", "debug", "loglength"})
+GLOBAL_PARAMS = frozenset(
+    {"speed", "instant", "maxhours", "time", "debug", "loglength", "warn"}
+)
 
 # Every --%% directive flua understands (globals + locals). --check flags
 # anything else, and the runtime parser warns about it too — a typo like
@@ -400,6 +402,7 @@ KNOWN_DIRECTIVES = frozenset(
         "proxy",  # legacy alias for --%%mode:proxy
         "debug",  # --%%debug:refreshState=true,api=true,http=true
         "loglength",  # --%%loglength:120 — debug line length
+        "warn",  # --%%warn:true — extra runtime warnings
         "uid",
         "description",
         "model",

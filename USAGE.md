@@ -225,6 +225,7 @@ Parsing stops at the end-of-header marker:
 | `--%%mode:proxy` | proxy mode: mirror this QA onto the HC3 (online only, see below) |
 | `--%%debug:refreshState=true,api=true,http=true` | debug logging: refreshStates events / `api.*` calls / `net.HTTPClient` requests (global) |
 | `--%%loglength:120` | debug line length cap (default 120) |
+| `--%%warn:true` | extra runtime warnings for things the HC3 stays silent about (global) |
 
 The legacy `--%%offline:true` and `--%%proxy:true` still work as aliases for
 `--%%mode:offline` and `--%%mode:proxy` (an explicit `--%%mode` wins when
@@ -249,6 +250,16 @@ logging (any subset; it is a global directive, so `.directives` can carry it):
 
 `--%%loglength:120` caps the debug line length (default 120; a cut line ends
 with `...`).
+
+`--%%warn:true` turns on extra runtime warnings for things the HC3 never
+complains about — starting with api error codes: when an `api.get`/`post`/
+`put`/`delete` (or `api.hc3.*`) returns a 4xx/5xx — or a transport failure —
+the emulator logs it, because most QA code silently ignores those status
+codes:
+
+```
+api GET /devices/9999 -> 404 (my-qa)
+```
 
 ### QuickApp UI (`--%%u`)
 
