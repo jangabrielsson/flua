@@ -98,6 +98,13 @@ an interval firing once per simulated second fires exactly five times):
 .venv/bin/flua --instant script.lua     # timers fire now, os.time() jumps ahead
 ```
 
+`fibaro.sleep(ms)` suspends the *calling QA* for `ms` of virtual time — other
+QAs keep running, and the sleep follows `--speed`/`--instant` like a timer.
+Like on the HC3 it is a busy wait: nothing is delivered to the QA while it
+sleeps — timer callbacks, actions, UI and network events that arrive during
+the sleep are dropped, not queued. It is only valid inside a callback; at top
+level or in `onInit` it raises an error.
+
 ## VS Code setup
 
 The repo ships `.vscode/launch.json` with three configurations:

@@ -1,6 +1,7 @@
 fibaro = fibaro or {}
 local fmt = string.format
 _PY = _PY or {}
+_FLUA = _FLUA or {}
 __TAG = __TAG or "FLUA"
 
 -- A simple ternary operator implementation.
@@ -68,11 +69,6 @@ function __fibaro_get_partitions() return api.get('/alarms/v1/partitions') end
 -- @return A table containing breached alarm partition objects.
 ---@diagnostic disable-next-line: lowercase-global
 function __fibaro_get_breached_partitions() return api.get("/alarms/v1/partitions/breached") end
-
--- Pauses execution for a specified number of milliseconds.
--- @param ms - The duration to sleep in milliseconds.
----@diagnostic disable-next-line: lowercase-global
-function __fibaroSleep(ms) _PY.sleep(ms/1000.0) end
 
 -- Placeholder function, seems to indicate async handler usage.
 -- @param _ - Unused parameter.
@@ -475,10 +471,20 @@ function fibaro.wakeUpDeadDevice(deviceID)
 end
 
 -- Pauses execution for a specified number of milliseconds.
--- @param ms - The duration to sleep in milliseconds.
+-- flua: suspends the CALLING QA for ms of virtual time — other QAs keep
+-- running. No callback is delivered to the QA while it sleeps (busy-wait
+-- semantics, like the HC3's blocking sleep): timer callbacks, device actions,
+-- UI and network events that arrive during the sleep are lost. Only valid
+-- inside a QA callback; at top level or in onInit it raises an error.
 function fibaro.sleep(ms)
   __assert_type(ms, "number")
-  __fibaroSleep(ms)
+  if coroutine.running() == nil then
+    error("fibaro.sleep can only be called from a QA callback", 2)
+  end
+  if not _FLUA.qa(_FLUA.qaId) then
+    error("fibaro.sleep can only be called after the QA has started (not during init)", 2)
+  end
+  return coroutine.yield(ms)
 end
 
 function fibaro.useAsyncHandler(value)

@@ -21,11 +21,13 @@ _FLUA.version = _PY.version()
 -- side: _PY.post{type="setTimeout", id=N, ...} schedules timer N, and the
 -- resulting timerExpired message runs callbacks[N] exactly once.
 local callbacks = {}
+local callback_qas = {} -- timer id -> owning qaId (nil = runtime/main-state timer)
 local nextId = 0
 
-local function register(fn)
+local function register(fn, qa)
   nextId = nextId + 1
   callbacks[nextId] = fn
+  callback_qas[nextId] = qa
   return nextId
 end
 
@@ -120,7 +122,7 @@ end
 -- ------------------------------------------------------------------- timers
 function _FLUA.setTimeout(fn, ms, qa)
   ms = ms or 0
-  local id = register(fn)
+  local id = register(fn, qa)
   -- qa attributes the timer to a QA; nil = runtime/untracked
   _PY.post{ type = "setTimeout", id = id, delay = ms, qa = qa }
   return id
@@ -169,6 +171,67 @@ clearInterval = _FLUA.clearInterval
 -- from runtime code and stops the engine itself.
 function _FLUA.exit(code, qaId)
   _PY.post{ type = "exit", code = code or 0, qa = qaId }
+end
+
+-- ------------------------------------------------------------------- sleep
+-- fibaro.sleep(ms): suspend the CALLING QA for ms of virtual time (fibaro.lua
+-- implements the API surface). Callbacks run as per-QA coroutines (runInQa);
+-- fibaro.sleep yields ms and the runner schedules a QA-attributed wake timer,
+-- so sleep rides the virtual clock (--speed/--instant) like any other timer.
+-- While a QA sleeps no message is delivered to it — busy-wait semantics, like
+-- the HC3's blocking sleep — and the pump keeps the other QAs running.
+local sleeping = {}    -- qaId -> suspended callback coroutine
+local wakeTimers = {}  -- timer ids that end a sleep (never deferred)
+
+local function resumeQa(qaId, co, ...)
+  local ok, res = coroutine.resume(co, ...)
+  if not ok then
+    if sleeping[qaId] == co then sleeping[qaId] = nil end
+    postLog("error", tostring(res))
+    postLog("error", debug.traceback(co, nil, 2))
+    return
+  end
+  if coroutine.status(co) == "suspended" then
+    if type(res) ~= "number" then
+      -- yield protocol violation (e.g. async.await outside async.run)
+      sleeping[qaId] = nil
+      postLog("error", "unexpected yield from QA callback (fibaro.sleep expects ms)")
+      return
+    end
+    sleeping[qaId] = co
+    -- declare id first: a closure inside a `local id = ...` initializer binds
+    -- to an outer id in this Lua version (Lua 5.5 initializer scoping)
+    local id
+    id = _FLUA.setTimeout(function()
+      wakeTimers[id] = nil
+      if sleeping[qaId] == co then
+        sleeping[qaId] = nil
+        resumeQa(qaId, co)
+      end
+    end, res, qaId)
+    wakeTimers[id] = true
+  elseif sleeping[qaId] == co then
+    sleeping[qaId] = nil
+  end
+end
+
+-- Every QA callback entry point goes through here. qaId == nil means a
+-- runtime (main-state) timer: run it plain, like before — fibaro.sleep
+-- cannot work there and errors clearly.
+local function runInQa(qaId, fn, ...)
+  if qaId == nil then
+    xpcall(fn, traceback)
+    return
+  end
+  local co = coroutine.create(fn)
+  -- Lua 5.5 does not inherit debug hooks into new coroutines: mirror the
+  -- current thread's hook (mobdebug breakpoints/stepping) onto the callback
+  -- coroutine, so debugged QAs behave like they ran on the main thread.
+  local hook, mask, count = debug.gethook()
+  if hook then
+    debug.sethook(co, hook, mask, count)
+  end
+  resumeQa(qaId, co, ...)
 end
 
 -- --------------------------------------------------------------------- json
@@ -631,7 +694,11 @@ handlers.timerExpired = function(msg)
   local fn = callbacks[msg.id]
   if fn then
     callbacks[msg.id] = nil -- one-shot
-    xpcall(fn, traceback)
+    local qaId = callback_qas[msg.id]
+    if not wakeTimers[msg.id] and qaId and sleeping[qaId] then
+      return -- QA busy: the callback is lost (busy-wait semantics)
+    end
+    runInQa(qaId, fn)
   else
     postLog("warning", "timerExpired for unknown id " .. tostring(msg.id))
   end
@@ -639,21 +706,26 @@ end
 
 -- Device actions arrive through the pump (never synchronously from Python):
 -- the api handler enqueues, the pump delivers, and the QA's own callAction
--- does method lookup + error containment (quickapp.lua).
+-- does method lookup + error containment (quickapp.lua). Returns
+-- (instance, ownerQaId): children share the parent QA's code, so a sleeping
+-- child sleeps the parent (busy-wait on the shared instance, like the HC3).
 local function qaForDevice(id)
   local qa = qaInstances[id]
-  if qa then return qa end
-  for _, main in pairs(qaInstances) do
+  if qa then return qa, id end
+  for qaId, main in pairs(qaInstances) do
     local child = main.childDevices and main.childDevices[id]
-    if child then return child end
+    if child then return child, qaId end
   end
-  return nil
+  return nil, nil
 end
 
 handlers.deviceAction = function(msg)
-  local qa = qaForDevice(msg.id)
+  local qa, qaId = qaForDevice(msg.id)
   if qa and type(qa.callAction) == "function" then
-    qa:callAction(msg.action, table.unpack(msg.args or {}))
+    if sleeping[qaId] then return end -- QA busy: the action is lost
+    runInQa(qaId, function()
+      qa:callAction(msg.action, table.unpack(msg.args or {}))
+    end)
   elseif qa == nil then
     postLog("warning", "deviceAction for unknown device " .. tostring(msg.id))
   end
@@ -675,8 +747,9 @@ local function isMultiSelect(qa, elementName)
 end
 
 handlers.uiEvent = function(msg)
-  local qa = qaForDevice(msg.deviceId)
+  local qa, qaId = qaForDevice(msg.deviceId)
   if qa and type(qa.UIAction) == "function" then
+    if sleeping[qaId] then return end -- QA busy: the event is lost
     local value = msg.value
     -- multi selects arrive as a comma-joined list through the single value
     -- param (the real HC3 contract); restore the list so the QA sees
@@ -686,9 +759,13 @@ handlers.uiEvent = function(msg)
       for v in string.gmatch(value, "[^,]+") do
         values[#values + 1] = v
       end
-      qa:UIAction(msg.eventType, msg.elementName, values)
+      runInQa(qaId, function()
+        qa:UIAction(msg.eventType, msg.elementName, values)
+      end)
     else
-      qa:UIAction(msg.eventType, msg.elementName, value)
+      runInQa(qaId, function()
+        qa:UIAction(msg.eventType, msg.elementName, value)
+      end)
     end
   elseif qa == nil then
     postLog("warning", "uiEvent for unknown device " .. tostring(msg.deviceId))
@@ -696,10 +773,14 @@ handlers.uiEvent = function(msg)
 end
 
 handlers.customEvent = function(msg)
-  for _, qa in pairs(qaInstances) do
+  for qaId, qa in pairs(qaInstances) do
     local fn = qa.onCustomEvent
     if type(fn) == "function" then
-      xpcall(function() fn(qa, msg.name) end, traceback)
+      if sleeping[qaId] then
+        -- QA busy: the event is not delivered
+      else
+        runInQa(qaId, function() fn(qa, msg.name) end)
+      end
     end
   end
 end
@@ -717,6 +798,9 @@ handlers.startQA = function(msg)
 end
 
 handlers.restartQA = function(msg)
+  -- abandon any pending sleep: the wake timer was cancelled Python-side and
+  -- the suspended coroutine belongs to the old code instance
+  sleeping[msg.id] = nil
   local env = qaEnvFor(msg.id)
   startQaInEnv(env, msg.id, msg.config or {}, msg.arg0, function()
     local ok, err = loadExtraFiles(msg.files, env)
@@ -728,35 +812,40 @@ end
 handlers.httpResult = function(msg)
   local h = _FLUA.netHandlers[msg.qa]
   if h then
-    xpcall(function() h(msg) end, traceback)
+    if sleeping[msg.qa] then return end -- QA busy: the result is lost
+    runInQa(msg.qa, function() h(msg) end)
   end
 end
 
 handlers.tcpResult = function(msg)
   local h = _FLUA.netHandlers[msg.qa]
   if h then
-    xpcall(function() h(msg) end, traceback)
+    if sleeping[msg.qa] then return end
+    runInQa(msg.qa, function() h(msg) end)
   end
 end
 
 handlers.udpResult = function(msg)
   local h = _FLUA.netHandlers[msg.qa]
   if h then
-    xpcall(function() h(msg) end, traceback)
+    if sleeping[msg.qa] then return end
+    runInQa(msg.qa, function() h(msg) end)
   end
 end
 
 handlers.wsEvent = function(msg)
   local h = _FLUA.netHandlers[msg.qa]
   if h then
-    xpcall(function() h(msg) end, traceback)
+    if sleeping[msg.qa] then return end
+    runInQa(msg.qa, function() h(msg) end)
   end
 end
 
 handlers.mqttEvent = function(msg)
   local h = _FLUA.mqttHandlers[msg.qa]
   if h then
-    xpcall(function() h(msg) end, traceback)
+    if sleeping[msg.qa] then return end
+    runInQa(msg.qa, function() h(msg) end)
   end
 end
 
@@ -784,8 +873,12 @@ handlers.refreshStateEvent = function(msg)
     end
     postLog("debug", line)
   end
-  for handle in pairs(_FLUA.refreshStateListeners) do
-    xpcall(function() handle(msg.event) end, traceback)
+  for handle, qaId in pairs(_FLUA.refreshStateListeners) do
+    if sleeping[qaId] then
+      -- QA busy: the event is not delivered
+    else
+      runInQa(qaId, function() handle(msg.event) end)
+    end
   end
 end
 

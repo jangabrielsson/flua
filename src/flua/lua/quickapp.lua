@@ -468,8 +468,9 @@ local listeners = {}
 -- Starts the refresh state subscriber
 ---@diagnostic disable-next-line: undefined-field
 function RefreshStateSubscriber:run()
-  -- flua: events arrive through the message pump (handlers.refreshStateEvent)
-  _FLUA.refreshStateListeners[self.handle] = true
+  -- flua: events arrive through the message pump (handlers.refreshStateEvent).
+  -- The registry maps handle -> owning qaId so delivery can skip a sleeping QA.
+  _FLUA.refreshStateListeners[self.handle] = _FLUA.qaId
 end
 
 -- Stops the refresh state subscriber

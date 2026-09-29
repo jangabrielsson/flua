@@ -10,6 +10,13 @@ WebSocket, MQTT) — all with `lupa` as the only runtime dependency.
 It grew out of an earlier emulator prototype; flua stands on its own —
 the same file runs in the emulator and on a real HC3.
 
+The flua philosophy is to keep the parts simple.
+* Most of the engine is written in Python; timers, api handlers, device structure directory etc.
+* Net libraries are implemented in python with a thin lua wrapper around it. HTTPClient, UDPSocket, TCPSocket, WebSocket, mqtt.
+* No emulated UI built in. Instead we have a viewer html page that renders the QA UI by connecting to a running flua instance. In the future it may become a standalone app with more features.
+Prefered UI debugging is to use the proxy concept to run a QA on the HC3 that renders the real UI and sends the events back to flua
+* flua provide tools to download and upload QAs using the flua QA format (--%% directives)
+
 **QA developers start at [USAGE.md](USAGE.md)** — install, VS Code setup,
 directives, multi-file QAs, the offline HC3, and deploying to the HC3.
 The rest of this file is how flua works under the hood.
