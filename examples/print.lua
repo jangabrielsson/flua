@@ -13,4 +13,7 @@ function QuickApp:onInit()
   print("<font color='red'>HELLO</font>")
   print("<font color='green'><i>HELLO</i></font>")
   print("<table><tr><td>HELLO</td><td></td><td>A</td></tr><tr><td>WORLD</td></tr></table>")
+
+  -- print iso characters
+  print("ISO: ñ, ü, é, å, ø")
 end
