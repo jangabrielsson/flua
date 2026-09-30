@@ -113,6 +113,7 @@ def install_bindings(engine: "LuaEngine") -> None:
     py["getenv"] = engine.env.get
     py["version"] = lambda: __version__
     py["color_enabled"] = engine.color_enabled
+    py["render_html"] = engine.render_html
 
     # JSON for QA code and mobdebug's VSCODE protocol (json.lua delegates
     # here). _json_to_python honors json.util.InitArray; lua_to_python (the

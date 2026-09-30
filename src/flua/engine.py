@@ -47,6 +47,7 @@ from .environment import EnvChain
 from .hc3 import Hc3Remote
 from .http import http_call
 from .http_server import ApiServer
+from .loghtml import render_html as render_html_tags
 from .mqtt import MqttPool
 from .proxy import PROXY_PORT_DEFAULT, connect_proxy, local_ip, resolve_proxy
 from .sync_socket import SyncTCPSockets, SyncUDPSockets
@@ -286,6 +287,12 @@ class LuaEngine:
         and logging, never Lua state — so it works inside debugger-stepped
         code, where the pump is frozen)."""
         self._handle_log({"type": messages.LOG, "level": level, "text": text})
+
+    def render_html(self, text: str) -> str:
+        """Render the HTML subset the HC3 console supports in QA log
+        messages (see loghtml.py). Pure Python — safe at any Lua call depth
+        like log_line."""
+        return render_html_tags(str(text), self.color_enabled())
 
     def debug_log(self, text: str) -> None:
         """Print a --%%debug line, cut short after --%%loglength characters

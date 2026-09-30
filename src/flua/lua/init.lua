@@ -84,7 +84,15 @@ local function postLog(level, ...)
   _PY.log(level, sanitizeMsg(table.concat(parts, "\t")))
 end
 
-print = function(...) postLog("info", ...) end
+print = function(...)
+  local parts = {}
+  for i = 1, select("#", ...) do
+    parts[i] = tostring(select(i, ...))
+  end
+  -- the HC3 console renders a small HTML subset in log messages; flua
+  -- renders it to the terminal (ANSI with colors on, tags stripped off)
+  _PY.log("info", _PY.render_html(sanitizeMsg(table.concat(parts, "\t"))))
+end
 _FLUA.print = print
 
 -- --------------------------------------------------------- virtual time
@@ -453,6 +461,9 @@ local LOG_GRAY, LOG_RESET = "\27[37m", "\27[0m"
 
 local function formatLogLine(tag, level, msg)
   local date = os.date("[%d.%m.%Y][%H:%M:%S]")
+  -- render the HC3 console's HTML subset (fibaro.debug supports it there);
+  -- sanitize first so raw bytes never cross the bridge
+  msg = _PY.render_html(sanitizeMsg(tostring(msg)))
   if _PY.color_enabled() then
     return string.format(
       "%s%s%s[%-7s]%s[%s]: %s%s",

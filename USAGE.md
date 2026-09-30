@@ -297,6 +297,23 @@ codes:
 api GET /devices/9999 -> 404 (my-qa)
 ```
 
+### HTML in log messages
+
+The HC3 console renders a small HTML subset in QA log lines; flua renders
+it to the terminal as well — `print` and `fibaro.debug`/`trace`/`warning`/
+`error` messages only (flua's own diagnostic lines are left alone):
+
+- `<b>`/`<strong>`, `<i>`/`<em>`, `<u>` — bold, italic, underline
+- `<font color="red">` / `<span style="color:blue">` — text color (named
+  colors and `#rrggbb`)
+- `<table>`/`<tr>`/`<td>`/`<th>` — a table with padded columns
+- `<ul>`/`<ol>`/`<li>` — bullet / numbered lists
+- `<br/>` — a line break
+- anything else loses its tags, keeping the content
+
+With colors on, formatting becomes ANSI; with `--color never` (or a
+non-terminal) the tags are stripped instead, so the text stays readable.
+
 ### QuickApp UI (`--%%u`)
 
 Each `--%%u:` line defines one row of the QuickApp UI; several elements can

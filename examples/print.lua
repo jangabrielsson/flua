@@ -9,4 +9,8 @@ function QuickApp:onInit()
   self:trace("TRACE")
   self:warning("WARN")
   self:error("ERROR")
+
+  print("<font color='red'>HELLO</font>")
+  print("<font color='green'><i>HELLO</i></font>")
+  print("<table><tr><td>HELLO</td><td></td><td>A</td></tr><tr><td>WORLD</td></tr></table>")
 end

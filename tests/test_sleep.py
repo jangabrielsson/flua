@@ -288,11 +288,11 @@ async def test_plugin_restart_reruns_qa(tmp_path, capsys) -> None:
         await engine.stop()
 
 
-def test_example_state_restarts_with_variable() -> None:
-    # examples/state.lua: sleep in onInit + plugin.restart, bounded by a
+def test_example_restart_restarts_with_variable() -> None:
+    # examples/restart.lua: sleep in onInit + plugin.restart, bounded by a
     # quickAppVariable counter that survives the restarts
     result = subprocess.run(
-        [sys.executable, "-m", "flua", "--api", "local", "examples/state.lua"],
+        [sys.executable, "-m", "flua", "--api", "local", "examples/restart.lua"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
