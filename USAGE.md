@@ -233,10 +233,37 @@ Parsing stops at the end-of-header marker:
 | `--%%debug:refreshState=true,api=true,http=true` | debug logging: refreshStates events / `api.*` calls / `net.HTTPClient` requests (global) |
 | `--%%loglength:120` | debug line length cap (default 120) |
 | `--%%warn:true` | extra runtime warnings for things the HC3 stays silent about (global) |
+| `--%%db:house.json` | seed the simulated HC3 from a JSON file (devices, rooms, scenes, globalVariables, alarms, profiles) |
+| `--%%db:+house.json` | seed **and** persist emulator state back to the file (see below) |
 
 The legacy `--%%offline:true` and `--%%proxy:true` still work as aliases for
 `--%%mode:offline` and `--%%mode:proxy` (an explicit `--%%mode` wins when
 both appear).
+
+### The emulator database (`--%%db`)
+
+`--%%db:house.json` seeds the simulated HC3 from a JSON file — the same
+schema as `examples/house.json` and the `--seed` flag (the directive wins
+over `--seed`). `--%%db:+house.json` additionally persists emulator state
+back to the file as it changes (atomic writes; the file must exist —
+`echo '{}' > db.json` creates an empty one). What is persisted depends on
+the mode, following each mode's source of truth:
+
+- **offline** — the file *is* the house: devices, rooms, scenes,
+  globalVariables, alarms and profiles, plus each QA's state (properties
+  and quickAppVariables) and children, under a `qaState` section keyed by
+  QA name.
+- **online** — the real HC3 owns the house data; only the emulator's own
+  artifacts are written back: `qaState` and `globalVariables`.
+- **proxy** — everything worth keeping is already on the HC3; the `+` is
+  ignored with a warning (seed still applies).
+
+Running QAs are never persisted as devices — they are rebuilt from code each
+run. Children survive restarts and re-register under their parent QA, so a
+QA's usual `api.get("/devices?parentId="..self.id)` startup check finds
+them. QA state is keyed by QA name (not the per-run id), so persisted state
+is stable across runs; `--%%var` and the other property directives win over
+persisted values.
 
 Names: `--%%name:value` for scalars,
 `--%%name:sub1=val1,sub2=val2` for subparameters. A typo'd directive is

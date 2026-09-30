@@ -70,6 +70,41 @@ class SimState:
 
     # -- seeding --------------------------------------------------------------
 
+    def snapshot(self, exclude_qa_ids: set[int] | None = None) -> dict[str, Any]:
+        """Serializable seed-format document of the persistent sim data.
+
+        Excludes the running QAs (rebuilt from code each run) and the
+        transient feeds (refreshStates/events/customEvents). Children are
+        excluded here too — they persist under their parent QA's state
+        (see the engine's qaState), so the parent id can be remapped per run.
+        """
+        exclude = exclude_qa_ids or set()
+        return {
+            "version": 1,
+            "rooms": [public(r) for r in self.rooms.values()],
+            "scenes": [public(s) for s in self.scenes.values()],
+            "globalVariables": {k: public(v) for k, v in self.global_variables.items()},
+            "alarms": [public(a) for a in self.alarms.values()],
+            "profiles": [public(p) for p in self.profiles.values()],
+            "devices": [
+                public(d)
+                for d in self.devices.values()
+                if int(d["id"]) not in exclude and not d.get("parentId")
+            ],
+        }
+
+    def restore_child(self, child: dict[str, Any], parent_id: int) -> None:
+        """Re-register a persisted child device under its parent QA (the QA's
+        startup children lookup then finds it; new ids stay above it)."""
+        child_id = int(child["id"])
+        entry = dict(child)
+        entry["parentId"] = int(parent_id)
+        if "interfaces" not in entry:
+            entry["interfaces"] = ["quickAppChild"]
+        self.devices[child_id] = entry
+        if child_id >= self._next_id:
+            self._next_id = child_id + 1
+
     def apply_seed(self, seed: dict[str, Any]) -> None:
         for device in seed.get("devices") or []:
             dev = dict(device)

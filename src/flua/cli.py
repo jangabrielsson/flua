@@ -317,6 +317,20 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             parser.error(f"invalid seed JSON: {exc}")
         if not isinstance(seed, dict):
             parser.error("seed file must contain a JSON object")
+    # --%%db (from the main QA's directives): seeds the sim like --seed and,
+    # with the + variant, persists emulator state back to the file. The
+    # directive wins over the --seed flag.
+    db_path: str | None = None
+    db_persist = False
+    for main_path, _main_code, main_params in qa_specs:
+        if main_path is None:
+            continue
+        db_cfg = main_params.get("db")
+        if isinstance(db_cfg, dict) and db_cfg.get("path"):
+            db_path = str(Path(db_cfg["path"]).resolve())
+            db_persist = bool(db_cfg.get("persist"))
+            seed = None
+        break
     try:
         # The engine mode follows the MAIN QA's merged directives (its
         # header over the .directives defaults) — --%%mode:offline selects
@@ -346,6 +360,8 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             color=args.color,
             api_mode=api_mode,
             seed=seed,
+            db_path=db_path,
+            db_persist=db_persist,
         )
     except ValueError as exc:
         parser.error(str(exc))

@@ -339,6 +339,15 @@ def parse_annotations(source: str, warn_unknown: bool = True) -> dict[str, Any]:
                 rows = []
                 config["u"] = rows
             rows.append(parse_lua_literal(value))
+        elif name == "db":
+            # --%%db:house.json — seed the sim from the file; --%%db:+house.json
+            # additionally persists emulator state back to it (offline: the
+            # whole sim; online: QA state + globalVariables; proxy: seed only)
+            db_path = value.strip()
+            config["db"] = {
+                "path": db_path[1:] if db_path.startswith("+") else db_path,
+                "persist": db_path.startswith("+"),
+            }
         elif "=" in value:
             sub: dict[str, Any] = {}
             for part in value.split(","):
@@ -403,6 +412,7 @@ KNOWN_DIRECTIVES = frozenset(
         "debug",  # --%%debug:refreshState=true,api=true,http=true
         "loglength",  # --%%loglength:120 — debug line length
         "warn",  # --%%warn:true — extra runtime warnings
+        "db",  # --%%db:file.json — seed data; +file.json also persists
         "uid",
         "description",
         "model",

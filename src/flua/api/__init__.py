@@ -97,6 +97,8 @@ class Api:
         emulator (viewer, proxy callbacks): the real HC3 recorded their
         events already, so handlers must not emit duplicates.
         """
+        if self._engine is not None:
+            self._engine.mark_db_dirty()  # may mutate the sim (--%%db:+)
         method = method.upper()
         segments, query = parse_url(url)
         if segments[:1] == ["quickApp"]:

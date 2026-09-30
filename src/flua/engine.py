@@ -20,6 +20,7 @@ Flow::
 
 import asyncio
 import contextlib
+import json
 import logging
 import os
 import re
@@ -109,10 +110,32 @@ class LuaEngine:
         color: str = "auto",
         api_mode: str = "local",
         seed: dict[str, Any] | None = None,
+        db_path: str | None = None,
+        db_persist: bool = False,
     ) -> None:
         self._lua = lupa.LuaRuntime(unpack_returned_tuples=True, encoding="UTF-8")
         self._inbound: deque[dict[str, Any]] = deque()
         self._outbound: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        # --%%db: a JSON file seeding the sim (like --seed) and, with the +
+        # variant, the file emulator state persists back to. The QA-state
+        # section is engine-owned (keyed by QA name, not id); the rest seeds
+        # the sim directly.
+        self.db_path = str(Path(db_path).resolve()) if db_path else None
+        self._db_persist = bool(db_persist)
+        self._db_qa_state: dict[str, Any] = {}
+        self._db_dirty = False
+        self._db_last_written: str | None = None
+        if self.db_path is not None:
+            try:
+                raw = json.loads(Path(self.db_path).read_text(encoding="utf-8"))
+            except OSError as exc:
+                raise ValueError(f"cannot read --%%db file: {exc}") from exc
+            except ValueError as exc:
+                raise ValueError(f"invalid --%%db JSON: {exc}") from exc
+            if not isinstance(raw, dict):
+                raise ValueError("--%%db file must contain a JSON object")
+            self._db_qa_state = raw.get("qaState") or {}
+            seed = {k: v for k, v in raw.items() if k not in ("qaState", "version")}
         # Virtual time: 1 = realtime, N = accelerated, inf = instant (timers
         # fire immediately and virtual time jumps to their deadlines).
         self.clock = VirtualClock(speed)
@@ -354,6 +377,13 @@ class LuaEngine:
                 name,
             )
             proxy_enabled = False
+        if proxy_enabled and self._db_persist:
+            # proxy mode mirrors everything on the HC3 — the db file would
+            # only fight the mirror
+            logger.warning(
+                "--%%db:+ persistence ignored in proxy mode (state lives on the HC3)"
+            )
+            self._db_persist = False
         self._normalize_files(qa_config)
         # Device properties: skeleton defaults < --%%properties < --%%property
         # and the named directives (--%%uid/description/model/build/
@@ -410,7 +440,9 @@ class LuaEngine:
         # Register the QA as a device before its code runs: on the HC3 the
         # plugin device exists before onInit executes, and onInit's own api
         # calls (internalStorage, updateProperty) must find it.
+        self._restore_qa_state(name, qa_id, device_properties)
         self.api.register_qa(qa_id, name, qa_config.get("type"), device_properties)
+        self.mark_db_dirty()
         if proxy_enabled:
             # the sim only shadows the HC3's device from here on
             self.api.state.mark_proxy(qa_id)
@@ -1101,6 +1133,7 @@ class LuaEngine:
             with contextlib.suppress(OSError):
                 shutil.rmtree(base, ignore_errors=True)
         self._qa_file_dirs.clear()
+        self._flush_db()  # last chance to persist --%%db:+ state
 
     def is_running(self) -> bool:
         return self._running
@@ -1133,6 +1166,7 @@ class LuaEngine:
             try:
                 batch = [await asyncio.wait_for(self._outbound.get(), timeout=_PUMP_POLL)]
             except TimeoutError:
+                self._flush_db()  # idle: persist any --%%db:+ changes
                 continue
             while not self._outbound.empty():
                 batch.append(self._outbound.get_nowait())
@@ -1505,6 +1539,69 @@ class LuaEngine:
             if info.get("path") in self._temp_qa_paths:
                 # the temp file backing loadQAfromString was consumed
                 self._cleanup_temp_qa(info["path"])
+
+    # -- --%%db persistence --------------------------------------------------------
+
+    def mark_db_dirty(self) -> None:
+        """Note that sim state may have changed (flushed when the pump idles)."""
+        self._db_dirty = True
+
+    def _restore_qa_state(self, name: str, qa_id: int, device_properties: dict[str, Any]) -> None:
+        """Merge persisted --%%db state onto a fresh QA shell: saved properties
+        (incl. quickAppVariables) sit under the explicit directives, and
+        children re-register under their persisted ids (the QA's startup
+        children lookup then finds them)."""
+        saved = self._db_qa_state.get(name)
+        if not isinstance(saved, dict):
+            return
+        for key, value in (saved.get("properties") or {}).items():
+            device_properties.setdefault(key, value)
+        for child in saved.get("children") or []:
+            if isinstance(child, dict) and "id" in child:
+                self.api.state.restore_child(child, qa_id)
+
+    def _db_document(self) -> dict[str, Any]:
+        """The JSON document written to the --%%db file: the sim snapshot plus
+        per-QA state (properties + children) keyed by QA name. Online, the
+        real HC3 owns the house data, so only the emulator's own artifacts
+        (QA state + globalVariables) are persisted."""
+        doc = self.api.state.snapshot(exclude_qa_ids=set(self._qas))
+        qa_state: dict[str, Any] = {}
+        for qa_id, info in self._qas.items():
+            dev = self.api.state.devices.get(qa_id)
+            if dev is None:
+                continue
+            children = [
+                public(d)
+                for d in self.api.state.devices.values()
+                if d.get("parentId") == qa_id
+            ]
+            qa_state[info["name"]] = {
+                "properties": public(dev.get("properties") or {}),
+                "children": children,
+            }
+        if self.hc3 is not None:
+            return {
+                "version": doc.get("version"),
+                "globalVariables": doc["globalVariables"],
+                "qaState": qa_state,
+            }
+        doc["qaState"] = qa_state
+        return doc
+
+    def _flush_db(self) -> None:
+        """Write the db file if state changed since the last flush (atomic)."""
+        if not self._db_dirty or not self._db_persist or not self.db_path:
+            return
+        text = json.dumps(self._db_document(), indent=2)
+        if text == self._db_last_written:
+            self._db_dirty = False
+            return
+        tmp = self.db_path + ".tmp"
+        Path(tmp).write_text(text, encoding="utf-8")
+        os.replace(tmp, self.db_path)
+        self._db_last_written = text
+        self._db_dirty = False
 
     # -- timer bridge ---------------------------------------------------------------
 
