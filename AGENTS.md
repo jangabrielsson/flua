@@ -34,6 +34,33 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"   # first time
 
 Python 3.11+. `lupa` is the only runtime dependency.
 
+## Repository map
+
+| Area | Purpose | Typical changes |
+|---|---|---|
+| `src/flua/engine.py` | Lua VM, queues, and message pump | Engine and scheduling behavior |
+| `src/flua/api/` | Simulated and hybrid HC3 REST API | API routes and simulated state |
+| `src/flua/api/routes/` | Pure REST route handlers | New or changed endpoints |
+| `src/flua/lua/` | HC3-compatible Lua runtime | QuickApp, fibaro, timer, and network behavior |
+| `src/flua/cli.py` | `flua` command-line interface | CLI flags and commands |
+| `src/flua/tools/` | QA download/upload/update tools | HC3 file-management tools |
+| `src/flua/proxy.py` | Proxy-mode deployment and callbacks | Proxy synchronization |
+| `tests/` | Behavioral and compatibility contract | Regression and feature tests |
+| `examples/` | Runnable QuickApp fixtures | User-facing examples |
+| `docs/specs/` | Checked-in HC3 API reference | Endpoint and schema reference |
+| `dev/` | Local scratch space | Temporary probes only; never commit |
+
+## Compatibility
+
+- Python 3.11 or newer is supported.
+- `lupa` is the only runtime dependency; avoid adding dependencies without
+  discussing the trade-off in the change.
+- Preserve HC3 behavior where practical. If flua intentionally differs, make
+  the difference explicit in tests and document it in `USAGE.md` or
+  `ARCHITECTURE.md`.
+- Treat CLI flags, `--%%` directives, public Python APIs, and Lua runtime APIs
+  as compatibility-sensitive. Do not change them silently.
+
 ## How the tests work
 
 - Almost everything runs **offline**: QAs against the simulated HC3, and
@@ -84,6 +111,24 @@ Python 3.11+. `lupa` is the only runtime dependency.
 - Docs: behavior changes belong in `USAGE.md` (user-facing) and/or
   `ARCHITECTURE.md` (internals); directive changes belong in the directive
   table.
+
+## Workflow for AI agents
+
+Use this workflow regardless of the agent framework (Copilot, Codex, Claude
+Code, Cursor, or another tool):
+
+1. Read this file and `CONTRIBUTING.md`, then inspect the relevant source and
+  existing tests before proposing a change.
+2. Make the smallest focused change; do not refactor unrelated code.
+3. Add or update a deterministic test for behavior changes. Do not use a live
+  HC3 unless the user explicitly requests it.
+4. Update the appropriate documentation when behavior, directives, CLI flags,
+  or compatibility contracts change.
+5. Run the narrowest relevant test first, then `ruff check src/ tests/` and
+  `pytest tests/ -q` when practical.
+6. Review the diff for secrets, accidental probes, live-controller access, and
+  generated files.
+7. Report changed files, tests run, and any validation that could not run.
 
 ## Working with the user
 

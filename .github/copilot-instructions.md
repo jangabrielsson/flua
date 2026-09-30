@@ -6,6 +6,10 @@ flua is a Lua engine for Fibaro HC3 QuickApps: [lupa](https://github.com/scoder/
 
 QA developers start at [USAGE.md](USAGE.md); [ARCHITECTURE.md](ARCHITECTURE.md) is the under-the-hood tour; [AGENTS.md](AGENTS.md) is the framework-agnostic guide for AI agents working in this repo.
 
+`AGENTS.md` is the authoritative repository-wide contribution and agent
+workflow. Read it before changing code. Do not contact a real HC3 from tests
+or scripts unless the user explicitly asks for it.
+
 ## Key components
 
 - **`src/flua/engine.py` — LuaEngine**: owns the lupa VM, the message queues, and the dispatch pump. Lua is entered from exactly one place (`_PY.dispatch(batch)`); Lua→Python traffic is append-only via `_PY.post`.
@@ -50,6 +54,9 @@ Tests run against local mock servers (threaded HTTP servers), never a real contr
 - Per-QA isolation: each QA gets its own Lua env; QA ids are engine-assigned (5000+), proxy QAs run under their HC3 id.
 - `dev/` is the scratch directory (create test scripts here, don't pollute the top level).
 - Keep `_PY` functions minimal; end-user convenience lives in Lua.
+
+For the complete change workflow, compatibility rules, repository map, and
+validation checklist, follow `AGENTS.md` and `CONTRIBUTING.md`.
 
 ---
 

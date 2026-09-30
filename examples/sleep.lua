@@ -1,8 +1,10 @@
 --%%name: sleep
 --%%type:com.fibaro.binarySwitch
 
+-- Sleep preventing other messages from being processed immediately, including timers
+
 local function test1()
-  print("Test 1 executed, 2s later")
+  print("Test 1 executed, 2s later") -- actually executess 3 seconds later, waiting for the sleep in onInit
 end
 
 function QuickApp:onInit()
