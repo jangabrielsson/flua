@@ -17,7 +17,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 async def wait_until(predicate, timeout: float = 3.0) -> None:
-    import asyncio
 
     deadline = time.monotonic() + timeout
     while not predicate():
@@ -234,12 +233,34 @@ async def test_fibaro_get_returns_value_and_modified(tmp_path, capsys) -> None:
     await engine.start()
     try:
         engine.start_qa(str(script), None, {}, str(script))
-        await asyncio.sleep(0.3)
+        await wait_until(lambda: not engine.has_pending_work())
         out = capsys.readouterr().out
         assert "GET false true" in out
         assert "GVAL false" in out
     finally:
         await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_tag_bound_before_qa_code_runs(tmp_path, capsys) -> None:
+    # __TAG is <name><id> from the moment the QA's files execute — a QA may
+    # have no onInit at all, but its logs still carry the QA tag (not FLUA)
+    script = tmp_path / "tagged.lua"
+    script.write_text(
+        "--%%name:tagged\n"
+        "print('TAG', __TAG)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await wait_until(lambda: not engine.has_pending_work())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "TAG tagged5000" in out
+    # the default fibaro debug tag (print routes through it) is the same
+    assert "[tagged5000]" in out
 
 
 # -- dynamic loading (loadQAfromFile / loadQAfromString) ------------------------
@@ -269,7 +290,7 @@ async def test_dynamic_load_from_file(tmp_path, capsys) -> None:
     await engine.start()
     try:
         engine.start_qa(str(loader), None, {}, str(loader))
-        await asyncio.sleep(0.4)
+        await wait_until(lambda: not engine.has_pending_work())
     finally:
         await engine.stop()
     out = capsys.readouterr().out
@@ -296,7 +317,7 @@ async def test_dynamic_load_from_string(tmp_path, capsys) -> None:
     await engine.start()
     try:
         engine.start_qa(str(loader), None, {}, str(loader))
-        await asyncio.sleep(0.4)
+        await wait_until(lambda: not engine.has_pending_work())
         assert engine._temp_qa_paths == set()  # temp file consumed and removed
     finally:
         await engine.stop()
@@ -327,7 +348,7 @@ async def test_inline_qa_directives_do_not_leak(tmp_path, capsys) -> None:
     await engine.start()
     try:
         engine.load_qa_file(str(loader))  # parses the --%% header (EOH-aware)
-        await asyncio.sleep(0.4)
+        await wait_until(lambda: not engine.has_pending_work())
     finally:
         await engine.stop()
     out = capsys.readouterr().out
@@ -349,7 +370,9 @@ async def test_dynamic_load_missing_file(tmp_path, capsys) -> None:
     await engine.start()
     try:
         engine.start_qa(str(loader), None, {}, str(loader))
-        await asyncio.sleep(0.3)
+        # wait for the work to complete instead of a fixed sleep: under
+        # load the 20ms timer can fire after a 0.3s deadline
+        await wait_until(lambda: not engine.has_pending_work())
     finally:
         await engine.stop()
     assert "ERR true true" in capsys.readouterr().out

@@ -674,6 +674,10 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
     config.var = vars
     _PY.post{ type = "qaVars", id = qaId, vars = vars }
   end
+  -- the QA's log tag, <name><id>, bound before its files execute: the HC3
+  -- binds __TAG when the QA loads — onInit is only the user entry point and
+  -- may not even be defined. fibaro.lua keeps a pre-set value (__TAG or ...).
+  env.__TAG = tostring(config.name or "QA") .. tostring(qaId)
   installQaLibs(env)  -- class/quickapp/fibaro into this QA, before its code
   local chunk, err = loader()
   if not chunk then

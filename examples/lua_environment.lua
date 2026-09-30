@@ -1,5 +1,5 @@
---%name:Environment
--- %mode:offline
+--%%name:Environment
+--%%mode:offline
 
 for k,v in pairs(_FLUA) do
   print(k,v)
@@ -18,4 +18,8 @@ for k,v in pairs(_G) do
       print('  ',kk,vv)
     end
   end
+end
+
+function QuickApp:onInit()
+  print("OK")
 end
