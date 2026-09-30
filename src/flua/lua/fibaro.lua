@@ -472,10 +472,10 @@ end
 
 -- Pauses execution for a specified number of milliseconds.
 -- flua: suspends the CALLING QA for ms of virtual time — other QAs keep
--- running. No callback is delivered to the QA while it sleeps (busy-wait
--- semantics, like the HC3's blocking sleep): timer callbacks, device actions,
--- UI and network events that arrive during the sleep are lost. Only valid
--- inside a QA callback; at top level or in onInit it raises an error.
+-- running. Messages destined for the QA while it sleeps (timer callbacks,
+-- device actions, UI and network events) are queued and delivered, in
+-- arrival order, after the sleeping callback resumes.
+-- Only valid inside a QA callback; at top level or in onInit it errors.
 function fibaro.sleep(ms)
   __assert_type(ms, "number")
   if coroutine.running() == nil then

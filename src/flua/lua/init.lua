@@ -178,15 +178,59 @@ end
 -- implements the API surface). Callbacks run as per-QA coroutines (runInQa);
 -- fibaro.sleep yields ms and the runner schedules a QA-attributed wake timer,
 -- so sleep rides the virtual clock (--speed/--instant) like any other timer.
--- While a QA sleeps no message is delivered to it — busy-wait semantics, like
--- the HC3's blocking sleep — and the pump keeps the other QAs running.
-local sleeping = {}    -- qaId -> suspended callback coroutine
+-- While a QA sleeps, messages destined for it are queued and delivered after
+-- the sleeping callback resumes (in arrival order). Other QAs keep running.
+local sleeping = {}    -- qaId -> true while a sleep is active (messages defer)
 local wakeTimers = {}  -- timer ids that end a sleep (never deferred)
+local workQueues = {}  -- qaId -> FIFO of messages deferred during the sleep
 
-local function resumeQa(qaId, co, ...)
+-- forward slots: handlers, qaInstances and the mutually recursive runners
+-- are declared later in this chunk
+local handlers, qaInstances, resumeQa, runInQa, processWork
+
+local function queueFor(qaId, msg)
+  local q = workQueues[qaId]
+  if not q then q = {}; workQueues[qaId] = q end
+  q[#q + 1] = msg
+end
+
+-- Deliver one deferred message. Broadcasts are per-QA here: re-dispatching
+-- through the shared handler would hand a second copy to every QA.
+local function deliverQueued(qaId, msg)
+  local t = msg.type
+  if t == "customEvent" then
+    local qa = qaInstances[qaId]
+    local fn = qa and qa.onCustomEvent
+    if type(fn) == "function" and not sleeping[qaId] then
+      runInQa(qaId, function() fn(qa, msg.name) end)
+    end
+  elseif t == "refreshStateEvent" then
+    for handle, hqaId in pairs(_FLUA.refreshStateListeners) do
+      if hqaId == qaId and not sleeping[qaId] then
+        runInQa(qaId, function() handle(msg.event) end)
+      end
+    end
+  else
+    local h = handlers[t]
+    if h then
+      xpcall(function() h(msg) end, traceback)
+    else
+      postLog("warning", "no Lua handler for message type " .. tostring(t))
+    end
+  end
+end
+
+processWork = function(qaId)
+  while not sleeping[qaId] do
+    local q = workQueues[qaId]
+    if not q or #q == 0 then return end
+    deliverQueued(qaId, table.remove(q, 1))
+  end
+end
+
+resumeQa = function(qaId, co, ...)
   local ok, res = coroutine.resume(co, ...)
   if not ok then
-    if sleeping[qaId] == co then sleeping[qaId] = nil end
     postLog("error", tostring(res))
     postLog("error", debug.traceback(co, nil, 2))
     return
@@ -194,31 +238,29 @@ local function resumeQa(qaId, co, ...)
   if coroutine.status(co) == "suspended" then
     if type(res) ~= "number" then
       -- yield protocol violation (e.g. async.await outside async.run)
-      sleeping[qaId] = nil
       postLog("error", "unexpected yield from QA callback (fibaro.sleep expects ms)")
       return
     end
-    sleeping[qaId] = co
+    sleeping[qaId] = true
     -- declare id first: a closure inside a `local id = ...` initializer binds
     -- to an outer id in this Lua version (Lua 5.5 initializer scoping)
     local id
     id = _FLUA.setTimeout(function()
       wakeTimers[id] = nil
-      if sleeping[qaId] == co then
+      if sleeping[qaId] then
         sleeping[qaId] = nil
-        resumeQa(qaId, co)
+        resumeQa(qaId, co) -- the sleeping callback continues first
+        processWork(qaId)  -- then whatever was deferred during the sleep
       end
     end, res, qaId)
     wakeTimers[id] = true
-  elseif sleeping[qaId] == co then
-    sleeping[qaId] = nil
   end
 end
 
 -- Every QA callback entry point goes through here. qaId == nil means a
 -- runtime (main-state) timer: run it plain, like before — fibaro.sleep
 -- cannot work there and errors clearly.
-local function runInQa(qaId, fn, ...)
+runInQa = function(qaId, fn, ...)
   if qaId == nil then
     xpcall(fn, traceback)
     return
@@ -386,7 +428,8 @@ table.member = function(name, list)
   return false
 end
 
-local qaInstances = {}  -- qaId -> QuickApp instance (registered by the bootstrap)
+-- forward-declared in the sleep section (the deferral machinery uses it)
+qaInstances = {}  -- qaId -> QuickApp instance (registered by the bootstrap)
 -- net.HTTPClient response routing: net.lua registers one handler per QA.
 _FLUA.netHandlers = {}
 -- mqtt.* response routing: mqtt.lua registers one handler per QA.
@@ -688,16 +731,19 @@ end
 
 -- ----------------------------------------------------------------- dispatch
 -- Python -> Lua entry point: batch is an array of messages.
-local handlers = {}
+-- forward-declared in the sleep section (the deferred-delivery machinery uses it)
+handlers = {}
 
 handlers.timerExpired = function(msg)
   local fn = callbacks[msg.id]
   if fn then
-    callbacks[msg.id] = nil -- one-shot
     local qaId = callback_qas[msg.id]
     if not wakeTimers[msg.id] and qaId and sleeping[qaId] then
-      return -- QA busy: the callback is lost (busy-wait semantics)
+      -- QA asleep: defer, keep the callback registered — it runs on wake
+      queueFor(qaId, msg)
+      return
     end
+    callbacks[msg.id] = nil -- one-shot
     runInQa(qaId, fn)
   else
     postLog("warning", "timerExpired for unknown id " .. tostring(msg.id))
@@ -708,7 +754,7 @@ end
 -- the api handler enqueues, the pump delivers, and the QA's own callAction
 -- does method lookup + error containment (quickapp.lua). Returns
 -- (instance, ownerQaId): children share the parent QA's code, so a sleeping
--- child sleeps the parent (busy-wait on the shared instance, like the HC3).
+-- child defers the parent (messages wait on the shared code, like the HC3).
 local function qaForDevice(id)
   local qa = qaInstances[id]
   if qa then return qa, id end
@@ -722,7 +768,7 @@ end
 handlers.deviceAction = function(msg)
   local qa, qaId = qaForDevice(msg.id)
   if qa and type(qa.callAction) == "function" then
-    if sleeping[qaId] then return end -- QA busy: the action is lost
+    if sleeping[qaId] then queueFor(qaId, msg) return end -- delivered on wake
     runInQa(qaId, function()
       qa:callAction(msg.action, table.unpack(msg.args or {}))
     end)
@@ -749,7 +795,7 @@ end
 handlers.uiEvent = function(msg)
   local qa, qaId = qaForDevice(msg.deviceId)
   if qa and type(qa.UIAction) == "function" then
-    if sleeping[qaId] then return end -- QA busy: the event is lost
+    if sleeping[qaId] then queueFor(qaId, msg) return end -- delivered on wake
     local value = msg.value
     -- multi selects arrive as a comma-joined list through the single value
     -- param (the real HC3 contract); restore the list so the QA sees
@@ -777,7 +823,7 @@ handlers.customEvent = function(msg)
     local fn = qa.onCustomEvent
     if type(fn) == "function" then
       if sleeping[qaId] then
-        -- QA busy: the event is not delivered
+        queueFor(qaId, msg) -- deferred: delivered when the sleep ends
       else
         runInQa(qaId, function() fn(qa, msg.name) end)
       end
@@ -798,9 +844,10 @@ handlers.startQA = function(msg)
 end
 
 handlers.restartQA = function(msg)
-  -- abandon any pending sleep: the wake timer was cancelled Python-side and
-  -- the suspended coroutine belongs to the old code instance
+  -- abandon any pending sleep and its deferred messages: the wake timer was
+  -- cancelled Python-side and both belong to the old code instance
   sleeping[msg.id] = nil
+  workQueues[msg.id] = nil
   local env = qaEnvFor(msg.id)
   startQaInEnv(env, msg.id, msg.config or {}, msg.arg0, function()
     local ok, err = loadExtraFiles(msg.files, env)
@@ -812,7 +859,7 @@ end
 handlers.httpResult = function(msg)
   local h = _FLUA.netHandlers[msg.qa]
   if h then
-    if sleeping[msg.qa] then return end -- QA busy: the result is lost
+    if sleeping[msg.qa] then queueFor(msg.qa, msg) return end
     runInQa(msg.qa, function() h(msg) end)
   end
 end
@@ -820,7 +867,7 @@ end
 handlers.tcpResult = function(msg)
   local h = _FLUA.netHandlers[msg.qa]
   if h then
-    if sleeping[msg.qa] then return end
+    if sleeping[msg.qa] then queueFor(msg.qa, msg) return end
     runInQa(msg.qa, function() h(msg) end)
   end
 end
@@ -828,7 +875,7 @@ end
 handlers.udpResult = function(msg)
   local h = _FLUA.netHandlers[msg.qa]
   if h then
-    if sleeping[msg.qa] then return end
+    if sleeping[msg.qa] then queueFor(msg.qa, msg) return end
     runInQa(msg.qa, function() h(msg) end)
   end
 end
@@ -836,7 +883,7 @@ end
 handlers.wsEvent = function(msg)
   local h = _FLUA.netHandlers[msg.qa]
   if h then
-    if sleeping[msg.qa] then return end
+    if sleeping[msg.qa] then queueFor(msg.qa, msg) return end
     runInQa(msg.qa, function() h(msg) end)
   end
 end
@@ -844,7 +891,7 @@ end
 handlers.mqttEvent = function(msg)
   local h = _FLUA.mqttHandlers[msg.qa]
   if h then
-    if sleeping[msg.qa] then return end
+    if sleeping[msg.qa] then queueFor(msg.qa, msg) return end
     runInQa(msg.qa, function() h(msg) end)
   end
 end
@@ -873,9 +920,13 @@ handlers.refreshStateEvent = function(msg)
     end
     postLog("debug", line)
   end
+  local deferred = {}
   for handle, qaId in pairs(_FLUA.refreshStateListeners) do
     if sleeping[qaId] then
-      -- QA busy: the event is not delivered
+      if not deferred[qaId] then
+        deferred[qaId] = true
+        queueFor(qaId, msg) -- deferred: delivered when the sleep ends
+      end
     else
       runInQa(qaId, function() handle(msg.event) end)
     end

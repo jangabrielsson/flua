@@ -1,13 +1,18 @@
-"""fibaro.sleep: per-QA suspension with busy-wait (drop) semantics."""
+"""fibaro.sleep: per-QA suspension; messages defer and run after the sleep."""
 
 import asyncio
+import subprocess
+import sys
 import time
+from pathlib import Path
 
 import pytest
 
 pytest.importorskip("lupa")
 
 from flua.engine import LuaEngine  # noqa: E402
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 async def wait_until(predicate, timeout: float = 3.0) -> None:
@@ -31,7 +36,7 @@ async def wait_for_output(capsys, needle: str, timeout: float = 3.0) -> str:
 
 
 @pytest.mark.asyncio
-async def test_sleep_suspends_only_the_calling_qa(tmp_path, capsys) -> None:
+async def test_timers_during_sleep_run_after_the_sleeping_callback(tmp_path, capsys) -> None:
     a = tmp_path / "a.lua"
     a.write_text(
         "setTimeout(function()\n"
@@ -39,8 +44,8 @@ async def test_sleep_suspends_only_the_calling_qa(tmp_path, capsys) -> None:
         "  fibaro.sleep(200)\n"
         "  print('A-AFTER')\n"
         "end, 10)\n"
-        "-- fires while A sleeps: the callback is lost\n"
-        "setTimeout(function() print('A-LOST') end, 100)\n"
+        "-- due while A sleeps: deferred, runs after the callback resumed\n"
+        "setTimeout(function() print('A-DEFERRED') end, 100)\n"
     )
     b = tmp_path / "b.lua"
     b.write_text("setTimeout(function() print('B-RAN') end, 100)\n")
@@ -51,16 +56,17 @@ async def test_sleep_suspends_only_the_calling_qa(tmp_path, capsys) -> None:
         engine.start_qa(str(b), None, {}, str(b))
         await wait_until(lambda: not engine.has_pending_work())
         out = capsys.readouterr().out
-        assert "A-BEFORE" in out
-        assert "A-AFTER" in out
-        assert "B-RAN" in out  # the other QA kept running during the sleep
-        assert "A-LOST" not in out  # busy-wait: callback dropped
+        assert "A-BEFORE" in out and "A-AFTER" in out
+        assert "B-RAN" in out  # the other QA ran during the sleep
+        # the sleeping callback resumed first, then the deferred timer
+        assert "A-DEFERRED" in out
+        assert out.index("A-AFTER") < out.index("A-DEFERRED")
     finally:
         await engine.stop()
 
 
 @pytest.mark.asyncio
-async def test_device_action_lost_during_sleep(tmp_path, capsys) -> None:
+async def test_device_action_during_sleep_runs_after_resume(tmp_path, capsys) -> None:
     a = tmp_path / "a.lua"
     a.write_text(
         "setTimeout(function()\n"
@@ -75,12 +81,10 @@ async def test_device_action_lost_during_sleep(tmp_path, capsys) -> None:
         engine.start_qa(str(a), None, {}, str(a))
         await asyncio.sleep(0.1)  # A is sleeping now (wakes at ~310ms)
         engine.api.dispatch("POST", "/devices/5000/action/turnOn", {})
-        await wait_for_output(capsys, "A-WOKE")
-        out = capsys.readouterr().out
-        assert "TURNED-ON" not in out  # arrived during the sleep: lost
-        # after the wake, actions are delivered again
-        engine.api.dispatch("POST", "/devices/5000/action/turnOn", {})
-        await wait_for_output(capsys, "TURNED-ON")
+        seen = await wait_for_output(capsys, "TURNED-ON")
+        # the sleeping callback resumed first, then the deferred action
+        assert "A-WOKE" in seen
+        assert seen.index("A-WOKE") < seen.index("TURNED-ON")
     finally:
         await engine.stop()
 
@@ -146,7 +150,7 @@ async def test_error_after_sleep_is_contained(tmp_path, capsys) -> None:
 
 
 @pytest.mark.asyncio
-async def test_restart_during_sleep_starts_fresh(tmp_path, capsys) -> None:
+async def test_restart_during_sleep_drops_deferred_messages(tmp_path, capsys) -> None:
     a = tmp_path / "a.lua"
     a.write_text(
         "function QuickApp:onInit() print('BOOTED') end\n"
@@ -164,13 +168,33 @@ async def test_restart_during_sleep_starts_fresh(tmp_path, capsys) -> None:
         capsys.readouterr()  # drain
         engine.api.dispatch("POST", "/devices/5000/action/startSleep", {})
         await asyncio.sleep(0.1)  # the QA is now sleeping
+        engine.api.dispatch("POST", "/devices/5000/action/turnOn", {})  # deferred
+        await asyncio.sleep(0.1)
         engine.restart_qa(5000)
         await wait_for_output(capsys, "BOOTED")
         await asyncio.sleep(0.2)
         out = capsys.readouterr().out
         assert "OLD-WOKE" not in out  # the old sleep never resumes
-        # the fresh instance is not sleeping: actions are delivered
+        assert "TURNED-ON" not in out  # deferred message died with the old instance
+        # the fresh instance delivers actions normally
         engine.api.dispatch("POST", "/devices/5000/action/turnOn", {})
         await wait_for_output(capsys, "TURNED-ON")
     finally:
         await engine.stop()
+
+
+def test_example_sleep_keeps_deferred_timer() -> None:
+    # examples/sleep.lua sets a 2s timer and sleeps 3s: the timer is due
+    # during the sleep, so it must run after the sleeping callback resumed
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--api", "local", "examples/sleep.lua"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=90,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Test 1 executed, 2s later" in result.stdout
+    assert "Slept for 3 seconds in onInit" in result.stdout
+    assert result.stdout.index("Slept for 3 seconds") < result.stdout.index("Test 1 executed")
+    assert "stack traceback" not in result.stdout

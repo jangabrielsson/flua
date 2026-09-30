@@ -100,10 +100,10 @@ an interval firing once per simulated second fires exactly five times):
 
 `fibaro.sleep(ms)` suspends the *calling QA* for `ms` of virtual time — other
 QAs keep running, and the sleep follows `--speed`/`--instant` like a timer.
-Like on the HC3 it is a busy wait: nothing is delivered to the QA while it
-sleeps — timer callbacks, actions, UI and network events that arrive during
-the sleep are dropped, not queued. It is only valid inside a callback; at top
-level or in `onInit` it raises an error.
+Messages destined for the QA while it sleeps (timer callbacks, actions, UI
+and network events) are queued and delivered, in arrival order, after the
+sleeping callback resumes. It is only valid inside a callback; at top level
+or in `onInit` it raises an error.
 
 ## VS Code setup
 
