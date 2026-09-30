@@ -603,8 +603,26 @@ local function bootstrapQa(env, qaId, config)
     props.quickAppVariables = vars
     dev.properties = props
   end
+  -- Construct WITHOUT running onInit (QuickApp:__init honors the flag): the
+  -- HC3 runs onInit during startup too, but flua defers it one pump tick —
+  -- the instance must be registered in qaInstances before a fibaro.sleep can
+  -- defer/queue messages, so onInit runs after registration, through the
+  -- runner like any callback.
+  env.QuickApp._deferInit = true
   local qa = env.QuickApp(dev)
+  env.QuickApp._deferInit = nil
   qaInstances[qaId] = qa
+  if type(qa.onInit) == "function" then
+    env.setTimeout(function()
+      -- an onInit error fails the QA load, like a bootstrap error
+      local ok, err = pcall(function() qa:onInit() end)
+      if not ok then
+        print("Error in onInit:", err)
+        print(debug.traceback(nil, 2))
+        _FLUA.exit(1)
+      end
+    end, 0)
+  end
   return qa
 end
 

@@ -83,6 +83,18 @@ class Api:
         remote_path = "/" + "/".join(segments)
         return self._remote.request(method, remote_path, query, body)
 
+    def _restart_qa(self, qa_id: int) -> bool:
+        """Real QA restart for POST /plugins/restartDevice: the HC3 restarts
+        the plugin process; flua re-runs the code (timers cancelled, onInit
+        runs again). False when the id is not a running QA."""
+        if self._engine is None:
+            return False
+        try:
+            self._engine.restart_qa(qa_id)
+        except ValueError:
+            return False
+        return True
+
     def dispatch(
         self,
         method: str,
@@ -128,6 +140,7 @@ class Api:
                 qa_id=qa_id,
                 external=external,
                 remote=remote_hook,
+                restart_qa=self._restart_qa,
             )
             try:
                 data, status = handler(self.state, req)

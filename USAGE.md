@@ -102,8 +102,10 @@ an interval firing once per simulated second fires exactly five times):
 QAs keep running, and the sleep follows `--speed`/`--instant` like a timer.
 Messages destined for the QA while it sleeps (timer callbacks, actions, UI
 and network events) are queued and delivered, in arrival order, after the
-sleeping callback resumes. It is only valid inside a callback; at top level
-or in `onInit` it raises an error.
+sleeping callback resumes. It works in callbacks and in `onInit` (flua defers
+`onInit` until the instance is registered, so a sleeping `onInit` just delays
+startup, like on the HC3); only at QA top level, before the instance exists,
+does it raise an error.
 
 ## VS Code setup
 
@@ -584,6 +586,9 @@ everything works between them:
 - `fibaro.call(id, 'turnOn')` — calls another QA's QuickApp method
 - `fibaro.emitCustomEvent(name)` → `QuickApp:onCustomEvent(name)` handlers
 - `self:setVariable/getVariable` — persistent, survives restarts
+- `plugin.restart(id)` — re-runs the QA's code (onInit runs again, like the
+  HC3 restarting the plugin); timers are cancelled and deferred messages
+  dropped
 - `GET /refreshStates?last=N` — the HC3's polling change feed
 
 QAs find each other by name with `fibaro.getIds({type = "quickApp"})` — see

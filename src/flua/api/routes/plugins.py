@@ -245,12 +245,23 @@ def plugin_update_interfaces(state: SimState, req: ApiRequest) -> tuple[Any, int
 
 
 def plugin_restart(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    # HC3 restarts the plugin process; flua QAs run cooperatively, so a real
-    # restart is not implemented yet — accept and note it.
+    # HC3 restarts the plugin process; flua QAs run cooperatively, so the
+    # restart re-runs the QA's code (timers cancelled, deferred messages
+    # dropped, onInit runs again) through the pump.
+    if isinstance(req.body, dict):
+        device_id = req.body.get("deviceId")
+        if state.is_proxy(device_id):
+            # a proxy-mode QA owns a real plugin on the HC3: restart that one
+            # too (the HC3 owns the device; the sim only shadows it)
+            forward_to_proxy(req, True)
+            return None, 204
+        try:
+            device_id = int(device_id)
+        except (TypeError, ValueError):
+            device_id = None
+        if device_id is not None and req.restart_qa is not None and req.restart_qa(device_id):
+            return None, 204
     logger.warning("plugin restart requested for %r: simulated (QA keeps running)", req.body)
-    # a proxy-mode QA owns a real plugin on the HC3: restart that one too
-    if isinstance(req.body, dict) and state.is_proxy(req.body.get("deviceId")):
-        forward_to_proxy(req, True)
     return None, 204
 
 

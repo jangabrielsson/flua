@@ -289,7 +289,10 @@ function QuickApp:__init(dev)
   self.childDevices = {}
   self.childsInitialized = false
   self:setupUICallbacks()
-  if self.onInit then self:onInit() end
+  -- flua defers the main QA's onInit to a 0ms timer (after the instance is
+  -- registered — see bootstrapQa), so fibaro.sleep works inside it; the
+  -- child class below stays synchronous
+  if self.onInit and not QuickApp._deferInit then self:onInit() end
   if not self.childsInitialized then self:initChildDevices() end
 end
 

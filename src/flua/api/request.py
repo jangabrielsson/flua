@@ -41,6 +41,11 @@ class ApiRequest:
     # engine's outbound queue (device actions, custom events). None when a
     # handler is invoked outside dispatch.
     emit: Callable[[dict[str, Any]], None] | None = None
+    # Filled by Api.dispatch: a real QA restart (POST /plugins/restartDevice
+    # on an emulated QA — the HC3 restarts the plugin, flua re-runs the
+    # code). Returns False when the id is not a running QA. None outside
+    # dispatch.
+    restart_qa: Callable[[int], bool] | None = None
 
     @property
     def path(self) -> str:
