@@ -10,7 +10,9 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
@@ -152,7 +154,11 @@ def test_variables_list_and_clear(api: Api) -> None:
 
 def test_plugin_routes_reject_non_plugins(api: Api) -> None:
     assert api.dispatch("GET", "/plugins/10") == (None, 404)
-    assert api.dispatch("GET", "/plugins/10/variables") == (None, 404)
+    assert api.dispatch("GET", "/plugins/99/variables") == (None, 404)
+    # variables serve any existing device (empty for non-QAs — dev/apitest
+    # reads them on device 1), but unknown devices still 404
+    data, status = api.dispatch("GET", "/plugins/10/variables")
+    assert status == 200 and data == []
     api.register_qa(5000, "qa", None, {})
     data, status = api.dispatch("GET", "/plugins/5000")
     assert status == 200 and data["name"] == "qa"
@@ -418,7 +424,7 @@ def test_rooms(api: Api) -> None:
 def test_unknown_paths_are_404(api: Api) -> None:
     assert api.dispatch("GET", "/energy/consumption/summary") == (None, 404)  # M3
     assert api.dispatch("PATCH", "/devices/10") == (None, 404)
-    assert api.dispatch("GET", "/users") == (None, 404)
+    assert api.dispatch("GET", "/no/such/endpoint") == (None, 404)
 
 
 # -- integration: QAs through the engine ---------------------------------------
@@ -537,6 +543,76 @@ def test_custom_event(api: Api) -> None:
     assert api.state.custom_events == [{"name": "wakeup"}]
     data, _ = api.dispatch("GET", "/refreshStates")
     assert data["events"] == [{"type": "CustomEvent", "data": {"name": "wakeup"}}]
+
+
+def test_misc_system_endpoints(api: Api) -> None:
+    # the GET endpoints dev/apitest.lua exercises — empty results are fine
+    assert api.dispatch("POST", "/customEvents", {"name": "testEvent", "userDescription": "x"})[
+        1
+    ] < 206
+    for url in (
+        "/customEvents",
+        "/customEvents/testEvent",
+        "/iosDevices",
+        "/home",
+        "/debugMessages",
+        "/weather",
+        "/alarms/v1/devices",
+        "/notificationCenter",
+        "/profiles/1",
+        "/icons",
+        "/users",
+        "/energy/devices",
+        "/panels/location",
+        "/panels/climate",
+        "/panels/climate/1",
+        "/panels/notifications",
+        "/panels/family",
+        "/panels/sprinklers",
+        "/panels/humidity",
+        "/panels/favoriteColors",
+        "/panels/favoriteColors/v2",
+        "/diagnostics",
+        "/settings/info",
+        "/plugins/1/variables",
+    ):
+        _data, status = api.dispatch("GET", url)
+        assert status < 206, f"{url} -> {status}"
+    # shapes worth pinning
+    home, _ = api.dispatch("GET", "/home")
+    assert home["hcName"] == "HC3"
+    info, _ = api.dispatch("GET", "/settings/info")
+    assert info["defaultRoomId"] == 219
+    assert info["sunsetHour"].count(":") == 1
+    users, _ = api.dispatch("GET", "/users")
+    assert users[0]["name"] == "admin"
+
+
+class _ProxyHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        payload = b"hello-from-proxy"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def log_message(self, *args) -> None:
+        pass
+
+
+def test_proxy_fetch() -> None:
+    # GET /proxy?url=... fetches server-side through the engine's HTTP client
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _ProxyHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        engine = LuaEngine()
+        url = f"http://127.0.0.1:{server.server_port}/anything"
+        body, status = engine.api.dispatch("GET", f"/proxy?url={url}")
+        assert status == 200 and body == "hello-from-proxy"
+        assert engine.api.dispatch("GET", "/proxy") == (None, 400)  # url required
+    finally:
+        server.shutdown()
+
 
 
 def test_call_ui_event(api: Api) -> None:

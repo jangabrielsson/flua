@@ -46,6 +46,10 @@ class ApiRequest:
     # code). Returns False when the id is not a running QA. None outside
     # dispatch.
     restart_qa: Callable[[int], bool] | None = None
+    # Filled by Api.dispatch: a server-side HTTP fetch for GET /proxy?url=...
+    # (the HC3's UI helper). Returns (status, body, headers), status None on
+    # transport failure. None outside dispatch.
+    fetch: Callable[[str], tuple[int | None, str, dict]] | None = None
 
     @property
     def path(self) -> str:

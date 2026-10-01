@@ -47,3 +47,17 @@ def custom_event_post(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     if req.emit is not None:
         req.emit(messages.custom_event(name))
     return None, 202
+
+
+def custom_event_post_body(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # POST /customEvents with a body ({name=..., userDescription=...}) — the
+    # CustomEventDto form the HC3 accepts
+    if not isinstance(req.body, dict) or not req.body.get("name"):
+        return None, 400
+    entry = {"name": str(req.body["name"])}
+    if req.body.get("userDescription") is not None:
+        entry["userDescription"] = req.body["userDescription"]
+    state.custom_events.append(entry)
+    if req.emit is not None:
+        req.emit(messages.custom_event(entry["name"]))
+    return public(entry), 201

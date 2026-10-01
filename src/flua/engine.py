@@ -294,6 +294,15 @@ class LuaEngine:
         like log_line."""
         return render_html_tags(str(text), self.color_enabled())
 
+    def fetch_url(self, url: str) -> tuple[int | None, str, dict[str, str]]:
+        """Server-side fetch for GET /proxy?url=... (the HC3's UI helper):
+        one blocking HTTP GET through the engine's HTTP client. Transport
+        failures return status None (the route answers 502)."""
+        try:
+            return http_call("GET", url)
+        except OSError:
+            return None, "", {}
+
     def debug_log(self, text: str) -> None:
         """Print a --%%debug line, cut short after --%%loglength characters
         (default 120; "..." marks the cut)."""

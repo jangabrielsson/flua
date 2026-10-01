@@ -95,6 +95,13 @@ class Api:
             return False
         return True
 
+    def _fetch(self, url: str) -> tuple[int | None, str, dict]:
+        """Server-side fetch for GET /proxy?url=... through the engine's
+        HTTP client."""
+        if self._engine is None:
+            return None, "", {}
+        return self._engine.fetch_url(url)
+
     def dispatch(
         self,
         method: str,
@@ -141,6 +148,7 @@ class Api:
                 external=external,
                 remote=remote_hook,
                 restart_qa=self._restart_qa,
+                fetch=self._fetch,
             )
             try:
                 data, status = handler(self.state, req)

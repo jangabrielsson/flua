@@ -51,6 +51,7 @@ class SimState:
         self.rooms: dict[int, dict[str, Any]] = {}
         self.sections: dict[int, dict[str, Any]] = {}
         self.scenes: dict[int, dict[str, Any]] = {}
+        self.climate_zones: dict[int, dict[str, Any]] = {}
         self.global_variables: dict[str, dict[str, Any]] = {}
         self.profiles: dict[int, dict[str, Any]] = {}
         self.alarms: dict[int, dict[str, Any]] = {}
@@ -93,6 +94,9 @@ class SimState:
             self.rooms[219] = {"id": 219, "name": "Default room", "sectionID": 219}
         if 219 not in self.sections:
             self.sections[219] = {"id": 219, "name": "Default section"}
+        # The controller comes with a default climate zone (panels/climate)
+        if not self.climate_zones:
+            self.climate_zones[1] = {"id": 1, "name": "Home", "mode": 0, "active": False}
 
     # -- seeding --------------------------------------------------------------
 
@@ -117,6 +121,7 @@ class SimState:
             "version": 1,
             "rooms": [public(r) for r in self.rooms.values()],
             "sections": [public(s) for s in self.sections.values()],
+            "climateZones": [public(z) for z in self.climate_zones.values()],
             "scenes": [public(s) for s in self.scenes.values()],
             "globalVariables": {k: public(v) for k, v in self.global_variables.items()},
             "alarms": [public(a) for a in self.alarms.values()],
@@ -172,6 +177,9 @@ class SimState:
         for section in seed.get("sections") or []:
             section = dict(section)
             self.sections[int(section["id"])] = section
+        for zone in seed.get("climateZones") or []:
+            zone = dict(zone)
+            self.climate_zones[int(zone["id"])] = zone
         for scene in seed.get("scenes") or []:
             scene = dict(scene)
             scene.setdefault("running", False)

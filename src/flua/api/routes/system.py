@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from datetime import datetime
 from typing import Any
 
 from ... import messages
@@ -112,6 +113,24 @@ def room_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     return (public(room), 200) if room is not None else (None, 404)
 
 
+def settings_info(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # GET /settings/info — the controller's identity + the day's sun times
+    sun = state.sun_times(_now(req))
+    offset = datetime.now().astimezone().utcoffset()
+    timezone_offset = int(offset.total_seconds() // 60) if offset else 0
+    return public(
+        {
+            "serialNumber": "HC3-00000000",
+            "softVersion": "flua",
+            "hcName": (state.devices.get(1) or {}).get("name", "HC3"),
+            "defaultRoomId": 219,
+            "timezoneOffset": timezone_offset,
+            "sunriseHour": sun["sunriseHour"],
+            "sunsetHour": sun["sunsetHour"],
+        }
+    ), 200
+
+
 def sections_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     sections = sorted(state.sections.values(), key=lambda s: s["id"])
     return public(sections), 200
@@ -123,6 +142,140 @@ def section_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     except (TypeError, ValueError):
         section = None
     return (public(section), 200) if section is not None else (None, 404)
+
+
+def custom_events_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    return public(list(state.custom_events)), 200
+
+
+def custom_event_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    name = req.path_params["name"]
+    for event in state.custom_events:
+        if event.get("name") == name:
+            return public(event), 200
+    return None, 404
+
+
+def ios_devices_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    return public([]), 200  # the sim has no iOS companions
+
+
+def home_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    return public(
+        {
+            "hcName": (state.devices.get(1) or {}).get("name", "HC3"),
+            "timestamp": int(_now(req)),
+            "defaultSensors": {"temperature": True, "light": True},
+        }
+    ), 200
+
+
+def debug_messages_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    return public({"messages": [], "nextLast": 0}), 200
+
+
+def weather_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # no weather provider in the sim: zeroed values, HC3-shaped
+    return public(
+        {
+            "ConditionCode": 0,
+            "Humidity": None,
+            "Temperature": None,
+            "TemperatureUnit": "C",
+            "WeatherCondition": "",
+            "WeatherConditionConverted": "",
+            "Wind": None,
+            "WindUnit": "m/s",
+        }
+    ), 200
+
+
+def alarm_devices_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    return public([]), 200  # no devices are armed into the alarm
+
+
+def notification_center_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    return public([]), 200
+
+
+def profile_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    try:
+        profile = state.profiles.get(int(req.path_params["id"]))
+    except (TypeError, ValueError):
+        profile = None
+    if profile is None:
+        return None, 404
+    out = dict(profile)
+    for key in ("climateZones", "devices", "partitions", "scenes"):
+        out.setdefault(key, [])
+    return public(out), 200
+
+
+def icons_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    return None, 200  # the HC3 response carries no body (per the reference)
+
+
+def users_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # the controller always has at least the admin user
+    return public([{"id": 1, "name": "admin", "type": "superuser"}]), 200
+
+
+def energy_devices_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    return public([]), 200
+
+
+def panels_location(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    return public([]), 200
+
+
+def panels_climate(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    zones = sorted(state.climate_zones.values(), key=lambda z: z["id"])
+    return public(zones), 200
+
+
+def panel_climate_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    try:
+        zone = state.climate_zones.get(int(req.path_params["id"]))
+    except (TypeError, ValueError):
+        zone = None
+    return (public(zone), 200) if zone is not None else (None, 404)
+
+
+def panels_notifications(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    return public({"notifications": []}), 200
+
+
+def panels_family(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    return public([]), 200
+
+
+def panels_sprinklers(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    return public([]), 200
+
+
+def panels_humidity(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    return public([]), 200
+
+
+def panels_favorite_colors(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    return public([]), 200
+
+
+def diagnostics_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    return public({"cpuLoad": 0, "memory": 0, "storage": 0}), 200
+
+
+def proxy_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # GET /proxy?url=... — the HC3's UI helper fetches a URL server-side
+    url = req.query.get("url")
+    if not url:
+        return None, 400
+    if req.fetch is None:
+        return None, 501
+    status, body, _headers = req.fetch(url)
+    if status is None:
+        return None, 502
+    return body, status
 
 
 def refresh_states(state: SimState, req: ApiRequest) -> tuple[Any, int]:

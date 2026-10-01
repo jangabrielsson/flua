@@ -34,12 +34,14 @@ def plugin_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 def _variables(state: SimState, dev: dict[str, Any]) -> dict[str, dict[str, Any]]:
     # plugin variables live outside the device shape (the real HC3 has no
-    # top-level "variables" field — the compat oracle caught it)
+    # top-level "variables" field — the compat oracle caught it). Served for
+    # any existing device: QAs hold their variables, everything else (e.g.
+    # device 1) reads an empty set.
     return state.plugin_variables.setdefault(dev["id"], {})
 
 
 def variables_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    dev = state.plugin(req.path_params["id"])
+    dev = state.device(req.path_params["id"])
     if dev is None:
         return None, 404
     variables = sorted(_variables(state, dev).values(), key=lambda v: v["name"])
@@ -47,7 +49,7 @@ def variables_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def variable_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    dev = state.plugin(req.path_params["id"])
+    dev = state.device(req.path_params["id"])
     if dev is None:
         return None, 404
     var = _variables(state, dev).get(req.path_params["key"])
@@ -68,7 +70,7 @@ def _var_from_body(req: ApiRequest, default_name: str | None = None) -> dict[str
 
 
 def variable_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    dev = state.plugin(req.path_params["id"])
+    dev = state.device(req.path_params["id"])
     if dev is None:
         return None, 404
     variables = _variables(state, dev)
@@ -93,7 +95,7 @@ def variable_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def variable_post(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    dev = state.plugin(req.path_params["id"])
+    dev = state.device(req.path_params["id"])
     if dev is None:
         return None, 404
     spec = _var_from_body(req)
@@ -118,7 +120,7 @@ def variable_post(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def variable_delete(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    dev = state.plugin(req.path_params["id"])
+    dev = state.device(req.path_params["id"])
     if dev is None:
         return None, 404
     variables = _variables(state, dev)
@@ -131,7 +133,7 @@ def variable_delete(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def variables_clear(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    dev = state.plugin(req.path_params["id"])
+    dev = state.device(req.path_params["id"])
     if dev is None:
         return None, 404
     _variables(state, dev).clear()
