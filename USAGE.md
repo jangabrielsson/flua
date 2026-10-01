@@ -265,7 +265,9 @@ run. Children survive restarts and re-register under their parent QA, so a
 QA's usual `api.get("/devices?parentId="..self.id)` startup check finds
 them. QA state is keyed by QA name (not the per-run id), so persisted state
 is stable across runs; `--%%var` and the other property directives win over
-persisted values.
+persisted values. `internalStorage` (`self:internalStorageSet/Get`) is
+persisted with the QA's state too — plugin variables survive runs like on
+the HC3.
 
 Names: `--%%name:value` for scalars,
 `--%%name:sub1=val1,sub2=val2` for subparameters. A typo'd directive is

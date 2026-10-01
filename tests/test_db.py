@@ -183,6 +183,7 @@ async def test_db_online_persists_only_emulator_state(
         "function QuickApp:onInit()\n"
         "  api.put('/globalVariables/nightMode', {value='true'})\n"
         "  self:updateProperty('value', true)\n"
+        "  self:internalStorageSet('token', 'abc')\n"
         "end\n"
     )
     engine = LuaEngine(api_mode="remote", db_path=str(db), db_persist=True)
@@ -197,4 +198,44 @@ async def test_db_online_persists_only_emulator_state(
     # the real HC3 owns the house data: only emulator artifacts persist
     assert set(saved.keys()) == {"version", "globalVariables", "qaState"}
     assert saved["globalVariables"]["nightMode"]["value"] == "true"
-    assert saved["qaState"]["a"]["properties"]["value"] is True
+    qa = saved["qaState"]["a"]
+    assert qa["properties"]["value"] is True
+    assert qa["variables"]["token"]["value"] == "abc"
+
+
+@pytest.mark.asyncio
+async def test_db_persists_internal_storage(tmp_path, capsys) -> None:
+    db = tmp_path / "house.json"
+    db.write_text(json.dumps({"globalVariables": {}}))
+    script = tmp_path / "store.lua"
+    script.write_text(
+        "function QuickApp:onInit()\n"
+        "  local v = self:internalStorageGet('token')\n"
+        "  print('TOKEN', tostring(v))\n"
+        "  if v == nil then self:internalStorageSet('token', 'abc-123') end\n"
+        "end\n"
+    )
+
+    # run 1: sets the internalStorage variable
+    engine = LuaEngine(db_path=str(db), db_persist=True)
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await wait_until(lambda: not engine.has_pending_work())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "TOKEN nil" in out
+    saved = json.loads(db.read_text(encoding="utf-8"))
+    assert saved["qaState"]["store"]["variables"]["token"]["value"] == "abc-123"
+
+    # run 2: the variable came back from the db
+    engine = LuaEngine(db_path=str(db), db_persist=True)
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await wait_until(lambda: not engine.has_pending_work())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "TOKEN abc-123" in out

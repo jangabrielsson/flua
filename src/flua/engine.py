@@ -1566,6 +1566,13 @@ class LuaEngine:
         for child in saved.get("children") or []:
             if isinstance(child, dict) and "id" in child:
                 self.api.state.restore_child(child, qa_id)
+        saved_vars = saved.get("variables")
+        if isinstance(saved_vars, dict) and saved_vars:
+            # internalStorage: plugin variables persist with the QA state
+            # (keyed by QA name in the file, re-keyed to the run's id here)
+            self.api.state.plugin_variables[qa_id] = {
+                key: dict(var) for key, var in saved_vars.items() if isinstance(var, dict)
+            }
 
     def _db_document(self) -> dict[str, Any]:
         """The JSON document written to the --%%db file: the sim snapshot plus
@@ -1586,6 +1593,7 @@ class LuaEngine:
             qa_state[info["name"]] = {
                 "properties": public(dev.get("properties") or {}),
                 "children": children,
+                "variables": public(self.api.state.plugin_variables.get(qa_id) or {}),
             }
         if self.hc3 is not None:
             return {

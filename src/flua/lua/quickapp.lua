@@ -292,6 +292,7 @@ function QuickApp:__init(dev)
   -- flua defers the main QA's onInit to a 0ms timer (after the instance is
   -- registered — see bootstrapQa), so fibaro.sleep works inside it; the
   -- child class below stays synchronous
+---@diagnostic disable-next-line: undefined-field
   if self.onInit and not QuickApp._deferInit then self:onInit() end
   if not self.childsInitialized then self:initChildDevices() end
 end
