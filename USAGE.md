@@ -674,6 +674,9 @@ format (individual `.lua` files) and only the HC3 sees `.fqa`:
 # download a QA from the HC3 and unpack it into individual .lua files
 .venv/bin/flua --tool downloadQA 123 -d project/     # -d DIR (default: QA name)
 
+# build an offline db from the real HC3 (device 1, location, family locations)
+.venv/bin/flua --tool createDB -o db.json            # -f to overwrite
+
 # list the installed tools (a bare --tool, or --tool help)
 .venv/bin/flua --tool
 ```

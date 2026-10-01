@@ -225,7 +225,7 @@ def energy_devices_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def panels_location(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    return public([]), 200
+    return public(list(state.family_locations)), 200
 
 
 def panels_climate(state: SimState, req: ApiRequest) -> tuple[Any, int]:

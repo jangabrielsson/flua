@@ -52,6 +52,7 @@ class SimState:
         self.sections: dict[int, dict[str, Any]] = {}
         self.scenes: dict[int, dict[str, Any]] = {}
         self.climate_zones: dict[int, dict[str, Any]] = {}
+        self.family_locations: list[dict[str, Any]] = []
         self.global_variables: dict[str, dict[str, Any]] = {}
         self.profiles: dict[int, dict[str, Any]] = {}
         self.alarms: dict[int, dict[str, Any]] = {}
@@ -122,6 +123,7 @@ class SimState:
             "rooms": [public(r) for r in self.rooms.values()],
             "sections": [public(s) for s in self.sections.values()],
             "climateZones": [public(z) for z in self.climate_zones.values()],
+            "familyLocations": [public(loc) for loc in self.family_locations],
             "scenes": [public(s) for s in self.scenes.values()],
             "globalVariables": {k: public(v) for k, v in self.global_variables.items()},
             "alarms": [public(a) for a in self.alarms.values()],
@@ -180,6 +182,9 @@ class SimState:
         for zone in seed.get("climateZones") or []:
             zone = dict(zone)
             self.climate_zones[int(zone["id"])] = zone
+        for loc in seed.get("familyLocations") or []:
+            if isinstance(loc, dict):
+                self.family_locations.append(dict(loc))
         for scene in seed.get("scenes") or []:
             scene = dict(scene)
             scene.setdefault("running", False)
