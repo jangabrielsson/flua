@@ -72,10 +72,11 @@ hand a second copy to every QA).
 - Each handler in the table above gained its queue check / per-QA queue.
 
 **`src/flua/lua/fibaro.lua`** — `fibaro.sleep(ms)`:
-`__assert_type` → `coroutine.running()` check (clear error at top level) →
-`_FLUA.qa(_FLUA.qaId)` check (clear error during init, before the instance
-exists) → `coroutine.yield(ms)`. The old blocking `_PY.sleep` stub was
-removed (it did not exist on the Python side and would have errored).
+`__assert_type` → `coroutine.running()` check (clear error outside a QA) →
+`coroutine.yield(ms)`. The old blocking `_PY.sleep` stub was removed (it did
+not exist on the Python side and would have errored). The QA identity (a
+stub in `qaInstances`) is registered before the file executes, so sleep works
+at top level, in onInit, and in callbacks alike.
 
 **`src/flua/lua/quickapp.lua`** —
 `RefreshStateSubscriber:run()` registers `handle -> _FLUA.qaId` so refresh
@@ -93,10 +94,13 @@ unchanged, and `exit()`/`restart_qa()` cancel it via `cancel_qa`.
   way).
 - **restartQA while sleeping** — `sleeping[id]` and `workQueues[id]` are
   cleared, the old coroutine is abandoned, the new instance boots normally.
-- **sleep at top level** — hard error, not a silent no-op. In `onInit` it
-  works: flua defers the main QA's onInit to a 0ms timer after the instance
-  is registered (children's onInit stays synchronous); an onInit error still
-  fails the load.
+- **sleep anywhere in QA code** — top level, onInit, callbacks. The QA
+  identity (a stub in `qaInstances`) registers before the file executes, so
+  a top-level sleep suspends the whole chunk — including the later
+  `QuickApp` construction — and messages queue by device id; the real
+  instance replaces the stub at construction, before the queue drains.
+  onInit runs synchronously in `__init`, in the HC3 order (onInit before
+  `initChildDevices`); an onInit error fails the load.
 - **children** — a sleeping child defers its parent QA (the code that
   handles its events), like the HC3's shared instance thread.
 - **nested sleep** — a callback that sleeps again after waking re-arms
@@ -116,10 +120,12 @@ unchanged, and `exit()`/`restart_qa()` cancel it via `cancel_qa`.
   QA's timer is unaffected.
 - device action arriving during the sleep is delivered after the
   continuation.
-- sleep works in `onInit` (deferred until the instance registers); messages
-  during an onInit sleep queue; an onInit error still fails the load.
+- sleep works in `onInit` and at top level (the QA identity registers
+  before the file runs); messages during an onInit sleep queue; an onInit
+  error still fails the load.
+- `onInit` runs before `initChildDevices` (HC3 order).
 - `--instant` (speed=inf) collapses the sleep.
-- `fibaro.sleep` at top level errors and fails the QA load.
+- `fibaro.sleep` outside a QA (main-state code) errors.
 - error in the code after the sleep is contained and printed.
 - restart during sleep drops the deferred queue and the pending sleep.
 - `examples/sleep.lua` runs end to end and keeps its deferred timer.

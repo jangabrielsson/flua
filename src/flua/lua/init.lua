@@ -614,26 +614,12 @@ local function bootstrapQa(env, qaId, config)
     props.quickAppVariables = vars
     dev.properties = props
   end
-  -- Construct WITHOUT running onInit (QuickApp:__init honors the flag): the
-  -- HC3 runs onInit during startup too, but flua defers it one pump tick —
-  -- the instance must be registered in qaInstances before a fibaro.sleep can
-  -- defer/queue messages, so onInit runs after registration, through the
-  -- runner like any callback.
-  env.QuickApp._deferInit = true
+  -- Construct the QuickApp (onInit runs synchronously in __init, before
+  -- initChildDevices — the HC3 order). The QA identity was registered as a
+  -- stub before the code ran (see startQaInEnv), so a fibaro.sleep in onInit
+  -- or top-level code suspends this whole construction and resumes here.
   local qa = env.QuickApp(dev)
-  env.QuickApp._deferInit = nil
-  qaInstances[qaId] = qa
-  if type(qa.onInit) == "function" then
-    env.setTimeout(function()
-      -- an onInit error fails the QA load, like a bootstrap error
-      local ok, err = pcall(function() qa:onInit() end)
-      if not ok then
-        print("Error in onInit:", err)
-        print(debug.traceback(nil, 2))
-        _FLUA.exit(1)
-      end
-    end, 0)
-  end
+  qaInstances[qaId] = qa  -- replaces the identity stub
   return qa
 end
 
@@ -678,6 +664,11 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
   -- binds __TAG when the QA loads — onInit is only the user entry point and
   -- may not even be defined. fibaro.lua keeps a pre-set value (__TAG or ...).
   env.__TAG = tostring(config.name or "QA") .. tostring(qaId)
+  -- Register the QA identity before its files execute: fibaro.sleep only
+  -- needs the QA resolvable (deviceId -> qaId) so messages can queue while
+  -- the code runs — at top level, before the QuickApp instance exists.
+  -- bootstrapQa replaces this stub with the real instance.
+  qaInstances[qaId] = { id = qaId, name = tostring(config.name) }
   installQaLibs(env)  -- class/quickapp/fibaro into this QA, before its code
   local chunk, err = loader()
   if not chunk then
@@ -800,8 +791,8 @@ end
 
 handlers.deviceAction = function(msg)
   local qa, qaId = qaForDevice(msg.id)
+  if sleeping[qaId] then queueFor(qaId, msg) return end -- delivered on wake
   if qa and type(qa.callAction) == "function" then
-    if sleeping[qaId] then queueFor(qaId, msg) return end -- delivered on wake
     runInQa(qaId, function()
       qa:callAction(msg.action, table.unpack(msg.args or {}))
     end)
@@ -827,8 +818,8 @@ end
 
 handlers.uiEvent = function(msg)
   local qa, qaId = qaForDevice(msg.deviceId)
+  if sleeping[qaId] then queueFor(qaId, msg) return end -- delivered on wake
   if qa and type(qa.UIAction) == "function" then
-    if sleeping[qaId] then queueFor(qaId, msg) return end -- delivered on wake
     local value = msg.value
     -- multi selects arrive as a comma-joined list through the single value
     -- param (the real HC3 contract); restore the list so the QA sees
@@ -853,11 +844,11 @@ end
 
 handlers.customEvent = function(msg)
   for qaId, qa in pairs(qaInstances) do
-    local fn = qa.onCustomEvent
-    if type(fn) == "function" then
-      if sleeping[qaId] then
-        queueFor(qaId, msg) -- deferred: delivered when the sleep ends
-      else
+    if sleeping[qaId] then
+      queueFor(qaId, msg) -- deferred: delivered when the sleep ends
+    else
+      local fn = qa.onCustomEvent
+      if type(fn) == "function" then
         runInQa(qaId, function() fn(qa, msg.name) end)
       end
     end
@@ -866,14 +857,18 @@ end
 
 -- Dynamically loaded QAs (loadQAfromFile/loadQAfromString) boot eagerly,
 -- so a fibaro.call in the same callback that loaded them already reaches
--- the new instance.
+-- the new instance. The whole bootstrap runs through the runner, so a
+-- fibaro.sleep at the loaded QA's top level (or in onInit) works like the
+-- CLI start path.
 handlers.startQA = function(msg)
   local env = qaEnvFor(msg.id)
-  startQaInEnv(env, msg.id, msg.config or {}, msg.arg0, function()
-    local ok, err = loadExtraFiles(msg.files, env)
-    if not ok then return nil, err end
-    return loadfile(msg.path, "bt", env)
-  end, msg.path)
+  runInQa(msg.id, function()
+    startQaInEnv(env, msg.id, msg.config or {}, msg.arg0, function()
+      local ok, err = loadExtraFiles(msg.files, env)
+      if not ok then return nil, err end
+      return loadfile(msg.path, "bt", env)
+    end, msg.path)
+  end)
 end
 
 handlers.restartQA = function(msg)
@@ -882,11 +877,13 @@ handlers.restartQA = function(msg)
   sleeping[msg.id] = nil
   workQueues[msg.id] = nil
   local env = qaEnvFor(msg.id)
-  startQaInEnv(env, msg.id, msg.config or {}, msg.arg0, function()
-    local ok, err = loadExtraFiles(msg.files, env)
-    if not ok then return nil, err end
-    return loadfile(msg.path, "bt", env)
-  end, msg.path)
+  runInQa(msg.id, function()
+    startQaInEnv(env, msg.id, msg.config or {}, msg.arg0, function()
+      local ok, err = loadExtraFiles(msg.files, env)
+      if not ok then return nil, err end
+      return loadfile(msg.path, "bt", env)
+    end, msg.path)
+  end)
 end
 
 handlers.httpResult = function(msg)

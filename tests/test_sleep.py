@@ -112,19 +112,50 @@ async def test_sleep_is_virtual_time_instant_collapses_it(tmp_path, capsys) -> N
 
 
 @pytest.mark.asyncio
-async def test_sleep_at_top_level_errors(tmp_path, capsys) -> None:
+async def test_sleep_at_top_level_works(tmp_path, capsys) -> None:
+    # the QA identity is registered before the file executes, so a
+    # top-level sleep suspends the whole chunk (incl. construction) and
+    # messages arriving meanwhile queue for delivery after wake
     a = tmp_path / "a.lua"
-    a.write_text("fibaro.sleep(100)\n")
+    a.write_text(
+        "print('TOP-BEFORE')\n"
+        "fibaro.sleep(300)\n"
+        "print('TOP-AFTER')\n"
+        "function QuickApp:turnOn() print('TURNED-ON') end\n"
+    )
     engine = LuaEngine()
     await engine.start()
     try:
         engine.start_qa(str(a), None, {}, str(a))
-        await asyncio.sleep(0.3)
-        assert engine.exit_code == 1  # load failed
+        await asyncio.sleep(0.1)  # the chunk is sleeping now
+        engine.api.dispatch("POST", "/devices/5000/action/turnOn", {})
+        seen = await wait_for_output(capsys, "TURNED-ON")
+        assert "TOP-BEFORE" in seen and "TOP-AFTER" in seen
+        # the chunk resumed (construction completed), then the deferred action ran
+        assert seen.index("TOP-AFTER") < seen.index("TURNED-ON")
     finally:
         await engine.stop()
-    out = capsys.readouterr().out
-    assert "fibaro.sleep" in out  # the error names the API
+
+
+@pytest.mark.asyncio
+async def test_onInit_runs_before_initChildDevices(tmp_path, capsys) -> None:
+    # the HC3 order: onInit (user setup) first, then the framework adopts
+    # children — a deferred-onInit hack once inverted this
+    a = tmp_path / "a.lua"
+    a.write_text(
+        "function QuickApp:onInit() print('ONINIT') end\n"
+        "function QuickApp:initChildDevices() print('CHILD-INIT') end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(a), None, {}, str(a))
+        await wait_until(lambda: not engine.has_pending_work())
+        out = capsys.readouterr().out
+        assert "ONINIT" in out and "CHILD-INIT" in out
+        assert out.index("ONINIT") < out.index("CHILD-INIT")
+    finally:
+        await engine.stop()
 
 
 @pytest.mark.asyncio

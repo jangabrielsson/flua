@@ -474,16 +474,13 @@ end
 -- flua: suspends the CALLING QA for ms of virtual time — other QAs keep
 -- running. Messages destined for the QA while it sleeps (timer callbacks,
 -- device actions, UI and network events) are queued and delivered, in
--- arrival order, after the sleeping callback resumes. Works in callbacks
--- and in onInit (flua defers onInit until the instance is registered);
--- only at QA top level, before the instance exists, does it error.
+-- arrival order, after the sleeping callback resumes. Works anywhere in QA
+-- code — top level, onInit, callbacks (the QA identity is registered before
+-- the file executes); only outside a QA does it error.
 function fibaro.sleep(ms)
   __assert_type(ms, "number")
   if coroutine.running() == nil then
-    error("fibaro.sleep can only be called from a QA callback", 2)
-  end
-  if not _FLUA.qa(_FLUA.qaId) then
-    error("fibaro.sleep can only be called after the QA has started (not during init)", 2)
+    error("fibaro.sleep can only be called from QA code", 2)
   end
   return coroutine.yield(ms)
 end

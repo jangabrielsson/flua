@@ -102,10 +102,9 @@ an interval firing once per simulated second fires exactly five times):
 QAs keep running, and the sleep follows `--speed`/`--instant` like a timer.
 Messages destined for the QA while it sleeps (timer callbacks, actions, UI
 and network events) are queued and delivered, in arrival order, after the
-sleeping callback resumes. It works in callbacks and in `onInit` (flua defers
-`onInit` until the instance is registered, so a sleeping `onInit` just delays
-startup, like on the HC3); only at QA top level, before the instance exists,
-does it raise an error.
+sleeping callback resumes. It works anywhere in QA code — top level,
+`onInit`, callbacks — because the QA identity is registered before the file
+executes; only outside a QA (main-state code) does it raise an error.
 
 ## VS Code setup
 
