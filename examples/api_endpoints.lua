@@ -1,6 +1,8 @@
 --%%name:API Endpoints
 --%%type:com.fibaro.binarySwitch
 --%%mode:offline
+--%%location:latitude=59.31695,longitude=18.063798 
+-- %%time:start=2027/6/21 12:00:00
 
 function QuickApp:onInit()
   self:debug("Offline test - Testing all GET endpoints")
@@ -57,9 +59,26 @@ function QuickApp:testDeviceEndpoints()
   self:debug("✓ /api/devices/{id} endpoint working")
   
   -- Get device property
-  local a,b = api.get("/devices/1/properties/sunsetHour")
+  local sunset,b = api.get("/devices/1/properties/sunsetHour")
+  local sunrise,c = api.get("/devices/1/properties/sunriseHour")
   assert(b < 206, "/api/devices/1/properties/sunsetHour failed")
+  assert(c < 206, "/api/devices/1/properties/sunriseHour failed")
   self:debug("✓ /api/devices/{id}/properties/{name} endpoint working")
+
+  local hc3sunset = api.hc3.get("/devices/1/properties/sunsetHour")
+  local hc3sunrise = api.hc3.get("/devices/1/properties/sunriseHour")
+
+  print(sunset, hc3sunset, sunrise, hc3sunrise)
+  local hc3sunsetHour, hc3sunsetMinute = string.match(hc3sunset, "(%d+):(%d+)")
+  local hc3sunriseHour, hc3sunriseMinute = string.match(hc3sunrise, "(%d+):(%d+)")
+  local hc3min = hc3sunsetHour * 60 + hc3sunsetMinute + hc3sunriseHour * 60 + hc3sunriseMinute
+
+  local sunsetHour, sunsetMinute = string.match(sunset, "(%d+):(%d+)")
+  local sunriseHour, sunriseMinute = string.match(sunrise, "(%d+):(%d+)")
+  local min = sunsetHour * 60 + sunsetMinute + sunriseHour * 60 + sunriseMinute
+  
+  print("Difference in minutes:", min - hc3min)
+  assert(math.abs(min - hc3min) < 3, "Mismatch between API and HC3 sunset/sunrise times > 2")
   
   -- Get device action (GET version)
   local a,b = api.post("/devices/"..self.id.."/action/turnOn")

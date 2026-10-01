@@ -32,6 +32,8 @@ def test_db_directive_parsing() -> None:
     assert cfg["db"] == {"path": "house.json", "persist": False}
     cfg = parse_annotations("--%%db:+house.json\nprint('hi')\n")
     assert cfg["db"] == {"path": "house.json", "persist": True}
+    cfg = parse_annotations("--%%location:latitude=59.33,longitude=18.07\nprint('hi')\n")
+    assert cfg["location"] == {"latitude": 59.33, "longitude": 18.07}
 
 
 def test_db_requires_an_existing_file() -> None:

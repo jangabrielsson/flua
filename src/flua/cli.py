@@ -322,6 +322,7 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
     # directive wins over the --seed flag.
     db_path: str | None = None
     db_persist = False
+    location: dict[str, Any] | None = None
     for main_path, _main_code, main_params in qa_specs:
         if main_path is None:
             continue
@@ -330,6 +331,10 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             db_path = str(Path(db_cfg["path"]).resolve())
             db_persist = bool(db_cfg.get("persist"))
             seed = None
+        loc_cfg = main_params.get("location")
+        if isinstance(loc_cfg, dict):
+            # --%%location:latitude=N,longitude=N pins the sim's location
+            location = loc_cfg
         break
     try:
         # The engine mode follows the MAIN QA's merged directives (its
@@ -362,6 +367,7 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             seed=seed,
             db_path=db_path,
             db_persist=db_persist,
+            location=location,
         )
     except ValueError as exc:
         parser.error(str(exc))

@@ -125,11 +125,23 @@ def test_flua_lua_configures_location(tmp_path, monkeypatch) -> None:
     engine = LuaEngine()
     assert engine.api.state.location["latitude"] == -33.87
     assert engine.api.state.location["longitude"] == 151.21
-    # the db file wins over... no — .flua.lua wins over the db file
-    # (a runtime PUT would win over both). Sun times render in the host's
-    # timezone (like flua's os.date), so only the shape is asserted here.
+    # Sun times render in the host's timezone (like flua's os.date), so
+    # only the shape is asserted here.
     sun = engine.api.state.sun_times(datetime(2026, 6, 21, 12, 0).timestamp())
     assert HH_MM.match(sun["sunriseHour"]) and HH_MM.match(sun["sunsetHour"])
+
+
+def test_location_directive_wins_over_config(tmp_path, monkeypatch) -> None:
+    # precedence: db/seed < .flua.lua < --%%location < runtime PUT
+    (tmp_path / ".flua.lua").write_text(
+        "return { location = { latitude = 1.0, longitude = 2.0 } }\n"
+    )
+    monkeypatch.chdir(tmp_path)
+    engine = LuaEngine(location={"latitude": 59.33, "longitude": 18.07})
+    assert engine.api.state.location == {"latitude": 59.33, "longitude": 18.07}
+    # a runtime PUT wins over the directive
+    engine.api.dispatch("PUT", "/settings/location", {"latitude": 9.0, "longitude": 9.0})
+    assert engine.api.state.location["latitude"] == 9.0
 
 
 @pytest.mark.asyncio

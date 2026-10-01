@@ -113,6 +113,7 @@ class LuaEngine:
         seed: dict[str, Any] | None = None,
         db_path: str | None = None,
         db_persist: bool = False,
+        location: dict[str, Any] | None = None,
     ) -> None:
         self._lua = lupa.LuaRuntime(unpack_returned_tuples=True, encoding="UTF-8")
         self._inbound: deque[dict[str, Any]] = deque()
@@ -223,6 +224,13 @@ class LuaEngine:
         install_bindings(self)
         # .flua.lua (local > home > legacy ~/.plua/config.lua)
         self._load_lua_config()
+        # --%%location (the main QA's directive) pins the sim's location; it
+        # wins over .flua.lua (which won over the db/seed file) — a runtime
+        # PUT /settings/location wins over all of them
+        if isinstance(location, dict):
+            for key in ("latitude", "longitude"):
+                if location.get(key) is not None:
+                    self.api.state.location[key] = location[key]
 
     def qa_is_offline(self, qa_id: int | None) -> bool:
         """--%%mode:offline (legacy --%%offline:true) on a QA pins its api.*

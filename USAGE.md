@@ -236,6 +236,7 @@ Parsing stops at the end-of-header marker:
 | `--%%warn:true` | extra runtime warnings for things the HC3 stays silent about (global) |
 | `--%%db:house.json` | seed the simulated HC3 from a JSON file (devices, rooms, scenes, globalVariables, alarms, profiles) |
 | `--%%db:+house.json` | seed **and** persist emulator state back to the file (see below) |
+| `--%%location:latitude=59.33,longitude=18.07` | pin the sim's location (device 1's sunrise/sunset) — deterministic sun times without touching `.flua.lua` |
 
 The legacy `--%%offline:true` and `--%%proxy:true` still work as aliases for
 `--%%mode:offline` and `--%%mode:proxy` (an explicit `--%%mode` wins when
@@ -386,7 +387,9 @@ return {
 ```
 
 Precedence: the built-in default (Stockholm) < the db/seed file's
-`location` < `.flua.lua` < a runtime `PUT /settings/location`.
+`location` < `.flua.lua` < `--%%location` (the main QA's directive) < a
+runtime `PUT /settings/location`. Combine it with `--%%time:start=...` for
+a fully deterministic sun: a known place on a known date.
 
 `os.getenv(name)` reads through flua's environment chain: the local `.env`
 in the directory you run from, then `~/.env`, then the shell environment.
