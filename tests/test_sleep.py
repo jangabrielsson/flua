@@ -70,6 +70,7 @@ async def test_device_action_during_sleep_runs_after_resume(tmp_path, capsys) ->
     a = tmp_path / "a.lua"
     a.write_text(
         "setTimeout(function()\n"
+        "  print('A-SLEEPING-NOW')\n"
         "  fibaro.sleep(300)\n"
         "  print('A-WOKE')\n"
         "end, 10)\n"
@@ -79,7 +80,9 @@ async def test_device_action_during_sleep_runs_after_resume(tmp_path, capsys) ->
     await engine.start()
     try:
         engine.start_qa(str(a), None, {}, str(a))
-        await asyncio.sleep(0.1)  # A is sleeping now (wakes at ~310ms)
+        # wait for the sleep to actually start (the print is in the same
+        # callback, before fibaro.sleep — once we see it, the QA is asleep)
+        await wait_for_output(capsys, "A-SLEEPING-NOW")
         engine.api.dispatch("POST", "/devices/5000/action/turnOn", {})
         seen = await wait_for_output(capsys, "TURNED-ON")
         # the sleeping callback resumed first, then the deferred action
@@ -186,6 +189,7 @@ async def test_restart_during_sleep_drops_deferred_messages(tmp_path, capsys) ->
     a.write_text(
         "function QuickApp:onInit() print('BOOTED') end\n"
         "function QuickApp:startSleep()\n"
+        "  print('SLEEPING')\n"
         "  fibaro.sleep(60 * 1000)\n"
         "  print('OLD-WOKE')\n"
         "end\n"
@@ -198,9 +202,9 @@ async def test_restart_during_sleep_drops_deferred_messages(tmp_path, capsys) ->
         await wait_for_output(capsys, "BOOTED")
         capsys.readouterr()  # drain
         engine.api.dispatch("POST", "/devices/5000/action/startSleep", {})
-        await asyncio.sleep(0.1)  # the QA is now sleeping
+        # wait for the sleep to actually start before deferring the action
+        await wait_for_output(capsys, "SLEEPING")
         engine.api.dispatch("POST", "/devices/5000/action/turnOn", {})  # deferred
-        await asyncio.sleep(0.1)
         engine.restart_qa(5000)
         await wait_for_output(capsys, "BOOTED")
         await asyncio.sleep(0.2)

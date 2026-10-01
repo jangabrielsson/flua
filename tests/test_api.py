@@ -57,7 +57,7 @@ def api() -> Api:
 def test_devices_list(api: Api) -> None:
     data, status = api.dispatch("GET", "/devices")
     assert status == 200
-    assert [d["id"] for d in data] == [10, 20]
+    assert [d["id"] for d in data] == [1, 10, 20]  # the HC3 + the seed
 
 
 def test_devices_query_filters(api: Api) -> None:
@@ -396,6 +396,19 @@ def test_rooms(api: Api) -> None:
     assert status == 200 and data[0]["name"] == "Living Room"
     room, status = api.dispatch("GET", "/rooms/1")
     assert status == 200 and room["id"] == 1
+    # the HC3 always has the default room, id 219
+    default, status = api.dispatch("GET", "/rooms/219")
+    assert status == 200 and default["name"] == "Default room"
+    assert default["sectionID"] == 219
+    assert any(r["id"] == 219 for r in data)
+    # and the default section, also 219 — rooms without an explicit section
+    # land there (the seeded Living Room has no sectionID)
+    sections, status = api.dispatch("GET", "/sections")
+    assert status == 200
+    assert any(s["id"] == 219 and s["name"] == "Default section" for s in sections)
+    section, status = api.dispatch("GET", "/sections/219")
+    assert status == 200 and section["id"] == 219
+    assert room.get("sectionID") == 219
     assert api.dispatch("GET", "/rooms/99") == (None, 404)
 
 

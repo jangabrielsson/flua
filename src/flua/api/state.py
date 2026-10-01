@@ -15,10 +15,14 @@ import time
 from typing import Any
 
 from ..devices import skeleton_for
+from ..suncalc import sunrise_sunset
 
 FIRST_RUNTIME_ID = 900000
 
 DEFAULT_DEVICE_TYPE = "com.fibaro.binarySwitch"
+
+# the sim's default controller location (Stockholm) until seeded/configured
+DEFAULT_LOCATION = {"latitude": 59.3293, "longitude": 18.0686}
 
 
 def _device_skeleton(device_id: int, name: str, device_type: str | None) -> dict[str, Any]:
@@ -45,10 +49,14 @@ class SimState:
         self.devices: dict[int, dict[str, Any]] = {}
         self.plugin_variables: dict[int, dict[str, dict[str, Any]]] = {}  # qa_id -> {name: var}
         self.rooms: dict[int, dict[str, Any]] = {}
+        self.sections: dict[int, dict[str, Any]] = {}
         self.scenes: dict[int, dict[str, Any]] = {}
         self.global_variables: dict[str, dict[str, Any]] = {}
         self.profiles: dict[int, dict[str, Any]] = {}
         self.alarms: dict[int, dict[str, Any]] = {}
+        # the controller's location (GET/PUT /settings/location): the HC3
+        # computes sunrise/sunset for device 1 from it
+        self.location: dict[str, Any] = dict(DEFAULT_LOCATION)
         # refreshStates feed: (seq, entry) pairs with strictly increasing seq.
         self.changes: list[tuple[int, dict[str, Any]]] = []
         self.events: list[tuple[int, dict[str, Any]]] = []
@@ -67,8 +75,34 @@ class SimState:
             self.alarms[1] = {"id": 1, "name": "Home", "armed": False, "breached": False}
         if not self.profiles:
             self.profiles[1] = {"id": 1, "name": "Home", "active": True}
+        # Device 1 is the HC3 itself: its name is the controller name and
+        # its properties carry the day's sunrise/sunset (computed on read —
+        # see sun_times). A seed may override the entry.
+        if 1 not in self.devices:
+            self.devices[1] = {
+                "id": 1,
+                "name": "HC3",
+                "type": "HC3",
+                "properties": {"sunriseHour": "00:00", "sunsetHour": "00:00"},
+                "modified": int(time.time()),
+            }
+        # The HC3 always has the default room, id 219 (new devices land
+        # there — see devices.DEFAULT_ROOM_ID) and the default section, also
+        # 219, which the default room belongs to. Seeds may override them.
+        if 219 not in self.rooms:
+            self.rooms[219] = {"id": 219, "name": "Default room", "sectionID": 219}
+        if 219 not in self.sections:
+            self.sections[219] = {"id": 219, "name": "Default section"}
 
     # -- seeding --------------------------------------------------------------
+
+    def sun_times(self, timestamp: float) -> dict[str, str]:
+        """The HC3 device's sunrise/sunset for the virtual clock's current
+        date at the configured location (HH:MM, like the HC3 computes)."""
+        latitude = float(self.location.get("latitude", DEFAULT_LOCATION["latitude"]))
+        longitude = float(self.location.get("longitude", DEFAULT_LOCATION["longitude"]))
+        sunrise, sunset, _rise_t, _set_t = sunrise_sunset(latitude, longitude, timestamp)
+        return {"sunriseHour": sunrise, "sunsetHour": sunset}
 
     def snapshot(self, exclude_qa_ids: set[int] | None = None) -> dict[str, Any]:
         """Serializable seed-format document of the persistent sim data.
@@ -82,10 +116,12 @@ class SimState:
         return {
             "version": 1,
             "rooms": [public(r) for r in self.rooms.values()],
+            "sections": [public(s) for s in self.sections.values()],
             "scenes": [public(s) for s in self.scenes.values()],
             "globalVariables": {k: public(v) for k, v in self.global_variables.items()},
             "alarms": [public(a) for a in self.alarms.values()],
             "profiles": [public(p) for p in self.profiles.values()],
+            "location": public(self.location),
             "devices": [
                 public(d)
                 for d in self.devices.values()
@@ -130,7 +166,12 @@ class SimState:
             self.devices[dev_id] = base
         for room in seed.get("rooms") or []:
             room = dict(room)
+            # rooms without an explicit section land in the default one (219)
+            room.setdefault("sectionID", 219)
             self.rooms[int(room["id"])] = room
+        for section in seed.get("sections") or []:
+            section = dict(section)
+            self.sections[int(section["id"])] = section
         for scene in seed.get("scenes") or []:
             scene = dict(scene)
             scene.setdefault("running", False)
@@ -152,6 +193,11 @@ class SimState:
             profile = dict(profile)
             profile.setdefault("active", False)
             self.profiles[int(profile["id"])] = profile
+        location = seed.get("location")
+        if isinstance(location, dict):
+            for key in ("latitude", "longitude"):
+                if key in location:
+                    self.location[key] = location[key]
 
     # -- ids ------------------------------------------------------------------
 

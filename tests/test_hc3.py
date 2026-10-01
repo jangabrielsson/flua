@@ -836,9 +836,11 @@ async def test_devices_list_is_union_of_sim_and_hc3(
     finally:
         await engine.stop()
     out = capsys.readouterr().out
-    assert "A 4" in out  # QA a + QA b + the two HC3 devices
+    # QA a + QA b + the sim's device 1 (the HC3) + the two HC3 devices
+    assert "A 5" in out
     assert "hc3-device" in out and "hc3-other" in out
-    assert "B 2" in out  # the offline-pinned QA sees the sim only (a + b)
+    assert "HC3" in out
+    assert "B 3" in out  # the offline-pinned QA sees the sim only (1 + a + b)
 
 
 def test_cli_remote_requires_hc3_url(tmp_path, monkeypatch) -> None:

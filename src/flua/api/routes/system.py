@@ -14,6 +14,23 @@ def _now(req: ApiRequest) -> float:
     return req.clock.time if req.clock is not None else time.time()
 
 
+def location_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # GET /settings/location — the controller's location (drives device 1's
+    # sunrise/sunset)
+    return public(state.location), 200
+
+
+def location_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # PUT /settings/location — the HC3 accepts the full settings object;
+    # the sim keeps latitude/longitude (the fields suncalc uses)
+    if not isinstance(req.body, dict):
+        return None, 400
+    for key in ("latitude", "longitude"):
+        if key in req.body:
+            state.location[key] = req.body[key]
+    return None, 200
+
+
 def globals_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     variables = sorted(state.global_variables.values(), key=lambda v: v["name"])
     return public(variables), 200
@@ -93,6 +110,19 @@ def room_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     except (TypeError, ValueError):
         room = None
     return (public(room), 200) if room is not None else (None, 404)
+
+
+def sections_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    sections = sorted(state.sections.values(), key=lambda s: s["id"])
+    return public(sections), 200
+
+
+def section_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    try:
+        section = state.sections.get(int(req.path_params["id"]))
+    except (TypeError, ValueError):
+        section = None
+    return (public(section), 200) if section is not None else (None, 404)
 
 
 def refresh_states(state: SimState, req: ApiRequest) -> tuple[Any, int]:

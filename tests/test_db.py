@@ -86,7 +86,7 @@ async def test_db_offline_persists_and_restores(tmp_path, capsys) -> None:
     saved = json.loads(db.read_text(encoding="utf-8"))
     assert saved["globalVariables"]["nightMode"]["value"] == "true"
     # the QA shell is not a persisted device; the child lives in qaState
-    assert [d["id"] for d in saved["devices"]] == [10]
+    assert sorted(d["id"] for d in saved["devices"]) == [1, 10]  # the HC3 + the seed
     qa_state = saved["qaState"]["sleepy"]
     assert qa_state["properties"]["value"] is True
     assert len(qa_state["children"]) == 1

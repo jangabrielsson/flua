@@ -63,11 +63,15 @@ from .system import (
     global_put,
     globals_create,
     globals_list,
+    location_get,
+    location_put,
     profile_activate,
     profiles_list,
     refresh_states,
     room_get,
     rooms_list,
+    section_get,
+    sections_list,
 )
 
 Handler = Callable[[SimState, ApiRequest], tuple[Any, int]]
@@ -118,9 +122,13 @@ ROUTES: list[tuple[str, str, Handler]] = [
     ("GET", "/globalVariables/{name}", global_get),
     ("PUT", "/globalVariables/{name}", global_put),
     ("DELETE", "/globalVariables/{name}", global_delete),
+    ("GET", "/settings/location", location_get),
+    ("PUT", "/settings/location", location_put),
     ("GET", "/refreshStates", refresh_states),
     ("GET", "/profiles", profiles_list),
     ("POST", "/profiles/activeProfile/{id}", profile_activate),
     ("GET", "/rooms", rooms_list),
     ("GET", "/rooms/{id}", room_get),
+    ("GET", "/sections", sections_list),
+    ("GET", "/sections/{id}", section_get),
 ]
