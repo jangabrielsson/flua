@@ -2,6 +2,8 @@
 --%%type:com.fibaro.multilevelSwitch
 --%%debug:refreshState=true
 
+-- Debug line will log every refreshEvent, like the QA value property updates
+
 function QuickApp:onInit()
   print("QuickApp API demo initialized")
   print("Value:",fibaro.getValue(self.id, "value"))
