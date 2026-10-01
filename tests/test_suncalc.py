@@ -116,6 +116,22 @@ def test_location_seeded_and_persisted(tmp_path) -> None:
     assert saved["location"]["longitude"] == 20.0
 
 
+def test_flua_lua_configures_location(tmp_path, monkeypatch) -> None:
+    # .flua.lua can set the sim's location (device 1's sun times)
+    (tmp_path / ".flua.lua").write_text(
+        "return { location = { latitude = -33.87, longitude = 151.21 } }\n"  # Sydney
+    )
+    monkeypatch.chdir(tmp_path)
+    engine = LuaEngine()
+    assert engine.api.state.location["latitude"] == -33.87
+    assert engine.api.state.location["longitude"] == 151.21
+    # the db file wins over... no — .flua.lua wins over the db file
+    # (a runtime PUT would win over both). Sun times render in the host's
+    # timezone (like flua's os.date), so only the shape is asserted here.
+    sun = engine.api.state.sun_times(datetime(2026, 6, 21, 12, 0).timestamp())
+    assert HH_MM.match(sun["sunriseHour"]) and HH_MM.match(sun["sunsetHour"])
+
+
 @pytest.mark.asyncio
 async def test_fibaro_get_value_sunset(tmp_path, capsys) -> None:
     a = tmp_path / "a.lua"

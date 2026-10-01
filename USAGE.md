@@ -376,6 +376,18 @@ startup error — flua names the variable and exits 1 — but an expression
 that evaluates to nil (`config.foo`, `os.getenv("MISSING")`) simply leaves
 the variable unset.
 
+A `location` table configures the simulated controller's location — device
+1's `sunriseHour`/`sunsetHour` are computed from it:
+
+```lua
+return {
+  location = { latitude = 59.3293, longitude = 18.0686 },  -- Stockholm
+}
+```
+
+Precedence: the built-in default (Stockholm) < the db/seed file's
+`location` < `.flua.lua` < a runtime `PUT /settings/location`.
+
 `os.getenv(name)` reads through flua's environment chain: the local `.env`
 in the directory you run from, then `~/.env`, then the shell environment.
 Files are plain `KEY=value` lines (comments and quotes supported) and are

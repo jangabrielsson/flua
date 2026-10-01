@@ -275,6 +275,15 @@ class LuaEngine:
         if lupa.lua_type(table) != "table":
             raise ValueError(f"Lua config {path} must return a table")
         self._lua.globals()["_FLUA"]["configFile"] = table
+        location = table["location"]
+        if lupa.lua_type(location) == "table":
+            # .flua.lua configures the sim's controller location (device 1's
+            # sunrise/sunset); it wins over the db file's location, and a
+            # runtime PUT /settings/location wins over both
+            for key in ("latitude", "longitude"):
+                value = location[key]
+                if value is not None:
+                    self.api.state.location[key] = float(value)
 
     # -- bridge surface (used by bindings.py) ---------------------------------
 
