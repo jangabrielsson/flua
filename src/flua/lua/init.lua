@@ -70,6 +70,26 @@ end
 local _PY_post = _PY.post
 _PY.post = function(msg) _PY_post(sanitizeMsg(msg)) end
 
+-- Binary-safe transport for socket payloads: escapes the bytes that cannot
+-- cross the UTF-8 bridge (>= 0x80, NUL, DEL) AND the backslash itself, so
+-- the engine can un-escape exactly — a literal \x in the data arrives as
+-- \x5C and never looks like an escaped byte.
+function _FLUA.escapeBytes(v)
+  if type(v) ~= "string" then v = tostring(v) end
+  local out, m = {}, 0
+  for i = 1, #v do
+    local b = string.byte(v, i)
+    if b >= 0x80 or b == 0x00 or b == 0x7F or b == 0x5C then
+      m = m + 1
+      out[m] = string.format("\\x%02X", b)
+    else
+      m = m + 1
+      out[m] = string.char(b)
+    end
+  end
+  return table.concat(out)
+end
+
 -- ------------------------------------------------------------------ logging
 -- Log lines print directly from Python (_PY.log): writing to stdout never
 -- touches Lua state, so it is safe at any call depth — including inside
@@ -223,7 +243,7 @@ local function deliverQueued(qaId, msg)
     if h then
       xpcall(function() h(msg) end, traceback)
     else
-      postLog("warning", "no Lua handler for message type " .. tostring(t))
+      _PY.flua_log("warning", nil, "no Lua handler for message type " .. tostring(t))
     end
   end
 end
@@ -246,7 +266,7 @@ resumeQa = function(qaId, co, ...)
   if coroutine.status(co) == "suspended" then
     if type(res) ~= "number" then
       -- yield protocol violation (e.g. async.await outside async.run)
-      postLog("error", "unexpected yield from QA callback (fibaro.sleep expects ms)")
+      _PY.flua_log("error", qaId, "unexpected yield from QA callback (fibaro.sleep expects ms)")
       return
     end
     sleeping[qaId] = true
@@ -770,7 +790,7 @@ handlers.timerExpired = function(msg)
     callbacks[msg.id] = nil -- one-shot
     runInQa(qaId, fn)
   else
-    postLog("warning", "timerExpired for unknown id " .. tostring(msg.id))
+    _PY.flua_log("warning", nil, "timerExpired for unknown id " .. tostring(msg.id))
   end
 end
 
@@ -797,7 +817,7 @@ handlers.deviceAction = function(msg)
       qa:callAction(msg.action, table.unpack(msg.args or {}))
     end)
   elseif qa == nil then
-    postLog("warning", "deviceAction for unknown device " .. tostring(msg.id))
+    _PY.flua_log("warning", nil, "deviceAction for unknown device " .. tostring(msg.id))
   end
 end
 
@@ -838,7 +858,7 @@ handlers.uiEvent = function(msg)
       end)
     end
   elseif qa == nil then
-    postLog("warning", "uiEvent for unknown device " .. tostring(msg.deviceId))
+    _PY.flua_log("warning", nil, "uiEvent for unknown device " .. tostring(msg.deviceId))
   end
 end
 
@@ -876,6 +896,10 @@ handlers.restartQA = function(msg)
   -- cancelled Python-side and both belong to the old code instance
   sleeping[msg.id] = nil
   workQueues[msg.id] = nil
+  -- log the restart in flua's own log format (distinct [FLUA] level plus
+  -- the QA tag), before the new instance boots — plugin.restart, file
+  -- changes and /quickApp file updates all arrive here
+  _PY.flua_log("info", msg.id, "restarting QA")
   local env = qaEnvFor(msg.id)
   runInQa(msg.id, function()
     startQaInEnv(env, msg.id, msg.config or {}, msg.arg0, function()
@@ -968,7 +992,7 @@ handlers.runPreamble = function(msg)
   -- a QA — so the preamble doesn't consume a QA id
   local fn, err = load(msg.code, "=-e preamble")
   if not fn then
-    postLog("warning", "error in -e preamble: " .. tostring(err))
+    _PY.flua_log("warning", nil, "error in -e preamble: " .. tostring(err))
     return
   end
   xpcall(fn, traceback)
@@ -981,7 +1005,7 @@ function _FLUA.dispatch(batch)
     if h then
       xpcall(function() h(msg) end, traceback)
     else
-      postLog("warning", "no Lua handler for message type " .. tostring(msg.type))
+      _PY.flua_log("warning", nil, "no Lua handler for message type " .. tostring(msg.type))
     end
   end
 end

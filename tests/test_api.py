@@ -346,8 +346,10 @@ async def test_warn_directive_logs_api_error_codes(tmp_path, capsys) -> None:
     finally:
         await engine.stop()
     out = capsys.readouterr().out
-    assert "api GET /notAnEndpoint -> 404 (w)" in out
-    assert "api POST /alsoMissing -> 404 (w)" in out
+    # flua's own format: a [FLUA] level column + the QA tag (name+id)
+    assert "api GET /notAnEndpoint -> 404" in out
+    assert "[FLUA" in out and "[w5000]" in out
+    assert "api POST /alsoMissing -> 404" in out
     assert "DONE" in out  # warnings don't stop the QA
 
 

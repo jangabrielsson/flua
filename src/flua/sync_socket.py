@@ -151,6 +151,21 @@ class SyncTCPSockets:
             return False, "closed", None
         return True, data.decode("utf-8", errors="replace"), None
 
+    def read_chunk_bytes(self, conn_id: int, n: int = 4096) -> tuple:
+        """Like read_chunk, but the raw bytes (binary-safe for QAs)."""
+        try:
+            sock = self._get(conn_id)
+            data = sock.recv(int(n))
+        except (BlockingIOError, TimeoutError):
+            return False, "timeout", None
+        except ConnectionResetError:
+            return False, "closed", None
+        except OSError as exc:
+            return False, f"read: {exc}", None
+        if not data:
+            return False, "closed", None
+        return True, bytes(data), None
+
     def read_until(self, conn_id: int, delimiter: str) -> tuple:
         """Read until ``delimiter`` appears (excluded from the result), like
         the HC3's TCPSocket:readUntil. (True, data) | (False, err, partial)."""
@@ -171,6 +186,26 @@ class SyncTCPSockets:
             data += byte
             if data.endswith(needle):
                 return True, data[: -len(needle)].decode("utf-8", errors="replace"), None
+
+    def read_until_bytes(self, conn_id: int, delimiter: str) -> tuple:
+        """Like read_until, but the raw bytes (binary-safe for QAs)."""
+        sock = self._get(conn_id)
+        data = b""
+        needle = delimiter.encode("utf-8")
+        while True:
+            try:
+                byte = sock.recv(1)
+            except (BlockingIOError, TimeoutError):
+                return False, "timeout", bytes(data)
+            except ConnectionResetError:
+                return False, "closed", bytes(data)
+            except OSError as exc:
+                return False, f"read: {exc}", bytes(data)
+            if not byte:
+                return False, "closed", bytes(data)
+            data += byte
+            if data.endswith(needle):
+                return True, bytes(data[: -len(needle)]), None
 
     def set_timeout(self, conn_id: int, timeout: float | None) -> tuple:
         """None = blocking, 0 = non-blocking, t > 0 = timeout in seconds."""
@@ -272,11 +307,12 @@ class SyncUDPSockets:
             sock.close()
             return False, f"bind: {exc}", None
 
-    def send_to(self, conn_id: int, data: str, ip: str, port: int) -> tuple:
+    def send_to(self, conn_id: int, data: str | bytes, ip: str, port: int) -> tuple:
         """(True, bytes_sent) | (False, error_message)."""
         try:
             sock = self._get(conn_id)
-            return True, sock.sendto(data.encode("utf-8"), (str(ip), int(port)))
+            payload = data if isinstance(data, bytes) else str(data).encode("utf-8")
+            return True, sock.sendto(payload, (str(ip), int(port)))
         except OSError as exc:
             return False, f"sendto: {exc}"
 
@@ -290,6 +326,17 @@ class SyncUDPSockets:
         except OSError as exc:
             return False, f"receive: {exc}", None
         return True, data.decode("utf-8", errors="replace"), None
+
+    def receive_bytes(self, conn_id: int) -> tuple:
+        """Like receive, but the raw datagram bytes (binary-safe for QAs)."""
+        try:
+            sock = self._get(conn_id)
+            data, _addr = sock.recvfrom(65535)
+        except (BlockingIOError, TimeoutError):
+            return False, "timeout", None
+        except OSError as exc:
+            return False, f"receive: {exc}", None
+        return True, bytes(data), None
 
     def close(self, conn_id: int) -> tuple:
         with self._lock:

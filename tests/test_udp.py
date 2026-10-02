@@ -79,6 +79,38 @@ async def test_udp_echo_roundtrip(capsys) -> None:
 
 
 @pytest.mark.asyncio
+async def test_udp_binary_roundtrip(capsys) -> None:
+    # binary datagrams survive the bridge byte-for-byte
+    port = _udp_echo_server()
+    out = await _run_qa(
+        "setTimeout(function()\n"
+        "  local udp = net.UDPSocket({timeout = 2000})\n"
+        "  local blob = string.char(0,1,127,128,255,65) .. '\\\\x41'\n"
+        f"  udp:sendTo(blob, '127.0.0.1', {port}, {{\n"
+        "    success = function()\n"
+        "      udp:receive({\n"
+        "        success = function(data)\n"
+        "          local ok = #data == 10\n"
+        "          local expected = {0,1,127,128,255,65,92,120,52,49}\n"
+        "          for i = 1, #expected do\n"
+        "            if string.byte(data, i) ~= expected[i] then ok = false end\n"
+        "          end\n"
+        "          print('BINARY', tostring(ok), #data)\n"
+        "          udp:close()\n"
+        "        end,\n"
+        "        error = function(e) print('RECV ERR', e) end,\n"
+        "      })\n"
+        "    end,\n"
+        "    error = function(e) print('SEND ERR', e) end,\n"
+        "  })\n"
+        "end, 20)\n",
+        capsys=capsys,
+    )
+    assert "BINARY true 10" in out
+    assert "ERR" not in out
+
+
+@pytest.mark.asyncio
 async def test_udp_receive_timeout(capsys) -> None:
     # no peer replies: receive must hit the options.timeout and call error
     out = await _run_qa(

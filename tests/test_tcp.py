@@ -118,6 +118,44 @@ async def test_tcp_echo_roundtrip(capsys) -> None:
 
 
 @pytest.mark.asyncio
+async def test_tcp_binary_roundtrip(capsys) -> None:
+    # binary payloads survive the bridge byte-for-byte (0x00, 0x7F, >=0x80)
+    _, port = _echo_server()
+    out = await _run_qa(
+        "setTimeout(function()\n"
+        "  local sock = net.TCPSocket({timeout = 2000})\n"
+        f"  sock:connect('127.0.0.1', {port}, {{\n"
+        "    success = function()\n"
+        "      -- 0, 1, 127, 128, 255, 'A', plus a literal backslash-x sequence\n"
+        "      local blob = string.char(0,1,127,128,255,65) .. '\\\\x41'\n"
+        "      sock:send(blob, {\n"
+        "        success = function()\n"
+        "          sock:read({\n"
+        "            success = function(data)\n"
+        "              local ok = #data == 10\n"
+        "              local expected = {0,1,127,128,255,65,92,120,52,49}\n"
+        "              for i = 1, #expected do\n"
+        "                if string.byte(data, i) ~= expected[i] then ok = false end\n"
+        "              end\n"
+        "              print('BINARY', tostring(ok), #data)\n"
+        "              sock:close()\n"
+        "            end,\n"
+        "            error = function(e) print('READ ERR', e) end,\n"
+        "          })\n"
+        "        end,\n"
+        "        error = function(e) print('SEND ERR', e) end,\n"
+        "      })\n"
+        "    end,\n"
+        "    error = function(e) print('CONNECT ERR', e) end,\n"
+        "  })\n"
+        "end, 20)\n",
+        capsys=capsys,
+    )
+    assert "BINARY true 10" in out
+    assert "ERR" not in out
+
+
+@pytest.mark.asyncio
 async def test_tcp_connect_refused(capsys) -> None:
     out = await _run_qa(
         "setTimeout(function()\n"

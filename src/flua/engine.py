@@ -31,6 +31,7 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -98,6 +99,35 @@ def sanitize_filename(text: str) -> str:
     (used for the downloaded project file names)."""
     sanitized = re.sub(r"[^A-Za-z0-9]+", "_", str(text)).strip("_")
     return sanitized or "qa"
+
+
+def _unescape_data(text: Any) -> bytes | str:
+    """Inverse of the Lua side's byte escaper (_FLUA.escapeBytes) for socket
+    and HTTP payloads: ``\\xHH`` becomes the raw byte. A literal backslash
+    arrived escaped as ``\\x5C``, so the transform is exact. Payloads without
+    escapes return unchanged (kept as str — plain text behaves as before)."""
+    if isinstance(text, bytes):
+        return text
+    s = str(text)
+    if "\\x" not in s:
+        return s
+    out = bytearray()
+    i, n = 0, len(s)
+    hexdigits = "0123456789abcdefABCDEF"
+    while i < n:
+        if (
+            s[i] == "\\"
+            and i + 3 < n
+            and s[i + 1] == "x"
+            and s[i + 2] in hexdigits
+            and s[i + 3] in hexdigits
+        ):
+            out.append(int(s[i + 2 : i + 4], 16))
+            i += 4
+            continue
+        out += s[i].encode("utf-8")
+        i += 1
+    return bytes(out)
 
 
 class LuaEngine:
@@ -304,6 +334,24 @@ class LuaEngine:
         and logging, never Lua state — so it works inside debugger-stepped
         code, where the pump is frozen)."""
         self._handle_log({"type": messages.LOG, "level": level, "text": text})
+
+    def flua_log(self, level: str, qa_id: int | None, message: str) -> None:
+        """Flua's own log lines — visually distinct from QA logs: a [FLUA]
+        level column plus the QA tag (name+id) the message belongs to, with
+        the virtual-clock timestamp. Pure Python, safe at any call depth
+        (like log_line)."""
+        date = datetime.fromtimestamp(self.clock.time).strftime("[%d.%m.%Y][%H:%M:%S]")
+        tag = "flua"
+        if qa_id is not None:
+            info = self.qa_info(int(qa_id))
+            if info is not None:
+                tag = f"{info['name']}{qa_id}"
+        text = str(message)
+        logger.debug("Flua [%s]: %s", level, text)
+        if self.color_enabled():
+            print(f"\x1b[37m{date}\x1b[35m[FLUA   ]\x1b[37m[{tag}]: {text}\x1b[0m", flush=True)
+        else:
+            print(f"{date}[FLUA   ][{tag}]: {text}", flush=True)
 
     def render_html(self, text: str) -> str:
         """Render the HTML subset the HC3 console supports in QA log
@@ -1291,20 +1339,26 @@ class LuaEngine:
 
     def _handle_tcp_send(self, msg: dict[str, Any]) -> None:
         self._spawn_tcp(
-            msg, "send", self.qa_sockets.write, int(msg["conn"]), str(msg.get("data") or "")
+            msg,
+            "send",
+            self.qa_sockets.write,
+            int(msg["conn"]),
+            _unescape_data(msg.get("data") or ""),
         )
 
     def _handle_tcp_read(self, msg: dict[str, Any]) -> None:
         conn = int(msg["conn"])
         if msg.get("delimiter") is not None:
-            self._spawn_tcp(msg, "read", self.qa_sockets.read_until, conn, str(msg["delimiter"]))
+            self._spawn_tcp(
+                msg, "read", self.qa_sockets.read_until_bytes, conn, str(msg["delimiter"])
+            )
         elif msg.get("pattern") == "*l":
             self._spawn_tcp(msg, "read", self.qa_sockets.read, conn, "*l")
         elif msg.get("pattern") == "*a":
             self._spawn_tcp(msg, "read", self.qa_sockets.read, conn, "*a")
         else:
             # HC3's read() returns the next available data package: one recv
-            self._spawn_tcp(msg, "read", self.qa_sockets.read_chunk, conn)
+            self._spawn_tcp(msg, "read", self.qa_sockets.read_chunk_bytes, conn)
 
     async def _run_tcp_op(self, msg: dict[str, Any], kind: str, func: Any, *args: Any) -> None:
         try:
@@ -1334,7 +1388,7 @@ class LuaEngine:
                 msg,
                 self.qa_udp.send_to,
                 int(msg["conn"]),
-                str(msg.get("data") or ""),
+                _unescape_data(msg.get("data") or ""),
                 str(msg["ip"]),
                 int(msg["port"]),
             ),
@@ -1346,7 +1400,7 @@ class LuaEngine:
     def _handle_udp_receive(self, msg: dict[str, Any]) -> None:
         logger.debug("udp %s id=%s", msg["type"], msg["id"])
         task = asyncio.create_task(
-            self._run_udp_op(msg, self.qa_udp.receive, int(msg["conn"])),
+            self._run_udp_op(msg, self.qa_udp.receive_bytes, int(msg["conn"])),
             name="flua-udp",
         )
         self._http_tasks.add(task)
@@ -1513,7 +1567,7 @@ class LuaEngine:
                 str(msg.get("method") or "GET"),
                 str(msg["url"]),
                 {str(k): str(v) for k, v in (msg.get("headers") or {}).items()},
-                msg.get("data"),
+                _unescape_data(msg.get("data")) if msg.get("data") is not None else None,
                 float(msg.get("timeout") or 30.0),
             )
             result = messages.http_result(msg["id"], msg.get("qa"), status, data, headers)

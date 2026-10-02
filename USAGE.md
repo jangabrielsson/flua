@@ -293,10 +293,11 @@ with `...`).
 complains about — starting with api error codes: when an `api.get`/`post`/
 `put`/`delete` (or `api.hc3.*`) returns a 4xx/5xx — or a transport failure —
 the emulator logs it, because most QA code silently ignores those status
-codes:
+codes. Flua's own log lines are visually distinct from QA logs: a `[FLUA]`
+level column plus the QA tag the message belongs to:
 
 ```
-api GET /devices/9999 -> 404 (my-qa)
+[02.10.2026][17:32:41][FLUA   ][my-qa5000]: api GET /devices/9999 -> 404
 ```
 
 ### HTML in log messages
@@ -649,6 +650,11 @@ run in your QA, timers keep running while requests are in flight):
 - `net.UDPSocket({broadcast, timeout})` → `sendTo/receive` — `examples/udp.lua`
 - `net.WebSocketClient()/WebSocketClientTls()` → `addEventListener`, `connect`, `send` — `examples/websocket.lua`
 - `mqtt.Client.connect(uri, options)` → `subscribe/publish/unsubscribe/disconnect`, `mqtt.QoS` — `examples/mqtt.lua`
+
+TCP/UDP payloads are **binary-safe**: raw bytes (including NUL and values
+above 0x7F) cross the bridge byte-for-byte in both directions — a payload
+is escaped for the message bridge and un-escaped on the wire, so even a
+literal `\x` sequence in your data round-trips intact.
 
 ## Deploying to the HC3
 

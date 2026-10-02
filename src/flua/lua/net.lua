@@ -47,7 +47,7 @@ function HTTPClient:request(url, params)
     url = tostring(url),
     method = options.method or "GET",
     headers = options.headers,
-    data = options.data,
+    data = options.data ~= nil and _FLUA.escapeBytes(options.data) or nil,
     timeout = options.timeout,
   }
   return id
@@ -113,7 +113,7 @@ function TCPSocket:send(data, callbacks)
   tcpRequest(self, "send", callbacks, {
     type = "tcpSend",
     conn = self._conn,
-    data = tostring(data),
+    data = _FLUA.escapeBytes(data),
   })
 end
 
@@ -162,7 +162,7 @@ function UDPSocket:sendTo(data, ip, port, callbacks)
   tcpRequest(self, "send", callbacks, {
     type = "udpSend",
     conn = self._conn,
-    data = tostring(data),
+    data = _FLUA.escapeBytes(data),
     ip = tostring(ip),
     port = tonumber(port),
   })

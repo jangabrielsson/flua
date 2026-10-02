@@ -312,6 +312,8 @@ async def test_plugin_restart_reruns_qa(tmp_path, capsys) -> None:
         out = capsys.readouterr().out
         assert "BOOT 1" in out and "BOOT 2" in out and "BOOT 3" in out
         assert "BOOT 4" not in out
+        # each restart logs a flua-format line (distinct [FLUA] level + QA tag)
+        assert out.count("[FLUA   ][r5000]: restarting QA") == 2
         # the device struct survives the restart: the property set on boot 1
         # is visible before boot 2's updateProperty
         assert "BOOT 2 VALUE-BEFORE true" in out

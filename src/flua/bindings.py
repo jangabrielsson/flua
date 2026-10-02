@@ -110,6 +110,7 @@ def install_bindings(engine: "LuaEngine") -> None:
     py["vclock"] = lambda: engine.clock.elapsed()
     py["note_debugger_pause"] = engine.note_debugger_pause
     py["log"] = engine.log_line
+    py["flua_log"] = engine.flua_log
     py["getenv"] = engine.env.get
     py["version"] = lambda: __version__
     py["color_enabled"] = engine.color_enabled
@@ -133,15 +134,13 @@ def install_bindings(engine: "LuaEngine") -> None:
         """--%%warn:true: error status codes are easy to miss (most QA code
         ignores them) — the HC3 stays silent, the emulator can shout."""
         enabled = bool(engine.config.get("warn"))
-        name = ""
         if qa_id is not None:
             info = engine.qa_info(int(qa_id))
             if info is not None:
                 enabled = enabled or bool(info.get("config", {}).get("warn"))
-                name = f" ({info['name']})"
         if enabled and (status >= 300 or status <= 0):
-            engine.log_line(
-                "warning", f"api {method.upper()} {url} -> {status}{name}"
+            engine.flua_log(
+                "warning", qa_id, f"api {method.upper()} {url} -> {status}"
             )
 
     def api_call(

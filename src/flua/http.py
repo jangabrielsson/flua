@@ -19,7 +19,7 @@ def http_call(
     method: str,
     url: str,
     headers: dict[str, str] | None = None,
-    data: str | None = None,
+    data: str | bytes | None = None,
     timeout: float = 30.0,
 ) -> tuple[int, str, dict[str, str]]:
     """One blocking HTTP exchange -> (status, body, headers).
@@ -31,7 +31,12 @@ def http_call(
     """
     headers = dict(headers or {})
     headers.setdefault("User-Agent", USER_AGENT)
-    payload = data.encode("utf-8") if isinstance(data, str) else None
+    if isinstance(data, bytes):
+        payload = data
+    elif isinstance(data, str):
+        payload = data.encode("utf-8")
+    else:
+        payload = None
     request = urllib.request.Request(url, data=payload, headers=headers, method=method.upper())
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
