@@ -133,68 +133,23 @@ Ctrl-C stops it. Works on top of the debugger too.
 
 ### Without the repo (pip install)
 
-Installed from PyPI you don't have this checkout's `.vscode/` — drop these two
-files in your project. Extensions needed: **Python** (for run/debug via
-debugpy) and **Lua MobDebug** (`alexeymelnichuk.lua-mobdebug`).
+Installed from PyPI you don't have this checkout's developer setup — the
+VS Code run/debug configs, the Lua Language Server settings, and the agent
+files (Copilot skills/instructions, `AGENTS.md`). One command scaffolds a
+QA project directory with all of it:
 
-`.vscode/launch.json`:
-
-```json
-{
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "Flua: Run Current File",
-      "type": "debugpy",
-      "request": "launch",
-      "module": "flua",
-      "args": ["${relativeFile}"],
-      "console": "internalConsole",
-      "cwd": "${workspaceFolder}",
-      "justMyCode": false
-    },
-    {
-      "name": "Flua: Run Current File (Terminal)",
-      "type": "debugpy",
-      "request": "launch",
-      "module": "flua",
-      "args": ["${relativeFile}"],
-      "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}",
-      "justMyCode": false
-    },
-    {
-      "name": "Flua: Debug Current File (mobdebug)",
-      "type": "luaMobDebug",
-      "request": "launch",
-      "workingDirectory": "${workspaceFolder}",
-      "sourceBasePath": "${workspaceFolder}",
-      "listenPort": 8172,
-      "stopOnEntry": false,
-      "sourceEncoding": "UTF-8",
-      "interpreter": "flua",
-      "arguments": ["${relativeFile}"],
-      "listenPublicly": true
-    }
-  ]
-}
+```bash
+flua --tool setup              # the current directory
+flua --tool setup my-project/  # a project directory (created if missing)
 ```
 
-`.luarc.json` (for the **Lua Language Server** extension, `sumneko.lua`) —
-the HC3 globals (`QuickApp`, `fibaro`, `api`, `net`, …) aren't type-annotated,
-so the language server would flood you with undefined-global warnings:
+It writes `.vscode/launch.json` (run in the panel, run in the terminal,
+mobdebug), `.vscode/extensions.json` (VS Code will offer to install the
+**Python**, **Lua MobDebug** and **Lua Language Server** extensions),
+`.luarc.json` (silences the HC3 globals for the language server), `AGENTS.md`
+and the `.github/` skills, instructions and prompts. Existing files are
+kept; `--force` overwrites.
 
-```json
-{
-  "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
-  "runtime.version": "Lua 5.4",
-  "workspace.ignoreDir": [".venv", "node_modules"],
-  "diagnostics.disable": ["undefined-global", "lowercase-global", "undefined-field"]
-}
-```
-
-If you later add HC3 type stubs, you can re-enable `undefined-global` and
-point `workspace.library` at them instead.
 
 ## QA directives (`--%%`)
 
@@ -684,6 +639,9 @@ format (individual `.lua` files) and only the HC3 sees `.fqa`:
 
 # build an offline db from the real HC3 (device 1, location, family locations)
 .venv/bin/flua --tool createDB -o db.json            # -f to overwrite
+
+# scaffold a QA project: .vscode configs + agent skills/instructions
+.venv/bin/flua --tool setup [project-dir]
 
 # list the installed tools (a bare --tool, or --tool help)
 .venv/bin/flua --tool

@@ -8,6 +8,7 @@ import argparse
 import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 import pytest
 
@@ -17,7 +18,7 @@ from flua import tools  # noqa: E402
 
 
 def test_registry_discovers_all_tools() -> None:
-    assert tools.tool_names() == ["createDB", "downloadQA", "updateQA", "uploadQA"]
+    assert tools.tool_names() == ["createDB", "downloadQA", "setup", "updateQA", "uploadQA"]
     for name in tools.tool_names():
         module = tools._TOOLS[name]
         assert module.NAME == name
@@ -109,6 +110,46 @@ def test_family_locations_seed_and_serve(tmp_path) -> None:
     api = Api(seed={"familyLocations": [{"id": 1, "name": "Sommarstuga"}]})
     data, status = api.dispatch("GET", "/panels/location")
     assert status == 200 and data[0]["name"] == "Sommarstuga"
+
+
+def test_setup_tool_scaffolds_a_qa_project(tmp_path, capsys) -> None:
+    module = tools._TOOLS["setup"]
+    parser = argparse.ArgumentParser()
+    module.add_arguments(parser)
+    assert module.run(parser, parser.parse_args([str(tmp_path)])) == 0
+    out = capsys.readouterr().out
+    # the VS Code configs and the agent files land
+    for path in (
+        ".vscode/launch.json",
+        ".vscode/extensions.json",
+        ".luarc.json",
+        "AGENTS.md",
+        ".github/copilot-instructions.md",
+        ".github/instructions/quickapp-dev.instructions.md",
+        ".github/prompts/install-qa-skills.prompt.md",
+        ".github/skills/quickapp-api/SKILL.md",
+    ):
+        assert (tmp_path / path).exists(), path
+    assert "wrote .vscode/launch.json" in out
+    # idempotent: a second run keeps the existing files
+    (tmp_path / "AGENTS.md").write_text("custom\n")
+    assert module.run(parser, parser.parse_args([str(tmp_path)])) == 0
+    assert "kept AGENTS.md" in capsys.readouterr().out
+    assert (tmp_path / "AGENTS.md").read_text() == "custom\n"
+    # --force overwrites
+    assert module.run(parser, parser.parse_args(["--force", str(tmp_path)])) == 0
+    assert "flua" in (tmp_path / "AGENTS.md").read_text()
+
+
+def test_packaged_skills_match_the_repo() -> None:
+    # the wheel ships the skills; a sync guard keeps the copies honest
+    repo = Path(__file__).resolve().parent.parent
+    packaged = repo / "src" / "flua" / "setup_templates" / "github" / "skills"
+    for origin in (repo / ".github" / "skills").rglob("*"):
+        if origin.is_file():
+            copy = packaged / origin.relative_to(repo / ".github" / "skills")
+            assert copy.exists(), f"missing packaged skill: {copy}"
+            assert copy.read_bytes() == origin.read_bytes(), f"drifted: {copy}"
 
 
 def test_sanitize_filename() -> None:

@@ -56,12 +56,13 @@ include = ["flua*"]
 "flua.examples" = "examples"
 
 [tool.setuptools.package-data]
-flua = ["lua/*.lua", "devices/*.json"]
+flua = ["lua/*.lua", "devices/*.json", "setup_templates/**/*"]
 "flua.examples" = ["*.lua", "house.json", "multifile/*.lua"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+exclude = ["src/flua/setup_templates"]  # vendored template files (skills etc.), not flua code
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

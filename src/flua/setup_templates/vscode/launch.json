@@ -1,0 +1,40 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flua: Run Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "flua",
+      "args": ["${relativeFile}"],
+      "console": "internalConsole",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
+    },
+    {
+      "name": "Flua: Run Current File (Terminal)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "flua",
+      "args": ["${relativeFile}"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
+    },
+    {
+      "name": "Flua: Debug Current File (mobdebug)",
+      "type": "luaMobDebug",
+      "request": "launch",
+      "workingDirectory": "${workspaceFolder}",
+      "sourceBasePath": "${workspaceFolder}",
+      "listenPort": 8172,
+      "stopOnEntry": false,
+      "sourceEncoding": "UTF-8",
+      "interpreter": ".venv/bin/flua",
+      "arguments": [
+        "${relativeFile}"
+      ],
+      "listenPublicly": true
+    }
+  ]
+}
