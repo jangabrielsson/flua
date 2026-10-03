@@ -145,6 +145,32 @@ async def _run_qa(script: str, sleep: float = 1.0, capsys=None) -> str:
 
 
 @pytest.mark.asyncio
+async def test_websocket_binary_roundtrip(capsys) -> None:
+    # the new HC3 binary mode: sendBinary sends a binary frame; dataReceived
+    # gets the raw bytes with isBinary=true
+    server = EchoWsServer()
+    out = await _run_qa(
+        "setTimeout(function()\n"
+        "  local ws = net.WebSocketClient()\n"
+        "  ws:addEventListener('dataReceived', function(payload, isBinary)\n"
+        "    local b = {}\n"
+        "    for i = 1, #payload do b[#b + 1] = string.byte(payload, i) end\n"
+        "    print('BIN', tostring(isBinary), #payload, table.concat(b, ','))\n"
+        "    ws:close()\n"
+        "  end)\n"
+        "  ws:addEventListener('connected', function()\n"
+        "    ws:sendBinary(string.char(0x10, 0x16, 0x00, 0xFF))\n"
+        "  end)\n"
+        "  ws:addEventListener('error', function(e) print('ERR', tostring(e)) end)\n"
+        f"  ws:connect('ws://127.0.0.1:{server.port}/')\n"
+        "end, 20)\n",
+        capsys=capsys,
+    )
+    assert "BIN true 4 16,22,0,255" in out
+    assert "ERR" not in out
+
+
+@pytest.mark.asyncio
 async def test_websocket_connect_headers(capsys) -> None:
     # the HC3 supports a headers table as the second connect() argument
     server = EchoWsServer()

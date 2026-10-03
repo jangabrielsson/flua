@@ -6,10 +6,10 @@ events (connected/disconnected/error/dataReceived) are handed to the
 engine through a thread-safe callback and delivered to QA code via the
 pump, like the other net.* classes.
 
-Data fidelity: sends are UTF-8 text frames. Text frames arrive decoded as
-UTF-8; binary frames arrive decoded as latin-1 (every byte preserved as a
-character 0-255), since Lua strings are byte strings and the bridge is
-UTF-8-strict.
+Data fidelity: sends are UTF-8 text frames (sendBinary sends binary
+frames). Text frames arrive decoded as UTF-8; binary frames arrive as raw
+bytes with the dataReceived listener's isBinary flag true (the new HC3
+binary mode), so MQTT-over-WSS style protocols work end to end.
 """
 
 from __future__ import annotations
@@ -183,10 +183,11 @@ class WsClient:
                     data = b"".join(self._message)
                     self._message = []
                     if opcode == _OP_BINARY:
-                        # binary -> latin-1: every byte preserved as a char
-                        self._on_event("dataReceived", data.decode("latin-1"))
+                        # raw bytes + the isBinary flag (the HC3 binary mode)
+                        self._on_event("dataReceived", data, True)
                     else:
-                        self._on_event("dataReceived", data.decode("utf-8", errors="replace"))
+                        text = data.decode("utf-8", errors="replace")
+                        self._on_event("dataReceived", text, False)
 
     def _next_frame(self) -> tuple[int, bool, bytes] | None:
         buf = self._buffer
@@ -250,6 +251,11 @@ class WsClient:
             raise WsError("socket not open")
         self._send_frame(_OP_TEXT, data.encode("utf-8"))
 
+    def send_binary(self, data: bytes) -> None:
+        if not self._open or self._stop.is_set():
+            raise WsError("socket not open")
+        self._send_frame(_OP_BINARY, data)
+
     def close(self) -> None:
         self._stop.set()
         sock, self._sock = self._sock, None
@@ -309,7 +315,10 @@ class WebSocketPool:
         if entry is None:
             return False, "unknown connection"
         client = WsClient(
-            url, timeout, lambda event, data: self._emit(conn, event, data), headers
+            url,
+            timeout,
+            lambda event, data, is_binary=False: self._emit(conn, event, data, is_binary),
+            headers,
         )
         try:
             client.connect()
@@ -325,13 +334,16 @@ class WebSocketPool:
         if client is not None:
             threading.Thread(target=client.run, daemon=True).start()
 
-    def send(self, conn: int, data: str) -> tuple[bool, str | None]:
+    def send(self, conn: int, data: str | bytes, binary: bool = False) -> tuple[bool, str | None]:
         entry = self._entry(conn)
         client = entry["client"] if entry else None
         if client is None or not client.is_open():
             return False, "socket not open"
         try:
-            client.send(data)
+            if binary:
+                client.send_binary(data if isinstance(data, bytes) else str(data).encode("utf-8"))
+            else:
+                client.send(data)
             return True, None
         except Exception as exc:
             return False, str(exc)

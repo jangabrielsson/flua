@@ -205,9 +205,9 @@ end
 --   ws:addEventListener("connected", function() ... end)
 --   ws:addEventListener("disconnected", function() ... end)
 --   ws:addEventListener("error", function(err) ... end)
---   ws:addEventListener("dataReceived", function(data) ... end)
---   ws:connect("ws://echo.websocket.org")
---   ws:send("hello")   ws:isOpen()   ws:close()
+--   ws:addEventListener("dataReceived", function(data, isBinary) ... end)
+--   ws:connect("ws://echo.websocket.org", {["Authorization"] = "Basic ..."})
+--   ws:send("hello")   ws:sendBinary(rawBytes)   ws:isOpen()   ws:close()
 --
 -- Text frames arrive as UTF-8; binary frames arrive latin-1-decoded (each
 -- byte preserved as one character, 0-255).
@@ -242,6 +242,18 @@ end
 
 function WsBase:send(data)
   _PY.post{ type = "wsSend", qa = qaId, conn = self._conn, data = tostring(data) }
+end
+
+function WsBase:sendBinary(data)
+  -- the new HC3 binary mode: a binary frame; the payload rides the bridge
+  -- in flua's byte-safe escaping (un-escaped on the wire, like TCP/UDP)
+  _PY.post{
+    type = "wsSend",
+    qa = qaId,
+    conn = self._conn,
+    data = _FLUA.escapeBytes(data),
+    binary = true,
+  }
 end
 
 function WsBase:isOpen()
@@ -279,7 +291,13 @@ local function handleWsEvent(msg)
   local list = client._listeners[msg.event]
   if not list then return end
   for _, fn in ipairs(list) do
-    xpcall(function() fn(msg.data) end, callbackErr)
+    xpcall(function()
+      if msg.event == "dataReceived" then
+        fn(msg.data, msg.isBinary == true)
+      else
+        fn(msg.data)
+      end
+    end, callbackErr)
   end
 end
 

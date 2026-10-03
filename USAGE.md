@@ -650,7 +650,7 @@ run in your QA, timers keep running while requests are in flight):
   like the HC3 — handy for self-signed certs; the default verifies)
 - `net.TCPSocket({timeout=ms})` → `connect/send/read/readUntil/close` — `examples/tcp.lua`
 - `net.UDPSocket({broadcast, timeout})` → `sendTo/receive` — `examples/udp.lua`
-- `net.WebSocketClient()/WebSocketClientTls()` → `addEventListener`, `connect`, `send` — `examples/websocket.lua` (`connect(url, headers)` takes a headers table, like the HC3)
+- `net.WebSocketClient()/WebSocketClientTls()` → `addEventListener`, `connect`, `send`, `sendBinary` — `examples/websocket.lua` (`connect(url, headers)` takes a headers table, like the HC3; `sendBinary` sends binary frames, and `dataReceived(payload, isBinary)` receives them — the new HC3 binary mode)
 - `mqtt.Client.connect(uri, options)` → `subscribe/publish/unsubscribe/disconnect`, `mqtt.QoS` — `examples/mqtt.lua`
 
 TCP/UDP payloads are **binary-safe**: raw bytes (including NUL and values

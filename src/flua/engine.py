@@ -1443,24 +1443,30 @@ class LuaEngine:
 
     def _handle_ws_send(self, msg: dict[str, Any]) -> None:
         logger.debug("ws send conn=%s", msg["conn"])
+        binary = bool(msg.get("binary"))
+        data: str | bytes = str(msg.get("data") or "")
+        if binary:
+            data = _unescape_data(msg.get("data") or "")  # the escaped raw bytes
         task = asyncio.create_task(
-            self._run_ws_send(msg, int(msg["conn"]), str(msg.get("data") or "")),
+            self._run_ws_send(msg, int(msg["conn"]), data, binary),
             name="flua-ws",
         )
         self._http_tasks.add(task)
         task.add_done_callback(self._http_tasks.discard)
 
-    async def _run_ws_send(self, msg: dict[str, Any], conn: int, data: str) -> None:
-        ok, err = await asyncio.to_thread(self.qa_websockets.send, conn, data)
+    async def _run_ws_send(
+        self, msg: dict[str, Any], conn: int, data: str | bytes, binary: bool = False
+    ) -> None:
+        ok, err = await asyncio.to_thread(self.qa_websockets.send, conn, data, binary)
         if not ok:
             self._on_ws_event(conn, "error", err)
 
-    def _on_ws_event(self, conn: int, event: str, data: Any) -> None:
+    def _on_ws_event(self, conn: int, event: str, data: Any, is_binary: bool = False) -> None:
         """Event sink for WsClient receiver threads (any thread)."""
         qa = self.qa_websockets.qa_of(conn)
         if qa is None:
             return
-        out = messages.ws_event(qa, conn, event, data)
+        out = messages.ws_event(qa, conn, event, data, is_binary)
         loop = self._loop
         try:
             running = asyncio.get_running_loop()

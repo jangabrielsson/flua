@@ -175,11 +175,21 @@ def udp_result(
     return msg
 
 
-def ws_event(qa: int, conn: int, event: str, data: str | None = None) -> dict[str, Any]:
-    """A net.WebSocketClient event: connected/disconnected/error/dataReceived."""
+def ws_event(
+    qa: int,
+    conn: int,
+    event: str,
+    data: Any = None,
+    is_binary: bool = False,
+) -> dict[str, Any]:
+    """A net.WebSocketClient event: connected/disconnected/error/dataReceived.
+    Binary frames carry the raw bytes plus isBinary=true (the HC3's new
+    binary mode)."""
     msg: dict[str, Any] = {"type": WS_EVENT, "qa": int(qa), "conn": int(conn), "event": event}
     if data is not None:
         msg["data"] = data
+    if is_binary:
+        msg["isBinary"] = True
     return msg
 
 
