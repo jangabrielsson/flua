@@ -1,5 +1,6 @@
 {
   "Lua.diagnostics.enable": true,
   "Lua.runtime.version": "Lua 5.4",
-  "Lua.workspace.checkThirdParty": false
+  "Lua.workspace.checkThirdParty": false,
+  "python-envs.defaultEnvManager": "ms-python.python:system"
 }
