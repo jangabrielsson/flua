@@ -46,6 +46,7 @@ class WsClient:
         url: str,
         timeout: float,
         on_event: Callable[[str, Any], None],
+        headers: dict[str, str] | None = None,
     ) -> None:
         parsed = urlparse(url)
         if parsed.scheme not in ("ws", "wss"):
@@ -58,6 +59,7 @@ class WsClient:
         self._tls = parsed.scheme == "wss"
         self._timeout = timeout
         self._on_event = on_event
+        self._headers = headers or {}
         self._sock: socket.socket | None = None
         self._stop = threading.Event()
         self._open = False
@@ -74,6 +76,13 @@ class WsClient:
                 context = ssl.create_default_context()
                 sock = context.wrap_socket(sock, server_hostname=self._host)
             key = base64.b64encode(os.urandom(16)).decode()
+            extra = ""
+            for name, value in self._headers.items():
+                n = str(name).strip()
+                v = str(value).strip()
+                if not n or "\r" in n or "\n" in n or "\r" in v or "\n" in v:
+                    raise WsError("invalid websocket header")
+                extra += f"{n}: {v}\r\n"
             request = (
                 f"GET {self._path} HTTP/1.1\r\n"
                 f"Host: {self._host}:{self._port}\r\n"
@@ -81,6 +90,7 @@ class WsClient:
                 "Connection: Upgrade\r\n"
                 f"Sec-WebSocket-Key: {key}\r\n"
                 "Sec-WebSocket-Version: 13\r\n"
+                f"{extra}"
                 "\r\n"
             )
             sock.sendall(request.encode("ascii"))
@@ -292,11 +302,15 @@ class WebSocketPool:
         entry = self._entry(conn)
         return entry["qa"] if entry else None
 
-    def connect(self, conn: int, url: str, timeout: float) -> tuple[bool, str | None]:
+    def connect(
+        self, conn: int, url: str, timeout: float, headers: dict[str, str] | None = None
+    ) -> tuple[bool, str | None]:
         entry = self._entry(conn)
         if entry is None:
             return False, "unknown connection"
-        client = WsClient(url, timeout, lambda event, data: self._emit(conn, event, data))
+        client = WsClient(
+            url, timeout, lambda event, data: self._emit(conn, event, data), headers
+        )
         try:
             client.connect()
         except Exception as exc:

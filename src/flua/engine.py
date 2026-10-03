@@ -1433,6 +1433,7 @@ class LuaEngine:
             conn,
             str(msg["url"]),
             float(msg.get("timeout") or 10.0),
+            {str(k): str(v) for k, v in (msg.get("headers") or {}).items()},
         )
         if not ok:
             self._on_ws_event(conn, "error", err)

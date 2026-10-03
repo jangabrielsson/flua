@@ -74,6 +74,7 @@ class EchoWsServer:
     """Minimal RFC 6455 server: accepts, handshakes, echoes text frames."""
 
     def __init__(self) -> None:
+        self.seen_requests: list[bytes] = []  # raw handshakes (for assertions)
         self.listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.listener.bind(("127.0.0.1", 0))
@@ -100,6 +101,7 @@ class EchoWsServer:
             match = re.search(rb"Sec-WebSocket-Key: (.+)\r\n", request)
             if match is None:
                 return
+            self.seen_requests.append(request)
             accept = base64.b64encode(
                 hashlib.sha1(match.group(1).strip() + _GUID).digest()
             ).decode()
@@ -140,6 +142,27 @@ async def _run_qa(script: str, sleep: float = 1.0, capsys=None) -> str:
         finally:
             await engine.stop()
     return capsys.readouterr().out
+
+
+@pytest.mark.asyncio
+async def test_websocket_connect_headers(capsys) -> None:
+    # the HC3 supports a headers table as the second connect() argument
+    server = EchoWsServer()
+    out = await _run_qa(
+        "setTimeout(function()\n"
+        "  local ws = net.WebSocketClient()\n"
+        "  ws:addEventListener('connected', function() print('CONNECTED'); ws:close() end)\n"
+        "  ws:addEventListener('error', function(e) print('ERR', tostring(e)) end)\n"
+        f"  ws:connect('ws://127.0.0.1:{server.port}/', "
+        "{['Authorization'] = 'Basic abc123', ['X-Custom'] = 'yes'})\n"
+        "end, 20)\n",
+        capsys=capsys,
+    )
+    assert "CONNECTED" in out
+    assert "ERR" not in out
+    assert server.seen_requests
+    assert b"Authorization: Basic abc123\r\n" in server.seen_requests[0]
+    assert b"X-Custom: yes\r\n" in server.seen_requests[0]
 
 
 @pytest.mark.asyncio

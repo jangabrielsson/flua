@@ -225,14 +225,19 @@ function WsBase:addEventListener(eventName, callback)
   list[#list + 1] = callback
 end
 
-function WsBase:connect(url)
-  _PY.post{
+function WsBase:connect(url, headers)
+  local msg = {
     type = "wsConnect",
     qa = qaId,
     conn = self._conn,
     url = tostring(url),
     timeout = self._timeout,
   }
+  -- the HC3 supports a headers table as the second argument
+  if type(headers) == "table" then
+    msg.headers = headers
+  end
+  _PY.post(msg)
 end
 
 function WsBase:send(data)
