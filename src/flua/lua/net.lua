@@ -48,6 +48,8 @@ function HTTPClient:request(url, params)
     method = options.method or "GET",
     headers = options.headers,
     data = options.data ~= nil and _FLUA.escapeBytes(options.data) or nil,
+    -- HC3 option for HTTPS: verify the server certificate (default true)
+    checkCertificate = options.checkCertificate ~= false,
     timeout = options.timeout,
   }
   return id

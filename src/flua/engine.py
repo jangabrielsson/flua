@@ -1569,6 +1569,7 @@ class LuaEngine:
                 {str(k): str(v) for k, v in (msg.get("headers") or {}).items()},
                 _unescape_data(msg.get("data")) if msg.get("data") is not None else None,
                 float(msg.get("timeout") or 30.0),
+                bool(msg.get("checkCertificate", True)),
             )
             result = messages.http_result(msg["id"], msg.get("qa"), status, data, headers)
         except Exception as exc:

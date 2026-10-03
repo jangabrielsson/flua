@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import ssl
 import subprocess
 import sys
 import threading
@@ -87,6 +88,53 @@ def test_http_call_timeout_raises(http_server: str) -> None:
 def test_http_call_refused_raises() -> None:
     with pytest.raises(urllib.error.URLError):
         http_call("GET", "http://127.0.0.1:1/x", timeout=1.0)
+
+
+def _https_server(cert_dir: str):
+    """A local HTTPS server with a self-signed certificate (tests/certs)."""
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(Path(cert_dir) / "cert.pem", Path(cert_dir) / "key.pem")
+    httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    return httpd, f"https://127.0.0.1:{httpd.server_port}/"
+
+
+@pytest.mark.asyncio
+async def test_http_check_certificate_option(tmp_path, capsys) -> None:
+    # the HC3's checkCertificate option: false skips HTTPS verification
+    # (self-signed certs — very common in QA code); true (the default) fails
+    httpd, url = _https_server(str(Path(__file__).parent / "certs"))
+    try:
+        script = tmp_path / "tls.lua"
+        script.write_text(
+            "function QuickApp:onInit()\n"
+            "  local client = net.HTTPClient()\n"
+            f"  client:request('{url}', {{\n"
+            "    options = { checkCertificate = false },\n"
+            "    success = function(resp) print('OK', resp.status, resp.data) end,\n"
+            "    error = function(e) print('ERR1', tostring(e)) end,\n"
+            "  })\n"
+            f"  client:request('{url}', {{\n"
+            "    options = {},\n"
+            "    success = function(resp) print('SHOULD_NOT_SUCCEED', resp.status) end,\n"
+            "    error = function(e) print('ERR2', tostring(e)) end,\n"
+            "  })\n"
+            "end\n"
+        )
+        engine = LuaEngine()
+        await engine.start()
+        try:
+            engine.start_qa(str(script), None, {}, str(script))
+            await asyncio.sleep(1.0)
+        finally:
+            await engine.stop()
+        out = capsys.readouterr().out
+        assert "OK 200" in out  # verification skipped
+        assert "SHOULD_NOT_SUCCEED" not in out
+        assert "ERR2" in out  # the default verifies, the self-signed cert fails
+    finally:
+        httpd.shutdown()
 
 
 # -- engine wiring: Lua request -> pump -> callback ------------------------------

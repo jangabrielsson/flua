@@ -9,6 +9,7 @@ it is one synchronous function, safe to run in any thread.
 
 from __future__ import annotations
 
+import ssl
 import urllib.error
 import urllib.request
 
@@ -21,6 +22,7 @@ def http_call(
     headers: dict[str, str] | None = None,
     data: str | bytes | None = None,
     timeout: float = 30.0,
+    check_certificate: bool = True,
 ) -> tuple[int, str, dict[str, str]]:
     """One blocking HTTP exchange -> (status, body, headers).
 
@@ -28,6 +30,9 @@ def http_call(
     only transport-level failures (DNS, refused, timeout) raise. This
     mirrors the HC3: ``success`` receives completed exchanges and can check
     ``response.status``; ``error`` fires for failures to reach the server.
+    ``check_certificate=False`` skips HTTPS certificate verification (the
+    HC3's checkCertificate option; Python verifies by default, like the
+    HC3's default true).
     """
     headers = dict(headers or {})
     headers.setdefault("User-Agent", USER_AGENT)
@@ -37,9 +42,10 @@ def http_call(
         payload = data.encode("utf-8")
     else:
         payload = None
+    context = None if check_certificate else ssl._create_unverified_context()
     request = urllib.request.Request(url, data=payload, headers=headers, method=method.upper())
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with urllib.request.urlopen(request, timeout=timeout, context=context) as response:
             status = response.status
             body = response.read()
             response_headers = dict(response.headers.items())
