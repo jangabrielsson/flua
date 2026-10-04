@@ -13,7 +13,6 @@ Save this as `sunset_lamp_auto.lua` (or use the repo's copy at
 ```lua
 --%%name:SunsetLamp
 --%%type:com.fibaro.binarySwitch
--- --------------- EOH ---------------
 
 function QuickApp:onInit()
   self:debug("Sunset lamp ready")
@@ -139,7 +138,6 @@ same as the terminal command:
 --%%speed:60                  -- run 60x faster (optional)
 --%%name:SunsetLamp
 --%%type:com.fibaro.binarySwitch
--- --------------- EOH ---------------
 ```
 
 ```text

@@ -1,6 +1,5 @@
 --%%name:SunsetLamp
 --%%type:com.fibaro.binarySwitch
--- --------------- EOH ---------------
 -- The tutorial's running project, chapter 04: the lamp checks the sun once
 -- a minute and switches itself on at sunset, off again in the morning.
 --   .venv/bin/flua --api local --start '2026/10/4 18:30:00' examples/sunset_lamp_auto.lua

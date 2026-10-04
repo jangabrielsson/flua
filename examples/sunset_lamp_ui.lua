@@ -5,7 +5,6 @@
 
 --%%u:{label="status",text="Automatic mode"}
 --%%u:{switch="automatic",text="Automatic",value="true",onReleased="toggleAuto"}
--- --------------- EOH ---------------
 -- The tutorial's running project, chapter 05: the lamp gets a custom UI —
 -- an "Automatic" switch and a status label — plus quickApp variables.
 -- "auto" is a variable (not a property): a QA's properties are fixed by

@@ -36,7 +36,6 @@ Create `sunset_lamp.lua` in your project (or use the repo's copy at
 ```lua
 --%%name:SunsetLamp
 --%%type:com.fibaro.binarySwitch
--- --------------- EOH ---------------
 
 function QuickApp:onInit()
   self:debug("Sunset lamp ready")
@@ -61,8 +60,6 @@ Line by line:
 - `--%%type:com.fibaro.binarySwitch` — this QuickApp pretends to be a
   *binary switch*: a device that is ON or OFF. That's what gives it the
   On/Off buttons you're about to see.
-- `-- --------------- EOH ---------------` — "end of header". Everything
-  after this line is the program itself.
 - `function QuickApp:onInit()` — runs **once**, when the QuickApp starts.
   (The `self:debug(...)` writes a line to the log, tagged with the lamp's
   name.)
@@ -73,6 +70,12 @@ Line by line:
   lamp as ON — the QuickApp *is* the device, and this is how it tells the
   world.
 - `turnOff()` is the mirror image: `value` becomes `false`.
+
+> How does flua know where the header ends? It doesn't need to — only
+> `--%%` lines are header lines, everything else is code. (There *is* an
+> `-- --------------- EOH ---------------` marker for the rare case where a
+> QuickApp is embedded inside another file as a long string, so its header
+> lines aren't read as the outer file's. Not needed here.)
 
 That's the whole anatomy: **onInit** (start once), **actions** (react),
 **properties** (remember and show).

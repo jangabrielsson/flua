@@ -19,7 +19,6 @@ Save this as `sunset_lamp_ui.lua` (or use the repo's copy at
 
 --%%u:{label="status",text="Automatic mode"}
 --%%u:{switch="automatic",text="Automatic",value="true",onReleased="toggleAuto"}
--- --------------- EOH ---------------
 
 function QuickApp:onInit()
   self:debug("Sunset lamp ready,", self:getVariable("wattage"), "W")
