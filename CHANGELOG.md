@@ -4,6 +4,26 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.10] - 2026-10-04
+
+### Added
+
+- UI viewer restyled after the HC3 look: light theme with white device
+  cards, HC3-style buttons, sliders with a blue fill and round knob,
+  toggle switches.
+- Selects render as collapsed dropdowns (radio circles / check squares in
+  the popup), like the HC3 — with the text as a placeholder.
+- Components in one `--%%u` row share the row (buttons side by side).
+- Label elements render their HTML (`<table>`, `<font color>`, ...).
+- Viewer docs in USAGE.md (starting the `--ui` server, the callUIEvent
+  contract, proxy mode for the real HC3 UI).
+
+### Changed
+
+- The viewer only rebuilds a device panel when its rendered state actually
+  changes (value/structure fingerprint), and never mid-interaction — polls
+  are otherwise a no-op, so open dropdowns stay open.
+
 ## [0.1.9] - 2026-10-03
 
 - `net.HTTPClient`: `options.checkCertificate = false` skips HTTPS certificate

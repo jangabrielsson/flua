@@ -66,16 +66,65 @@ rm -f pyproject.toml.bak
 grep "__version__" "$VERSION_FILE"
 grep "^version" pyproject.toml
 
-# 4. commit + tag
-git add pyproject.toml "$VERSION_FILE"
-git commit -m "chore: bump version to $NEW"
+# 4. changelog: generate the [NEW] section from the commits since v$CURRENT
+#    (conventional-commit subjects, grouped Added/Changed/Fixed). Runs before
+#    the bump commit, so the bump commit itself is not listed.
+python3 - "$CURRENT" "$NEW" <<'PYEOF'
+import re
+import subprocess
+import sys
+from datetime import date
+
+current, new = sys.argv[1], sys.argv[2]
+log = subprocess.run(
+    ["git", "log", "--pretty=format:%s", f"v{current}..HEAD"],
+    capture_output=True,
+    text=True,
+)
+if log.returncode != 0:
+    sys.exit(
+        f"no commits since tag v{current} (is it tagged?) — "
+        f"tag the base first or pass the exact base version"
+    )
+subjects = [line for line in log.stdout.splitlines() if line.strip()]
+groups = {"Added": [], "Changed": [], "Fixed": []}
+for subject in subjects:
+    match = re.match(r"^(feat|fix|refactor|docs|chore|perf)(\([^)]*\))?:\s*(.*)$", subject)
+    kind, text = (match.group(1), match.group(3)) if match else ("", subject)
+    bucket = "Added" if kind == "feat" else "Fixed" if kind == "fix" else "Changed"
+    groups[bucket].append(text)
+if not any(groups.values()):
+    groups["Changed"].append("Housekeeping")
+lines = [f"## [{new}] - {date.today().isoformat()}", ""]
+for bucket, entries in groups.items():
+    if entries:
+        lines.append(f"### {bucket}")
+        for entry in entries:
+            lines.append(f"- {entry}")
+        lines.append("")
+path = "CHANGELOG.md"
+with open(path, encoding="utf-8") as handle:
+    doc = handle.read()
+marker = "## ["
+index = doc.find(marker)
+if index < 0:
+    sys.exit(f"{path}: no version sections found")
+doc = doc[:index] + "\n".join(lines) + "\n" + doc[index:]
+with open(path, "w", encoding="utf-8") as handle:
+    handle.write(doc)
+print(f"wrote {path} section for {new}")
+PYEOF
+
+# 5. commit + tag
+git add pyproject.toml "$VERSION_FILE" CHANGELOG.md
+git commit -m "chore: release $NEW"
 git tag "v$NEW"
 
-# 5. push — the tag alone triggers nothing; the RELEASE does
+# 6. push — the tag alone triggers nothing; the RELEASE does
 git push origin HEAD
 git push origin "v$NEW"
 
-# 6. publish the GitHub Release -> fires the PyPI workflow
+# 7. publish the GitHub Release -> fires the PyPI workflow
 if command -v gh >/dev/null 2>&1; then
   gh release create "v$NEW" --generate-notes --title "flua $NEW"
   echo "release published — the PyPI workflow is running."
