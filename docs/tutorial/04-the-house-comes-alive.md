@@ -128,6 +128,31 @@ but you watch it run.
 > ✅ **You should see** `Lamp on` stamped `18:13:00` — the sunset from the
 > `sunsetHour` calculation, to the minute.
 
+### The same knobs as directives — so F5 works too
+
+Every flag from this chapter can live in the QuickApp's **header** instead,
+so an F5 run (chapter 02's launch configurations pass no flags) behaves the
+same as the terminal command:
+
+```lua
+--%%time:2026/10/4 18:30:00   -- start the virtual clock at 18:30
+--%%speed:60                  -- run 60x faster (optional)
+--%%name:SunsetLamp
+--%%type:com.fibaro.binarySwitch
+-- --------------- EOH ---------------
+```
+
+```text
+🚀 flua 0.1.13 (Lua 5.5, Python 3.14.3), mode offline
+[04.10.2026][18:30:01][DEBUG  ][dtime5000]: NOW 18:30
+```
+
+The directives mirror the flags: `--%%time:…` is `--start`,
+`--%%speed:60` is `--speed`, `--%%instant:true` is `--instant`, and
+`--%%maxhours:1` is `--max-hours`. A terminal flag beats a directive, so
+the same file can pin the time in its header *and* be overridden from the
+command line when you want a different date.
+
 ## What did we just learn?
 
 - **Timers** are how a QuickApp wakes itself up: `setInterval(fn, ms)`.
