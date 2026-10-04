@@ -1,12 +1,14 @@
 --%%name:PotatoMaster
 --%%type:com.fibaro.multilevelSwitch
 --%%offline:true
---%% debug:true
+-- %%debug:true
 
+local potato = "Potato"
 function QuickApp:onInit()
   self:debug("onInit",self.name,self.id)
   setTimeout(function()
-    fibaro.call(5001,"pass","Potato")
+    print("passing",potato,"to",5001)
+    fibaro.call(5001,"pass",potato)
   end,0)
   local n = 100
   for i=1,n do
@@ -16,5 +18,5 @@ function QuickApp:onInit()
 end
 
 function QuickApp:pass(str)
-  print("Got my potato back!")
+  print("Got my",str,"back!")
 end

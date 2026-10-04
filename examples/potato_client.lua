@@ -7,7 +7,7 @@ end
 
 function QuickApp:pass(str)
   local friend = self:getVariable("friend")
-  print(self.id,"pass",str,friend)
+  print("passing",str,"to",friend)
   fibaro.call(friend,"pass",str)
   gotPotato = true
   api.delete("/devices/"..self.id)
