@@ -14,7 +14,7 @@ Save this as `sunset_lamp_ui.lua` (or use the repo's copy at
 ```lua
 --%%name:SunsetLamp
 --%%type:com.fibaro.binarySwitch
---%%property:auto=true
+--%%var:auto=true
 --%%var:wattage=60
 
 --%%u:{label="status",text="Automatic mode"}
@@ -39,13 +39,13 @@ end
 
 function QuickApp:toggleAuto(e)
   local auto = e.values and e.values[1] == "true"
-  self:updateProperty("auto", auto)
+  self:setVariable("auto", auto)
   self:updateView("status", "text", auto and "Automatic mode" or "Manual mode")
   if auto then self:checkSun() end
 end
 
 function QuickApp:checkSun()
-  if not self.properties.auto then return end -- manual mode: hands off
+  if not self:getVariable("auto") then return end -- manual mode: hands off
   local now = os.date("*t")
   local h, m = fibaro.getValue(1, "sunsetHour"):match("(%d+):(%d+)")
   local sunsetMin = tonumber(h) * 60 + tonumber(m)
@@ -82,7 +82,7 @@ HC3 app renders the same rows on the real controller later.
 ```lua
 function QuickApp:toggleAuto(e)
   local auto = e.values and e.values[1] == "true"
-  self:updateProperty("auto", auto)
+  self:setVariable("auto", auto)
   self:updateView("status", "text", auto and "Automatic mode" or "Manual mode")
   if auto then self:checkSun() end
 end
@@ -91,9 +91,9 @@ end
 Two new tricks:
 
 - **UI actions receive an event.** `e.values[1]` is what the user did — a
-  switch delivers `"true"` or `"false"`. The lamp stores it in a new
-  property, `auto` (declared with `--%%property:auto=true`, its start
-  value).
+  switch delivers `"true"` or `"false"`. The lamp stores it in a
+  **variable** named `auto` (see the next section for why a variable and
+  not a property).
 - **`self:updateView(...)`** changes a piece of your UI: the `status` label
   now reads "Manual mode" — or "Automatic mode" again when switched back.
   This is how QuickApps talk to their own panels.
@@ -101,7 +101,7 @@ Two new tricks:
 And the guard at the top of `checkSun`:
 
 ```lua
-if not self.properties.auto then return end
+if not self:getVariable("auto") then return end
 ```
 
 In manual mode the lamp leaves the light alone — the user has taken over.
@@ -109,20 +109,28 @@ In manual mode the lamp leaves the light alone — the user has taken over.
 
 ### QuickApp variables: `--%%var`
 
-The header line
+Both header lines starting with `--%%var` give the lamp **variables** —
+named values that live *with* the QuickApp:
 
 ```lua
+--%%var:auto=true
 --%%var:wattage=60
 ```
 
-gives the lamp a **variable** — a named value that lives *with* the
-QuickApp. The lamp reads it with `self:getVariable("wattage")` (that's the
-`60 W` in the startup log). On the real HC3 you can edit variables in the
-app — device settings — without changing any code, which makes them perfect
-for things you might want to tweak later: a wattage, a name, a threshold.
-(`self:setVariable("wattage", 40)` is the writing counterpart, and
-`self:updateProperty("auto", …)` from above is the same idea applied to the
-device's own properties.)
+- `wattage` is a value you might tweak later — on the real HC3 you can
+  edit variables in the app (device settings) without changing any code.
+- `auto` is the lamp's **memory**: whether the automatic mode is on.
+  `toggleAuto` writes it with `self:setVariable("auto", …)` and `checkSun`
+  reads it with `self:getVariable("auto")`.
+
+Why a variable and not a property? A QuickApp's properties are **fixed by
+its type**: a `binarySwitch` has `value`, and that's the schema — you can't
+invent an `auto` property for it. (`self:updateProperty("value", …)` from
+chapter 03 works because `value` is in the schema.) Variables, on the
+other hand, are free-form, and — the real reason `auto` is one — they
+**survive restarts**: when the HC3 (or flua) restarts the QuickApp, the
+variables keep their values, so the user's switch choice isn't lost. The
+`--%%var:auto=true` line only sets the *starting* value, the first time.
 
 ## Run it and flip the switch
 
@@ -170,7 +178,8 @@ Press the red square (■) in VS Code's Run toolbar when you're done.
   did.
 - **`updateView`** lets the QuickApp change its own UI live.
 - **QuickApp variables** (`--%%var`, `getVariable`/`setVariable`) are
-  tweakable values that live with the device.
+  free-form values that live with the device — tweakable settings, and
+  state that survives restarts (a QA's properties are fixed by its type).
 
 Next: the lamp has been living in a simulation this whole time. Time to
 move it into your real HC3.
