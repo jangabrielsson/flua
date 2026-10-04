@@ -18,6 +18,7 @@ when it works.
     - [Without the repo (pip install)](#without-the-repo-pip-install)
   - [QA directives (`--%%`)](#qa-directives---)
     - [The Lua config file](#the-lua-config-file)
+    - [The UI viewer](#the-ui-viewer)
   - [Multi-file QAs](#multi-file-qas)
   - [The offline HC3](#the-offline-hc3)
     - [Online mode — the real HC3](#online-mode--the-real-hc3)
@@ -301,6 +302,30 @@ don't. Long rows may continue on following comment lines. At runtime the
 device's `properties.viewLayout`, `properties.uiView`, and
 `properties.uiCallbacks` hold the generated structures, and
 `self:updateView(elm, prop, value)` updates them.
+
+### The UI viewer
+
+`flua --ui [PORT]` serves the simulated HC3 API over HTTP for the bundled
+viewer (`viewer/index.html` in the repo) — open the page and point it at the
+printed URL:
+
+```bash
+.venv/bin/flua --ui 8090 examples/ui.lua   # UI API on http://127.0.0.1:8090
+open viewer/index.html                    # default base URL matches
+```
+
+The viewer polls `GET /devices`, renders `properties.uiView` (labels,
+buttons, sliders, switches, single and multi selects — styled after the HC3
+look), and sends interactions back through `GET /plugins/callUIEvent` — the
+same contract the real HC3 UI uses, so your `onReleased`/`onChanged`/
+`onToggled` methods fire exactly as on the controller. `self:updateView`
+changes land live (the viewer merges `device.view` over the static
+properties). The API server stays up after the QA's timers drain, so the
+viewer keeps working while you tweak the file.
+
+For the *real* HC3 UI, use proxy mode instead (`--%%mode:proxy`): the mirror
+QA on the HC3 renders the genuine UI and funnels every interaction back to
+the emulated QA.
 
 The virtual clock starts **now** unless you set a start time — handy for
 testing dates: leap years, DST switches, New Year logic. Combine with

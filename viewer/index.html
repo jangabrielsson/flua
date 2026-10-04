@@ -5,45 +5,162 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>flua UI viewer</title>
 <style>
-  :root { color-scheme: dark; }
+  :root {
+    --blue: #2196f3; --blue-dark: #1976d2; --blue-pale: #e3f2fd;
+    --bg: #eef0f2; --card: #ffffff; --ink: #2c3136; --muted: #7a828b;
+    --border: #dfe3e8; --track: #d5d8dd;
+  }
   * { box-sizing: border-box; }
   body {
     margin: 0; padding: 16px;
-    background: #14161a; color: #e6e6e6;
+    background: var(--bg); color: var(--ink);
     font: 14px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif;
   }
   header {
     display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-    padding: 10px; background: #1d2026; border-radius: 8px; margin-bottom: 16px;
+    padding: 10px 14px; background: var(--card); border-radius: 12px;
+    margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08);
   }
-  header label { color: #9aa; font-size: 12px; margin-left: 8px; }
+  header label { color: var(--muted); font-size: 12px; margin-left: 8px; }
   header input {
-    background: #14161a; color: #e6e6e6; border: 1px solid #3a3f4a;
-    border-radius: 4px; padding: 5px 8px;
+    background: #fff; color: var(--ink); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 8px; font: inherit;
   }
-  #status { margin-left: auto; font-size: 12px; color: #9aa; }
-  #status.ok { color: #5c5; }
-  #status.err { color: #e55; }
+  #status { margin-left: auto; font-size: 12px; color: var(--muted); }
+  #status.ok { color: #2e9e5b; }
+  #status.err { color: #d44444; }
   .device {
-    background: #1d2026; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px;
+    background: var(--card); border-radius: 14px; padding: 14px 18px;
+    margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    max-width: 480px;
   }
-  .device h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
-  .device h2 small { color: #788; font-weight: 400; margin-left: 6px; }
-  .row { display: flex; gap: 12px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
-  .row > * { flex: 1 1 120px; }
-  .row > .component-label { flex: 0 0 auto; min-width: 90px; color: #9aa; }
+  .device h2 { margin: 0 0 12px; font-size: 16px; font-weight: 600; }
+  .device h2 small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+  .row { display: flex; gap: 12px; align-items: center; margin: 10px 0; }
+  .row > button.ctl { flex: 1 1 0; width: auto; }  /* side-by-side buttons share the row */
+  .component-label {
+    flex: 0 0 110px; color: var(--ink); font-size: 14px;
+  }
+  .component-label::before {
+    content: ""; display: inline-block; vertical-align: -3px;
+    width: 14px; height: 14px; border-radius: 4px; margin-right: 8px;
+    background: var(--blue);
+  }
+  .control { flex: 1 1 auto; min-width: 0; }
+
+  /* label element: just text on the row (may carry HTML: tables, fonts) */
+  .element-label::before { display: none; }
+  .element-label table { border-collapse: collapse; margin: 2px 0; }
+  .element-label td, .element-label th {
+    border: 1px solid var(--border); padding: 2px 8px; font-size: 13px;
+  }
+  .element-label { color: var(--ink); }
+
+  /* button: the HC3's blue rounded rect */
   button.ctl {
-    flex: 0 0 auto; background: #2d6cf0; border: none; color: #fff;
-    padding: 7px 16px; border-radius: 6px; cursor: pointer; font: inherit;
+    display: block; width: 100%; background: var(--blue); border: none; color: #fff;
+    padding: 11px 16px; border-radius: 10px; cursor: pointer; font: inherit;
+    font-size: 15px; box-shadow: 0 1px 3px rgba(25,118,210,.35);
+    transition: background .12s, transform .05s;
   }
-  button.ctl:hover { background: #3d7cff; }
-  button.ctl:active { background: #1d5ce0; }
-  input[type=range] { width: 100%; }
-  input[type=checkbox] { width: 18px; height: 18px; flex: 0 0 auto; }
-  select { background: #14161a; color: #e6e6e6; border: 1px solid #3a3f4a; border-radius: 4px; padding: 5px; }
-  .value { color: #7aa; font-size: 12px; flex: 0 0 auto; min-width: 40px; text-align: right; }
-  .hint { color: #667; font-size: 12px; margin-top: 16px; }
-  code { background: #111; padding: 1px 5px; border-radius: 3px; }
+  button.ctl:hover { background: var(--blue-dark); }
+  button.ctl:active { background: #1565c0; transform: translateY(1px); }
+
+  /* slider: gray track with a blue fill and a round white knob */
+  input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 28px;
+    background: transparent; margin: 0; --fill: 0%;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 6px; border-radius: 3px;
+    background: linear-gradient(to right, var(--blue) var(--fill), var(--track) var(--fill));
+  }
+  input[type=range]::-moz-range-track {
+    height: 6px; border-radius: 3px; background: var(--track);
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%;
+    background: #fff; border: 2px solid var(--blue);
+    margin-top: -9px; box-shadow: 0 1px 3px rgba(0,0,0,.25);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 22px; height: 22px; border-radius: 50%; background: #fff;
+    border: 2px solid var(--blue); box-shadow: 0 1px 3px rgba(0,0,0,.25);
+  }
+  input[type=range]::-moz-range-progress {
+    height: 6px; border-radius: 3px; background: var(--blue);
+  }
+  .value {
+    flex: 0 0 auto; min-width: 44px; text-align: right;
+    background: var(--blue-pale); color: var(--blue-dark);
+    border-radius: 8px; padding: 2px 8px; font-size: 13px; font-weight: 600;
+  }
+
+  /* select / multi: the HC3's option rows with radio circles / check squares */
+  .option {
+    display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+    background: #f6f8fa; border: 1px solid var(--border); border-radius: 10px;
+    cursor: pointer; user-select: none;
+  }
+  .option:hover { border-color: var(--blue); }
+  .option .mark {
+    flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%;
+    border: 2px solid #b7bec6; background: #fff; position: relative;
+  }
+  .option.selected .mark { border-color: var(--blue); }
+  .option.selected .mark::after {
+    content: ""; position: absolute; inset: 3px; border-radius: 50%;
+    background: var(--blue);
+  }
+  .option.multi .mark { border-radius: 5px; }
+  .option.multi.selected .mark { background: var(--blue); border-color: var(--blue); }
+  .option.multi.selected .mark::after {
+    content: ""; position: absolute; inset: 3px; border-radius: 0;
+    background: none;
+    border-left: 2.5px solid #fff; border-bottom: 2.5px solid #fff;
+    transform: rotate(-45deg); left: 4px; top: 2px; width: 8px; height: 4px;
+  }
+  .option .text { color: var(--ink); }
+
+  /* select / multi: a collapsed dropdown field with a chevron, like the HC3 */
+  .dropdown-field {
+    display: flex; justify-content: space-between; align-items: center;
+    width: 100%; background: #fff; border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 12px; font: inherit; color: var(--ink);
+    cursor: pointer; gap: 8px;
+  }
+  .dropdown-field .label {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;
+  }
+  .dropdown-field .label.placeholder { color: var(--muted); }
+  .caret { color: var(--muted); flex: 0 0 auto; }
+  .dropdown-panel {
+    margin-top: 4px; background: #fff; border: 1px solid var(--border);
+    border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,.12);
+    padding: 4px; max-height: 220px; overflow-y: auto;
+  }
+  .dropdown-panel .option { border: none; background: none; border-radius: 8px; }
+  .dropdown-panel .option:hover { background: #f0f5fb; }
+
+  /* switch: toggle pill */
+  .switch {
+    position: relative; display: inline-block; width: 46px; height: 26px;
+  }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .knob {
+    position: absolute; cursor: pointer; inset: 0;
+    background: #c6ccd2; border-radius: 13px; transition: background .15s;
+  }
+  .switch .knob::before {
+    content: ""; position: absolute; width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; top: 3px; left: 3px; transition: transform .15s;
+    box-shadow: 0 1px 2px rgba(0,0,0,.3);
+  }
+  .switch input:checked + .knob { background: var(--blue); }
+  .switch input:checked + .knob::before { transform: translateX(20px); }
+
+  .hint { color: var(--muted); font-size: 12px; margin-top: 16px; max-width: 480px; }
+  code { background: #eceff2; padding: 1px 5px; border-radius: 3px; }
 </style>
 </head>
 <body>
@@ -133,32 +250,46 @@ function componentValue(device, component) {
 
 function setComponentValue(device, component, value) {
   (uiValues[device.id] = uiValues[device.id] || {})[component.name] = value;
+  // keep the panel's value stamp current, so the next poll sees no change
+  // and leaves the just-interacted panel alone
+  const panel = document.querySelector('[data-key="' + CSS.escape(String(device.id)) + '"]');
+  if (panel) panel.dataset.values = valueKey(device);
 }
 
-function renderComponent(device, component) {
-  const wrap = document.createElement("div");
-  wrap.className = "row";
+function renderComponent(device, component, row) {
   const name = document.createElement("span");
   name.className = "component-label";
   name.textContent = component.text || component.name;
-  wrap.appendChild(name);
+  row.appendChild(name);
 
   const live = liveState(device, component);
   const text = live.text !== undefined ? live.text : component.text;
   const value = componentValue(device, component);
   const event = eventFor(component);
-  if (component.visible === false) wrap.style.display = "none";
+  if (component.visible === false) {
+    row.removeChild(name);
+    return;
+  }
 
   const t = component.type;
   if (t === "label") {
-    name.textContent = text || component.name;
+    // no side label: the text IS the element, like the HC3 — and labels may
+    // carry HTML (<table>, <font color=...>, ...), which renders as-is
+    name.className = "component-label element-label";
+    name.innerHTML = text || component.name;
   } else if (t === "button") {
+    // no side label: the button carries its own text, like the HC3
+    row.removeChild(name);
     const btn = document.createElement("button");
     btn.className = "ctl";
     btn.textContent = text || component.name;
     btn.onclick = () => event && uiEvent(device.id, component.name, event);
-    wrap.appendChild(btn);
+    row.appendChild(btn);
   } else if (t === "slider") {
+    // no side label: just the slider and its value, like the HC3
+    row.removeChild(name);
+    const control = document.createElement("div");
+    control.className = "control";
     const slider = document.createElement("input");
     slider.type = "range";
     slider.min = component.min ?? "0";
@@ -168,64 +299,139 @@ function renderComponent(device, component) {
     const val = document.createElement("span");
     val.className = "value";
     val.textContent = slider.value;
-    slider.oninput = () => (val.textContent = slider.value);
+    const paint = () => {
+      const min = parseFloat(slider.min), max = parseFloat(slider.max);
+      const pct = max > min ? ((parseFloat(slider.value) - min) / (max - min)) * 100 : 0;
+      slider.style.setProperty("--fill", pct + "%");
+    };
+    paint();
+    slider.oninput = () => { val.textContent = slider.value; paint(); };
     slider.onchange = () => {
       setComponentValue(device, component, slider.value);
       if (event) uiEvent(device.id, component.name, event, slider.value);
     };
-    wrap.appendChild(slider);
-    wrap.appendChild(val);
+    control.appendChild(slider);
+    row.appendChild(control);
+    row.appendChild(val);
   } else if (t === "switch") {
+    const control = document.createElement("div");
+    control.className = "control";
+    const sw = document.createElement("label");
+    sw.className = "switch";
     const box = document.createElement("input");
     box.type = "checkbox";
     box.checked = String(value) === "true";
+    const knob = document.createElement("span");
+    knob.className = "knob";
     box.onchange = () => {
       const v = box.checked ? "true" : "false";
       setComponentValue(device, component, v);
       if (event) uiEvent(device.id, component.name, event, v);
     };
-    wrap.appendChild(box);
+    sw.appendChild(box);
+    sw.appendChild(knob);
+    control.appendChild(sw);
+    row.appendChild(control);
   } else if (t === "select") {
-    const sel = document.createElement("select");
+    // a collapsed dropdown (the HC3 renders selects as dropdowns, not open
+    // lists); no side label either — the field itself shows the current
+    // selection (or the text as a placeholder)
     const isMulti = component.selectionType === "multi";
-    sel.multiple = isMulti;
-    if (isMulti) sel.size = 1; // compact dropdown; the popup lists checkboxes
-    const chosen = value === undefined ? [] : Array.isArray(value) ? value : [value];
+    name.remove();
+    const control = document.createElement("div");
+    control.className = "control";
+    const field = document.createElement("button");
+    field.type = "button";
+    field.className = "dropdown-field";
+    const fieldText = document.createElement("span");
+    fieldText.className = "label";
+    const caret = document.createElement("span");
+    caret.className = "caret";
+    caret.textContent = "\u25BE";
+    field.appendChild(fieldText);
+    field.appendChild(caret);
+    const panel = document.createElement("div");
+    panel.className = "dropdown-panel";
+    panel.style.display = "none";
+    const chosen = value === undefined ? [] : Array.isArray(value) ? value.slice() : [value];
+    const isChosen = (v) => chosen.some((c) => String(c) === String(v));
+    const paintField = () => {
+      const texts = (component.options || [])
+        .filter((o) => isChosen(o.value))
+        .map((o) => o.text ?? o.value);
+      if (texts.length) {
+        fieldText.textContent = texts.join(", ");
+        fieldText.classList.remove("placeholder");
+      } else {
+        fieldText.textContent = text || component.name;
+        fieldText.classList.add("placeholder");
+      }
+    };
+    const paintMarks = () => {
+      for (const row of panel.querySelectorAll(".option")) {
+        row.classList.toggle("selected", isChosen(row.dataset.value));
+      }
+    };
     for (const opt of component.options || []) {
-      const o = document.createElement("option");
-      o.value = opt.value;
-      o.textContent = opt.text ?? opt.value;
-      if (chosen.some((v) => String(v) === String(opt.value))) o.selected = true;
-      sel.appendChild(o);
+      const row = document.createElement("div");
+      row.className = "option" + (isMulti ? " multi" : "");
+      row.dataset.value = opt.value;
+      const mark = document.createElement("span");
+      mark.className = "mark";
+      const label = document.createElement("span");
+      label.className = "text";
+      label.textContent = opt.text ?? opt.value;
+      row.appendChild(mark);
+      row.appendChild(label);
+      row.onclick = () => {
+        if (isMulti) {
+          const idx = chosen.findIndex((c) => String(c) === String(opt.value));
+          if (idx >= 0) chosen.splice(idx, 1); else chosen.push(opt.value);
+          setComponentValue(device, component, chosen.slice());
+          paintField();
+          paintMarks();
+          // send every selected value, comma-joined (the single callUIEvent
+          // value param); the sim restores the list for the QA
+          if (event) uiEvent(device.id, component.name, event, chosen.join(","));
+        } else {
+          chosen.length = 0;
+          chosen.push(opt.value);
+          setComponentValue(device, component, opt.value);
+          paintField();
+          paintMarks();
+          hide();
+          if (event) uiEvent(device.id, component.name, event, opt.value);
+        }
+      };
+      panel.appendChild(row);
     }
-    if (isMulti) {
-      const count = document.createElement("span");
-      count.className = "value";
-      const updateCount = () => {
-        count.textContent = sel.selectedOptions.length
-          ? sel.selectedOptions.length + " selected"
-          : "";
-      };
-      updateCount();
-      sel.onchange = () => {
-        // send every selected value, comma-joined (the single callUIEvent
-        // value param); the sim restores the list for the QA
-        const vals = Array.from(sel.selectedOptions).map((o) => o.value);
-        setComponentValue(device, component, vals);
-        updateCount();
-        if (event) uiEvent(device.id, component.name, event, vals.join(","));
-      };
-      wrap.appendChild(sel);
-      wrap.appendChild(count);
-    } else {
-      sel.onchange = () => {
-        setComponentValue(device, component, sel.value);
-        if (event) uiEvent(device.id, component.name, event, sel.value);
-      };
-      wrap.appendChild(sel);
-    }
+    paintField();
+    paintMarks();
+    field.onclick = (e) => {
+      e.stopPropagation();
+      const wasOpen = panel.style.display !== "none";
+      panel.style.display = wasOpen ? "none" : "";
+      // mark the panel as interacting while the dropdown is open, so the
+      // poll's in-place refresh never rebuilds it mid-interaction
+      const devicePanel = row.closest(".device");
+      if (devicePanel) {
+        if (wasOpen) delete devicePanel.dataset.open;
+        else devicePanel.dataset.open = "1";
+      }
+    };
+    const hide = () => {
+      panel.style.display = "none";
+      const devicePanel = row.closest(".device");
+      if (devicePanel) delete devicePanel.dataset.open;
+    };
+    const close = (e) => {
+      if (!control.contains(e.target)) hide();
+    };
+    document.addEventListener("click", close);
+    control.appendChild(field);
+    control.appendChild(panel);
+    row.appendChild(control);
   }
-  return wrap;
 }
 
 function renderDevice(device) {
@@ -248,10 +454,15 @@ function renderDevice(device) {
     panel.appendChild(note);
     return panel;
   }
-  for (const row of props.uiView) {
-    for (const component of row.components || []) {
-      panel.appendChild(renderComponent(device, component));
+  for (const uiRow of props.uiView) {
+    // one .row per --%%u line: components in the same directive share it
+    // (e.g. two buttons side by side)
+    const row = document.createElement("div");
+    row.className = "row";
+    for (const component of uiRow.components || []) {
+      renderComponent(device, component, row);
     }
+    panel.appendChild(row);
   }
   return panel;
 }
@@ -265,13 +476,32 @@ function structureKey(device) {
   )));
 }
 
-// render + stamp the panel with its device id and structure key — every
-// replacement needs the stamp, or the cleanup loop below treats the fresh
-// panel as a device that vanished and removes it (the 1s blink)
-function freshPanel(device, key) {
+// value key: the panel's rendered state — component values (live state,
+// local interaction, or the directive default) plus live text. The poll
+// only rebuilds when THIS changes; if nothing changed, the DOM is left
+// alone.
+function valueKey(device) {
+  const props = device.properties || {};
+  return JSON.stringify((props.uiView || []).flatMap((row) =>
+    (row.components || []).map((c) => {
+      const live = (device.view && device.view[c.name]) || {};
+      return [
+        c.name,
+        componentValue(device, c),
+        live.text !== undefined ? live.text : c.text,
+      ];
+    })
+  ));
+}
+
+// render + stamp the panel with its device id, structure key and value key —
+// every replacement needs the stamps, or the cleanup loop below treats the
+// fresh panel as a device that vanished and removes it (the 1s blink)
+function freshPanel(device, key, vkey) {
   const panel = renderDevice(device);
   panel.dataset.key = device.id;
   panel.dataset.struct = key;
+  panel.dataset.values = vkey;
   return panel;
 }
 
@@ -282,17 +512,22 @@ async function poll() {
     const qas = devices.filter((d) => d.properties && (d.properties.uiView || d.properties.viewLayout));
     for (const device of qas) {
       const key = device.id + ":" + structureKey(device);
+      const vkey = valueKey(device);
       let panel = root.querySelector('[data-key="' + CSS.escape(String(device.id)) + '"]');
       if (!panel || panel.dataset.struct !== key) {
-        const fresh = freshPanel(device, key);
+        // new or structurally changed: rebuild
+        const fresh = freshPanel(device, key, vkey);
         if (panel) panel.replaceWith(fresh);
         else root.appendChild(fresh);
-      } else {
-        // refresh values only, unless the user is interacting with it
-        if (!panel.contains(document.activeElement)) {
-          panel.replaceWith(freshPanel(device, key));
-        }
+      } else if (
+        panel.dataset.values !== vkey &&
+        !panel.contains(document.activeElement) &&
+        !panel.dataset.open
+      ) {
+        // values changed and the user isn't interacting: refresh
+        panel.replaceWith(freshPanel(device, key, vkey));
       }
+      // otherwise the panel already shows the current state — leave it alone
     }
     // drop panels for devices that are gone
     const live = new Set(qas.map((d) => String(d.id)));
