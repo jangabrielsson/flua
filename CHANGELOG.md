@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.11] - 2026-10-04
+
+### Added
+- implement embedded UI support for device types with default views
+- automate changelog generation for new releases
+
 ## [0.1.10] - 2026-10-04
 
 ### Added
