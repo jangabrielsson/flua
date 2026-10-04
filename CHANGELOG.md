@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.12] - 2026-10-04
+
+### Added
+- enhance dynamic QA loading with directive support and improve debug configuration
+- add UI+mobdebug launch configuration and update documentation
+
 ## [0.1.11] - 2026-10-04
 
 ### Added
