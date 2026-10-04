@@ -1,4 +1,4 @@
---%%name:UI test 2
+--%%name:UI test2 
 --%%type:com.fibaro.binarySwitch
 
 --%%u:{label="l1",text="<font color='red'>Label text</font>"}

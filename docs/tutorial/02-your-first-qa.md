@@ -3,7 +3,7 @@
 In this chapter you write a real QuickApp — a dozen lines — and run it.
 It will count to three, tell you it's done, and stop. You don't need to
 understand every line yet; chapter 03 explains them. Right now the goal is
-simpler: **write, run, see it live.**
+simpler: **write, press F5, see it live.**
 
 ## Step 1 — create the file
 
@@ -39,16 +39,15 @@ A few first impressions, without the theory:
 > `os.exit()` ends the QuickApp that called it. That's the same name real
 > HC3 QuickApps use (there, every QuickApp is its own program — ending it
 > is as simple as leaving a room). In these first experiments it's also
-> what lets flua finish and hand the terminal back to you — a QuickApp that
+> what lets flua finish and hand you back the terminal — a QuickApp that
 > never exits just keeps running.
 
-## Step 2 — run it
+## Step 2 — run it with F5
 
-Open a terminal in VS Code (**Terminal → New Terminal**) and run:
-
-```bash
-flua --api local hello.lua
-```
+Make sure `hello.lua` is the tab you're looking at, and press **F5** (the
+first time, choose **Flua: Run Current File (Terminal)** from the menu —
+chapter 01's setup installed it). VS Code runs the file and shows the log
+in its terminal panel:
 
 ```text
 🚀 flua 0.1.12 (Lua 5.5, Python 3.14.3), mode offline
@@ -66,20 +65,32 @@ line is the QuickApp's *tag* — its name and its id. The `5000` is the id
 flua assigned it; on your real HC3 it would get the controller's next free
 id.
 
-**What just happened?** flua pretended to be an HC3 on your computer. It
-gave your QuickApp a home, started it, kept time for it, and stopped when
-the program ended. Your real HC3 was never involved — that's the whole
-point of `--api local`: experiment safely, then go live later.
+**What did F5 do?** The launch configuration ran `flua --api local
+hello.lua` for you — the same command you used for the smoke test in
+chapter 01. `--api local` is the important part: it tells flua to pretend
+to be an HC3 **on your computer**. It gave your QuickApp a home, started
+it, kept time for it, and stopped when the program ended. Your real HC3
+was never involved — that's the whole point: experiment safely, then go
+live later.
+
+> If F5 complains that `flua` was not found: VS Code on some systems
+> doesn't inherit the shell's PATH when started from the dock. Restart it
+> from the terminal once — on macOS run `open -a "Visual Studio Code"` in a
+> terminal, on Windows/Linux start `code` from one — and F5 will find flua.
+> If it says *No module named 'flua'* instead, VS Code is using a Python
+> that doesn't have flua: open the Command Palette (Ctrl/Cmd+Shift+P),
+> choose **Python: Select Interpreter**, and pick the one you installed
+> flua into (chapter 01). You can always run the command by hand instead:
+> open a terminal with **Terminal → New Terminal** and type
+> `flua --api local hello.lua` — every F5 run in this tutorial is exactly
+> that command.
 
 ## Step 3 — break it, on purpose
 
 Programmers don't get code right the first time. They get it *wrong fast*
 and let the computer tell them where. Try it: change `local n = 0` to
-`local n = 0 + nn` (a name that doesn't exist), save, and run again:
-
-```bash
-flua --api local hello.lua
-```
+`local n = 0 + nn` (a name that doesn't exist), save, and press **F5**
+again:
 
 ```text
 Error:	hello.lua:4: attempt to perform arithmetic on a nil value (global 'nn')
@@ -90,8 +101,8 @@ arithmetic on `nn`, which is nothing. ("Bootstrap" is flua-speak for
 "while starting your QuickApp" — mistakes at startup show up like this,
 mistakes later show up while the QuickApp is running.)
 
-Change `0 + nn` back to `0`. **The loop from now on is exactly this: change
-one thing, save, run, read the log.**
+Change `0 + nn` back to `0`, save, F5. **The loop from now on is exactly
+this: change one thing, save, F5, read the log.**
 
 > QuickApp files run again every time from scratch — there is no hidden
 > state between runs. That makes experiments safe: nothing you break
@@ -99,8 +110,8 @@ one thing, save, run, read the log.**
 
 ## Step 4 — faster tinkering: watch mode
 
-flua can watch your file and restart it every time you save, so you never
-have to run the command twice:
+For a really fast loop, flua can watch your file and restart it on every
+save — no F5 needed. This one is a terminal command (it has extra flags):
 
 ```bash
 flua --api local --watch hello.lua
@@ -114,7 +125,7 @@ with the new text. Press `Ctrl-C` in the terminal to stop watching.
 
 - A QuickApp is a small program that **runs on its own**, wakes up on
   **timers**, and writes to a **log**.
-- You develop it **on your computer** (`--api local`) and only later move
-  it to the HC3.
+- You develop it **on your computer** (`--api local` — the F5 configs do
+  this for you) and only later move it to the HC3.
 
 Next chapter: what a QuickApp *is* — and the Sunset Lamp gets its switch.

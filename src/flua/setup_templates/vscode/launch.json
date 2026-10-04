@@ -6,7 +6,7 @@
       "type": "debugpy",
       "request": "launch",
       "module": "flua",
-      "args": ["${relativeFile}"],
+      "args": ["--api", "local", "${relativeFile}"],
       "console": "internalConsole",
       "cwd": "${workspaceFolder}",
       "justMyCode": false
@@ -16,7 +16,17 @@
       "type": "debugpy",
       "request": "launch",
       "module": "flua",
-      "args": ["${relativeFile}"],
+      "args": ["--api", "local", "${relativeFile}"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
+    },
+    {
+      "name": "Flua: Run Current File (UI)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "flua",
+      "args": ["--api", "local", "--ui", "8090", "${relativeFile}"],
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "justMyCode": false
@@ -30,8 +40,9 @@
       "listenPort": 8172,
       "stopOnEntry": false,
       "sourceEncoding": "UTF-8",
-      "interpreter": ".venv/bin/flua",
+      "interpreter": "flua",
       "arguments": [
+        "--api", "local",
         "${relativeFile}"
       ],
       "listenPublicly": true
@@ -45,9 +56,9 @@
       "listenPort": 8172,
       "stopOnEntry": false,
       "sourceEncoding": "UTF-8",
-      "interpreter": ".venv/bin/flua",
+      "interpreter": "flua",
       "arguments": [
-        "--ui", "8090",
+        "--api", "local", "--ui", "8090",
         "${relativeFile}"
       ],
       "listenPublicly": true

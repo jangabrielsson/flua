@@ -114,6 +114,10 @@ A popup asks you to install the recommended extensions (**Python**,
 **Lua MobDebug**, **Lua Language Server**) — accept. They give you syntax
 coloring, error squiggles, and later a debugger.
 
+The setup also installed **launch configurations** — small scripts that run
+your QuickApps when you press `F5`. From the next chapter on, F5 is how you
+run things; no terminal needed.
+
 ## Step 6 (optional but smart) — your HC3's address
 
 In a later chapter you will upload the lamp to your real HC3. flua finds it

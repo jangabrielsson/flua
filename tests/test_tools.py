@@ -136,10 +136,14 @@ def test_setup_tool_scaffolds_a_qa_project(tmp_path, capsys) -> None:
     # the reading links (clickable in the VS Code terminal)
     assert "github.com/jangabrielsson/flua/blob/main/USAGE.md" in out
     assert "github.com/jangabrielsson/flua/tree/main/docs/tutorial" in out
-    # the launch configs ship both debug flavors (mobdebug, and mobdebug
-    # with the UI viewer server)
+    # the launch configs: run (panel/terminal/UI), debug (mobdebug, and
+    # mobdebug with the UI viewer) — all offline, all using the `flua`
+    # command (pip users have no .venv)
     launch = (tmp_path / ".vscode/launch.json").read_text()
+    assert "Flua: Run Current File (UI)" in launch
     assert "Flua: Debug Current File (UI+mobdebug)" in launch
+    assert '"interpreter": "flua"' in launch
+    assert '"--api", "local"' in launch
     # the mermaid extension recommendation renders docs/tutorial diagrams in
     # VS Code's markdown preview
     extensions = (tmp_path / ".vscode/extensions.json").read_text()

@@ -80,22 +80,23 @@ That's the whole anatomy: **onInit** (start once), **actions** (react),
 ## Run it — and click the switch
 
 flua can serve the QuickApp's UI to a small viewer page, so you can click
-the buttons exactly like in the HC3 app:
-
-```bash
-flua --api local --ui 8090 sunset_lamp.lua
-```
+the buttons exactly like in the HC3 app. Press **F5** with the
+**Flua: Run Current File (UI)** configuration (from the menu, or
+**Run → Run Without Debugging** and pick it). It starts the lamp *and*
+serves the viewer:
 
 ```text
-flua: UI API on http://127.0.0.1:8090 — open viewer/index.html
+flua: UI viewer on http://127.0.0.1:8090/ — open it in a browser
 🚀 flua 0.1.12 (Lua 5.5, Python 3.14.3), mode offline
 [04.10.2026][20:11:17][DEBUG  ][SunsetLamp5000]: Sunset lamp ready
 ```
 
-Now open `viewer/index.html` in a browser — the file was copied into your
-project by `flua --tool setup` back in chapter 01 (in the flua repository
-it lives in the `viewer/` directory). The page opens with the address
-`http://127.0.0.1:8090` already filled in — press **Connect**.
+(Under the hood that configuration runs `flua --api local --ui 8090
+sunset_lamp.lua` — run it in a terminal if you ever prefer that.)
+
+Now open **http://127.0.0.1:8090/** in a browser — flua serves the viewer
+page itself (it's the same page `--tool setup` copied into your project,
+now with the address already filled in). Press **Connect**.
 
 > ✅ **You should see** a panel titled `SunsetLamp`, with a red `FALSE`
 > label and **Turn On / Turn Off** buttons.
@@ -127,7 +128,8 @@ would have been a light in your house. Everything else is identical.
 Click **Turn Off**, then on again. Each click is one event, one action, one
 state change.
 
-Press `Ctrl-C` in the terminal to stop flua.
+When you're done, stop the run with the red square (■) in VS Code's Run
+toolbar — the lamp runs until you stop it.
 
 ## What did we just learn?
 

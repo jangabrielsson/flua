@@ -126,15 +126,22 @@ device's own properties.)
 
 ## Run it and flip the switch
 
-```bash
-flua --api local --ui 8090 --start '2026/10/4 18:30:00' sunset_lamp_ui.lua
-```
+Press **F5** with the **Flua: Run Current File (UI)** configuration, as in
+chapter 03, and open **http://127.0.0.1:8090/**.
 
 ```text
 flua: UI viewer on http://127.0.0.1:8090/ — open it in a browser
 🚀 flua 0.1.12 (Lua 5.5, Python 3.14.3), mode offline
-[04.10.2026][18:30:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready, 60 W
-[04.10.2026][18:30:00][DEBUG  ][SunsetLamp5000]: Lamp on
+[04.10.2026][21:00:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready, 60 W
+[04.10.2026][21:00:00][DEBUG  ][SunsetLamp5000]: Lamp on
+```
+
+If the lamp *didn't* turn on: it's daytime where your virtual clock thinks
+it is (F5 starts at the real time, like chapter 04). Pin the sun with
+chapter 04's trick instead:
+
+```bash
+flua --api local --ui 8090 --start '2026/10/4 18:30:00' sunset_lamp_ui.lua
 ```
 
 Open the viewer (chapter 03) and press **Connect**.
@@ -153,7 +160,7 @@ with **Turn Off / Turn On** — manual mode means the lamp won't fight you:
 `checkSun` returns immediately and leaves the light exactly where you put
 it. Flip **Automatic** back on and watch it take over again.
 
-Press `Ctrl-C` when you're done.
+Press the red square (■) in VS Code's Run toolbar when you're done.
 
 ## What did we just learn?
 

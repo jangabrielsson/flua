@@ -98,7 +98,9 @@ for free.
 Logging gets you far. When you need to *watch the code run line by line*,
 flua has a debugger, and chapter 01's setup already installed the pieces:
 the **Lua MobDebug** extension and the launch configuration
-**Flua: Debug Current File (mobdebug)**.
+**Flua: Debug Current File (mobdebug)**. Like all the F5 configurations it
+runs your QA in the offline playground (`--api local`) — the same code you
+were already running.
 
 The flow:
 

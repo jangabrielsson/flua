@@ -109,20 +109,25 @@ executes; only outside a QA (main-state code) does it raise an error.
 
 ## VS Code setup
 
-The repo ships `.vscode/launch.json` with four configurations:
+The repo ships `.vscode/launch.json` with five configurations (the
+`--tool setup` template has the same five, pointing at `flua` on the PATH
+instead of the repo's `.venv`, and all running with `--api local` — the
+offline playground):
 
 - **Flua: Run Current File** — runs the file in the panel.
 - **Flua: Run Current File (Terminal)** — runs it in the integrated terminal
   (pick this one for `self:debug` output you can scroll).
+- **Flua: Run Current File (UI)** — runs it and serves the UI viewer at
+  `http://127.0.0.1:8090/` (if 8090 is busy the server picks the next free
+  port — open the printed URL).
 - **Flua: Debug Current File (mobdebug)** — real debugging: breakpoints,
   stepping, variable inspection. Install the VS Code extension
   **Lua MobDebug** (`alexeymelnichuk.lua-mobdebug`), open your QA, press F5
   with the mobdebug configuration selected. flua waits for the debugger
   before running your code.
 - **Flua: Debug Current File (UI+mobdebug)** — the same, plus the UI
-  viewer server (`--ui 8090`): debug your QA while its UI is rendered in
-  `viewer/index.html` (if 8090 is busy the server picks the next free port
-  — point the viewer at the printed URL).
+  viewer server (`--ui 8090`): debug your QA while its UI is rendered at
+  `http://127.0.0.1:8090/`.
 
 While you step through code, `print`/`self:debug` output appears **immediately**
 — logs never queue behind a paused program.

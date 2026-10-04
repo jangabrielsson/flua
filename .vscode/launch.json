@@ -22,6 +22,16 @@
       "justMyCode": false
     },
     {
+      "name": "Flua: Run Current File (UI)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "flua",
+      "args": ["--api", "local", "--ui", "8090", "${relativeFile}"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
+    },
+    {
       "name": "Flua: Debug Current File (mobdebug)",
       "type": "luaMobDebug",
       "request": "launch",
