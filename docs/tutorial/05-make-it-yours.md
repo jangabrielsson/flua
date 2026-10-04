@@ -132,6 +132,11 @@ other hand, are free-form, and — the real reason `auto` is one — they
 variables keep their values, so the user's switch choice isn't lost. The
 `--%%var:auto=true` line only sets the *starting* value, the first time.
 
+If a value does **not** need to survive a restart, don't give it a
+variable — a plain Lua variable in the file (or a field on `self`, like
+`self.lastCheck = os.time()`) is simpler and just as good. Variables earn
+their keep exactly when the value must outlive the QuickApp's run.
+
 ## Run it and flip the switch
 
 Press **F5** with the **Flua: Run Current File (UI)** configuration, as in
