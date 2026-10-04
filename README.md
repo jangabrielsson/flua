@@ -19,6 +19,9 @@ The flua philosophy is to keep the parts simple.
 
 **QA developers start at [USAGE.md](USAGE.md)** — install, VS Code setup,
 directives, multi-file QAs, the offline HC3, and deploying to the HC3.
+**New to QuickApps entirely?** Start with the
+[step-by-step tutorial](docs/tutorial/README.md) — it builds one QuickApp
+(the Sunset Lamp) from zero, no programming background assumed.
 The rest of this file is how flua works under the hood.
 
 ## Install
