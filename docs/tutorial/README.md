@@ -56,6 +56,10 @@ forever, skip to the next one — you can always come back.
 - The examples live in the `examples/` directory of the flua repository and
   are executed by flua's own test suite — the code in this tutorial is the
   same code that is tested with every release, so it always runs.
+- The diagrams are drawn with Mermaid. VS Code renders them in the markdown
+  preview once you accept the recommended **Markdown Preview Mermaid**
+extension (it's in the `.vscode/extensions.json` that `--tool setup`
+  installs); on GitHub they render on the page automatically.
 
 One promise before we start: **you will not need to understand everything.**
 QuickApps are small. The whole trick is a handful of ideas — this tutorial

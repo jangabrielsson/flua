@@ -135,6 +135,10 @@ def test_setup_tool_scaffolds_a_qa_project(tmp_path, capsys) -> None:
     # with the UI viewer server)
     launch = (tmp_path / ".vscode/launch.json").read_text()
     assert "Flua: Debug Current File (UI+mobdebug)" in launch
+    # the mermaid extension recommendation renders docs/tutorial diagrams in
+    # VS Code's markdown preview
+    extensions = (tmp_path / ".vscode/extensions.json").read_text()
+    assert "bierner.markdown-mermaid" in extensions
     # idempotent: a second run keeps the existing files
     (tmp_path / "AGENTS.md").write_text("custom\n")
     assert module.run(parser, parser.parse_args([str(tmp_path)])) == 0

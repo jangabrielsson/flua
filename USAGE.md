@@ -150,8 +150,9 @@ flua --tool setup my-project/  # a project directory (created if missing)
 
 It writes `.vscode/launch.json` (run in the panel, run in the terminal,
 mobdebug, and mobdebug with the UI viewer), `.vscode/extensions.json`
-(VS Code will offer to install the **Python**, **Lua MobDebug** and
-**Lua Language Server** extensions),
+(VS Code will offer to install the **Python**, **Lua MobDebug**,
+**Lua Language Server** and **Markdown Preview Mermaid** extensions — the
+last one renders the diagrams in `docs/tutorial/`),
 `.luarc.json` (silences the HC3 globals for the language server), `AGENTS.md`
 and the `.github/` skills, instructions and prompts. Existing files are
 kept; `--force` overwrites.
