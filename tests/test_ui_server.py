@@ -44,6 +44,13 @@ def _http(url: str, method: str = "GET", body: object = None) -> tuple[int, dict
         return res.status, dict(res.headers), json.loads(payload) if payload else None
 
 
+def _http_page(url: str) -> tuple[int, dict, str]:
+    """Raw GET for non-JSON responses (the viewer page)."""
+    req = urllib.request.Request(url)
+    with urllib.request.urlopen(req) as res:
+        return res.status, dict(res.headers), res.read().decode("utf-8")
+
+
 def _http_raw(url: str, method: str, raw_body: bytes) -> None:
     req = urllib.request.Request(url, data=raw_body, method=method)
     req.add_header("Content-Type", "application/json")
@@ -61,6 +68,21 @@ async def server(tmp_path):
     yield engine, api_server, base
     await api_server.stop()
     await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_viewer_page_served_at_root(server) -> None:
+    # flua --ui serves the viewer itself: GET / returns the page (same
+    # origin as the API it polls), with the packaged copy synced to the repo
+    _, _, base = server
+    status, headers, page = await asyncio.to_thread(_http_page, f"{base}/")
+    assert status == 200
+    assert "text/html" in headers["Content-Type"]
+    assert "flua UI viewer" in page
+    assert "Access-Control-Allow-Origin" in headers
+    # the API still answers on the same server
+    status, _, devices = await asyncio.to_thread(_http, f"{base}/devices")
+    assert status == 200 and isinstance(devices, list)
 
 
 @pytest.mark.asyncio
@@ -272,7 +294,7 @@ def test_ui_port_busy_falls_back_to_next_free_port(tmp_path) -> None:
         text=True,
     )
     try:
-        announce_re = re.compile(r"UI API on http://127\.0\.0\.1:(\d+)")
+        announce_re = re.compile(r"UI viewer on http://127\.0\.0\.1:(\d+)/")
         served_port = None
         output = ""
         deadline = time.monotonic() + 15.0

@@ -95,8 +95,19 @@ flua --tool setup my-first-qa
   wrote .luarc.json
   wrote AGENTS.md
   wrote .github/skills
-done — VS Code will suggest the Python and Lua MobDebug extensions on the next open
+  wrote viewer/index.html
+done — VS Code will suggest the Python and Lua MobDebug extensions on the next open; open viewer/index.html while `flua --ui` runs to see your QAs' UI
+Read on:
+  USAGE.md   https://github.com/jangabrielsson/flua/blob/main/USAGE.md
+  Tutorial   https://github.com/jangabrielsson/flua/tree/main/docs/tutorial
 ```
+
+Notice the last file: `viewer/index.html` — a small page that shows your
+QuickApp's buttons and switches while it runs. You'll meet it in chapter 03
+(where flua serves it for you — the copied file is for opening it by hand,
+or from another computer).
+The two links at the end open in the browser with a cmd/ctrl-click — the
+`USAGE.md` manual for when you wonder "can flua do X", and this tutorial.
 
 Now open the folder in VS Code — **File → Open Folder… → `my-first-qa`**.
 A popup asks you to install the recommended extensions (**Python**,

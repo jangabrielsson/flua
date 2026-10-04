@@ -578,6 +578,99 @@ def test_exit_terminates_only_the_calling_qa(tmp_path) -> None:
     assert "B_DONE" in result.stdout  # the other QA kept running
 
 
+def test_exit_inside_interval_kills_the_interval(tmp_path) -> None:
+    # regression: exit() from inside a setInterval callback used to be
+    # followed by the interval's re-arm, which survived cancel_qa (the
+    # re-arm is still a message, not a scheduled timer) and kept the QA
+    # ticking forever — the process never drained
+    script = tmp_path / "iv.lua"
+    script.write_text(
+        "local n = 0\n"
+        "setInterval(function()\n"
+        "  n = n + 1\n"
+        "  print('tick', n)\n"
+        "  if n >= 3 then exit(0) end\n"
+        "end, 20)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--api", "local", str(script)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "tick 3" in result.stdout
+    assert "tick 4" not in result.stdout  # the interval died with the QA
+
+
+def test_os_exit_terminates_the_calling_qa(tmp_path) -> None:
+    # os.exit() is the name real HC3 QAs use; flua's QA env shadows os so it
+    # terminates the calling QA only — and its timers with it (the interval
+    # re-arm after exit is refused, like exit())
+    a = tmp_path / "a.lua"
+    a.write_text(
+        "local n = 0\n"
+        "setInterval(function()\n"
+        "  n = n + 1\n"
+        "  print('A_TICK', n)\n"
+        "  if n >= 2 then os.exit(0) end\n"
+        "end, 10)\n"
+    )
+    b = tmp_path / "b.lua"
+    b.write_text("setTimeout(function() print('B_DONE'); exit(0) end, 50)\n")
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--api", "local", str(a), str(b)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "A_TICK 2" in result.stdout
+    assert "A_TICK 3" not in result.stdout  # the interval died with the QA
+    assert "B_DONE" in result.stdout  # the other QA kept running
+    # os still works like os inside a QA (the shadow table falls back to the
+    # shared virtual-clock os)
+    c = tmp_path / "c.lua"
+    c.write_text("print('C_TIME', os.time() > 0)\n")
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--api", "local", str(c)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert "C_TIME true" in result.stdout
+
+
+@pytest.mark.asyncio
+async def test_exited_qa_restart_runs_timers_again(tmp_path, capsys) -> None:
+    # after exit(), a restart revives the QA: the new code's timers must not
+    # be refused as re-arms of a dead QA
+    script = tmp_path / "r.lua"
+    script.write_text(
+        "local n = 0\n"
+        "setInterval(function()\n"
+        "  n = n + 1\n"
+        "  print('tick', n)\n"
+        "  if n >= 2 then exit(0) end\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await wait_until(lambda: not engine.has_pending_work())
+        engine.restart_qa(5000)
+        await wait_until(lambda: not engine.has_pending_work())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert out.count("tick 1") == 2  # once per run: the restart really re-ran
+    assert out.count("tick 2") == 2
+
+
 def test_exit_code_from_failing_qa_becomes_engine_exit_code(tmp_path) -> None:
     # a QA exiting nonzero marks the run failed (last failing QA wins)
     script = tmp_path / "failing.lua"

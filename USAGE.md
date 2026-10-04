@@ -152,7 +152,8 @@ It writes `.vscode/launch.json` (run in the panel, run in the terminal,
 mobdebug, and mobdebug with the UI viewer), `.vscode/extensions.json`
 (VS Code will offer to install the **Python**, **Lua MobDebug**,
 **Lua Language Server** and **Markdown Preview Mermaid** extensions — the
-last one renders the diagrams in `docs/tutorial/`),
+last one renders the diagrams in `docs/tutorial/`), `viewer/index.html`
+(the UI viewer page — open it while `flua --ui` runs),
 `.luarc.json` (silences the HC3 globals for the language server), `AGENTS.md`
 and the `.github/` skills, instructions and prompts. Existing files are
 kept; `--force` overwrites.
@@ -313,14 +314,18 @@ device's `properties.viewLayout`, `properties.uiView`, and
 
 ### The UI viewer
 
-`flua --ui [PORT]` serves the simulated HC3 API over HTTP for the bundled
-viewer (`viewer/index.html` in the repo) — open the page and point it at the
-printed URL:
+`flua --ui [PORT]` serves the viewer **itself** over HTTP, alongside the
+simulated HC3 API — no file to open:
 
 ```bash
-.venv/bin/flua --ui 8090 examples/ui.lua   # UI API on http://127.0.0.1:8090
-open viewer/index.html                    # default base URL matches
+.venv/bin/flua --ui 8090 examples/ui.lua   # UI viewer on http://127.0.0.1:8090/
+open http://127.0.0.1:8090/               # press Connect; the base URL matches
 ```
+
+The page defaults its API address to its own origin, so a busy port falling
+back to the next free one needs no editing. (`viewer/index.html` still ships
+in the repo and via `--tool setup` for opening from a file or pointing at
+another machine running flua.)
 
 The viewer polls `GET /devices`, renders `properties.uiView` (labels,
 buttons, sliders, switches, single and multi selects — styled after the HC3
@@ -760,7 +765,7 @@ stays portable:
 
 - `_FLUA.qaId` — this QA's id; `_FLUA.config` — this QA's config table
 - `_FLUA.arg` — the file path / `-e` marker
-- `_FLUA.exit(code)` — stop the engine (vs `exit(code)` which stops only this QA)
+- `_FLUA.exit(code)` — stop the engine (vs `exit(code)` / `os.exit()` in a QA, which stop only that QA — `os.exit()` is the name real HC3 QAs use)
 - `_FLUA.qa(id)` — another QA's QuickApp instance (lupa proxy)
 - `_FLUA.loadQAfromFile(path, directives?)` / `_FLUA.loadQAfromString(code, directives?)` — dynamic QA loading; `directives` is an optional table of directive strings added to the loaded QA's config
 - `_FLUA.async.run(fn)` / `_FLUA.async.await(worker)` / `_FLUA.async.wait(ms)` — coroutine awaits

@@ -60,8 +60,8 @@ Requires Python 3.11+. `lupa` is the only runtime dependency.
 # simulated HC3 (offline): seed the REST API with a house
 .venv/bin/flua --seed examples/house.json script.lua
 
-# UI viewer: serve the sim API for viewer/index.html (stays up until Ctrl-C,
-# busy ports fall back to the next free one)
+# UI viewer: flua serves the viewer at http://127.0.0.1:PORT/ (stays up
+# until Ctrl-C, busy ports fall back to the next free one)
 .venv/bin/flua --ui 8090 examples/ui.lua
 
 # develop: watch mode (restart on save), static checks, deploy artifacts
@@ -183,12 +183,12 @@ endpoint reference the sim mirrors.
 
 ## UI viewer
 
-`viewer/index.html` is a standalone page that renders QuickApp UIs and injects
-interactions through the sim API — the same contract the real HC3 UI uses.
-Serve the channel and open the file in a browser:
+`flua --ui` serves the viewer itself over HTTP (the packaged
+`viewer/index.html`) — the page renders QuickApp UIs and injects
+interactions through the sim API, the same contract the real HC3 UI uses:
 
 ```bash
-.venv/bin/flua --ui 8090 examples/ui.lua   # then open viewer/index.html
+.venv/bin/flua --ui 8090 examples/ui.lua   # then open http://127.0.0.1:8090/
 ```
 
 - polls `GET /devices` every second and renders `properties.uiView` (live

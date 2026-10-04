@@ -580,6 +580,14 @@ function _FLUA.makeQaEnv(qaId)
   env.exit = function(code)  -- HC3: terminates this QA
     return _FLUA.exit(code, qaId)
   end
+  -- os.exit is the name real HC3 QAs use (each QA is its own process
+  -- there). flua runs QAs cooperatively, so the QA sees its own os table
+  -- whose exit terminates just this QA — everything else on os is the
+  -- shared (virtual-clock aware) os.
+  env.os = setmetatable(
+    { exit = function(code) return _FLUA.exit(code, qaId) end },
+    { __index = os }
+  )
   return env
 end
 

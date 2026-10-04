@@ -1,6 +1,6 @@
 # 02 · Your first QuickApp
 
-In this chapter you write a real QuickApp — a whole ten lines — and run it.
+In this chapter you write a real QuickApp — a dozen lines — and run it.
 It will count to three, tell you it's done, and stop. You don't need to
 understand every line yet; chapter 03 explains them. Right now the goal is
 simpler: **write, run, see it live.**
@@ -15,14 +15,12 @@ create a new file: **File → New File…**, name it `hello.lua`, and type:
 print("Hello from my first QuickApp")
 
 local n = 0
-local iv
-iv = setInterval(function()
+setInterval(function()
   n = n + 1
   print("tick", n)
   if n >= 3 then
-    clearInterval(iv)
     print("done")
-    exit(0)
+    os.exit()
   end
 end, 400)
 ```
@@ -35,7 +33,14 @@ A few first impressions, without the theory:
 - `print(...)` writes a line to the log.
 - `setInterval(function() … end, 400)` means: *run this little block every
   400 milliseconds.* That's a **timer** — the heart of every QuickApp.
-- `exit(0)` ends the program.
+- The `if` counts to three: after the third tick the QuickApp says `done`
+  and `os.exit()` ends it — and stops its timer with it.
+
+> `os.exit()` ends the QuickApp that called it. That's the same name real
+> HC3 QuickApps use (there, every QuickApp is its own program — ending it
+> is as simple as leaving a room). In these first experiments it's also
+> what lets flua finish and hand the terminal back to you — a QuickApp that
+> never exits just keeps running.
 
 ## Step 2 — run it
 
@@ -47,11 +52,11 @@ flua --api local hello.lua
 
 ```text
 🚀 flua 0.1.12 (Lua 5.5, Python 3.14.3), mode offline
-[04.10.2026][20:16:10][DEBUG  ][hello5000]: Hello from my first QuickApp
-[04.10.2026][20:16:11][DEBUG  ][hello5000]: tick 1
-[04.10.2026][20:16:11][DEBUG  ][hello5000]: tick 2
-[04.10.2026][20:16:12][DEBUG  ][hello5000]: tick 3
-[04.10.2026][20:16:12][DEBUG  ][hello5000]: done
+[04.10.2026][20:50:10][DEBUG  ][hello5000]: Hello from my first QuickApp
+[04.10.2026][20:50:10][DEBUG  ][hello5000]: tick 1
+[04.10.2026][20:50:11][DEBUG  ][hello5000]: tick 2
+[04.10.2026][20:50:11][DEBUG  ][hello5000]: tick 3
+[04.10.2026][20:50:11][DEBUG  ][hello5000]: done
 ```
 
 > ✅ **You should see** your QuickApp say hello, tick three times, and stop.

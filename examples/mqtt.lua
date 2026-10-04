@@ -5,9 +5,12 @@
 --
 -- Connects to the public broker at broker.hivemq.com, subscribes to a
 -- topic, publishes a message and reads its own echo. If the broker is
--- unreachable, the error path prints cleanly.
+-- unreachable, the error path prints cleanly. The broker is configurable
+-- (the test suite points it at a local mock):
+--   MQTT_URL=mqtt://127.0.0.1:1883 .venv/bin/flua examples/mqtt.lua
+local broker = os.getenv("MQTT_URL") or "mqtt://broker.hivemq.com:1883"
 setTimeout(function()
-  local client = mqtt.Client.connect("mqtt://broker.hivemq.com:1883", {
+  local client = mqtt.Client.connect(broker, {
     clientId = "flua-demo-" .. tostring(os.time()),
     cleanSession = true,
     callback = function(errorCode)

@@ -1,6 +1,7 @@
 """mqtt.* client: MQTT 3.1.1 against a minimal local broker."""
 
 import asyncio
+import os
 import socket
 import struct
 import subprocess
@@ -263,16 +264,21 @@ async def test_mqtt_unsubscribe(capsys) -> None:
 
 
 def test_example_mqtt_runs_cleanly() -> None:
-    # The example targets the public broker broker.hivemq.com — network
-    # dependent, so assert only the deterministic parts: clean exit, no
-    # traceback, and one of the two outcome markers.
+    # the example defaults to the public broker broker.hivemq.com; point it
+    # at the local MiniBroker instead, so the suite never depends on the
+    # public broker's mood
+    broker = MiniBroker()
+    env = {**os.environ, "MQTT_URL": f"mqtt://127.0.0.1:{broker.port}"}
     result = subprocess.run(
         [sys.executable, "-m", "flua", "--api", "local", "examples/mqtt.lua"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
         timeout=90,
+        env=env,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "stack traceback" not in result.stdout
-    assert ("mqtt echo:" in result.stdout) or ("mqtt error" in result.stdout)
+    assert "connect result: ok" in result.stdout
+    assert "mqtt echo: flua/demo hello from flua qos=1" in result.stdout
+    assert "mqtt error" not in result.stdout

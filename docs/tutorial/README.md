@@ -24,12 +24,12 @@ forever, skip to the next one — you can always come back.
 ## The chapters
 
 - **[01 · Install](01-install.md)** — Python, VS Code, flua, one command to check it all works.
-- **[02 · Your first QuickApp](02-your-first-qa.md)** — write 7 lines, run them, see them tick.
+- **[02 · Your first QuickApp](02-your-first-qa.md)** — write a dozen lines, run them, see them tick.
 - **[03 · QuickApp anatomy](03-qa-anatomy.md)** — onInit, actions, properties — and the Sunset Lamp gets its On/Off buttons.
-- **04 · The house comes alive** — timers, sunrise and sunset, virtual time. *(coming next)*
-- **05 · Make it yours** — your own UI, variables, rooms and icons. *(coming next)*
-- **06 · On the real HC3** — connecting flua to your controller and uploading the lamp. *(coming next)*
-- **07 · When things go wrong** — reading the log, debugging, asking the forum. *(coming next)*
+- **[04 · The house comes alive](04-the-house-comes-alive.md)** — timers, sunset, and flua's virtual clock: a whole evening tested in a second.
+- **[05 · Make it yours](05-make-it-yours.md)** — your own control panel (a switch and a label) and your first quickApp variable.
+- **[06 · On the real HC3](06-on-the-real-hc3.md)** — a dress rehearsal against your real house, then uploading, updating and downloading QAs.
+- **[07 · When things go wrong](07-when-things-go-wrong.md)** — the log, `--check`, breakpoints, and how to ask for help.
 
 ## How to read this tutorial
 

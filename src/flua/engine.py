@@ -826,6 +826,7 @@ class LuaEngine:
         if info is None:
             raise ValueError(f"unknown QA {qa_id}")
         info["files"] = self._build_files(info["path"], info["code"], info["config"])
+        info["exited"] = None  # revive: the new code's timers must not be refused
         self._timers.cancel_qa(int(qa_id))
         self.enqueue_outbound(
             messages.restart_qa_msg(
@@ -1301,7 +1302,16 @@ class LuaEngine:
     # -- handlers (Lua -> Python message types) -----------------------------------
 
     def _handle_set_timeout(self, msg: dict[str, Any]) -> None:
-        self._timers.set_timeout(int(msg["id"]), int(msg["delay"]), msg.get("qa"))
+        qa = msg.get("qa")
+        if qa is not None:
+            info = self._qas.get(int(qa))
+            if info is not None and info.get("exited") is not None:
+                # a dead QA's timer registration — typically an interval
+                # re-arming after its callback called exit(): refuse it, so
+                # the chain dies (cancel_qa can't see it yet — it is still
+                # a message, not a scheduled timer)
+                return
+        self._timers.set_timeout(int(msg["id"]), int(msg["delay"]), qa)
 
     def _handle_qa_vars(self, msg: dict[str, Any]) -> None:
         """Merge evaluated --%%var values into the QA device's variables."""

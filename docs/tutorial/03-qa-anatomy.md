@@ -92,10 +92,10 @@ flua: UI API on http://127.0.0.1:8090 — open viewer/index.html
 [04.10.2026][20:11:17][DEBUG  ][SunsetLamp5000]: Sunset lamp ready
 ```
 
-Now open `viewer/index.html` in a browser (the file lives in the flua
-repository — GitHub users: the `viewer/` directory; `pip` users: download it
-from the same place). The page opens with the address `http://127.0.0.1:8090`
-already filled in — press **Connect**.
+Now open `viewer/index.html` in a browser — the file was copied into your
+project by `flua --tool setup` back in chapter 01 (in the flua repository
+it lives in the `viewer/` directory). The page opens with the address
+`http://127.0.0.1:8090` already filled in — press **Connect**.
 
 > ✅ **You should see** a panel titled `SunsetLamp`, with a red `FALSE`
 > label and **Turn On / Turn Off** buttons.

@@ -118,10 +118,11 @@ def test_setup_tool_scaffolds_a_qa_project(tmp_path, capsys) -> None:
     module.add_arguments(parser)
     assert module.run(parser, parser.parse_args([str(tmp_path)])) == 0
     out = capsys.readouterr().out
-    # the VS Code configs and the agent files land
+    # the VS Code configs, the viewer, and the agent files land
     for path in (
         ".vscode/launch.json",
         ".vscode/extensions.json",
+        "viewer/index.html",
         ".luarc.json",
         "AGENTS.md",
         ".github/copilot-instructions.md",
@@ -130,7 +131,11 @@ def test_setup_tool_scaffolds_a_qa_project(tmp_path, capsys) -> None:
         ".github/skills/quickapp-api/SKILL.md",
     ):
         assert (tmp_path / path).exists(), path
+    assert "wrote viewer/index.html" in out
     assert "wrote .vscode/launch.json" in out
+    # the reading links (clickable in the VS Code terminal)
+    assert "github.com/jangabrielsson/flua/blob/main/USAGE.md" in out
+    assert "github.com/jangabrielsson/flua/tree/main/docs/tutorial" in out
     # the launch configs ship both debug flavors (mobdebug, and mobdebug
     # with the UI viewer server)
     launch = (tmp_path / ".vscode/launch.json").read_text()
@@ -158,6 +163,17 @@ def test_packaged_skills_match_the_repo() -> None:
             copy = packaged / origin.relative_to(repo / ".github" / "skills")
             assert copy.exists(), f"missing packaged skill: {copy}"
             assert copy.read_bytes() == origin.read_bytes(), f"drifted: {copy}"
+
+
+def test_packaged_viewer_matches_the_repo() -> None:
+    # the wheel ships the UI viewer for --tool setup; a sync guard keeps the
+    # packaged copy identical to the repo's viewer/index.html
+    repo = Path(__file__).resolve().parent.parent
+    packaged = repo / "src" / "flua" / "setup_templates" / "viewer" / "index.html"
+    origin = repo / "viewer" / "index.html"
+    assert packaged.read_bytes() == origin.read_bytes(), (
+        "viewer drift — copy viewer/index.html into setup_templates/viewer/"
+    )
 
 
 def test_sanitize_filename() -> None:

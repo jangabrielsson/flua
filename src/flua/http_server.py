@@ -1,17 +1,18 @@
-"""HTTP server for the simulated HC3 REST API (the UI viewer's channel).
+"""HTTP server for the simulated HC3 REST API and the UI viewer.
 
 A tiny stdlib-only asyncio HTTP server wrapping :meth:`flua.api.Api.dispatch`
-— the same dispatch the Lua ``api`` table uses in-process. The UI viewer (a
-standalone static page, ``viewer/index.html``) polls ``/devices`` through it
-and injects UI interactions via ``GET /plugins/callUIEvent``, exactly like a
-real HC3 UI would.
+— the same dispatch the Lua ``api`` table uses in-process. The UI viewer
+page is served at ``/`` from the packaged copy (the same file
+``--tool setup`` installs), so ``flua --ui`` is all a user needs: the page
+polls ``/devices`` through the same origin and injects UI interactions via
+``GET /plugins/callUIEvent``, exactly like a real HC3 UI would.
 
 Design notes:
 
 - ``Connection: close`` per request — polling every second does not need
   keep-alive, and this keeps the parser trivial.
-- Permissive CORS (``Access-Control-Allow-Origin: *``) so the viewer works
-  from ``file://`` as well as any localhost origin.
+- Permissive CORS (``Access-Control-Allow-Origin: *``) so the viewer also
+  works opened from ``file://`` (the ``--tool setup`` copy).
 - The server is NOT pending work: the engine's ``has_pending_work()`` does
   not look at it, so a drained run exits while the listener is still up. The
   CLI owns the task and stops it on exit.
@@ -23,6 +24,7 @@ import asyncio
 import errno
 import json
 import logging
+from pathlib import Path
 from typing import Any
 
 from .api import Api
@@ -37,6 +39,16 @@ _CORS = {
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
 }
+
+# The viewer page, read once at import: the packaged copy (what --tool setup
+# installs, sync-guarded against the repo's viewer/index.html by tests).
+_VIEWER_PATH = Path(__file__).parent / "setup_templates" / "viewer" / "index.html"
+
+
+def _viewer_html() -> bytes:
+    if _VIEWER_PATH.exists():
+        return _VIEWER_PATH.read_bytes()
+    return b"<html><body>viewer/index.html missing from the flua package</body></html>"
 
 
 class ApiServer:
@@ -93,6 +105,10 @@ class ApiServer:
                 _respond(writer, 204, None, extra=_CORS)
                 return
             path, _, query = target.partition("?")
+            if method == "GET" and path in ("/", "/index.html", "/viewer", "/viewer/"):
+                # the UI viewer page itself (same origin as the API it polls)
+                _respond_html(writer, _viewer_html(), extra=_CORS)
+                return
             if path.startswith("/api/"):
                 # the HC3 REST prefix — proxy devices on the HC3 post their
                 # callbacks to http://ip:port/api/...; the sim routes the
@@ -160,8 +176,27 @@ def _respond(
         status = 500
     if status == 204:
         body = b""  # 204 responses carry no body
+    _write(writer, status, "application/json", body, extra)
+
+
+def _respond_html(
+    writer: asyncio.StreamWriter,
+    body: bytes,
+    extra: dict[str, str] | None = None,
+) -> None:
+    """The viewer page: raw bytes, not JSON."""
+    _write(writer, 200, "text/html; charset=utf-8", body, extra)
+
+
+def _write(
+    writer: asyncio.StreamWriter,
+    status: int,
+    content_type: str,
+    body: bytes,
+    extra: dict[str, str] | None,
+) -> None:
     reason = {200: "OK", 204: "No Content", 400: "Bad Request", 404: "Not Found"}.get(status, "OK")
-    head = [f"HTTP/1.1 {status} {reason}", "Content-Type: application/json"]
+    head = [f"HTTP/1.1 {status} {reason}", f"Content-Type: {content_type}"]
     head.append(f"Content-Length: {len(body)}")
     head.append("Connection: close")
     for key, value in (extra or {}).items():

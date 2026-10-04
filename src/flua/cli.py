@@ -155,11 +155,12 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         metavar="PORT",
-        help="serve the simulated HC3 API over HTTP for the UI viewer (default "
-        "port 8090). With no --run-for the run stays up until Ctrl-C, so the "
-        "viewer keeps its API even after the QA's timers drain. A busy port "
-        "falls back to the next free one (the effective port is printed at "
-        "startup)",
+        help="serve the UI viewer and the simulated HC3 API over HTTP (default "
+        "port 8090). The viewer is served at http://127.0.0.1:PORT/ — open "
+        "that URL in a browser. With no --run-for the run stays up until "
+        "Ctrl-C, so the viewer keeps its API even after the QA's timers "
+        "drain. A busy port falls back to the next free one (the effective "
+        "port is printed at startup)",
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="enable debug logging")
     parser.add_argument("--version", action="version", version=f"flua {__version__}")
@@ -385,7 +386,7 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         engine.post(
             messages.log(
                 "info",
-                f"flua: UI API on http://127.0.0.1:{ui_server.port} — open viewer/index.html",
+                f"flua: UI viewer on http://127.0.0.1:{ui_server.port}/ — open it in a browser",
             )
         )
     if args.debugger is not None:
