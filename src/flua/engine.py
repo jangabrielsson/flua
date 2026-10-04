@@ -42,7 +42,14 @@ from .api import Api
 from .api.state import public
 from .bindings import install_bindings
 from .clock import VirtualClock
-from .config import _apply_mode, _is_eoh, parse_annotations, split_annotations
+from .config import (
+    _apply_mode,
+    _is_eoh,
+    debug_flag,
+    merge_annotations,
+    parse_annotations,
+    split_annotations,
+)
 from .devices import catalog_types
 from .environment import EnvChain
 from .hc3 import Hc3Remote
@@ -595,22 +602,38 @@ class LuaEngine:
 
     # -- dynamic loading (loadQAfromFile / loadQAfromString) ----------------------
 
-    def load_qa_file(self, path: str) -> tuple[int | None, str | None]:
+    def load_qa_file(
+        self, path: str, directives: list[str] | None = None
+    ) -> tuple[int | None, str | None]:
         """Install and run a QA from a file — callable from running QA code.
 
         Reads the file's ``--%%`` annotations like the CLI (they win over the
         engine config; global params stay local to the loaded QA — a test QA
-        must not change the running engine's clock). The bootstrap is queued
-        as a ``startQA`` message so the pump runs it with no Lua on the
-        stack, and it boots eagerly so follow-up calls from the same callback
-        already reach the new QA. Returns (qa_id, None) or (None, error).
+        must not change the running engine's clock). ``directives`` (a list of
+        directive strings, e.g. ``["var:friend=42"]``) adds extra ``--%%``
+        lines as if appended to the QA's header: variables/properties merge
+        per key, UI rows and files append, scalar directives override. The
+        bootstrap is queued as a ``startQA`` message so the pump runs it with
+        no Lua on the stack, and it boots eagerly so follow-up calls from the
+        same callback already reach the new QA. Returns (qa_id, None) or
+        (None, error).
         """
         path = str(Path(path))
         try:
             source = Path(path).read_text(encoding="utf-8")
-            global_params, local_params = split_annotations(parse_annotations(source))
+            annotations = parse_annotations(source)
         except Exception as exc:  # missing file, bad encoding, ...
             return None, str(exc)
+        if directives:
+            if not isinstance(directives, (list, tuple)) or not all(
+                isinstance(entry, str) for entry in directives
+            ):
+                return None, "directives must be a table of strings"
+            annotations = merge_annotations(
+                annotations,
+                parse_annotations("\n".join("--%%" + entry for entry in directives)),
+            )
+        global_params, local_params = split_annotations(annotations)
         config = dict(self.config)
         config.update(global_params)
         config.update(local_params)
@@ -1312,7 +1335,7 @@ class LuaEngine:
     def _handle_http_request(self, msg: dict[str, Any]) -> None:
         """Run a net.HTTPClient request in a worker thread (never blocks the pump)."""
         logger.debug("http request id=%s %s %s", msg["id"], msg.get("method"), msg["url"])
-        if bool((self.config.get("debug") or {}).get("http")):
+        if debug_flag(self.config, "http"):
             # user net.HTTPClient traffic only — api.* calls are the "api" flag
             self.debug_log(f"http {msg.get('method') or 'GET'} {msg.get('url')}")
         task = asyncio.create_task(self._run_http_request(msg), name="flua-http")

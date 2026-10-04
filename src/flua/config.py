@@ -348,6 +348,12 @@ def parse_annotations(source: str, warn_unknown: bool = True) -> dict[str, Any]:
                 "path": db_path[1:] if db_path.startswith("+") else db_path,
                 "persist": db_path.startswith("+"),
             }
+        elif name == "debug" and "=" not in value:
+            # --%%debug:true — enable every debug channel; :false disables
+            # them (the full form is --%%debug:api=true,http=true,...).
+            # Normalized to the dict shape so consumers can read one shape.
+            enabled = parse_scalar(value)
+            config["debug"] = {"api": enabled, "http": enabled, "refreshState": enabled}
         elif "=" in value:
             sub: dict[str, Any] = {}
             for part in value.split(","):
@@ -433,3 +439,40 @@ def split_annotations(
     global_params = {k: v for k, v in annotations.items() if k in GLOBAL_PARAMS}
     local_params = {k: v for k, v in annotations.items() if k not in GLOBAL_PARAMS}
     return global_params, local_params
+
+
+def debug_flag(config: dict[str, Any], channel: str) -> bool:
+    """One ``--%%debug`` channel. The directive is normally a dict of
+    channels (``--%%debug:api=true,http=true``); a scalar form is normalized
+    at parse time. Defensive against any other shape (a plain bool arrives
+    when configs are built by hand, e.g. engine tests) — truthy means all
+    channels on."""
+    flag = config.get("debug")
+    if isinstance(flag, dict):
+        return bool(flag.get(channel))
+    return bool(flag)
+
+
+def merge_annotations(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
+    """``extra`` behaves like more ``--%%`` lines appended to a QA's header:
+    ``--%%var``/``--%%property`` merge per variable/property, ``--%%u``/
+    ``--%%file`` append, everything else overrides.
+
+    This is the semantic for directives passed dynamically at load time
+    (``_FLUA.loadQAfromFile(path, {"var:friend=42"})``): they *add* to the
+    QA's own header rather than replacing it wholesale.
+    """
+    merged = dict(base)
+    for key, value in extra.items():
+        if key in ("var", "property"):
+            sub = dict(merged.get(key) or {})
+            sub.update(value or {})
+            merged[key] = sub
+        elif key in ("u", "file"):
+            existing = merged.get(key)
+            if not isinstance(existing, list):
+                existing = [existing] if existing is not None else []
+            merged[key] = [*existing, *(value if isinstance(value, list) else [value])]
+        else:
+            merged[key] = value
+    return merged

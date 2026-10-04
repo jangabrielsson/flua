@@ -193,6 +193,7 @@ Parsing stops at the end-of-header marker:
 | `--%%mode:online` | force this QA online against the real HC3 |
 | `--%%mode:proxy` | proxy mode: mirror this QA onto the HC3 (online only, see below) |
 | `--%%debug:refreshState=true,api=true,http=true` | debug logging: refreshStates events / `api.*` calls / `net.HTTPClient` requests (global) |
+| `--%%debug:true` | shorthand for all three debug channels (`:false` disables them) |
 | `--%%loglength:120` | debug line length cap (default 120) |
 | `--%%warn:true` | extra runtime warnings for things the HC3 stays silent about (global) |
 | `--%%db:house.json` | seed the simulated HC3 from a JSON file (devices, rooms, scenes, globalVariables, alarms, profiles) |
@@ -238,7 +239,8 @@ flags it too.
 ### Debug logging
 
 `--%%debug:refreshState=true,api=true,http=true` turns on per-category debug
-logging (any subset; it is a global directive, so `.directives` can carry it):
+logging (any subset; it is a global directive, so `.directives` can carry
+it). `--%%debug:true` is shorthand for all three channels on:
 
 - `refreshState=true` logs every refreshStates event flua sees in a short
   form — the event type plus the `id`/`deviceId`/`name`/`property`/`value`/
@@ -634,10 +636,18 @@ From VS Code you often run one QA — let it bring up the QAs it needs:
 ```lua
 local id = _FLUA.loadQAfromFile("examples/qa3.lua")   -- annotations parsed
 local id2 = _FLUA.loadQAfromString([[ ...inline QA... ]])
+local id3 = _FLUA.loadQAfromFile(                      -- extra directives
+  "examples/qa3.lua",
+  { "var:friend=42", "property:value=true" }
+)
 fibaro.call(id, "turnOn")   -- immediately reachable
 ```
 
-Both return the new QA id (or `nil, error`). `examples/dynamic.lua` demos it.
+The optional second argument is a table of directive strings, applied as if
+appended to the loaded QA's `--%%` header: `var`/`property` merge per key
+(the QA's own variables survive), `u`/`file` append, everything else
+overrides. Both functions return the new QA id (or `nil, error`).
+`examples/dynamic.lua` demos it.
 
 ## Network clients
 
@@ -751,7 +761,7 @@ stays portable:
 - `_FLUA.arg` — the file path / `-e` marker
 - `_FLUA.exit(code)` — stop the engine (vs `exit(code)` which stops only this QA)
 - `_FLUA.qa(id)` — another QA's QuickApp instance (lupa proxy)
-- `_FLUA.loadQAfromFile(path)` / `_FLUA.loadQAfromString(code)` — dynamic QA loading
+- `_FLUA.loadQAfromFile(path, directives?)` / `_FLUA.loadQAfromString(code, directives?)` — dynamic QA loading; `directives` is an optional table of directive strings added to the loaded QA's config
 - `_FLUA.async.run(fn)` / `_FLUA.async.await(worker)` / `_FLUA.async.wait(ms)` — coroutine awaits
 - `_FLUA.millitime()` — virtual time in whole milliseconds (sub-second timing; `os.time()` is whole seconds, `os.clock()` is real CPU time)
 - `_FLUA.setTimeout(fn, ms, qaId)` — timer with explicit QA attribution

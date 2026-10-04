@@ -463,6 +463,28 @@ async def test_qa_uses_api_offline(tmp_path, capsys) -> None:
     assert "DEV a" in out
 
 
+@pytest.mark.asyncio
+async def test_scalar_debug_config_does_not_break_api_bridge(tmp_path, capsys) -> None:
+    # regression: --%%debug:true used to leave a plain bool in the engine
+    # config, and the api.debug log guard crashed dict-style .get() on it —
+    # killing every QA right after onInit (initChildDevices calls api.get)
+    script = tmp_path / "dbg.lua"
+    script.write_text(
+        "function QuickApp:onInit()\n"
+        "  local dev = api.get('/devices/'..self.id)\n"
+        "  print('DBG', dev.name)\n"
+        "end\n"
+    )
+    engine = LuaEngine(config={"debug": True})  # the shape --%%debug:true used to produce
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await asyncio.sleep(0.3)
+    finally:
+        await engine.stop()
+    assert "DBG" in capsys.readouterr().out
+
+
 def test_cli_seed_offline(tmp_path) -> None:
     script = tmp_path / "gv.lua"
     script.write_text("print('GV', fibaro.getGlobalVariable('night'))\n")

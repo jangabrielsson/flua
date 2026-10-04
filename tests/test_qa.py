@@ -378,6 +378,52 @@ async def test_dynamic_load_missing_file(tmp_path, capsys) -> None:
     assert "ERR true true" in capsys.readouterr().out
 
 
+@pytest.mark.asyncio
+async def test_dynamic_load_with_directives(tmp_path, capsys) -> None:
+    # _FLUA.loadQAfromFile's second argument: a table of directive strings
+    # added to the loaded QA as if appended to its --%% header. var merges
+    # per variable (the file's own vars survive), scalars override.
+    target = tmp_path / "target.lua"
+    target.write_text(
+        "--%%var:friend=1\n"
+        "--%%var:greeting='from-file'\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit()\n"
+        "  print('TVARS', self:getVariable('friend'), self:getVariable('greeting'))\n"
+        "end\n"
+    )
+    loader = tmp_path / "loader.lua"
+    loader.write_text(
+        "setTimeout(function()\n"
+        f"  local id, err = _FLUA.loadQAfromFile([[{target}]], {{[[var:friend=42]]}})\n"
+        "  print('LOADED', id ~= nil, err == nil)\n"
+        "  local id2, err2 = _FLUA.loadQAfromString([[\n"
+        "function QuickApp:onInit() print('SVARS', self:getVariable('greeting')) end\n"
+        "  ]], {[[var:greeting='hello']]})\n"
+        "  print('LOADED2', id2 ~= nil, err2 == nil)\n"
+        f"  local id3, err3 = _FLUA.loadQAfromFile([[{target}]], {{1}})\n"
+        "  print('BAD', id3 == nil, err3 ~= nil)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.load_qa_file(str(loader))
+        await wait_until(lambda: not engine.has_pending_work())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    # the dynamic directive overrides friend, the file's own greeting survives
+    assert "TVARS 42 from-file" in out
+    assert "SVARS hello" in out
+    assert "LOADED true true" in out and "LOADED2 true true" in out
+    assert "BAD true true" in out  # non-string entries are rejected
+    # the dynamically added variable landed in the device, like --%%var
+    device = engine.api.state.devices[5001]
+    names = {v["name"]: v["value"] for v in device["properties"]["quickAppVariables"]}
+    assert names == {"friend": 42, "greeting": "from-file"}
+
+
 def test_example_dynamic_loading() -> None:
     result = subprocess.run(
         [sys.executable, "-m", "flua", "--api", "local", "examples/dynamic.lua"],

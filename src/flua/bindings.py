@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from . import __version__
+from .config import debug_flag
 
 if TYPE_CHECKING:
     from .engine import LuaEngine
@@ -146,7 +147,7 @@ def install_bindings(engine: "LuaEngine") -> None:
     def api_call(
         method: str, url: str, body: object, qa_id: int | None = None
     ) -> tuple[object, int]:
-        if bool((engine.config.get("debug") or {}).get("api")):
+        if debug_flag(engine.config, "api"):
             engine.debug_log(f"api {method.upper()} {url}")
         data, status = engine.api.dispatch(method, url, lua_to_python(body), qa_id=qa_id)
         warn_api(method, url, status, qa_id)
@@ -159,7 +160,7 @@ def install_bindings(engine: "LuaEngine") -> None:
     # api.hc3.*: the real HC3 directly (no hybrid dispatch) — callhc3 and
     # test code; falls back to the local sim without a remote backend.
     def api_hc3(method: str, url: str, body: object) -> tuple[object, int]:
-        if bool((engine.config.get("debug") or {}).get("api")):
+        if debug_flag(engine.config, "api"):
             engine.debug_log(f"api.hc3 {method.upper()} {url}")
         data, status = engine.api.dispatch_hc3(method, url, lua_to_python(body))
         warn_api(method, url, status, None)
@@ -180,9 +181,12 @@ def install_bindings(engine: "LuaEngine") -> None:
 
     # Dynamic QA loading (dev/test convenience): install and run another QA
     # from a file (its --%% annotations are parsed) or from inline code.
-    # File loading returns (qa_id, nil) or (nil, error message).
-    def load_qa_file(path: str) -> tuple[object, object]:
-        qa_id, err = engine.load_qa_file(path)
+    # File loading returns (qa_id, nil) or (nil, error message). A second
+    # argument (a table of directive strings, e.g. {"var:friend=42"}) adds
+    # extra --%% lines on top of the file's own header.
+    def load_qa_file(path: str, directives: object = None) -> tuple[object, object]:
+        extra = None if directives is None else lua_to_python(directives)
+        qa_id, err = engine.load_qa_file(path, extra)
         return qa_id, err
 
     def qa_temp_file(code: str) -> str:

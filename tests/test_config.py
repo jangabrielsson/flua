@@ -169,6 +169,24 @@ def test_debug_directive_parses_subflags() -> None:
     }
 
 
+def test_debug_directive_scalar_enables_all_channels() -> None:
+    # --%%debug:true (the natural shorthand) normalizes to the dict shape so
+    # every consumer reads one shape — it used to leave a plain bool that
+    # crashed dict-style .get()s
+    assert parse_annotations("--%%debug:true\n") == {
+        "debug": {"api": True, "http": True, "refreshState": True}
+    }
+    assert parse_annotations("--%%debug:false\n") == {
+        "debug": {"api": False, "http": False, "refreshState": False}
+    }
+    from flua.config import debug_flag
+
+    assert debug_flag({"debug": True}, "api") is True  # hand-built bools still work
+    assert debug_flag({"debug": {"api": True}}, "api") is True
+    assert debug_flag({"debug": {"api": False}}, "api") is False
+    assert debug_flag({}, "api") is False
+
+
 def test_parse_annotations_warns_on_unknown_directive(caplog) -> None:
     import logging
 

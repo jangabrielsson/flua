@@ -762,15 +762,17 @@ end
 
 -- Dynamic QA loading (dev/test convenience): install and run another QA
 -- from a file (its --%% annotations are parsed Python-side) or from inline
--- code (written to a temp file first, then the file pipeline). Returns
+-- code (written to a temp file first, then the file pipeline). The optional
+-- second argument is a table of directive strings (e.g. {"var:friend=42"})
+-- added to the QA's config as if appended to its --%% header. Returns
 -- (qaId, nil) or (nil, error message).
-function _FLUA.loadQAfromFile(path)
-  return _PY.load_qa_file(path)
+function _FLUA.loadQAfromFile(path, directives)
+  return _PY.load_qa_file(path, directives)
 end
 
-function _FLUA.loadQAfromString(code)
+function _FLUA.loadQAfromString(code, directives)
   local path = _PY.qa_temp_file(code)
-  return _FLUA.loadQAfromFile(path)
+  return _FLUA.loadQAfromFile(path, directives)
 end
 
 -- ----------------------------------------------------------------- dispatch
