@@ -35,6 +35,22 @@
         "${relativeFile}"
       ],
       "listenPublicly": true
+    },
+    {
+      "name": "Flua: Debug Current File (UI+mobdebug)",
+      "type": "luaMobDebug",
+      "request": "launch",
+      "workingDirectory": "${workspaceFolder}",
+      "sourceBasePath": "${workspaceFolder}",
+      "listenPort": 8172,
+      "stopOnEntry": false,
+      "sourceEncoding": "UTF-8",
+      "interpreter": ".venv/bin/flua",
+      "arguments": [
+        "--ui", "8090",
+        "${relativeFile}"
+      ],
+      "listenPublicly": true
     }
   ]
 }

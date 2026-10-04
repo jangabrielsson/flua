@@ -109,7 +109,7 @@ executes; only outside a QA (main-state code) does it raise an error.
 
 ## VS Code setup
 
-The repo ships `.vscode/launch.json` with three configurations:
+The repo ships `.vscode/launch.json` with four configurations:
 
 - **Flua: Run Current File** — runs the file in the panel.
 - **Flua: Run Current File (Terminal)** — runs it in the integrated terminal
@@ -119,6 +119,10 @@ The repo ships `.vscode/launch.json` with three configurations:
   **Lua MobDebug** (`alexeymelnichuk.lua-mobdebug`), open your QA, press F5
   with the mobdebug configuration selected. flua waits for the debugger
   before running your code.
+- **Flua: Debug Current File (UI+mobdebug)** — the same, plus the UI
+  viewer server (`--ui 8090`): debug your QA while its UI is rendered in
+  `viewer/index.html` (if 8090 is busy the server picks the next free port
+  — point the viewer at the printed URL).
 
 While you step through code, `print`/`self:debug` output appears **immediately**
 — logs never queue behind a paused program.
@@ -145,8 +149,9 @@ flua --tool setup my-project/  # a project directory (created if missing)
 ```
 
 It writes `.vscode/launch.json` (run in the panel, run in the terminal,
-mobdebug), `.vscode/extensions.json` (VS Code will offer to install the
-**Python**, **Lua MobDebug** and **Lua Language Server** extensions),
+mobdebug, and mobdebug with the UI viewer), `.vscode/extensions.json`
+(VS Code will offer to install the **Python**, **Lua MobDebug** and
+**Lua Language Server** extensions),
 `.luarc.json` (silences the HC3 globals for the language server), `AGENTS.md`
 and the `.github/` skills, instructions and prompts. Existing files are
 kept; `--force` overwrites.
