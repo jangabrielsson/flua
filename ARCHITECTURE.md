@@ -155,6 +155,13 @@ One dispatcher, three outcomes:
   `DeviceActionRanEvent` with the real HC3's envelope; `updateProperty`
   emits only when the value actually changes. Configuration edits go to
   the `changes` feed instead.
+- **`/flua/embeddedUI`** — a flua-only route (no HC3 counterpart, always
+  local): the UI viewer's channel for the device type's default view. The
+  tables live in `devices/uielements.py` and resolve watched device
+  properties (e.g. `value`) into live label texts/control values per poll.
+  The elements are deliberately never part of the device structure — the
+  HC3 UI client renders them itself, so they must not leak into
+  `/devices` or the .fqa export.
 
 ## 7. Worker threads
 

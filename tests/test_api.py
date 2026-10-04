@@ -358,10 +358,7 @@ async def test_warn_directive_off_by_default(tmp_path, capsys) -> None:
     # without --%%warn the error codes stay silent, like on the HC3
     script = tmp_path / "w.lua"
     script.write_text(
-        "function QuickApp:onInit()\n"
-        "  api.get('/notAnEndpoint')\n"
-        "  print('DONE')\n"
-        "end\n"
+        "function QuickApp:onInit()\n  api.get('/notAnEndpoint')\n  print('DONE')\nend\n"
     )
     engine = LuaEngine()
     await engine.start()
@@ -549,9 +546,10 @@ def test_custom_event(api: Api) -> None:
 
 def test_misc_system_endpoints(api: Api) -> None:
     # the GET endpoints dev/apitest.lua exercises — empty results are fine
-    assert api.dispatch("POST", "/customEvents", {"name": "testEvent", "userDescription": "x"})[
-        1
-    ] < 206
+    assert (
+        api.dispatch("POST", "/customEvents", {"name": "testEvent", "userDescription": "x"})[1]
+        < 206
+    )
     for url in (
         "/customEvents",
         "/customEvents/testEvent",
@@ -614,7 +612,6 @@ def test_proxy_fetch() -> None:
         assert engine.api.dispatch("GET", "/proxy") == (None, 400)  # url required
     finally:
         server.shutdown()
-
 
 
 def test_call_ui_event(api: Api) -> None:
@@ -743,6 +740,55 @@ def test_profiles(api: Api) -> None:
     assert status == 200 and data[0]["id"] == 1 and data[0]["active"] is True
     assert api.dispatch("POST", "/profiles/activeProfile/1") == (None, 202)
     assert api.dispatch("POST", "/profiles/activeProfile/99") == (None, 404)
+
+
+# -- flua embedded (default) view ---------------------------------------------
+
+
+def test_embedded_ui_binary_switch(api: Api) -> None:
+    api.state.register_qa(5000, "bs", "com.fibaro.binarySwitch", {"value": True})
+    data, status = api.dispatch("GET", "/flua/embeddedUI")
+    assert status == 200
+    view = data["5000"]
+    assert view["type"] == "com.fibaro.binarySwitch"
+    names = [c["name"] for row in view["uiView"] for c in row["components"]]
+    assert names == ["__binarysensorValue", "__turnOn", "__turnOff"]
+    assert view["uiView"][1]["components"][0]["action"] == "turnOn"
+    assert "TRUE" in view["values"]["__binarysensorValue"]["text"]
+    # a property change re-resolves the watched label (green TRUE -> red FALSE)
+    api.dispatch(
+        "POST",
+        "/plugins/updateProperty",
+        {"deviceId": 5000, "propertyName": "value", "value": False},
+    )
+    data, _ = api.dispatch("GET", "/flua/embeddedUI")
+    assert "FALSE" in data["5000"]["values"]["__binarysensorValue"]["text"]
+    # the embedded elements never leak into the device structure (the HC3
+    # adds them itself — they must not reach /devices or the .fqa export)
+    device, _ = api.dispatch("GET", "/devices/5000")
+    assert "__turnOn" not in json.dumps(device)
+    assert "__binarysensorValue" not in json.dumps(device)
+
+
+def test_embedded_ui_multilevel_switch(api: Api) -> None:
+    api.state.register_qa(5001, "dimmer", "com.fibaro.multilevelSwitch", {"value": 0.5})
+    data, _ = api.dispatch("GET", "/flua/embeddedUI")
+    view = data["5001"]
+    assert view["values"]["__setValue"]["value"] == "0.5"
+    assert view["values"]["__multiswitchValue"]["text"] == "0.500"
+    slider = next(
+        c for row in view["uiView"] for c in row["components"] if c["name"] == "__setValue"
+    )
+    assert slider["action"] == "setValue"
+
+
+def test_embedded_ui_only_plugin_devices(api: Api) -> None:
+    # seed devices without a quickApp interface get no embedded view, even
+    # when their type has one — the HC3 renders those itself
+    api.state.register_qa(5002, "motion", "com.fibaro.binarySensor", {"value": True})
+    data, _ = api.dispatch("GET", "/flua/embeddedUI")
+    assert set(data) == {"5002"}  # seed lamp (10) / motion (20) are not plugins
+    assert data["5002"]["values"]["__binarysensorValue"]["text"]
 
 
 @pytest.mark.asyncio

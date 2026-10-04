@@ -36,3 +36,11 @@ end
 function QuickApp:multiChanged(e)
   print("Multi changed to", e.values and json.encode(e.values))
 end
+
+function QuickApp:turnOn()
+  print("Turn On pressed")
+end
+
+function QuickApp:turnOff()
+  print("Turn Off pressed")
+end

@@ -323,6 +323,20 @@ changes land live (the viewer merges `device.view` over the static
 properties). The API server stays up after the QA's timers drain, so the
 viewer keeps working while you tweak the file.
 
+On top of the QA's own UI, the viewer renders the device type's **default
+view** (the elements the HC3 adds itself): a binarySwitch gets a colored
+TRUE/FALSE state label and Turn On/Turn Off buttons, a multilevelSwitch
+adds a dimmer slider, sensors get a live value label, and so on — even when
+the QA defines no `--%%u` directives at all. The viewer fetches them from
+`GET /flua/embeddedUI` (a flua-only channel) and prepends them above the
+custom UI; the elements are never stored in the device's `viewLayout`/
+`uiView` properties, so they cannot leak into a .fqa export. Their controls
+invoke device actions (`POST /devices/{id}/action/{name}`), and their
+labels track the watched device properties (e.g. `value`), both exactly as
+the HC3 client behaves. The definitions live in a table in
+`src/flua/devices/uielements.py` — add a QA type there to give it a default
+view.
+
 For the *real* HC3 UI, use proxy mode instead (`--%%mode:proxy`): the mirror
 QA on the HC3 renders the genuine UI and funnels every interaction back to
 the emulated QA.

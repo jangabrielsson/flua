@@ -99,6 +99,35 @@ async def test_call_ui_event_over_http(server, tmp_path, capsys) -> None:
 
 
 @pytest.mark.asyncio
+async def test_embedded_ui_over_http(server, tmp_path) -> None:
+    # a binarySwitch QA with no --%%u of its own: the embedded channel
+    # serves the default view (state label + On/Off), and the buttons fire
+    # device actions like the HC3 client — while the elements stay out of
+    # the /devices structure
+    engine, _, base = server
+    script = tmp_path / "ui.lua"
+    script.write_text("function QuickApp:turnOn() self:updateProperty('value', true) end\n")
+    engine.load_qa_file(str(script))
+    await asyncio.sleep(0.3)
+    status, _, views = await asyncio.to_thread(_http, f"{base}/flua/embeddedUI")
+    assert status == 200
+    view = views["5000"]
+    names = [c["name"] for row in view["uiView"] for c in row["components"]]
+    assert names == ["__binarysensorValue", "__turnOn", "__turnOff"]
+    assert "FALSE" in view["values"]["__binarysensorValue"]["text"]
+    _, _, device = await asyncio.to_thread(_http, f"{base}/devices/5000")
+    assert "__turnOn" not in json.dumps(device)
+    # the embedded Turn On button is a device action, not a UI event
+    status, _, _ = await asyncio.to_thread(
+        _http, f"{base}/devices/5000/action/turnOn", method="POST", body={"args": []}
+    )
+    assert status == 202
+    await asyncio.sleep(0.3)
+    _, _, views = await asyncio.to_thread(_http, f"{base}/flua/embeddedUI")
+    assert "TRUE" in views["5000"]["values"]["__binarysensorValue"]["text"]
+
+
+@pytest.mark.asyncio
 async def test_update_view_visible_over_http(server, tmp_path) -> None:
     # QuickApp:updateView lands in device.view — what the viewer merges over
     # the component definitions when it renders
@@ -178,8 +207,7 @@ def test_ui_flag_keeps_api_alive_after_qa_drains(tmp_path) -> None:
 
     script = tmp_path / "ui.lua"
     script.write_text(
-        '--%%u:{button="B1",text="Press me",onReleased="go"}\n'
-        "function QuickApp:go() end\n"
+        '--%%u:{button="B1",text="Press me",onReleased="go"}\nfunction QuickApp:go() end\n'
     )
     proc = subprocess.Popen(
         [sys.executable, "-m", "flua", "--api", "local", "--ui", str(port), str(script)],
@@ -193,9 +221,7 @@ def test_ui_flag_keeps_api_alive_after_qa_drains(tmp_path) -> None:
         saw_button = False
         while time.monotonic() < deadline and proc.poll() is None:
             try:
-                with urllib.request.urlopen(
-                    f"http://127.0.0.1:{port}/devices", timeout=0.5
-                ) as res:
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/devices", timeout=0.5) as res:
                     devices = json.loads(res.read())
                 saw_button = any(
                     component.get("name") == "B1"
@@ -207,9 +233,7 @@ def test_ui_flag_keeps_api_alive_after_qa_drains(tmp_path) -> None:
                     break
             except (OSError, ValueError):
                 time.sleep(0.1)
-        assert proc.poll() is None, (
-            "flua --ui exited before serving the API: " + proc.stdout.read()
-        )
+        assert proc.poll() is None, "flua --ui exited before serving the API: " + proc.stdout.read()
         assert saw_button, "UI API never served the QA device"
         # the QA has no timers — a plain run would have drained and exited by
         # now; the UI session must still be alive and answering
@@ -238,8 +262,7 @@ def test_ui_port_busy_falls_back_to_next_free_port(tmp_path) -> None:
 
     script = tmp_path / "ui.lua"
     script.write_text(
-        '--%%u:{button="B1",text="Press me",onReleased="go"}\n'
-        "function QuickApp:go() end\n"
+        '--%%u:{button="B1",text="Press me",onReleased="go"}\nfunction QuickApp:go() end\n'
     )
     proc = subprocess.Popen(
         [sys.executable, "-m", "flua", "--api", "local", "--ui", str(port), str(script)],
@@ -269,9 +292,7 @@ def test_ui_port_busy_falls_back_to_next_free_port(tmp_path) -> None:
         assert served_port > port, "fallback moved backwards: " + output
         assert f"port {port} busy" in output, "no busy-port notice: " + output
         # the fallback listener actually serves the sim API
-        with urllib.request.urlopen(
-            f"http://127.0.0.1:{served_port}/devices", timeout=2
-        ) as res:
+        with urllib.request.urlopen(f"http://127.0.0.1:{served_port}/devices", timeout=2) as res:
             assert json.loads(res.read())
     finally:
         busy.close()

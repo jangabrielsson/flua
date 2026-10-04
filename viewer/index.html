@@ -180,9 +180,12 @@
 <p class="hint">
   flua UI viewer — polls <code>GET /devices</code>, renders
   <code>properties.uiView</code> (live state merged from <code>device.view</code>,
-  the target of <code>QuickApp:updateView</code>), and injects interactions via
-  <code>GET /plugins/callUIEvent</code> — the same contract the real HC3 UI uses.
-  Point it at a real HC3 with credentials and it works there too.
+  the target of <code>QuickApp:updateView</code>), prepends the device type's
+  default view (On/Off buttons, state label, dimmer — from
+  <code>GET /flua/embeddedUI</code>), and injects interactions via
+  <code>GET /plugins/callUIEvent</code> or device actions — the same contract
+  the real HC3 UI uses. Point it at a real HC3 with credentials and it works
+  there too.
 </p>
 <script>
 "use strict";
@@ -201,7 +204,11 @@ function setStatus(text, cls) {
 }
 
 async function json(url, options) {
-  const res = await fetch(url, { headers: authHeaders(), ...options });
+  options = options || {};
+  const res = await fetch(url, {
+    ...options,
+    headers: { ...authHeaders(), ...(options.headers || {}) },
+  });
   if (!res.ok) throw new Error("HTTP " + res.status + " for " + url);
   if (res.status === 204) return null;
   return res.json();
@@ -216,6 +223,19 @@ async function uiEvent(deviceId, element, eventType, value) {
   await json(url);
 }
 
+// embedded (default-view) controls call the device ACTION, like the HC3
+// client: POST /devices/{id}/action/{name} with args [value]
+async function deviceAction(deviceId, action, value) {
+  const url = $("base").value.replace(/\/+$/, "") +
+    "/devices/" + encodeURIComponent(deviceId) +
+    "/action/" + encodeURIComponent(action);
+  await json(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ args: value === undefined ? [] : [value] }),
+  });
+}
+
 // pick the interaction event from the component's eventBinding keys
 function eventFor(component) {
   const b = component.eventBinding || {};
@@ -226,7 +246,22 @@ function eventFor(component) {
 }
 
 function liveState(device, component) {
-  return (device.view && device.view[component.name]) || {};
+  // device.view (QuickApp:updateView) wins over the embedded view values
+  // (GET /flua/embeddedUI), the local viewer override wins over both
+  const embedded = embeddedView(device);
+  return {
+    ...((embedded && embedded.values && embedded.values[component.name]) || {}),
+    ...((device.view && device.view[component.name]) || {}),
+  };
+}
+
+// default (embedded) view rows and values per device, refreshed with each
+// poll from GET /flua/embeddedUI (a real HC3 has no such endpoint — the HC3
+// UI client renders the embedded view itself)
+const embeddedState = {};
+
+function embeddedView(device) {
+  return embeddedState[String(device.id)] || null;
 }
 
 // UI elements keep the user's last interaction locally, like the real HC3 UI
@@ -266,6 +301,9 @@ function renderComponent(device, component, row) {
   const text = live.text !== undefined ? live.text : component.text;
   const value = componentValue(device, component);
   const event = eventFor(component);
+  // embedded controls (component.action) invoke the device action, like the
+  // HC3 client; custom components go through callUIEvent instead
+  const action = component.action;
   if (component.visible === false) {
     row.removeChild(name);
     return;
@@ -283,7 +321,10 @@ function renderComponent(device, component, row) {
     const btn = document.createElement("button");
     btn.className = "ctl";
     btn.textContent = text || component.name;
-    btn.onclick = () => event && uiEvent(device.id, component.name, event);
+    btn.onclick = () => {
+      if (action) deviceAction(device.id, action);
+      else if (event) uiEvent(device.id, component.name, event);
+    };
     row.appendChild(btn);
   } else if (t === "slider") {
     // no side label: just the slider and its value, like the HC3
@@ -308,7 +349,8 @@ function renderComponent(device, component, row) {
     slider.oninput = () => { val.textContent = slider.value; paint(); };
     slider.onchange = () => {
       setComponentValue(device, component, slider.value);
-      if (event) uiEvent(device.id, component.name, event, slider.value);
+      if (action) deviceAction(device.id, action, slider.value);
+      else if (event) uiEvent(device.id, component.name, event, slider.value);
     };
     control.appendChild(slider);
     row.appendChild(control);
@@ -326,7 +368,8 @@ function renderComponent(device, component, row) {
     box.onchange = () => {
       const v = box.checked ? "true" : "false";
       setComponentValue(device, component, v);
-      if (event) uiEvent(device.id, component.name, event, v);
+      if (action) deviceAction(device.id, action, v);
+      else if (event) uiEvent(device.id, component.name, event, v);
     };
     sw.appendChild(box);
     sw.appendChild(knob);
@@ -445,7 +488,8 @@ function renderDevice(device) {
   panel.appendChild(title);
 
   const props = device.properties || {};
-  if (!props.uiView) {
+  const embedded = embeddedView(device);
+  if (!props.uiView && !embedded) {
     const note = document.createElement("div");
     note.className = "hint";
     note.textContent = props.viewLayout
@@ -454,26 +498,35 @@ function renderDevice(device) {
     panel.appendChild(note);
     return panel;
   }
-  for (const uiRow of props.uiView) {
-    // one .row per --%%u line: components in the same directive share it
-    // (e.g. two buttons side by side)
+  // one .row per UI line: components in the same line share it
+  // (e.g. two buttons side by side). Embedded rows come first, like the
+  // HC3 renders its default view above the QA's custom UI.
+  const appendRow = (uiRow) => {
     const row = document.createElement("div");
     row.className = "row";
     for (const component of uiRow.components || []) {
       renderComponent(device, component, row);
     }
     panel.appendChild(row);
-  }
+  };
+  for (const uiRow of embedded ? embedded.uiView : []) appendRow(uiRow);
+  for (const uiRow of props.uiView || []) appendRow(uiRow);
   return panel;
+}
+
+// all rendered rows: the embedded default view first, then the QA's custom uiView
+function allRows(device) {
+  const props = device.properties || {};
+  const embedded = embeddedView(device);
+  return [...(embedded ? embedded.uiView : []), ...(props.uiView || [])];
 }
 
 // structure key: re-render the panel only when the UI shape changes,
 // otherwise refresh values in place (keeps slider drags stable)
 function structureKey(device) {
-  const props = device.properties || {};
-  return JSON.stringify(((props.uiView || []).map((row) =>
+  return JSON.stringify(allRows(device).map((row) =>
     (row.components || []).map((c) => [c.type, c.name, c.options || null])
-  )));
+  ));
 }
 
 // value key: the panel's rendered state — component values (live state,
@@ -481,10 +534,9 @@ function structureKey(device) {
 // only rebuilds when THIS changes; if nothing changed, the DOM is left
 // alone.
 function valueKey(device) {
-  const props = device.properties || {};
-  return JSON.stringify((props.uiView || []).flatMap((row) =>
+  return JSON.stringify(allRows(device).flatMap((row) =>
     (row.components || []).map((c) => {
-      const live = (device.view && device.view[c.name]) || {};
+      const live = liveState(device, c);
       return [
         c.name,
         componentValue(device, c),
@@ -507,9 +559,22 @@ function freshPanel(device, key, vkey) {
 
 async function poll() {
   try {
-    const devices = await json($("base").value.replace(/\/+$/, "") + "/devices");
+    const base = $("base").value.replace(/\/+$/, "");
+    const devices = await json(base + "/devices");
+    try {
+      // default views: flua-only channel — a real HC3 404s here and the
+      // viewer simply shows the custom UI (the HC3 UI adds its own defaults)
+      const embedded = await json(base + "/flua/embeddedUI");
+      for (const key of Object.keys(embeddedState)) delete embeddedState[key];
+      Object.assign(embeddedState, embedded || {});
+    } catch {
+      /* no embedded channel: keep whatever the last successful poll fetched */
+    }
     const root = $("devices");
-    const qas = devices.filter((d) => d.properties && (d.properties.uiView || d.properties.viewLayout));
+    const qas = devices.filter((d) =>
+      (d.properties && (d.properties.uiView || d.properties.viewLayout)) ||
+      embeddedState[String(d.id)]
+    );
     for (const device of qas) {
       const key = device.id + ":" + structureKey(device);
       const vkey = valueKey(device);

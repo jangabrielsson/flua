@@ -12,6 +12,7 @@ import time
 from typing import Any
 
 from ... import messages
+from ...devices.uielements import embedded_view
 from ..request import ApiRequest, forward_to_proxy
 from ..state import SimState, public
 
@@ -265,6 +266,28 @@ def plugin_restart(state: SimState, req: ApiRequest) -> tuple[Any, int]:
             return None, 204
     logger.warning("plugin restart requested for %r: simulated (QA keeps running)", req.body)
     return None, 204
+
+
+def embedded_ui_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    """GET /flua/embeddedUI — the default (embedded) view channel for the UI
+    viewer.
+
+    flua-specific (no HC3 counterpart): the HC3 UI client renders these
+    elements itself. Returns ``{deviceId: {type, uiView, values}}`` for every
+    plugin device whose type has a default view — emulated devices only, so
+    the elements never appear in the /devices structure or the .fqa export.
+    ``values`` holds the live label texts/control values resolved from the
+    watched device properties, in the same shape the viewer merges from
+    ``device.view``.
+    """
+    out: dict[str, Any] = {}
+    for device in state.devices.values():
+        if not state.is_plugin_device(device):
+            continue
+        view = embedded_view(device)
+        if view is not None:
+            out[str(device["id"])] = view
+    return public(out), 200
 
 
 def ui_event_call(state: SimState, req: ApiRequest) -> tuple[Any, int]:
