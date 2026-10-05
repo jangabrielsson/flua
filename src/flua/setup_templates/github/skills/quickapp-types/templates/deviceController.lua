@@ -9,7 +9,7 @@
 -- Sample class for handling your binary switch logic. You can create as many classes as you need.
 -- Each device type you create should have its class which inherits from the QuickAppChild type.
 
----@class MyBinarySwitch : QuickAppChild
+QuickAppChild = QuickAppChild or {}
 MyBinarySwitch = {}
 class 'MyBinarySwitch'(QuickAppChild)
 

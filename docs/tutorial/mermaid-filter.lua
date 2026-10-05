@@ -11,6 +11,7 @@ local ESCAPE = { ["<"] = "&lt;", [">"] = "&gt;", ["&"] = "&amp;", ['"'] = "&quot
 function CodeBlock(el)
   if el.classes:includes("mermaid") then
     local escaped = el.text:gsub("[<>&\"]", ESCAPE)
+---@diagnostic disable-next-line: undefined-global
     return pandoc.RawBlock("html", '<pre class="mermaid">' .. escaped .. "</pre>")
   end
 end

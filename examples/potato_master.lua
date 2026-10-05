@@ -14,6 +14,7 @@ function QuickApp:onInit()
   local n = 100
   for i=1,n do
     local friend = i == n and id or id+i+1
+---@diagnostic disable-next-line: redundant-parameter
     _FLUA.loadQAfromFile("examples/potato_client.lua",{"var:friend="..friend})
   end
 end
