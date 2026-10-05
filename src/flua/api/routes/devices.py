@@ -65,6 +65,17 @@ def devices_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     return public(sorted(devices, key=lambda d: d["id"])), 200
 
 
+def flua_devices_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    """GET /flua/devices — the UI viewer's device list (flua-only channel).
+
+    The emulated devices only: the HC3's own QAs stay out (a controller can
+    carry a hundred of them; the viewer renders the QAs you run in flua).
+    No online union — the remote hook is deliberately unused.
+    """
+    devices = [_with_sun(d, state, req.clock) for d in state.devices.values()]
+    return public(sorted(devices, key=lambda d: d["id"])), 200
+
+
 def device_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     dev = state.device(req.path_params["id"])
     return (public(_with_sun(dev, state, req.clock)), 200) if dev is not None else (None, 404)

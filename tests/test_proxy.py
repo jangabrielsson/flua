@@ -63,6 +63,8 @@ class _MockHc3(BaseHTTPRequestHandler):
         cls.devices = {}
         cls.next_id = 100
         cls.requests = []
+        cls.queries = []  # the decoded query dicts of every GET, in order
+        cls.raw_queries = []  # the raw query strings, as they arrived on the wire
         cls.refresh_events = []
         cls.uploaded = []
 
@@ -74,11 +76,13 @@ class _MockHc3(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path, _, query_string = self.path.partition("?")
+        type(self).raw_queries.append(query_string)
         query = {}
         for pair in query_string.split("&"):
             if "=" in pair:
                 key, _, value = pair.partition("=")
                 query[unquote(key)] = unquote(value)
+        type(self).queries.append(query)
         type(self).requests.append((self.command, path, None))
         if path == "/api/refreshStates":
             now = int(time.time())
@@ -94,13 +98,18 @@ class _MockHc3(BaseHTTPRequestHandler):
             )
             return
         if path == "/api/devices":
+            # the HC3 filters by name in practice (though the OpenAPI doc
+            # omits it), plus parentId/interface — decoded values only, so
+            # a form-style '+' would NOT match a name with a space
             name = query.get("name")
             parent = query.get("parentId")
+            interface = query.get("interface")
             found = [
                 d
                 for d in type(self).devices.values()
                 if (name is None or d["name"] == name)
                 and (parent is None or str(d.get("parentId")) == parent)
+                and (interface is None or interface in (d.get("interfaces") or []))
             ]
             self._send_json(sorted(found, key=lambda d: d["id"]))
             return
@@ -333,7 +342,7 @@ async def test_proxy_fresh_deploy_reuses_id_and_connects(
     assert fqa["type"] == "com.fibaro.binarySwitch"
     assert "actionHandler" in fqa["files"][0]["content"]
     assert fqa["initialProperties"]["viewLayout"]["$jason"]  # UI travels along
-    assert fqa["initialProperties"]["useUiView"] is True  # fresh default
+    assert fqa["initialProperties"]["useUiView"] is False  # undeclared -> legacy layout
     # a fresh proxy gets its UI through initialProperties — no redundant PUT
     assert not _MockHc3.seen("PUT", "/api/devices/100")
     # the CONNECT action carries the emulator's ip:port
@@ -454,6 +463,38 @@ async def test_proxy_existing_reused_and_wrong_type_replaced(
     assert qa_id == 100  # the fresh proxy's id
     assert _MockHc3.seen("DELETE", "/api/devices/57")
     assert len(_MockHc3.uploaded) == 1
+
+
+@pytest.mark.asyncio
+async def test_proxy_name_with_space_is_reused(tmp_path, mock_hc3, monkeypatch) -> None:
+    # regression: a QA named "my qa" used to never find its "my qa_Proxy" —
+    # the name query reached the HC3 with the space encoded as '+' (the
+    # HC3 decodes %-escapes, not form-style '+'; PLua's urlencode sends
+    # %20). The wire format is %20 now, so the filter matches.
+    set_hc3_env(monkeypatch, tmp_path, mock_hc3)
+    script = write_script(
+        tmp_path,
+        content="--%%name:my qa\n"
+        "--%%mode:proxy\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() print('INIT', self.id, self.name) end\n",
+    )
+    add_existing_proxy(57, "my qa_Proxy", "com.fibaro.binarySwitch")
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        qa_id, err = engine.load_qa_file(str(script))
+        assert err is None, err
+        await wait_until(lambda: _MockHc3.seen("POST", "/api/devices/57/action/CONNECT"))
+    finally:
+        await engine.stop()
+    assert qa_id == 57  # the existing proxy, not a new one
+    assert _MockHc3.uploaded == []
+    # the lookup used the name filter — with the name arriving as %20 on the
+    # wire (the HC3 decodes %-escapes, not form-style '+')
+    assert {"name": "my qa_Proxy"} in _MockHc3.queries
+    assert any("name=my%20qa_Proxy" in raw for raw in _MockHc3.raw_queries)
+    assert all("+" not in raw.split("name=", 1)[-1] for raw in _MockHc3.raw_queries)
 
 
 @pytest.mark.asyncio

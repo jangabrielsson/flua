@@ -16,7 +16,8 @@ The two output structures match the HC3's device properties:
   flua's QuickApp runtime) can route UI events to QA methods.
 
 ``useUiView`` (device property) picks which of the two the UI renders; flua
-sets it true by default, ``--%%useUiView:false`` forces the legacy layout.
+defaults it to false (the legacy layout is still the common case),
+``--%%useUiView:true`` selects the new format.
 """
 
 from typing import Any

@@ -195,7 +195,7 @@ Parsing stops at the end-of-header marker:
 | `--%%time:speed=2,instant=true,hours=48,start=2027/10/6 12:00:20` | combined runtime settings (global) |
 | `--%%time:2027/10/6 12:00:20` | bare form: set the virtual start time |
 | `--%%u:{label="lbl",text="Status"}` | one UI row (see below); repeatable, order kept |
-| `--%%useUiView:false` | render the legacy `viewLayout` instead of the new `uiView` (default true) |
+| `--%%useUiView:true` | render the new `uiView` format instead of the legacy `viewLayout` (default false) |
 | `--%%mode:offline` | pin this QA to the simulated HC3 (see below) |
 | `--%%mode:online` | force this QA online against the real HC3 |
 | `--%%mode:proxy` | proxy mode: mirror this QA onto the HC3 (online only, see below) |
@@ -293,7 +293,7 @@ Each `--%%u:` line defines one row of the QuickApp UI; several elements can
 share a row with `{{...},{...}}`. flua translates the rows into **both** UI
 property structures the HC3 understands — the legacy `viewLayout` and the
 new `uiView` — plus the `uiCallbacks` table that routes UI events to your
-QuickApp methods. `useUiView` (default `true`) selects the new format:
+QuickApp methods. `useUiView` (default `false`) selects the new format:
 
 ```lua
 --%%u:{label="statusLbl",text="Status: Ready"}
@@ -332,7 +332,9 @@ back to the next free one needs no editing. (`viewer/index.html` still ships
 in the repo and via `--tool setup` for opening from a file or pointing at
 another machine running flua.)
 
-The viewer polls `GET /devices`, renders `properties.uiView` (labels,
+The viewer polls `GET /flua/devices` (the emulated devices only — in online
+mode the HC3's own QAs stay out of the list), renders `properties.uiView`
+(labels,
 buttons, sliders, switches, single and multi selects — styled after the HC3
 look), and sends interactions back through `GET /plugins/callUIEvent` — the
 same contract the real HC3 UI uses, so your `onReleased`/`onChanged`/

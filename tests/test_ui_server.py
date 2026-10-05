@@ -80,7 +80,10 @@ async def test_viewer_page_served_at_root(server) -> None:
     assert "text/html" in headers["Content-Type"]
     assert "flua UI viewer" in page
     assert "Access-Control-Allow-Origin" in headers
-    # the API still answers on the same server
+    # the viewer polls its own emulated-only device list, and the API still
+    # answers on the same server
+    status, _, devices = await asyncio.to_thread(_http, f"{base}/flua/devices")
+    assert status == 200 and isinstance(devices, list)
     status, _, devices = await asyncio.to_thread(_http, f"{base}/devices")
     assert status == 200 and isinstance(devices, list)
 

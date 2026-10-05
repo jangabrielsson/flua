@@ -1,4 +1,4 @@
---%%name:Ptest
+--%%name:P test
 --%%type:com.fibaro.binarySwitch
 
 --%%u:{label="l1",text="Label text2"}

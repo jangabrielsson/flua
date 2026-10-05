@@ -254,7 +254,8 @@ async def test_qa_device_gets_ui_properties(tmp_path) -> None:
         device, status = engine.api.dispatch("GET", f"/devices/{qa_id}")
         assert status == 200
         props = device["properties"]
-        assert props["useUiView"] is True
+        # undeclared: flua defaults to the legacy layout (viewLayout)
+        assert props["useUiView"] is False
         assert props["uiView"][0]["components"][0]["type"] == "label"
         assert props["uiCallbacks"][0] == {
             "callback": "go",

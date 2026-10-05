@@ -215,13 +215,23 @@ def deploy_proxy(
 def existing_proxy(engine: LuaEngine, proxy_name: str, device_type: str) -> dict[str, Any] | None:
     """Find an existing proxy on the HC3.
 
+    The HC3 filters /devices by ``name`` in practice (it is missing from the
+    OpenAPI reference, but PLua has used it for years). The name must
+    survive the wire encoding — spaces go as %20 (hc3.py uses quote_via=quote;
+    the HC3 does not decode form-style '+'). The client-side name match
+    below is a guard: if a HC3 ever ignored the filter and returned all
+    devices, the newest-keeps/deletes-older logic must not see them.
+
     Several proxies with the same name: keep the newest, delete the others.
     A proxy of the wrong type is deleted (the HC3 cannot change a device's
     type) and None is returned so the caller deploys a fresh one.
     """
     quoted = urllib.parse.quote(proxy_name)
     proxies, status = engine.api.dispatch_hc3("GET", f"/devices?name={quoted}")
-    if status != 200 or not isinstance(proxies, list) or not proxies:
+    if status != 200 or not isinstance(proxies, list):
+        return None
+    proxies = [dev for dev in proxies if dev.get("name") == proxy_name]
+    if not proxies:
         return None
     proxies = sorted(proxies, key=lambda dev: int(dev.get("id") or 0), reverse=True)
     for old in proxies[1:]:  # duplicates: keep only the newest

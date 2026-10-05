@@ -63,7 +63,10 @@ class Hc3Remote:
         and aborts flua — never retried (the HC3 locks after 4 attempts)."""
         url = self._base + "/api" + path
         if query:
-            url += "?" + urllib.parse.urlencode(query)
+            # spaces as %20, not '+' (quote_via=quote): the HC3 decodes
+            # %-escapes but not the form-style '+' (PLua's urlencode sends
+            # %20 — names with spaces must match on the wire)
+            url += "?" + urllib.parse.urlencode(query, quote_via=urllib.parse.quote)
         headers = {"Accept": "application/json"}
         auth = self._auth_header()
         if auth:
@@ -92,7 +95,9 @@ class Hc3Remote:
                 if body.get("roomId") is not None:
                     query = dict(query or {})
                     query.setdefault("roomId", str(int(body["roomId"])))
-                    url = self._base + "/api" + path + "?" + urllib.parse.urlencode(query)
+                    url = self._base + "/api" + path + "?" + urllib.parse.urlencode(
+                        query, quote_via=urllib.parse.quote
+                    )
             else:
                 payload = json.dumps(body).encode("utf-8")
                 headers["Content-Type"] = "application/json"

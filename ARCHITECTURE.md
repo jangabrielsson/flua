@@ -162,6 +162,9 @@ One dispatcher, three outcomes:
   The elements are deliberately never part of the device structure — the
   HC3 UI client renders them itself, so they must not leak into
   `/devices` or the .fqa export.
+- **`/flua/devices`** — the viewer's device list: the emulated devices
+  only, with no online union (a controller can carry hundreds of QAs that
+  the viewer should not render).
 
 ## 7. Worker threads
 

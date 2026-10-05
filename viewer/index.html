@@ -48,13 +48,14 @@
   }
   .control { flex: 1 1 auto; min-width: 0; }
 
-  /* label element: just text on the row (may carry HTML: tables, fonts) */
+  /* label element: the text fills its row, centered — like the HC3
+     (may carry HTML: tables, fonts) */
   .element-label::before { display: none; }
-  .element-label table { border-collapse: collapse; margin: 2px 0; }
+  .element-label table { border-collapse: collapse; margin: 2px auto; }
   .element-label td, .element-label th {
     border: 1px solid var(--border); padding: 2px 8px; font-size: 13px;
   }
-  .element-label { color: var(--ink); }
+  .element-label { color: var(--ink); flex: 1 1 auto; text-align: center; }
 
   /* button: the HC3's blue rounded rect */
   button.ctl {
@@ -178,14 +179,14 @@
 <div id="devices"></div>
 <p class="hint">
   flua UI viewer — served by <code>flua --ui</code> at this address, it polls
-  <code>GET /devices</code>, renders <code>properties.uiView</code> (live
-  state merged from <code>device.view</code>, the target of
-  <code>QuickApp:updateView</code>), prepends the device type's default view
-  (On/Off buttons, state label, dimmer — from <code>GET /flua/embeddedUI</code>),
-  and injects interactions via <code>GET /plugins/callUIEvent</code> or device
-  actions — the same contract the real HC3 UI uses. The <b>API</b> field can
-  point at another machine running flua (leave user/pass empty; they exist
-  for a real HC3).
+  <code>GET /flua/devices</code> (the QAs you run in flua, not the whole HC3),
+  renders <code>properties.uiView</code> (live state merged from
+  <code>device.view</code>, the target of <code>QuickApp:updateView</code>),
+  prepends the device type's default view (On/Off buttons, state label,
+  dimmer — from <code>GET /flua/embeddedUI</code>), and injects interactions
+  via <code>GET /plugins/callUIEvent</code> or device actions — the same
+  contract the real HC3 UI uses. The <b>API</b> field can point at another
+  machine running flua (leave user/pass empty; they exist for a real HC3).
 </p>
 <script>
 "use strict";
@@ -567,7 +568,15 @@ function freshPanel(device, key, vkey) {
 async function poll() {
   try {
     const base = $("base").value.replace(/\/+$/, "");
-    const devices = await json(base + "/devices");
+    let devices;
+    try {
+      // flua's own list: the emulated devices only (a real HC3 may carry
+      // hundreds of QAs that the viewer shouldn't render)
+      devices = await json(base + "/flua/devices");
+    } catch {
+      // real HC3 or an older flua: fall back to the full device list
+      devices = await json(base + "/devices");
+    }
     try {
       // default views: flua-only channel — a real HC3 404s here and the
       // viewer simply shows the custom UI (the HC3 UI adds its own defaults)

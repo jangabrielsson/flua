@@ -31,6 +31,7 @@ from .devices import (
     device_property_get,
     device_update,
     devices_list,
+    flua_devices_list,
     group_action,
 )
 from .plugins import (
@@ -104,6 +105,7 @@ Handler = Callable[[SimState, ApiRequest], tuple[Any, int]]
 ROUTES: list[tuple[str, str, Handler]] = [
     # -- devices -------------------------------------------------------------
     ("GET", "/devices", devices_list),
+    ("GET", "/flua/devices", flua_devices_list),  # flua-only viewer channel
     ("GET", "/devices/{id}", device_get),
     ("PUT", "/devices/{id}", device_update),
     ("DELETE", "/devices/{id}", device_delete),

@@ -126,7 +126,7 @@ Tasks in `.vscode/tasks.json` cover `--check`, `.fqa` export and unpack.
 | `--%%property:value=true` / `--%%properties:...` | raw device properties |
 | `--%%var:name=expr` | QuickApp variable initializer (a Lua expression) |
 | `--%%u:{...}` | one UI row (label/button/switch/slider/select/multi) |
-| `--%%useUiView:false` | render the legacy `viewLayout` instead of `uiView` |
+| `--%%useUiView:true` | render the new `uiView` format instead of the legacy `viewLayout` (default false) |
 | `--%%debug:refreshState=true,api=true,http=true` | debug logging categories |
 | `--%%loglength:120` | debug line length cap (default 120) |
 | `--%%keep-alive:true` | keep the online run alive past idle |

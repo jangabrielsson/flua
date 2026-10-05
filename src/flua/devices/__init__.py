@@ -68,6 +68,10 @@ def skeleton_for(device_type: str | None) -> dict[str, Any] | None:
     if isinstance(properties, dict):
         for key in _SCRUB_PROPERTIES:
             properties.pop(key, None)
+        # the donor device's UI mode is instance state, not type state: a
+        # QA/child built from this skeleton defaults to the legacy layout
+        # unless it declares --%%useUiView:true itself
+        properties["useUiView"] = False
     interfaces = skeleton.get("interfaces")
     if not isinstance(interfaces, list):
         interfaces = []

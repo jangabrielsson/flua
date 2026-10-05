@@ -491,7 +491,13 @@ class LuaEngine:
             device_properties["uiCallbacks"] = ui["uiCallbacks"]
             device_properties["viewLayout"] = ui["viewLayout"]
             device_properties["uiView"] = ui["uiView"]
-            device_properties["useUiView"] = bool(qa_config.get("useUiView", True))
+        if qa_config.get("useUiView") is not None:
+            device_properties["useUiView"] = bool(qa_config["useUiView"])
+        else:
+            # undeclared: default to the legacy layout (viewLayout is still
+            # the common case) — this also overrides the catalog skeleton's
+            # captured instance value, which says true from its donor device
+            device_properties["useUiView"] = False
         if path is not None:
             # --%%file paths resolve relative to the main file's directory
             base = Path(path).parent

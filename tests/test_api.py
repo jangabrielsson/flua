@@ -767,6 +767,13 @@ def test_profiles(api: Api) -> None:
 # -- flua embedded (default) view ---------------------------------------------
 
 
+def test_flua_devices_serves_emulated_devices_only(api: Api) -> None:
+    # the viewer's channel: the sim's devices, never the online union
+    data, status = api.dispatch("GET", "/flua/devices")
+    assert status == 200
+    assert [d["id"] for d in data] == [1, 10, 20]  # the HC3 itself + the seed's two
+
+
 def test_embedded_ui_binary_switch(api: Api) -> None:
     api.state.register_qa(5000, "bs", "com.fibaro.binarySwitch", {"value": True})
     data, status = api.dispatch("GET", "/flua/embeddedUI")
