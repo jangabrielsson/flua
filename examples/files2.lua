@@ -3,7 +3,7 @@
 --%%warn:true
 
 -- Demonstrates how to add file to quickapp dynamically at runtime
-
+FOO = FOO
 function QuickApp:onInit()
   if not FOO then
   api.post("/quickApp/"..self.id.."/files", {
