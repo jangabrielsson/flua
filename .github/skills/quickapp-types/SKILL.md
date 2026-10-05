@@ -7,7 +7,7 @@ description: All Fibaro device types (40+ types: switches, sensors, climate, cov
 
 Reference for all flua QuickApp file headers and the complete set of Fibaro device types.
 
-Starter Lua templates are in the [`templates/`](./templates/) directory — reference them when the user needs a working skeleton for a specific device type.
+Starter Lua templates are in the [`templates/`](./templates/) directory — the complete set (41 device types), one file per type, each with the type's canonical actions and property conventions (e.g. `multilevelSwitch.lua` handles `turnOn`/`turnOff`/`setValue` with `value` 0-99; `temperatureSensor.lua` asserts `{value=, unit=}`). Reference them when the user needs a working skeleton for a specific device type, and scaffold one with `flua --tool newQA <type> [name]` (lists all types with no argument).
 
 ---
 

@@ -1,13 +1,12 @@
---%%name:Thermostat
---%%type:com.fibaro.thermostat
---%%description:"Thermostat template"
+--%%name:ThermostatHeat
+--%%type:com.fibaro.thermostatHeat
+--%%description:Thermostat heat template
 
--- Thermostat should handle actions: setThermostatMode, setHeatingThermostatSetpoint, setCoolingThermostatSetpoint
+-- Thermostat heat should handle actions: setThermostatMode, setHeatingThermostatSetpoint
 -- Properties that should be updated:
--- * supportedThermostatModes - array of modes supported by the thermostat eg. {"Off", "Heat", "Cool", "Auto"}
+-- * supportedThermostatModes - array of modes supported by the thermostat eg. {"Off", "Heat"}
 -- * thermostatMode - current mode of the thermostat
 -- * heatingThermostatSetpoint - set point for heating, supported units: "C" - Celsius, "F" - Fahrenheit
--- * coolingThermostatSetpoint - set point for cooling, supported units: "C" - Celsius, "F" - Fahrenheit
 -- * temperature - current temperature, supported units: "C" - Celsius, "F" - Fahrenheit
 
 -- handle action for mode change 
@@ -18,11 +17,6 @@ end
 -- handle action for setting set point for heating
 function QuickApp:setHeatingThermostatSetpoint(value) 
     self:updateProperty("heatingThermostatSetpoint", { value= value, unit= "C" })
-end
-
--- handle action for setting set point for cooling
-function QuickApp:setCoolingThermostatSetpoint(value) 
-    self:updateProperty("coolingThermostatSetpoint", { value= value, unit= "C" })
 end
 
 -- Update current temperature
@@ -38,11 +32,10 @@ function QuickApp:onInit()
     end
 
     -- set supported modes for thermostat
-    self:updateProperty("supportedThermostatModes", {"Off", "Heat", "Cool", "Auto"})
+    self:updateProperty("supportedThermostatModes", {"Off", "Heat"})
 
     -- setup default values
-    self:updateProperty("thermostatMode", "Auto")
+    self:updateProperty("thermostatMode", "Heat")
     self:setHeatingThermostatSetpoint(21)
-    self:setCoolingThermostatSetpoint(23)
-    self:updateTemperature(22)
+    self:updateTemperature(20)
 end 

@@ -1,38 +1,48 @@
---%%name:My Thermostat
+--%%name:Thermostat
 --%%type:com.fibaro.thermostat
---%%var:pollInterval=60
---%%u:{label="tempLbl",text="Temp: --°C"}
---%%u:{slider="setpointSlider",text="Setpoint",min="5",max="30",value="21",onChanged="setSetpoint"}
---%%u:{select="modeSelect",text="Mode",value="Heat",onToggled="setMode",
---      options={{type='option',text='Off',value='Off'},{type='option',text='Heat',value='Heat'},{type='option',text='Cool',value='Cool'},{type='option',text='Auto',value='Auto'}}}
+--%%description:"Thermostat template"
+
+-- Thermostat should handle actions: setThermostatMode, setHeatingThermostatSetpoint, setCoolingThermostatSetpoint
+-- Properties that should be updated:
+-- * supportedThermostatModes - array of modes supported by the thermostat eg. {"Off", "Heat", "Cool", "Auto"}
+-- * thermostatMode - current mode of the thermostat
+-- * heatingThermostatSetpoint - set point for heating, supported units: "C" - Celsius, "F" - Fahrenheit
+-- * coolingThermostatSetpoint - set point for cooling, supported units: "C" - Celsius, "F" - Fahrenheit
+-- * temperature - current temperature, supported units: "C" - Celsius, "F" - Fahrenheit
+
+-- handle action for mode change 
+function QuickApp:setThermostatMode(mode)
+    self:updateProperty("thermostatMode", mode)
+end
+
+-- handle action for setting set point for heating
+function QuickApp:setHeatingThermostatSetpoint(value) 
+    self:updateProperty("heatingThermostatSetpoint", { value= value, unit= "C" })
+end
+
+-- handle action for setting set point for cooling
+function QuickApp:setCoolingThermostatSetpoint(value) 
+    self:updateProperty("coolingThermostatSetpoint", { value= value, unit= "C" })
+end
+
+-- Update current temperature
+function QuickApp:updateTemperature(value)
+    self:updateProperty("temperature", { value= value, unit= "C" })
+end
 
 function QuickApp:onInit()
-    self:debug(self.name, self.id)
-    self:updateProperty("supportedThermostatModes", {"Off","Heat","Cool","Auto"})
-    self:updateProperty("thermostatMode", "Heat")
-    self:updateProperty("heatingThermostatSetpoint", {value=21, unit="C"})
-    self:updateProperty("temperature", {value=20.5, unit="C"})
-    local interval = tonumber(self:getVariable("pollInterval")) * 1000
-    setInterval(function() self:poll() end, interval)
-end
+    self:debug(self.name,self.id)
+    if not api.get("/devices/"..self.id).enabled then
+        self:debug(self.name,self.id,"Device is disabled")
+        return
+    end
 
-function QuickApp:poll()
-    -- replace with real sensor read / HTTP call
-    local temp = 20.5
-    self:updateProperty("temperature", {value=temp, unit="C"})
-    self:updateView("tempLbl", "text", string.format("Temp: %.1f°C", temp))
-end
+    -- set supported modes for thermostat
+    self:updateProperty("supportedThermostatModes", {"Off", "Heat", "Cool", "Auto"})
 
-function QuickApp:setSetpoint(event)
-    local v = tonumber(event.values[1])
-    -- add API call to set setpoint
-    self:updateProperty("heatingThermostatSetpoint", {value=v, unit="C"})
-    self:debug("Setpoint:", v)
-end
-
-function QuickApp:setMode(event)
-    local mode = event.values[1]
-    -- add API call to set mode
-    self:updateProperty("thermostatMode", mode)
-    self:debug("Mode:", mode)
-end
+    -- setup default values
+    self:updateProperty("thermostatMode", "Auto")
+    self:setHeatingThermostatSetpoint(21)
+    self:setCoolingThermostatSetpoint(23)
+    self:updateTemperature(22)
+end 

@@ -1,23 +1,17 @@
---%%name:Thermostat
---%%type:com.fibaro.thermostat
---%%description:"Thermostat template"
+--%%name:ThermostatCool
+--%%type:com.fibaro.thermostatCool
+--%%description:"Thermostat cool template"
 
--- Thermostat should handle actions: setThermostatMode, setHeatingThermostatSetpoint, setCoolingThermostatSetpoint
+-- Thermostat cool should handle actions: setThermostatMode, setCoolingThermostatSetpoint
 -- Properties that should be updated:
--- * supportedThermostatModes - array of modes supported by the thermostat eg. {"Off", "Heat", "Cool", "Auto"}
+-- * supportedThermostatModes - array of modes supported by the thermostat eg. {"Off", "Cool"}
 -- * thermostatMode - current mode of the thermostat
--- * heatingThermostatSetpoint - set point for heating, supported units: "C" - Celsius, "F" - Fahrenheit
 -- * coolingThermostatSetpoint - set point for cooling, supported units: "C" - Celsius, "F" - Fahrenheit
 -- * temperature - current temperature, supported units: "C" - Celsius, "F" - Fahrenheit
 
 -- handle action for mode change 
 function QuickApp:setThermostatMode(mode)
     self:updateProperty("thermostatMode", mode)
-end
-
--- handle action for setting set point for heating
-function QuickApp:setHeatingThermostatSetpoint(value) 
-    self:updateProperty("heatingThermostatSetpoint", { value= value, unit= "C" })
 end
 
 -- handle action for setting set point for cooling
@@ -38,11 +32,10 @@ function QuickApp:onInit()
     end
 
     -- set supported modes for thermostat
-    self:updateProperty("supportedThermostatModes", {"Off", "Heat", "Cool", "Auto"})
+    self:updateProperty("supportedThermostatModes", {"Off", "Cool"})
 
     -- setup default values
-    self:updateProperty("thermostatMode", "Auto")
-    self:setHeatingThermostatSetpoint(21)
+    self:updateProperty("thermostatMode", "Cool")
     self:setCoolingThermostatSetpoint(23)
-    self:updateTemperature(22)
+    self:updateTemperature(24)
 end 

@@ -18,7 +18,14 @@ from flua import tools  # noqa: E402
 
 
 def test_registry_discovers_all_tools() -> None:
-    assert tools.tool_names() == ["createDB", "downloadQA", "setup", "updateQA", "uploadQA"]
+    assert tools.tool_names() == [
+        "createDB",
+        "downloadQA",
+        "newQA",
+        "setup",
+        "updateQA",
+        "uploadQA",
+    ]
     for name in tools.tool_names():
         module = tools._TOOLS[name]
         assert module.NAME == name
@@ -110,6 +117,33 @@ def test_family_locations_seed_and_serve(tmp_path) -> None:
     api = Api(seed={"familyLocations": [{"id": 1, "name": "Sommarstuga"}]})
     data, status = api.dispatch("GET", "/panels/location")
     assert status == 200 and data[0]["name"] == "Sommarstuga"
+
+
+def test_new_qa_tool_scaffolds_from_templates(tmp_path, capsys, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    module = tools._TOOLS["newQA"]
+    parser = argparse.ArgumentParser()
+    module.add_arguments(parser)
+    # no type: lists all templates
+    assert module.run(parser, parser.parse_args([])) == 0
+    out = capsys.readouterr().out
+    assert "binarySwitch" in out and "motionSensor" in out
+    # scaffold with a name: the --%%name is substituted, the type kept
+    assert module.run(parser, parser.parse_args(["binarySwitch", "Hall lamp"])) == 0
+    out = capsys.readouterr().out
+    assert "wrote binarySwitch.lua" in out
+    source = (tmp_path / "binarySwitch.lua").read_text()
+    assert "--%%name:Hall lamp" in source
+    assert "--%%type:com.fibaro.binarySwitch" in source
+    # an existing file is kept unless --force
+    assert module.run(parser, parser.parse_args(["binarySwitch", "x"])) == 1
+    assert "exists" in capsys.readouterr().err
+    assert module.run(parser, parser.parse_args(["-f", "binarySwitch", "x"])) == 0
+    # unknown and ambiguous types are reported, not guessed
+    assert module.run(parser, parser.parse_args(["bogus"])) == 1
+    assert "unknown" in capsys.readouterr().err
+    assert module.run(parser, parser.parse_args(["sensor"])) == 1
+    assert "ambiguous" in capsys.readouterr().err
 
 
 def test_setup_tool_scaffolds_a_qa_project(tmp_path, capsys) -> None:
