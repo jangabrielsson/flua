@@ -28,7 +28,7 @@ function class(name)
   return function(p) getmetatable(cls).__index = p end
 end
 
-plugin = plugin or {}
+plugin = plugin or { mainDeviceId = _FLUA.qaId }
 
 -- Retrieves a device by its ID
 -- @param deviceId - The ID of the device to retrieve

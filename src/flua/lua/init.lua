@@ -135,6 +135,18 @@ end
 
 os.getenv = function(name) return _PY.getenv(name) end
 
+-- The HC3's QuickApp objects are C userdata; flua's class() implementation
+-- (quickapp.lua) creates Lua tables marked __USERDATA. Monkeypatch type() so
+-- such objects report 'userdata' — QA code checking `type(x) == 'userdata'`
+-- behaves exactly as on the controller. Everything else is untouched.
+local real_type = type
+type = function(value)
+  if real_type(value) == "table" and rawget(value, "__USERDATA") then
+    return "userdata"
+  end
+  return real_type(value)
+end
+
 -- _FLUA.millitime(): virtual time in whole milliseconds (flua extension) —
 -- os.time() is integer seconds and os.clock() is the real runtime clock,
 -- so sub-second virtual timing needs its own helper.

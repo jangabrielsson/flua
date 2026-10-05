@@ -227,6 +227,9 @@ class _MockHc3(BaseHTTPRequestHandler):
             type(self).uploaded.append(fqa)
             self._send_json({"id": 300, "name": fqa["name"]})
             return
+        if path in ("/api/plugins/updateProperty", "/api/plugins/interfaces"):
+            self._send_json(None, 204)  # updateQA's property/interface sync
+            return
         self._send_json({"error": "not found"}, 404)
 
     def do_PUT(self):
@@ -236,6 +239,9 @@ class _MockHc3(BaseHTTPRequestHandler):
             qa_id = int(path.split("/")[3])
             type(self).file_updates.append((qa_id, body))
             self._send_json(None, 204)
+            return
+        if path.startswith("/api/devices/"):
+            self._send_json(None, 204)  # name/enabled/visible updates (updateQA renames)
             return
         self._send_json({"error": "not found"}, 404)
 
@@ -993,7 +999,7 @@ def test_tool_upload_qa_updates_id_from_qualified_main(tmp_path, mock_hc3) -> No
         timeout=60,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "updated QA 45 from downloaded (2 files)" in result.stdout
+    assert "updated QA 45 from downloaded (2 files" in result.stdout  # prefix: sync extras follow
     assert _MockHc3.uploaded == []  # no new QA was created
     assert len(_MockHc3.file_updates) == 1
     qa_id, files = _MockHc3.file_updates[0]
@@ -1015,7 +1021,7 @@ def test_tool_upload_qa_resolves_qa_name_in_cwd(tmp_path, mock_hc3) -> None:
         timeout=60,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "updated QA 45 from downloaded (2 files)" in result.stdout
+    assert "updated QA 45 from downloaded (2 files" in result.stdout  # prefix: sync extras follow
     assert len(_MockHc3.file_updates) == 1
 
 

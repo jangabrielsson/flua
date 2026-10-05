@@ -21,10 +21,14 @@ from flua import tools  # noqa: E402
 def test_registry_discovers_all_tools() -> None:
     assert tools.tool_names() == [
         "createDB",
+        "downloadFQA",
         "downloadQA",
         "newQA",
+        "pack",
         "setup",
+        "unpack",
         "updateQA",
+        "uploadFQA",
         "uploadQA",
     ]
     for name in tools.tool_names():
@@ -53,7 +57,17 @@ def test_tool_listing(capsys) -> None:
 
 
 class _MockHc3(BaseHTTPRequestHandler):
-    """Serves the endpoints createDB reads."""
+    """Serves the endpoints createDB/uploadFQA/downloadFQA/updateQA read."""
+
+    fqas: dict[int, dict] = {}  # id -> fqa, for the upload/download roundtrip
+    devices: dict[int, dict] = {}  # id -> device, for updateQA
+    requests: list[tuple[str, str, object]] = []  # (method, path, body)
+    next_id: int = 100
+
+    def _read_body(self):
+        length = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(length).decode("utf-8")
+        return json.loads(raw) if raw else None
 
     def _send(self, data, status: int = 200) -> None:
         payload = json.dumps(data).encode()
@@ -79,11 +93,206 @@ class _MockHc3(BaseHTTPRequestHandler):
             )
         elif path == "/api/panels/location":
             self._send([{"id": 1, "name": "Home", "latitude": 57.7, "longitude": 11.97}])
+        elif path.startswith("/api/devices/") and len(path.split("/")) == 4:
+            device = type(self).devices.get(int(path.split("/")[3]))
+            self._send(device if device is not None else {}, 200 if device else 404)
+        else:
+            self._send({}, 404)
+
+    def do_PUT(self):
+        path = self.path.split("?")[0]
+        body = self._read_body()
+        type(self).requests.append(("PUT", path, body))
+        if path.startswith("/api/devices/") and len(path.split("/")) == 4:
+            device = type(self).devices.get(int(path.split("/")[3]))
+            if device is None:
+                self._send({}, 404)
+                return
+            if isinstance(body, dict) and "name" in body:
+                device["name"] = body["name"]
+            self._send(None, 204)
+        elif path.startswith("/api/quickApp/") and path.endswith("/files"):
+            self._send(None, 204)
+        else:
+            self._send({}, 404)
+
+    def do_POST(self):
+        path = self.path.split("?")[0]
+        if path == "/api/quickApp":
+            # the flua client unwraps its own base64 envelope and sends the
+            # raw .fqa JSON body (the real HC3 contract)
+            length = int(self.headers.get("Content-Length", 0))
+            raw = self.rfile.read(length).decode("utf-8")
+            try:
+                fqa = json.loads(raw)
+            except Exception:
+                self._send({}, 400)
+                return
+            self.fqas[self.next_id] = fqa
+            self._send({"id": self.next_id, "name": fqa["name"]})
+            self.next_id += 1
+        elif path.startswith("/api/quickApp/") and path.endswith("/export"):
+            qa_id = int(path.split("/")[3])
+            fqa = self.fqas.get(qa_id)
+            if fqa is None:
+                self._send({}, 404)
+            else:
+                self._send(fqa)
+        elif path == "/api/plugins/updateProperty":
+            body = self._read_body()
+            type(self).requests.append(("POST", path, body))
+            device = type(self).devices.get((body or {}).get("deviceId"))
+            if device is not None and isinstance(body, dict):
+                device.setdefault("properties", {})[body["propertyName"]] = body["value"]
+            self._send(None, 204)
+        elif path == "/api/plugins/interfaces":
+            body = self._read_body()
+            type(self).requests.append(("POST", path, body))
+            device = type(self).devices.get((body or {}).get("deviceId"))
+            if device is not None and isinstance(body, dict):
+                interfaces = set(device.setdefault("interfaces", []))
+                if body["action"] == "add":
+                    interfaces.update(body["interfaces"])
+                else:
+                    interfaces.difference_update(body["interfaces"])
+                device["interfaces"] = sorted(interfaces)
+            self._send(None, 204)
         else:
             self._send({}, 404)
 
     def log_message(self, *args) -> None:
         pass
+
+
+def test_pack_unpack_tools_roundtrip(tmp_path, capsys, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "lib.lua").write_text("function helper() return 'lib' end\n")
+    (tmp_path / "main.lua").write_text(
+        "--%%name:packed\n"
+        "--%%type:com.fibaro.binarySwitch\n"
+        "--%%file:lib.lua,lib\n"
+        "function QuickApp:onInit() print('HI', helper()) end\n"
+    )
+    pack = tools._TOOLS["pack"]
+    parser = argparse.ArgumentParser()
+    pack.add_arguments(parser)
+    assert pack.run(parser, parser.parse_args(["main.lua"])) == 0
+    assert "packed packed (2 files)" in capsys.readouterr().out
+    fqa = json.loads((tmp_path / "main.fqa").read_text())
+    assert fqa["name"] == "packed" and len(fqa["files"]) == 2
+    # and back out as a project
+    unpack = tools._TOOLS["unpack"]
+    parser = argparse.ArgumentParser()
+    unpack.add_arguments(parser)
+    assert unpack.run(parser, parser.parse_args(["main.fqa", "-d", "proj"])) == 0
+    assert "unpacked to proj/" in capsys.readouterr().out
+    assert "--%%name:packed" in (tmp_path / "proj" / "main.lua").read_text()
+
+
+def test_upload_and_download_fqa_tools(tmp_path, monkeypatch, capsys) -> None:
+    _MockHc3.fqas = {}
+    _MockHc3.next_id = 100
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _MockHc3)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("HC3_URL", f"http://127.0.0.1:{server.server_port}")
+        monkeypatch.setenv("HC3_USER", "admin")
+        monkeypatch.setenv("HC3_PASSWORD", "secret")
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "qa.lua").write_text(
+            "--%%name:roundtrip\n"
+            "--%%type:com.fibaro.binarySwitch\n"
+            "function QuickApp:onInit() end\n"
+        )
+        pack = tools._TOOLS["pack"]
+        parser = argparse.ArgumentParser()
+        pack.add_arguments(parser)
+        assert pack.run(parser, parser.parse_args(["qa.lua"])) == 0
+        upload = tools._TOOLS["uploadFQA"]
+        parser = argparse.ArgumentParser()
+        upload.add_arguments(parser)
+        assert upload.run(parser, parser.parse_args(["qa.fqa"])) == 0
+        assert "uploaded roundtrip — HC3 device id 100" in capsys.readouterr().out
+        download = tools._TOOLS["downloadFQA"]
+        parser = argparse.ArgumentParser()
+        download.add_arguments(parser)
+        assert download.run(parser, parser.parse_args(["100"])) == 0
+        assert "downloaded roundtrip (id 100)" in capsys.readouterr().out
+        fqa = json.loads((tmp_path / "roundtrip.fqa").read_text())
+        assert fqa["name"] == "roundtrip"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_update_qa_syncs_files_name_properties_and_interfaces(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    # updateQA is no longer files-only: it syncs the package's name, the
+    # standard properties (UI structures + description) and the interfaces,
+    # each only when it changed — and is idempotent after that
+    _MockHc3.requests = []
+    _MockHc3.devices = {
+        100: {
+            "id": 100,
+            "name": "oldname",
+            "type": "com.fibaro.binarySwitch",
+            "properties": {},
+            "interfaces": ["quickApp"],
+        }
+    }
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _MockHc3)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("HC3_URL", f"http://127.0.0.1:{server.server_port}")
+        monkeypatch.setenv("HC3_USER", "admin")
+        monkeypatch.setenv("HC3_PASSWORD", "secret")
+        monkeypatch.chdir(tmp_path)
+        main = tmp_path / "qa_main_100.lua"
+        main.write_text(
+            "--%%name:newname\n"
+            "--%%type:com.fibaro.binarySwitch\n"
+            '--%%u:{label="lbl",text="Hi"}\n'
+            "--%%description:Updated description\n"
+            "function QuickApp:onInit() end\n"
+        )
+        module = tools._TOOLS["uploadQA"]
+        parser = argparse.ArgumentParser()
+        module.add_arguments(parser)
+        assert module.run(parser, parser.parse_args(["qa_main_100.lua"])) == 0
+        out = capsys.readouterr().out
+        assert "updated QA 100 from newname" in out
+        # name, properties and interfaces changed; files are always pushed
+        puts = [r for r in _MockHc3.requests if r[0] == "PUT" and r[1] == "/api/devices/100"]
+        assert puts and puts[-1][2] == {"name": "newname"}
+        props = [
+            r for r in _MockHc3.requests if r[0] == "POST" and r[1] == "/api/plugins/updateProperty"
+        ]
+        names = {r[2]["propertyName"] for r in props}
+        assert {"viewLayout", "uiView", "uiCallbacks", "useUiView", "userDescription"} <= names
+        iface = [
+            r for r in _MockHc3.requests if r[0] == "POST" and r[1] == "/api/plugins/interfaces"
+        ]
+        assert iface and iface[0][2] == {
+            "deviceId": 100,
+            "action": "add",
+            "interfaces": ["autoTurnOff", "light"],
+        }
+        # idempotent: a second run pushes only the files
+        _MockHc3.requests = []
+        assert module.run(parser, parser.parse_args(["qa_main_100.lua"])) == 0
+        capsys.readouterr()
+        assert not [
+            r
+            for r in _MockHc3.requests
+            if r[0] == "POST" or (r[0] == "PUT" and r[1] == "/api/devices/100")
+        ]
+        assert [r for r in _MockHc3.requests if r[0] == "PUT" and r[1] == "/api/quickApp/100/files"]
+    finally:
+        server.shutdown()
+        server.server_close()
 
 
 def test_create_db_tool(tmp_path, monkeypatch, capsys) -> None:

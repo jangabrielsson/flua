@@ -49,12 +49,11 @@
   .control { flex: 1 1 auto; min-width: 0; }
 
   /* label element: the text fills its row, centered — like the HC3
-     (may carry HTML: tables, fonts) */
+     (may carry HTML: tables, fonts). Tables render with THEIR own
+     attributes (bgcolor, border, cellpadding, ...) — the viewer must not
+     impose cell borders the user didn't ask for */
   .element-label::before { display: none; }
   .element-label table { border-collapse: collapse; margin: 2px auto; }
-  .element-label td, .element-label th {
-    border: 1px solid var(--border); padding: 2px 8px; font-size: 13px;
-  }
   .element-label { color: var(--ink); flex: 1 1 auto; text-align: center; }
 
   /* button: the HC3's blue rounded rect */
@@ -143,22 +142,14 @@
   .dropdown-panel .option { border: none; background: none; border-radius: 8px; }
   .dropdown-panel .option:hover { background: #f0f5fb; }
 
-  /* switch: toggle pill */
-  .switch {
-    position: relative; display: inline-block; width: 46px; height: 26px;
+  /* switch: the HC3 renders it as a stateful button — text on the button,
+     black when on, white with an outline when off */
+  button.ctl.toggle {
+    background: #fff; color: var(--ink); border: 1px solid #9aa3ad;
   }
-  .switch input { opacity: 0; width: 0; height: 0; }
-  .switch .knob {
-    position: absolute; cursor: pointer; inset: 0;
-    background: #c6ccd2; border-radius: 13px; transition: background .15s;
+  button.ctl.toggle.on {
+    background: #222; color: #fff; border-color: #222;
   }
-  .switch .knob::before {
-    content: ""; position: absolute; width: 20px; height: 20px; border-radius: 50%;
-    background: #fff; top: 3px; left: 3px; transition: transform .15s;
-    box-shadow: 0 1px 2px rgba(0,0,0,.3);
-  }
-  .switch input:checked + .knob { background: var(--blue); }
-  .switch input:checked + .knob::before { transform: translateX(20px); }
 
   .hint { color: var(--muted); font-size: 12px; margin-top: 16px; max-width: 480px; }
   code { background: #eceff2; padding: 1px 5px; border-radius: 3px; }
@@ -364,25 +355,25 @@ function renderComponent(device, component, row) {
     row.appendChild(control);
     row.appendChild(val);
   } else if (t === "switch") {
-    const control = document.createElement("div");
-    control.className = "control";
-    const sw = document.createElement("label");
-    sw.className = "switch";
-    const box = document.createElement("input");
-    box.type = "checkbox";
-    box.checked = String(value) === "true";
-    const knob = document.createElement("span");
-    knob.className = "knob";
-    box.onchange = () => {
-      const v = box.checked ? "true" : "false";
+    // the HC3 renders a switch as a stateful button: the text sits ON the
+    // button, black when on, white with an outline when off
+    row.removeChild(name);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ctl toggle";
+    btn.textContent = text || component.name;
+    const paint = () => {
+      btn.classList.toggle("on", String(componentValue(device, component)) === "true");
+    };
+    paint();
+    btn.onclick = () => {
+      const v = btn.classList.contains("on") ? "false" : "true";
       setComponentValue(device, component, v);
       if (action) deviceAction(device.id, action, v);
       else if (event) uiEvent(device.id, component.name, event, v);
+      paint();
     };
-    sw.appendChild(box);
-    sw.appendChild(knob);
-    control.appendChild(sw);
-    row.appendChild(control);
+    row.appendChild(btn);
   } else if (t === "select") {
     // a collapsed dropdown (the HC3 renders selects as dropdowns, not open
     // lists); no side label either — the field itself shows the current

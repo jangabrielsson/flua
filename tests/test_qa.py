@@ -645,6 +645,33 @@ def test_os_exit_terminates_the_calling_qa(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_type_reports_userdata_for_qa_objects(tmp_path, capsys) -> None:
+    # the HC3's QuickApp objects are C userdata; flua's class() tables are
+    # marked __USERDATA and the patched type() reports 'userdata' for them
+    script = tmp_path / "t.lua"
+    script.write_text(
+        "function QuickApp:onInit()\n"
+        "  print('SELF', type(self))\n"
+        "  print('CLASS', type(QuickApp))\n"
+        "  print('PLAIN', type({}))\n"
+        "  print('NUM', type(42))\n"
+        "end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await asyncio.sleep(0.3)
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "SELF userdata" in out
+    assert "CLASS userdata" in out
+    assert "PLAIN table" in out
+    assert "NUM number" in out
+
+
+@pytest.mark.asyncio
 async def test_exited_qa_restart_runs_timers_again(tmp_path, capsys) -> None:
     # after exit(), a restart revives the QA: the new code's timers must not
     # be refused as re-arms of a dead QA

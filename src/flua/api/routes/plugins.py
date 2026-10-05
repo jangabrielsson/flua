@@ -227,6 +227,46 @@ def plugin_update_view(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     return None, 204
 
 
+def _merge_view_state(node: Any, view: dict[str, Any]) -> None:
+    """Merge the updateView state (device.view) into one $jason layout tree:
+    every named element picks up its live values (label text, slider value,
+    ...). Walks nested horizontal rows."""
+    if not isinstance(node, dict):
+        return
+    live = view.get(node.get("name"))
+    if live:
+        for key, value in live.items():
+            node[key] = value
+    for child in node.get("components") or []:
+        _merge_view_state(child, view)
+
+
+def plugin_get_view(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    """GET /plugins/getView?id=<deviceId> — the plugin's legacy viewLayout
+    ($jason) with the live updateView state merged in, like the HC3 UI serves
+    it (user code parses the layout to read label texts and element values)."""
+    try:
+        device_id = int(req.query.get("id") or "")
+    except (TypeError, ValueError):
+        return None, 400
+    dev = state.device(device_id)
+    if dev is None:
+        return None, 404
+    layout = (dev.get("properties") or {}).get("viewLayout")
+    if not isinstance(layout, dict):
+        return None, 404
+    layout = public(layout)
+    view = dev.get("view")
+    if isinstance(view, dict):
+        jason = layout.get("$jason")
+        if isinstance(jason, dict):
+            sections = jason.get("body", {}).get("sections")
+            if isinstance(sections, dict) and isinstance(sections.get("items"), list):
+                for item in sections["items"]:
+                    _merge_view_state(item, view)
+    return layout, 200
+
+
 def plugin_update_interfaces(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     if not isinstance(req.body, dict):
         return None, 400
@@ -235,7 +275,8 @@ def plugin_update_interfaces(state: SimState, req: ApiRequest) -> tuple[Any, int
         return None, 404
     action = req.body.get("action")
     interfaces = req.body.get("interfaces")
-    if action not in ("add", "remove") or not isinstance(interfaces, (list, tuple)):
+    if action not in ("add", "remove", "delete") or not isinstance(interfaces, (list, tuple)):
+        # "delete" is the HC3's enum; "remove" is flua's historical spelling
         return None, 400
     current = dev.setdefault("interfaces", [])
     for interface in interfaces:

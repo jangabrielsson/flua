@@ -3,8 +3,8 @@
 local script_dir = (_FLUA.arg[0] or "."):match("^(.*)[/\\]") or "."
 local t = dofile(script_dir .. "/helpers.lua")
 
-t.expect(type(QuickApp) == "table", "QuickApp class loaded")
-t.expect(type(QuickAppBase) == "table", "QuickAppBase class loaded")
+t.expect(type(QuickApp) == "userdata", "QuickApp class loaded")
+t.expect(type(QuickAppBase) == "userdata", "QuickAppBase class loaded")
 t.expect(type(fibaro) == "table", "fibaro loaded")
 t.expect(type(__fibaro_add_debug_message) == "function", "HC3 global __fibaro_add_debug_message present")
 

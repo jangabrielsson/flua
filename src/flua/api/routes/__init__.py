@@ -39,6 +39,7 @@ from .plugins import (
     child_device_remove,
     embedded_ui_list,
     plugin_get,
+    plugin_get_view,
     plugin_restart,
     plugin_update_interfaces,
     plugin_update_property,
@@ -117,6 +118,7 @@ ROUTES: list[tuple[str, str, Handler]] = [
     ("GET", "/flua/embeddedUI", embedded_ui_list),  # flua-specific viewer channel
     ("GET", "/plugins/callUIEvent", ui_event_call),  # before /plugins/{id}: patterns overlap
     ("POST", "/plugins/callUIEvent", ui_event_call),  # proxy devices POST their UI events
+    ("GET", "/plugins/getView", plugin_get_view),  # before /plugins/{id}: same overlap
     ("GET", "/plugins/{id}", plugin_get),
     ("GET", "/plugins/{id}/variables", variables_list),
     ("GET", "/plugins/{id}/variables/{key}", variable_get),

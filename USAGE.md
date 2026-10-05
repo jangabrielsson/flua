@@ -711,6 +711,17 @@ format (individual `.lua` files) and only the HC3 sees `.fqa`:
 # scaffold a QA project: .vscode configs + agent skills/instructions
 .venv/bin/flua --tool setup [project-dir]
 
+# scaffold a QA from a standard device type template (41 types)
+.venv/bin/flua --tool newQA binarySwitch "Hall lamp"   # lists all types with no argument
+
+# package / unpack QA projects as .fqa files (tool forms of flua export/unpack)
+.venv/bin/flua --tool pack main.lua -o myqa.fqa
+.venv/bin/flua --tool unpack myqa.fqa -d project/
+
+# deploy a ready-made package as a NEW QA, or download one from the HC3
+.venv/bin/flua --tool uploadFQA myqa.fqa
+.venv/bin/flua --tool downloadFQA 123
+
 # list the installed tools (a bare --tool, or --tool help)
 .venv/bin/flua --tool
 ```

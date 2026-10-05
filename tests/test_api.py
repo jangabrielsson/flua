@@ -216,6 +216,50 @@ def test_update_view(api: Api) -> None:
     assert data["view"]["btn"]["text"] == "on"
 
 
+def test_get_view_returns_layout_with_live_values(api: Api) -> None:
+    # GET /plugins/getView?id=... — the legacy $jason layout with the
+    # updateView state merged in, like the HC3 UI serves it (user code parses
+    # the layout to read label texts and element values)
+    api.register_qa(
+        5000,
+        "qa",
+        None,
+        {
+            "viewLayout": {
+                "$jason": {
+                    "body": {
+                        "sections": {
+                            "items": [
+                                {
+                                    "type": "vertical",
+                                    "components": [
+                                        {"type": "label", "name": "lbl", "text": "Static"},
+                                        {"type": "button", "name": "btn", "text": "Go"},
+                                    ],
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+    )
+    api.dispatch(
+        "POST",
+        "/plugins/updateView",
+        {"deviceId": 5000, "componentName": "lbl", "propertyName": "text", "newValue": "Live!"},
+    )
+    data, status = api.dispatch("GET", "/plugins/getView?id=5000")
+    assert status == 200
+    items = data["$jason"]["body"]["sections"]["items"]
+    by_name = {c["name"]: c for c in items[0]["components"]}
+    assert by_name["lbl"]["text"] == "Live!"  # the updateView value, merged
+    assert by_name["btn"]["text"] == "Go"  # untouched elements stay static
+    # errors: unknown id, missing id
+    assert api.dispatch("GET", "/plugins/getView?id=9999") == (None, 404)
+    assert api.dispatch("GET", "/plugins/getView") == (None, 400)
+
+
 def test_update_interfaces(api: Api) -> None:
     api.register_qa(5000, "qa", None, {})
     assert api.dispatch(
