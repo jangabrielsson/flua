@@ -56,6 +56,10 @@ forever, skip to the next one — you can always come back.
 - Words in `<angle brackets>` are placeholders — replace them with *your*
   values (your HC3's address, your password, …).
 
+- **PDF edition.** The whole tutorial as one PDF with a chapter index:
+  `./scripts/build-tutorial-pdf.sh` (needs pandoc and Chrome; writes
+  `docs/tutorial/flua-tutorial.pdf`, diagrams included).
+
 - The examples live in the `examples/` directory of the flua repository and
   are executed by flua's own test suite — the code in this tutorial is the
   same code that is tested with every release, so it always runs.
