@@ -30,6 +30,9 @@ forever, skip to the next one — you can always come back.
 - **[05 · Make it yours](05-make-it-yours.md)** — your own control panel (a switch and a label) and your first quickApp variable.
 - **[06 · On the real HC3](06-on-the-real-hc3.md)** — a dress rehearsal against your real house, then uploading, updating and downloading QAs.
 - **[07 · When things go wrong](07-when-things-go-wrong.md)** — the log, `--check`, breakpoints, and how to ask for help.
+- **[08 · Proxy mode](08-proxy-mode.md)** — the real HC3 UI driving your code: mirror your QA onto the controller (and leave its HC3-edited UI alone with `noUI`).
+- **[09 · Multi-file QAs](09-multi-file-qas.md)** — your own libraries with `--%%file`, packed and deployed as one device.
+- **[10 · Debugging multi-QA runs](10-multi-qa-debugging.md)** — several QAs talking to each other, and how to keep the ensemble legible.
 
 ## How to read this tutorial
 
