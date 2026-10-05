@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.19] - 2026-10-05
+
+### Changed
+- update usage and installation instructions to clarify viewer handling
+
 ## [0.1.18] - 2026-10-05
 
 ### Added
