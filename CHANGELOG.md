@@ -4,6 +4,19 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.14] - 2026-10-05
+
+### Added
+- update useUiView to default to false and enhance documentation for flua devices
+- update potato_master to use dynamic IDs and modify useUiView default in proxy.py
+- remove EOH markers from example scripts and update documentation
+- update SunsetLamp to use variables instead of properties for auto mode
+- add section on using directives in QuickApp headers for F5 compatibility
+- add UI launch configuration and update documentation for VS Code setup
+
+### Changed
+- clarify variable usage in QuickApp tutorial
+
 ## [0.1.13] - 2026-10-04
 
 ### Added
