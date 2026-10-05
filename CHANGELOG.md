@@ -4,6 +4,17 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.18] - 2026-10-05
+
+### Added
+- add test for runtime file addition persistence in QuickApp
+
+### Changed
+- update default modes and improve documentation for HC3 interactions
+
+### Fixed
+- enhance breakpoint assertion messages in debugger tests
+
 ## [0.1.17] - 2026-10-05
 
 ### Changed
