@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.20] - 2026-10-05
+
+### Fixed
+- initialize FOO variable in files2.lua example for dynamic file addition
+
 ## [0.1.19] - 2026-10-05
 
 ### Changed
