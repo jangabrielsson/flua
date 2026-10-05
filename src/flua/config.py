@@ -55,7 +55,7 @@ def merge_directives(defaults: dict[str, Any], override: dict[str, Any]) -> dict
     """
     merged = dict(defaults)
     if any(key in override for key in _MODE_KEYS):
-        for key in _MODE_KEYS:
+        for key in (*_MODE_KEYS, "proxyNoUI"):
             merged.pop(key, None)
     merged.update(override)
     return _apply_mode(merged)
@@ -348,6 +348,15 @@ def parse_annotations(source: str, warn_unknown: bool = True) -> dict[str, Any]:
                 "path": db_path[1:] if db_path.startswith("+") else db_path,
                 "persist": db_path.startswith("+"),
             }
+        elif name == "mode":
+            # --%%mode:online|offline|proxy[,noUI] — the mode directive; the
+            # optional "noUI" (proxy mode only) connects to the existing
+            # proxy WITHOUT clobbering its UI (developers who edit the
+            # proxy's UI in the HC3's UI editor)
+            parts = [part.strip() for part in value.split(",")]
+            config["mode"] = parts[0] if parts and parts[0] else None
+            if "noUI" in parts:
+                config["proxyNoUI"] = True
         elif name == "debug" and "=" not in value:
             # --%%debug:true — enable every debug channel; :false disables
             # them (the full form is --%%debug:api=true,http=true,...).

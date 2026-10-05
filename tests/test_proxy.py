@@ -498,6 +498,36 @@ async def test_proxy_name_with_space_is_reused(tmp_path, mock_hc3, monkeypatch) 
 
 
 @pytest.mark.asyncio
+async def test_proxy_mode_no_ui_leaves_proxy_ui_untouched(
+    tmp_path, mock_hc3, monkeypatch
+) -> None:
+    # --%%mode:proxy,noUI: the existing proxy is reused and CONNECTed, but
+    # its UI properties are NOT pushed — the developer edits the UI in the
+    # HC3's own editor and the connect must not clobber it
+    set_hc3_env(monkeypatch, tmp_path, mock_hc3)
+    script = write_script(
+        tmp_path,
+        content="--%%name:sw\n"
+        "--%%mode:proxy,noUI\n"
+        '--%%u:{button="btn",text="Go",onReleased="turnOn"}\n'
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() print('INIT', self.id) end\n",
+    )
+    add_existing_proxy(57, "sw_Proxy", "com.fibaro.binarySwitch")
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        qa_id, err = engine.load_qa_file(str(script))
+        assert err is None, err
+        await wait_until(lambda: _MockHc3.seen("POST", "/api/devices/57/action/CONNECT"))
+    finally:
+        await engine.stop()
+    assert qa_id == 57
+    assert _MockHc3.uploaded == []
+    assert not _MockHc3.seen("PUT", "/api/devices/57")  # the UI sync is skipped
+
+
+@pytest.mark.asyncio
 async def test_devices_list_has_no_proxy_doublets(
     tmp_path, capsys, mock_hc3, monkeypatch
 ) -> None:

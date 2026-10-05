@@ -331,6 +331,7 @@ def resolve_proxy(
     device_type: str | None,
     device_properties: dict[str, Any],
     use_ui_view: Any = None,
+    no_ui: bool = False,
 ) -> dict[str, Any]:
     """Reuse the existing proxy or deploy a new one; raises on HC3 failure."""
     resolved_type = device_type or DEFAULT_DEVICE_TYPE
@@ -345,14 +346,27 @@ def resolve_proxy(
             raise ValueError(f"cannot create proxy {proxy_name} on the HC3")
         engine.post(messages.log("info", f"flua: proxy installed: {device.get('id')} {proxy_name}"))
     else:
-        # the proxy is reused, but the QA's UI may have changed since it was
-        # deployed — refresh its viewLayout/uiView/uiCallbacks (useUiView only
-        # when the QA declares it, so the HC3's own setting is respected)
-        sync_proxy_ui(engine, device["id"], device_properties, use_ui_view)
+        if no_ui:
+            # --%%mode:proxy,noUI — the developer edits the proxy's UI in the
+            # HC3's own editor; leave it untouched
+            engine.post(
+                messages.log(
+                    "info",
+                    f"flua: proxy UI left untouched: {device.get('id')} {proxy_name}",
+                )
+            )
+        else:
+            # the proxy is reused, but the QA's UI may have changed since it
+            # was deployed — refresh its viewLayout/uiView/uiCallbacks
+            # (useUiView only when the QA declares it, so the HC3's own
+            # setting is respected)
+            sync_proxy_ui(engine, device["id"], device_properties, use_ui_view)
+            engine.post(
+                messages.log("info", f"flua: proxy UI synced: {device.get('id')} {proxy_name}")
+            )
         # shadow the proxy's existing children before the QA boots, so
         # api.get("/devices?parentId=...") finds them under their HC3 ids
         register_proxy_children(engine, device["id"])
-        engine.post(messages.log("info", f"flua: proxy UI synced: {device.get('id')} {proxy_name}"))
     return device
 
 

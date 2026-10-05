@@ -134,6 +134,21 @@ def test_mode_directive_normalizes_flags() -> None:
     }
 
 
+def test_mode_proxy_no_ui_option() -> None:
+    # --%%mode:proxy,noUI: proxy mode, but the connect leaves the proxy's
+    # UI alone (the developer edits it in the HC3's UI editor)
+    cfg = _apply_mode(parse_annotations("--%%mode:proxy,noUI\n"))
+    assert cfg["mode"] == "proxy" and cfg["proxy"] is True
+    assert cfg["proxyNoUI"] is True
+    # plain proxy mode carries no proxyNoUI flag
+    cfg = _apply_mode(parse_annotations("--%%mode:proxy\n"))
+    assert cfg["proxy"] is True
+    assert "proxyNoUI" not in cfg
+    # noUI on a non-proxy mode is parsed but harmless (only proxy honors it)
+    cfg = _apply_mode(parse_annotations("--%%mode:online,noUI\n"))
+    assert cfg["proxy"] is False
+
+
 def test_mode_directive_parsed_with_legacy_aliases() -> None:
     assert parse_annotations("--%%mode:offline\n") == {
         "mode": "offline",

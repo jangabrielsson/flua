@@ -57,6 +57,8 @@ directory):
 - `--%%mode:online` — the default: online against the real HC3.
 - `--%%mode:proxy` — mirror the QA onto the HC3 as a `<name>_Proxy` device and
   funnel its actions/UI events back to the emulator (online only).
+- `--%%mode:proxy,noUI` — proxy mode, but leave the proxy's UI untouched
+  (you edit it in the HC3's own UI editor; the connect doesn't clobber it).
 
 Resolution order: explicit `--api local|remote` flag → the main QA's
 directives (merged over the `.directives` defaults) → default online.

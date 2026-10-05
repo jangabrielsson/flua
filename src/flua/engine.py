@@ -512,6 +512,7 @@ class LuaEngine:
                 qa_config.get("type"),
                 device_properties,
                 qa_config.get("useUiView"),  # None unless --%%useUiView is declared
+                no_ui=bool(qa_config.get("proxyNoUI")),  # --%%mode:proxy,noUI
             )
             qa_id = int(proxy_device["id"])
         else:

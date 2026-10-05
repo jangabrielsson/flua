@@ -199,6 +199,7 @@ Parsing stops at the end-of-header marker:
 | `--%%mode:offline` | pin this QA to the simulated HC3 (see below) |
 | `--%%mode:online` | force this QA online against the real HC3 |
 | `--%%mode:proxy` | proxy mode: mirror this QA onto the HC3 (online only, see below) |
+| `--%%mode:proxy,noUI` | proxy mode, but leave the proxy's UI untouched (you edit it in the HC3's UI editor) |
 | `--%%debug:refreshState=true,api=true,http=true` | debug logging: refreshStates events / `api.*` calls / `net.HTTPClient` requests (global) |
 | `--%%debug:true` | shorthand for all three debug channels (`:false` disables them) |
 | `--%%loglength:120` | debug line length cap (default 120) |
