@@ -171,7 +171,7 @@ def build_proxy_fqa(
         "viewLayout": view_layout,
         "uiView": ui_view,
         "uiCallbacks": ui_callbacks,
-        "useUiView": bool(device_properties.get("useUiView", True)),
+        "useUiView": bool(device_properties.get("useUiView", False)),
         "typeTemplateInitialized": True,
     }
     return {

@@ -6,13 +6,14 @@
 local potato = "Potato"
 function QuickApp:onInit()
   self:debug("onInit",self.name,self.id)
+  local id = self.id
   setTimeout(function()
-    print("passing",potato,"to",5001)
-    fibaro.call(5001,"pass",potato)
+    print("passing",potato,"to",id+1)
+    fibaro.call(id+1,"pass",potato)
   end,0)
   local n = 100
   for i=1,n do
-    local friend = i == n and 5000 or 5000+i+1
+    local friend = i == n and id or id+i+1
     _FLUA.loadQAfromFile("examples/potato_client.lua",{"var:friend="..friend})
   end
 end
