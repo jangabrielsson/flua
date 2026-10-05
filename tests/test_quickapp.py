@@ -71,6 +71,22 @@ async def test_quickapp_files_list_and_get(capsys) -> None:
     assert "X lib" in out
 
 
+def test_example_runtime_added_file_survives_restart() -> None:
+    # examples/files2.lua: a QA adds a file to itself via POST
+    # /quickApp/{id}/files — flua restarts it (like the HC3), the file is
+    # preserved and loaded, so the global it defines is there on reboot
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--api", "local", "examples/files2.lua"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "restarting QA" in result.stdout
+    assert "FOO= 42" in result.stdout
+
+
 @pytest.mark.asyncio
 async def test_quickapp_rest_routes_and_restart(tmp_path, capsys) -> None:
     main = tmp_path / "main.lua"
