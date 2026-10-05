@@ -430,7 +430,10 @@ def test_debugger_vscode_protocol_breakpoint_stop(tmp_path) -> None:
 
     assert result.returncode == 0, result.stdout + "\n" + result.stderr
     assert events and events[0] == "connected", f"debuggee never connected: {events}"
-    assert "stopped:breakpoint" in events, f"no breakpoint stop: {events}"
+    assert "stopped:breakpoint" in events, (
+        f"no breakpoint stop: {events}\n"
+        f"--- debuggee stdout ---\n{result.stdout}\n--- debuggee stderr ---\n{result.stderr}"
+    )
     assert "VSC_END" in result.stdout, "program did not finish after resume"
     assert "Warning: mobdebug failed" not in result.stdout, result.stdout
     # the stop is at the breakpoint line in the script (paths are normalized
@@ -488,6 +491,10 @@ def test_debugger_vscode_extension_injected_bootstrap(tmp_path) -> None:
             return
         events.append("connected")
         try:
+            # the messages are sent back-to-back: TCP preserves order and the
+            # debuggee blocks reading — sleeps only widen the window for CI
+            # timing flakiness (a slow runner once raced the script past the
+            # breakpoint setup)
             conn.sendall(
                 _vsc_frame(
                     {
@@ -501,7 +508,6 @@ def test_debugger_vscode_extension_injected_bootstrap(tmp_path) -> None:
                     }
                 )
             )
-            time.sleep(0.3)
             conn.sendall(
                 _vsc_frame(
                     {
@@ -515,7 +521,6 @@ def test_debugger_vscode_extension_injected_bootstrap(tmp_path) -> None:
                     }
                 )
             )
-            time.sleep(0.2)
             conn.sendall(
                 _vsc_frame(
                     {
@@ -579,7 +584,10 @@ def test_debugger_vscode_extension_injected_bootstrap(tmp_path) -> None:
 
     assert result.returncode == 0, result.stdout + "\n" + result.stderr
     assert events and events[0] == "connected", f"debuggee never connected: {events}"
-    assert "stopped:breakpoint" in events, f"no breakpoint stop: {events}"
+    assert "stopped:breakpoint" in events, (
+        f"no breakpoint stop: {events}\n"
+        f"--- debuggee stdout ---\n{result.stdout}\n--- debuggee stderr ---\n{result.stderr}"
+    )
     assert "EXT_END" in result.stdout, "program did not finish after resume"
     assert "Warning: mobdebug failed" not in result.stdout, result.stdout
     assert "error loading module" not in result.stdout, result.stdout
