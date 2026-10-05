@@ -362,11 +362,11 @@ def test_setup_tool_scaffolds_a_qa_project(tmp_path, capsys) -> None:
     module.add_arguments(parser)
     assert module.run(parser, parser.parse_args([str(tmp_path)])) == 0
     out = capsys.readouterr().out
-    # the VS Code configs, the viewer, and the agent files land
+    # the VS Code configs and the agent files land (the viewer is NOT copied
+    # — flua --ui serves it from the package)
     for path in (
         ".vscode/launch.json",
         ".vscode/extensions.json",
-        "viewer/index.html",
         ".luarc.json",
         "AGENTS.md",
         ".github/copilot-instructions.md",
@@ -375,7 +375,6 @@ def test_setup_tool_scaffolds_a_qa_project(tmp_path, capsys) -> None:
         ".github/skills/quickapp-api/SKILL.md",
     ):
         assert (tmp_path / path).exists(), path
-    assert "wrote viewer/index.html" in out
     assert "wrote .vscode/launch.json" in out
     # the reading links (clickable in the VS Code terminal)
     assert "github.com/jangabrielsson/flua/blob/main/USAGE.md" in out

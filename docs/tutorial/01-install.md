@@ -95,17 +95,14 @@ flua --tool setup my-first-qa
   wrote .luarc.json
   wrote AGENTS.md
   wrote .github/skills
-  wrote viewer/index.html
-done — VS Code will suggest the Python and Lua MobDebug extensions on the next open; open viewer/index.html while `flua --ui` runs to see your QAs' UI
+done — VS Code will suggest the Python and Lua MobDebug extensions on the next open; agents pick up AGENTS.md and the .github files; `flua --ui` serves the UI viewer at http://127.0.0.1:PORT/ (no file to open)
 Read on:
   USAGE.md   https://github.com/jangabrielsson/flua/blob/main/USAGE.md
   Tutorial   https://github.com/jangabrielsson/flua/tree/main/docs/tutorial
 ```
 
-Notice the last file: `viewer/index.html` — a small page that shows your
-QuickApp's buttons and switches while it runs. You'll meet it in chapter 03
-(where flua serves it for you — the copied file is for opening it by hand,
-or from another computer).
+(No `viewer/index.html` in the list — flua serves the viewer page itself
+when you run `--ui`; you'll meet it in chapter 03.)
 The two links at the end open in the browser with a cmd/ctrl-click — the
 `USAGE.md` manual for when you wonder "can flua do X", and this tutorial.
 

@@ -1,10 +1,10 @@
-"""setup: scaffold a QA project — .vscode configs, the viewer, agent files.
+"""setup: scaffold a QA project — .vscode configs and agent files.
 
 pip users don't get the repo's developer experience (VS Code run/debug
-configs, the UI viewer page, Copilot skills/instructions, AGENTS.md). This
-tool writes those files from templates that ship inside the flua package,
-into a QA project directory. Idempotent: existing files are kept unless
---force.
+configs, Copilot skills/instructions, AGENTS.md). This tool writes those
+files from templates that ship inside the flua package, into a QA project
+directory. Idempotent: existing files are kept unless --force. (The UI
+viewer is NOT copied — ``flua --ui`` serves it from the package.)
 """
 
 from __future__ import annotations
@@ -15,13 +15,12 @@ import shutil
 from pathlib import Path
 
 NAME = "setup"
-HELP = "scaffold a QA project: .vscode configs + the UI viewer + agent files"
+HELP = "scaffold a QA project: .vscode configs + agent files"
 
 # template path (inside the package) -> target path (relative to the project)
 _TEMPLATES = {
     "vscode/launch.json": ".vscode/launch.json",
     "vscode/extensions.json": ".vscode/extensions.json",
-    "viewer/index.html": "viewer/index.html",
     ".luarc.json": ".luarc.json",
     "AGENTS.md": "AGENTS.md",
     "github/copilot-instructions.md": ".github/copilot-instructions.md",
@@ -124,7 +123,8 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     print(
         "done — VS Code will suggest the Python and Lua MobDebug extensions "
         "on the next open; agents pick up AGENTS.md and the .github files; "
-        "open viewer/index.html while `flua --ui` runs to see your QAs' UI"
+        "`flua --ui` serves the UI viewer at http://127.0.0.1:PORT/ (no file "
+        "to open)"
     )
     # clickable in the VS Code terminal and most shells (cmd/ctrl-click)
     print("Read on:")

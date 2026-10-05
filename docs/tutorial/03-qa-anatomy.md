@@ -94,12 +94,12 @@ flua: UI viewer on http://127.0.0.1:8090/ — open it in a browser
 [04.10.2026][20:11:17][DEBUG  ][SunsetLamp5000]: Sunset lamp ready
 ```
 
-(Under the hood that configuration runs `flua --api local --ui 8090
-sunset_lamp.lua` — run it in a terminal if you ever prefer that.)
+(Under the hood that configuration runs `flua --ui 8090 sunset_lamp.lua` —
+run it in a terminal if you ever prefer that.)
 
 Now open **http://127.0.0.1:8090/** in a browser — flua serves the viewer
-page itself (it's the same page `--tool setup` copied into your project,
-now with the address already filled in). Press **Connect**.
+page itself, from the flua package, with the address already filled in.
+Press **Connect**.
 
 > ✅ **You should see** a panel titled `SunsetLamp`, with a red `FALSE`
 > label and **Turn On / Turn Off** buttons.

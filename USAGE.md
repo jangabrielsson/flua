@@ -159,8 +159,7 @@ It writes `.vscode/launch.json` (run in the panel, run in the terminal,
 mobdebug, and mobdebug with the UI viewer), `.vscode/extensions.json`
 (VS Code will offer to install the **Python**, **Lua MobDebug**,
 **Lua Language Server** and **Markdown Preview Mermaid** extensions — the
-last one renders the diagrams in `docs/tutorial/`), `viewer/index.html`
-(the UI viewer page — open it while `flua --ui` runs),
+last one renders the diagrams in `docs/tutorial/`),
 `.luarc.json` (silences the HC3 globals for the language server), `AGENTS.md`
 and the `.github/` skills, instructions and prompts. Existing files are
 kept; `--force` overwrites.
@@ -331,9 +330,10 @@ open http://127.0.0.1:8090/               # press Connect; the base URL matches
 ```
 
 The page defaults its API address to its own origin, so a busy port falling
-back to the next free one needs no editing. (`viewer/index.html` still ships
-in the repo and via `--tool setup` for opening from a file or pointing at
-another machine running flua.)
+back to the next free one needs no editing. The page ships inside the flua
+package (`viewer/index.html` in the repo is the source); `--tool setup` does
+not copy it — the served page can also point at another machine running
+flua.
 
 The viewer polls `GET /flua/devices` (the emulated devices only — in online
 mode the HC3's own QAs stay out of the list), renders `properties.uiView`
