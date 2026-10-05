@@ -4,6 +4,20 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.15] - 2026-10-05
+
+### Added
+- add GitHub Actions workflow for testing and scripts for syncing skills
+- add PDF build support for tutorial with mermaid diagrams
+- add multi-file QA examples and debugging tutorial
+- --%%mode:proxy,noUI leaves the proxy UI untouched
+
+### Changed
+- Refactor QuickApp templates and add new device types
+
+### Fixed
+- initialize QuickAppChild before defining MyBinarySwitch class
+
 ## [0.1.14] - 2026-10-05
 
 ### Added
