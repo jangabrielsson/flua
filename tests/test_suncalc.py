@@ -2,8 +2,10 @@
 
 import asyncio
 import json
+import os
 import re
 import threading
+import time
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -16,6 +18,32 @@ from flua.engine import LuaEngine  # noqa: E402
 from flua.suncalc import sunrise_sunset  # noqa: E402
 
 HH_MM = re.compile(r"^\d{2}:\d{2}$")
+
+
+@pytest.fixture(autouse=True)
+def stockholm_timezone():
+    """Pin the machine's timezone for the whole module.
+
+    The sun times are expressed in the runner's local time (flua uses the
+    host's zone as the HC3's), so the expected HH:MM values — 03:30/22:08 at
+    midsummer — only hold in Europe/Stockholm. CI runs in UTC, which shifted
+    the values and broke a midnight-wrapping string comparison. The location
+    itself was already pinned (Stockholm); this pins the clock's zone.
+    """
+    if not hasattr(time, "tzset"):
+        yield  # Windows: no tzset — the tests there run in the host zone
+        return
+    old_tz = os.environ.get("TZ")
+    os.environ["TZ"] = "Europe/Stockholm"
+    time.tzset()
+    try:
+        yield
+    finally:
+        if old_tz is None:
+            del os.environ["TZ"]
+        else:
+            os.environ["TZ"] = old_tz
+        time.tzset()
 
 
 class _MiniHc3(BaseHTTPRequestHandler):
