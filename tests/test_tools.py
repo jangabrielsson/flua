@@ -6,6 +6,7 @@ add_arguments() and run() — no other file changes.
 
 import argparse
 import json
+import subprocess
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -201,6 +202,30 @@ def test_packaged_skills_match_the_repo() -> None:
             copy = packaged / origin.relative_to(repo / ".github" / "skills")
             assert copy.exists(), f"missing packaged skill: {copy}"
             assert copy.read_bytes() == origin.read_bytes(), f"drifted: {copy}"
+
+
+def test_sync_skills_script_restores_drift() -> None:
+    # scripts/sync-skills.sh is the manual way back in sync: run it after a
+    # deliberate drift and the packaged copies match the repo again
+    repo = Path(__file__).resolve().parent.parent
+    packaged = repo / "src" / "flua" / "setup_templates" / "github" / "skills"
+    victim = packaged / "quickapp-types" / "SKILL.md"
+    original = victim.read_bytes()
+    victim.write_bytes(original + b"\n<!-- drift -->\n")
+    try:
+        result = subprocess.run(
+            [str(repo / "scripts" / "sync-skills.sh")],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert result.returncode == 0, result.stderr
+    finally:
+        if victim.read_bytes() != original:
+            victim.write_bytes(original)  # never leave the tree drifted
+    assert victim.read_bytes() == original
+    assert "synced .github/skills" in result.stdout
 
 
 def test_packaged_viewer_matches_the_repo() -> None:

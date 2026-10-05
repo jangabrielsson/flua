@@ -47,6 +47,17 @@ rerun them in an environment that permits local socket binds. Prefer existing
    `ARCHITECTURE.md`, new directives in the directive table.
 5. Run `ruff check` and the full suite before pushing.
 
+Prefer the one-command workflow when your change is ready:
+
+```bash
+git add <the files in this PR>
+./scripts/pr.sh my-fix "feat: describe the change"
+```
+
+It runs the gate (ruff + the offline suite), creates a `contrib/` branch,
+commits the staged files, pushes, and opens the PR (`gh` required for the
+last step). CI runs the same gate on every PR and push to `main`.
+
 For larger changes, also run `ruff format --check src/ tests/` and inspect the
 complete diff with `git diff --check`.
 
