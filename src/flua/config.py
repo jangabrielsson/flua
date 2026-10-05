@@ -395,6 +395,8 @@ def _apply_mode(config: dict[str, Any]) -> dict[str, Any]:
             mode = "offline"
         elif config.get("proxy") is True:
             mode = "proxy"
+        elif config.get("offline") is False:
+            mode = "online"  # legacy --%%offline:false opts INTO online
     if mode is not None:
         config["mode"] = mode
         config["offline"] = mode == "offline"

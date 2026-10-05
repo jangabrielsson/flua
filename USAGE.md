@@ -110,8 +110,10 @@ executes; only outside a QA (main-state code) does it raise an error.
 ## VS Code setup
 
 The repo ships `.vscode/launch.json` with five configurations (the
-`--tool setup` template has the same five, pointing at `flua` on the PATH
-instead of the repo's `.venv`, and all running with `--api local` — the
+`--tool setup` template has the same five, with the debug interpreter
+resolved to flua's **absolute path** — VS Code doesn't inherit the shell's
+PATH on macOS, so a bare `flua` would not be found; the run configurations
+use the selected Python interpreter), all running with `--api local` — the
 offline playground):
 
 - **Flua: Run Current File** — runs the file in the panel.
@@ -457,11 +459,12 @@ The backend is picked from the **main QA's directives — its header merged
 over the `.directives` defaults** (see below), before the engine starts:
 
 1. an explicit `--api local|remote` always wins;
-2. otherwise, `--%%mode:offline` in the **main** QA's directives selects
-   the offline sim, `--%%mode:online`/`--%%mode:proxy` selects the real HC3;
-3. otherwise, **online** — the default, which requires HC3 credentials in
-   the environment (`HC3_URL`/`HC3_HOST`); without them flua exits with an
-   error. The simulated HC3 is opt-in: `--api local` or `--%%mode:offline`.
+2. otherwise, `--%%mode:online`/`--%%mode:proxy` in the **main** QA's
+   directives selects the real HC3, `--%%mode:offline` the offline sim;
+3. otherwise, **offline** — the default: the simulated HC3, no credentials
+   needed. Online is opt-in (`--%%mode:online|proxy`, or `--api remote`),
+   and requires HC3 credentials in the environment (`HC3_URL`/`HC3_HOST`);
+   without them flua exits with an error.
 
 `--%%mode:offline` on a *secondary* QA pins just that QA's `api.*` calls to
 the sim while the rest of the run stays online — handy for keeping test QAs
@@ -553,7 +556,7 @@ and your firewall must let the controller reach that port.
 
 flua picks one of three modes per run: an explicit `--api local|remote` wins,
 then the main QA's directives (`--%%mode:...`, merged over the `.directives`
-defaults), then the default — `online`.
+defaults), then the default — `offline` (the simulated HC3).
 
 | Aspect | `offline` | `online` | `proxy` |
 |---|---|---|---|

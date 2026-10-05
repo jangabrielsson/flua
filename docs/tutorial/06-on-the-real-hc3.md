@@ -23,13 +23,15 @@ Three small things, all done or known from earlier chapters:
 
 ## Step 1 — a dress rehearsal against your real house
 
-So far `--api local` kept flua in its own simulated world. Leave that flag
-out and flua goes **online**: your QuickApp still runs on your computer, but
-every question it asks the HC3 — `fibaro.getValue(1, "sunsetHour")`,
-`api.get(...)`, everything — is answered by your **real** controller:
+So far the lamp has run in the simulated world (offline is flua's default).
+For the dress rehearsal, tell the lamp to go **online** with a mode
+directive in its header — `--%%mode:online` — or pass `--api remote` on the
+command line. Your QuickApp still runs on your computer, but every question
+it asks the HC3 — `fibaro.getValue(1, "sunsetHour")`, `api.get(...)`,
+everything — is answered by your **real** controller:
 
 ```bash
-flua --start '2026/10/4 18:30:00' sunset_lamp_ui.lua
+flua --api remote --start '2026/10/4 18:30:00' sunset_lamp_ui.lua
 ```
 
 ```text

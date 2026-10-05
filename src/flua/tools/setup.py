@@ -10,6 +10,7 @@ into a QA project directory. Idempotent: existing files are kept unless
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 from pathlib import Path
 
@@ -53,9 +54,40 @@ def _templates_dir() -> Path:
     return Path(__file__).resolve().parent.parent / "setup_templates"
 
 
+def _flua_interpreter() -> str:
+    """The interpreter path for launch.json.
+
+    pip user installs and venvs live outside the PATH that macOS GUI apps
+    (VS Code launched from the Dock) inherit — a bare ``flua`` is not found
+    there. Resolve the absolute path from the shell environment setup runs
+    in; fall back to the bare name with a warning when flua is not on PATH.
+    """
+    resolved = shutil.which("flua")
+    if resolved is None:
+        print(
+            "warning: flua not found on PATH — launch.json will use `flua`; "
+            "launch VS Code from a terminal once, or edit the interpreter path"
+        )
+        return "flua"
+    return resolved
+
+
 def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     root = Path(args.directory)
     root.mkdir(parents=True, exist_ok=True)
+    # validate the package up front: a missing template (wheel packaging
+    # gap) should be a clear error, not a half-scaffolded project + traceback
+    missing = [
+        template
+        for template in _TEMPLATES
+        if not (_templates_dir() / template).exists()
+    ]
+    if missing:
+        parser.error(
+            "missing packaged templates: "
+            + ", ".join(missing)
+            + " — reinstall fibaro-flua (or run from the source tree)"
+        )
     written, skipped = [], []
     for template, target in _TEMPLATES.items():
         src = _templates_dir() / template
@@ -73,6 +105,17 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
             shutil.copytree(src, dst)
         else:
             shutil.copy2(src, dst)
+        if target == ".vscode/launch.json":
+            # resolve `flua` to its absolute path so VS Code (which doesn't
+            # inherit the shell's PATH on macOS) can launch it
+            text = dst.read_text(encoding="utf-8")
+            dst.write_text(
+                text.replace(
+                    '"interpreter": "flua"',
+                    f'"interpreter": {json.dumps(_flua_interpreter())}',
+                ),
+                encoding="utf-8",
+            )
         written.append(target)
     for name in sorted(written):
         print(f"  wrote {name}")

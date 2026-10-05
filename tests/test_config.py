@@ -103,9 +103,14 @@ def test_merge_directives_qa_overrides_defaults() -> None:
     merged = merge_directives(defaults, {"name": "Mine"})
     assert merged == {"mode": "offline", "offline": True, "proxy": False, "name": "Mine"}
     # the mode family overrides as a whole: any QA mode directive replaces
-    # the file's mode default — even an explicit opt-out
+    # the file's mode default — --%%offline:false opts into online
     merged = merge_directives(defaults, {"offline": False})
-    assert "mode" not in merged and merged["offline"] is False
+    assert merged == {
+        "mode": "online",
+        "offline": False,
+        "proxy": False,
+        "name": "Default",
+    }
     merged = merge_directives(defaults, {"mode": "proxy"})
     assert merged == {"mode": "proxy", "offline": False, "proxy": True, "name": "Default"}
 
@@ -130,6 +135,11 @@ def test_mode_directive_normalizes_flags() -> None:
     assert _apply_mode({"mode": "bogus", "offline": True}) == {
         "mode": "offline",  # unknown mode falls back to the legacy flag
         "offline": True,
+        "proxy": False,
+    }
+    assert _apply_mode({"offline": False}) == {
+        "mode": "online",  # legacy --%%offline:false opts INTO online
+        "offline": False,
         "proxy": False,
     }
 

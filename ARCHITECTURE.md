@@ -250,7 +250,8 @@ class of drift.
   lockout-safe) and `tests/test_hc3_compat.py` (shape oracle: the same
   request through the sim and the real HC3 must agree on structure).
 - **Isolation** — an autouse fixture isolates `HOME` so a developer's real
-  `~/.env` can never flip plain tests into online mode.
+  `~/.env` can never flip plain tests into online mode. (Online is opt-in
+  anyway: `--%%mode:online` or `--api remote`.)
 
 ## 13. The invariants, in one place
 

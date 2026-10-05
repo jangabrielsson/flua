@@ -109,10 +109,9 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=["local", "remote"],
         default=None,
         help="explicit REST API backend. Default: the main QA's "
-        "--%%%%mode:offline selects offline, --%%%%mode:online|proxy selects "
-        "online; otherwise ONLINE (the default — requires HC3 credentials "
-        "in the environment). Use --api local or --%%%%mode:offline for the "
-        "simulated HC3",
+        "--%%%%mode:online|proxy selects the real HC3, --%%%%mode:offline "
+        "the sim; otherwise OFFLINE (the default — the simulated HC3). "
+        "Online needs HC3 credentials in the environment",
     )
     parser.add_argument(
         "--seed",
@@ -358,7 +357,7 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
                     api_mode = "remote"
                 break
         if api_mode is None:
-            api_mode = "remote"  # default: online (requires HC3 credentials)
+            api_mode = "local"  # default: offline (the sim) — online is opt-in
         engine = LuaEngine(
             start=start_epoch,
             speed=speed,

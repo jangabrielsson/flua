@@ -65,25 +65,26 @@ line is the QuickApp's *tag* — its name and its id. The `5000` is the id
 flua assigned it; on your real HC3 it would get the controller's next free
 id.
 
-**What did F5 do?** The launch configuration ran `flua --api local
-hello.lua` for you — the same command you used for the smoke test in
-chapter 01. `--api local` is the important part: it tells flua to pretend
-to be an HC3 **on your computer**. It gave your QuickApp a home, started
-it, kept time for it, and stopped when the program ended. Your real HC3
-was never involved — that's the whole point: experiment safely, then go
-live later.
+**What did F5 do?** The launch configuration ran `flua hello.lua` for
+you — and because your QuickApp doesn't declare a mode, flua ran it in its
+**default world: the simulated HC3, on your computer** (online is opt-in;
+chapter 06 shows how). It gave your QuickApp a home, started it, kept time
+for it, and stopped when the program ended. Your real HC3 was never
+involved — that's the whole point: experiment safely, then go live later.
 
 > If F5 complains that `flua` was not found: VS Code on some systems
-> doesn't inherit the shell's PATH when started from the dock. Restart it
-> from the terminal once — on macOS run `open -a "Visual Studio Code"` in a
-> terminal, on Windows/Linux start `code` from one — and F5 will find flua.
-> If it says *No module named 'flua'* instead, VS Code is using a Python
-> that doesn't have flua: open the Command Palette (Ctrl/Cmd+Shift+P),
-> choose **Python: Select Interpreter**, and pick the one you installed
-> flua into (chapter 01). You can always run the command by hand instead:
-> open a terminal with **Terminal → New Terminal** and type
-> `flua --api local hello.lua` — every F5 run in this tutorial is exactly
-> that command.
+> doesn't inherit the shell's PATH when started from the dock. Chapter 01's
+> setup normally prevents this — it writes the **absolute path** to flua
+> into the launch configurations. If you wrote the configuration by hand (or
+> reinstalled flua elsewhere), either re-run `flua --tool setup`, or restart
+> VS Code from the terminal once — on macOS run `open -a "Visual Studio
+> Code"` in a terminal, on Windows/Linux start `code` from one. If it says
+> *No module named 'flua'* instead, VS Code is using a Python that doesn't
+> have flua: open the Command Palette (Ctrl/Cmd+Shift+P), choose
+> **Python: Select Interpreter**, and pick the one you installed flua into
+> (chapter 01). You can always run the command by hand instead: open a
+> terminal with **Terminal → New Terminal** and type `flua hello.lua` —
+> every F5 run in this tutorial is exactly that command.
 
 ## Step 3 — break it, on purpose
 
@@ -125,7 +126,7 @@ with the new text. Press `Ctrl-C` in the terminal to stop watching.
 
 - A QuickApp is a small program that **runs on its own**, wakes up on
   **timers**, and writes to a **log**.
-- You develop it **on your computer** (`--api local` — the F5 configs do
-  this for you) and only later move it to the HC3.
+- You develop it **on your computer** (the offline sim is the default) and
+  only later move it to the HC3.
 
 Next chapter: what a QuickApp *is* — and the Sunset Lamp gets its switch.

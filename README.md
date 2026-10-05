@@ -40,8 +40,8 @@ Requires Python 3.11+. `lupa` is the only runtime dependency.
 .venv/bin/flua examples/timers.lua
 .venv/bin/flua examples/qa3.lua examples/qa4.lua
 
-# ONLINE is the default (HC3 credentials from the .env chain); for the
-# simulated HC3 pass --api local, or set --%%mode:offline in the QA header
+# OFFLINE is the default (the simulated HC3); for the real HC3 declare
+# --%%mode:online|proxy in the QA header (or pass --api remote)
 .venv/bin/flua --api local examples/timers.lua
 
 # one-liner

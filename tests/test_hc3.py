@@ -584,9 +584,9 @@ def _hc3_env(mock_url: str, home: str) -> dict[str, str]:
     }
 
 
-def test_cli_defaults_to_online_with_hc3_env(tmp_path, mock_hc3) -> None:
-    # no --api flag, no --%%offline: the engine picks online because the
-    # environment carries HC3 credentials (default-online behavior)
+def test_cli_defaults_to_offline_even_with_hc3_env(tmp_path, mock_hc3) -> None:
+    # no --api flag, no --%%mode: OFFLINE is the default — the sim answers,
+    # the HC3 (even with credentials in the environment) is not consulted
     script = tmp_path / "main.lua"
     script.write_text(
         "setTimeout(function()\n"
@@ -605,7 +605,8 @@ def test_cli_defaults_to_online_with_hc3_env(tmp_path, mock_hc3) -> None:
         timeout=60,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "MODE 200 hc3-device" in result.stdout
+    assert "mode offline" in result.stdout
+    assert "MODE 404 nil" in result.stdout  # the sim has no device 45
 
 
 def test_ctrl_c_terminates_promptly_mid_long_poll(tmp_path, mock_hc3) -> None:
@@ -614,7 +615,7 @@ def test_ctrl_c_terminates_promptly_mid_long_poll(tmp_path, mock_hc3) -> None:
     # (Before the daemon thread, asyncio.run joined the abandoned executor
     # worker — exit waited out the mock's full 20s hold.)
     script = tmp_path / "keep.lua"
-    script.write_text("--%%keep-alive:true\nprint('KA')\n")
+    script.write_text("--%%keep-alive:true\n--%%mode:online\nprint('KA')\n")
     home = tmp_path / "home"
     home.mkdir()
     _MockHc3.hold_refresh = 20.0
@@ -782,9 +783,9 @@ async def test_mode_directive_pins_secondary_qa_to_sim(
     assert "B 404" in out  # the pinned QA stays in the sim
 
 
-def test_cli_default_mode_is_online(tmp_path, monkeypatch) -> None:
-    # no --api flag and no --%%mode directive: ONLINE is the default — with
-    # no HC3 credentials the engine refuses to start (offline is opt-in)
+def test_cli_default_mode_is_offline(tmp_path, monkeypatch) -> None:
+    # no --api flag and no --%%mode directive: OFFLINE is the default —
+    # no HC3 credentials are needed (online is opt-in via --%%mode)
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.delenv("HC3_URL", raising=False)
@@ -802,8 +803,35 @@ def test_cli_default_mode_is_online(tmp_path, monkeypatch) -> None:
         text=True,
         timeout=60,
     )
-    assert result.returncode == 2
-    assert "HC3_URL" in result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "mode offline" in result.stdout  # the sim is the default
+    assert "x" in result.stdout
+
+
+def test_cli_mode_online_directive_selects_hc3(tmp_path, mock_hc3) -> None:
+    # --%%mode:online in the QA's header overrides the offline default —
+    # the QA's api.* then talks to the real HC3
+    script = tmp_path / "main.lua"
+    script.write_text(
+        "--%%mode:online\n"
+        "setTimeout(function()\n"
+        "  local d, s = api.get('/devices/45')\n"
+        "  print('MODE', s, d and d.name)\n"
+        "end, 20)\n"
+    )
+    home = tmp_path / "home"
+    home.mkdir()
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", str(script)],
+        env=_hc3_env(mock_hc3, str(home)),
+        cwd=tmp_path,  # isolated from the developer's .directives
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "mode online" in result.stdout
+    assert "MODE 200 hc3-device" in result.stdout
 
 
 @pytest.mark.asyncio

@@ -381,13 +381,19 @@ def test_setup_tool_scaffolds_a_qa_project(tmp_path, capsys) -> None:
     assert "github.com/jangabrielsson/flua/blob/main/USAGE.md" in out
     assert "github.com/jangabrielsson/flua/tree/main/docs/tutorial" in out
     # the launch configs: run (panel/terminal/UI), debug (mobdebug, and
-    # mobdebug with the UI viewer) — all offline, all using the `flua`
-    # command (pip users have no .venv)
+    # mobdebug with the UI viewer) — no --api flag anywhere, so the QA's own
+    # --%%mode directive decides (the default is the offline sim)
     launch = (tmp_path / ".vscode/launch.json").read_text()
     assert "Flua: Run Current File (UI)" in launch
     assert "Flua: Debug Current File (UI+mobdebug)" in launch
-    assert '"interpreter": "flua"' in launch
-    assert '"--api", "local"' in launch
+    assert "--api" not in launch
+    configs = json.loads(launch)["configurations"]
+    interpreters = [c["interpreter"] for c in configs if "interpreter" in c]
+    # absolute paths on all platforms: .../bin/flua on POSIX, flua.exe on
+    # Windows (shutil.which resolves the console script via PATHEXT there)
+    assert interpreters and all(
+        i.endswith(("flua", "flua.exe")) and i != "flua" for i in interpreters
+    )
     # the mermaid extension recommendation renders docs/tutorial diagrams in
     # VS Code's markdown preview
     extensions = (tmp_path / ".vscode/extensions.json").read_text()
@@ -400,6 +406,39 @@ def test_setup_tool_scaffolds_a_qa_project(tmp_path, capsys) -> None:
     # --force overwrites
     assert module.run(parser, parser.parse_args(["--force", str(tmp_path)])) == 0
     assert "flua" in (tmp_path / "AGENTS.md").read_text()
+
+
+def test_setup_falls_back_to_bare_flua_when_not_on_path(
+    tmp_path, capsys, monkeypatch
+) -> None:
+    monkeypatch.setattr("shutil.which", lambda _name: None)
+    module = tools._TOOLS["setup"]
+    parser = argparse.ArgumentParser()
+    module.add_arguments(parser)
+    assert module.run(parser, parser.parse_args([str(tmp_path)])) == 0
+    out = capsys.readouterr().out
+    assert "flua not found on PATH" in out
+    launch = json.loads((tmp_path / ".vscode/launch.json").read_text())
+    interpreters = [c["interpreter"] for c in launch["configurations"] if "interpreter" in c]
+    assert interpreters and all(i == "flua" for i in interpreters)
+
+
+def test_setup_reports_missing_templates_cleanly(tmp_path, capsys, monkeypatch) -> None:
+    # a wheel packaging gap (e.g. a template the globs dropped) must be a
+    # clear error, not a half-scaffolded project + FileNotFoundError
+    module = tools._TOOLS["setup"]
+    empty = tmp_path / "templates"
+    empty.mkdir()
+    monkeypatch.setattr(module, "_templates_dir", lambda: empty)
+    parser = argparse.ArgumentParser()
+    module.add_arguments(parser)
+    with pytest.raises(SystemExit) as exc:
+        module.run(parser, parser.parse_args([str(tmp_path / "proj")]))
+    assert exc.value.code == 2  # parser.error
+    err = capsys.readouterr().err
+    assert "missing packaged templates" in err
+    assert "reinstall fibaro-flua" in err
+    assert not list((tmp_path / "proj").iterdir())  # nothing half-written
 
 
 def test_packaged_skills_match_the_repo() -> None:

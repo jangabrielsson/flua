@@ -194,10 +194,10 @@ class LuaEngine:
         self.env = EnvChain()  # os.getenv chain: local .env > ~/.env > process env
         # HC3 REST API: the offline sim with api_mode="local" (the explicit
         # constructor default), the real HC3 otherwise — and with None (no
-        # flag at all) the default is ONLINE, so a missing HC3_URL is a loud
-        # error rather than a silent fallback to the sim.
+        # flag at all) the default is OFFLINE, so no credentials are needed
+        # unless the caller opts into the HC3.
         if api_mode is None:
-            api_mode = "remote"  # default: online (requires HC3 credentials)
+            api_mode = "local"  # default: offline (the sim) — online is opt-in
         if api_mode != "local":
             base_url = self.env.get("HC3_URL")
             host = self.env.get("HC3_HOST")
