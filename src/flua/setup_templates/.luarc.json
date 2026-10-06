@@ -51,7 +51,12 @@
     "library": [
       ".luals"
     ],
-    "checkThirdParty": false
+    "checkThirdParty": false,
+    "ignoreDir": [
+      ".github/skills/quickapp-types/templates",
+      ".venv",
+      "node_modules"
+    ]
   },
   "hint": {
     "enable": true
