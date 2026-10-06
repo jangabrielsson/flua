@@ -172,6 +172,26 @@ async def test_update_view_visible_over_http(server, tmp_path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_update_view_empty_array_stays_an_array(server, tmp_path) -> None:
+    # json.array() (an empty Lua array) must cross the bridge as [] — not
+    # the {} a dict-shaped conversion would produce, which the viewer would
+    # seed a select with and stringify as "[object Object]" on the next click
+    engine, _, base = server
+    script = tmp_path / "ui.lua"
+    script.write_text(
+        '--%%u:{multi="sel1",text="Pick",options={{type="option",text="One",value="1"}}}\n'
+        "function QuickApp:onInit()\n"
+        "  self:updateView('sel1','selectedItems',json.array())\n"
+        "end\n"
+    )
+    engine.load_qa_file(str(script))
+    await asyncio.sleep(0.4)
+    status, _, device = await asyncio.to_thread(_http, f"{base}/devices/5000")
+    assert status == 200
+    assert device["view"]["sel1"]["selectedItems"] == []
+
+
+@pytest.mark.asyncio
 async def test_update_view_post_over_http(server, tmp_path) -> None:
     engine, _, base = server
     script = tmp_path / "ui.lua"

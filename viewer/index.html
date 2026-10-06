@@ -271,10 +271,19 @@ const uiValues = {}; // deviceId -> { componentName: value }
 
 function componentValue(device, component) {
   const live = liveState(device, component);
-  if (live.value !== undefined) {
+  // selects get their chosen items from updateView: "selectedItems"
+  // (multi, a list), "selectedItem" (single, a scalar — the HC3 names);
+  // "value" works everywhere else
+  const liveValue =
+    live.selectedItems !== undefined
+      ? live.selectedItems
+      : live.selectedItem !== undefined
+        ? live.selectedItem
+        : live.value;
+  if (liveValue !== undefined) {
     // server state wins; drop any stale user override
     if (uiValues[device.id]) delete uiValues[device.id][component.name];
-    return live.value;
+    return liveValue;
   }
   const local = uiValues[device.id] && uiValues[device.id][component.name];
   if (local !== undefined) return local;
@@ -379,6 +388,10 @@ function renderComponent(device, component, row) {
     // lists); no side label either — the field itself shows the current
     // selection (or the text as a placeholder)
     const isMulti = component.selectionType === "multi";
+    // the QA can replace the option list at runtime with
+    // updateView(name, "options", {...}) — the live list wins
+    const options =
+      live.options !== undefined ? live.options : component.options || [];
     name.remove();
     const control = document.createElement("div");
     control.className = "control";
@@ -398,7 +411,7 @@ function renderComponent(device, component, row) {
     const chosen = value === undefined ? [] : Array.isArray(value) ? value.slice() : [value];
     const isChosen = (v) => chosen.some((c) => String(c) === String(v));
     const paintField = () => {
-      const texts = (component.options || [])
+      const texts = options
         .filter((o) => isChosen(o.value))
         .map((o) => o.text ?? o.value);
       if (texts.length) {
@@ -414,7 +427,7 @@ function renderComponent(device, component, row) {
         row.classList.toggle("selected", isChosen(row.dataset.value));
       }
     };
-    for (const opt of component.options || []) {
+    for (const opt of options) {
       const row = document.createElement("div");
       row.className = "option" + (isMulti ? " multi" : "");
       row.dataset.value = opt.value;
@@ -524,7 +537,12 @@ function allRows(device) {
 // otherwise refresh values in place (keeps slider drags stable)
 function structureKey(device) {
   return JSON.stringify(allRows(device).map((row) =>
-    (row.components || []).map((c) => [c.type, c.name, c.options || null])
+    (row.components || []).map((c) => {
+      // the option list can change at runtime (updateView "options") —
+      // that is a structure change, the dropdown must rebuild
+      const live = liveState(device, c);
+      return [c.type, c.name, live.options !== undefined ? live.options : (c.options || null)];
+    })
   ));
 }
 

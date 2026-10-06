@@ -33,6 +33,11 @@ python3 -m venv .venv
 
 Requires Python 3.11+. `lupa` is the only runtime dependency.
 
+For VS Code, `flua --tool setup` scaffolds a QA project with run/debug
+launch configurations, **Lua Language Server support** (a `.luarc.json`
+plus flua's `.luals/` type library — autocomplete for `QuickApp`, `fibaro`,
+`api` and `json`), and the agent files.
+
 ## Usage
 
 ```bash

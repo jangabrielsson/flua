@@ -19,4 +19,6 @@ function json.util.InitArray(e)
   return setmetatable(e, mt)
 end
 
+function json.array() return json.util.InitArray({}) end
+
 return json

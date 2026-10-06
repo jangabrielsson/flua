@@ -863,10 +863,16 @@ handlers.uiEvent = function(msg)
   if sleeping[qaId] then queueFor(qaId, msg) return end -- delivered on wake
   if qa and type(qa.UIAction) == "function" then
     local value = msg.value
-    -- multi selects arrive as a comma-joined list through the single value
-    -- param (the real HC3 contract); restore the list so the QA sees
-    -- event.values = {each selected value}
-    if value and isMultiSelect(qa, msg.elementName) then
+    if type(value) == "table" then
+      -- a whole list arrived (a proxy POSTed values as a list); the QA sees
+      -- event.values = {list} after UIAction's wrap
+      runInQa(qaId, function()
+        qa:UIAction(msg.eventType, msg.elementName, value)
+      end)
+    elseif value and isMultiSelect(qa, msg.elementName) then
+      -- multi selects arrive as a comma-joined list through the single value
+      -- param (the real HC3 contract); restore the list so the QA sees
+      -- event.values = {selected values} (values[1] is the list)
       local values = {}
       for v in string.gmatch(value, "[^,]+") do
         values[#values + 1] = v

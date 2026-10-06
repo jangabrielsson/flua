@@ -19,6 +19,29 @@ from ..state import SimState, public
 logger = logging.getLogger(__name__)
 
 
+def _flatten_values(values: Any) -> list[Any]:
+    """Flatten a callUIEvent ``values`` payload to the plain selected values.
+
+    The HC3 wraps UI event arguments once (``event.values``), and a proxy on
+    the HC3 forwards that shape; option objects carry the plain value in
+    their ``value`` field. Nested lists and option objects are flattened so
+    only the plain values cross the bridge to the QA.
+    """
+    flat: list[Any] = []
+
+    def walk(entry: Any) -> None:
+        if isinstance(entry, (list, tuple)):
+            for item in entry:
+                walk(item)
+        elif isinstance(entry, dict) and "value" in entry:
+            flat.append(entry["value"])
+        else:
+            flat.append(entry)
+
+    walk(values)
+    return flat
+
+
 def _now(req: ApiRequest) -> float:
     return req.clock.time if req.clock is not None else time.time()
 
@@ -359,8 +382,11 @@ def ui_event_call(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     values = body.get("values")
     if value is None and isinstance(values, (list, tuple)):
         # multi selects arrive as a list; join them — the Lua handler splits
-        # the single value param back into the list
-        value = ",".join(str(entry) for entry in values)
+        # the single value param back into the list. A proxy round trip may
+        # deliver the HC3's event.values shape (a list of the selected
+        # values) or option objects — flatten to the plain values the QA
+        # expects, so nothing Python-shaped leaks into the event.
+        value = ",".join(str(entry) for entry in _flatten_values(values))
     if req.emit is not None:
         req.emit(messages.ui_event(device_id, element_name, event_type, value))
     return None, 200

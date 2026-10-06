@@ -31,31 +31,41 @@ def _is_lua_table(obj: object) -> bool:
     return hasattr(obj, "items") and not isinstance(obj, dict)
 
 
-def lua_to_python(value: object) -> object:
+def lua_to_python(value: object, lua: object | None = None) -> object:
     """Convert a lupa value to plain JSON-compatible Python data.
 
     Lua tables arrive in Python as lupa proxies, not dicts. Messages must be
     converted at the post() boundary so the engine only ever sees plain data.
+    Tables marked with json.util.InitArray (a metatable with __isArray =
+    true) become lists even when empty — the one case the 1..n key heuristic
+    cannot decide ({} vs []).
     """
     if isinstance(value, bytes):
         return value.decode("utf-8")
     if _is_lua_table(value):
         items = list(value.items())
         keys = [key for key, _ in items]
+        marked = False
+        if lua is not None:
+            mt = lua.globals().getmetatable(value)
+            marked = mt is not None and bool(getattr(mt, "__isArray", False))
+        if marked:
+            int_keys = sorted(key for key in keys if isinstance(key, int) and key >= 1)
+            return [lua_to_python(value[key], lua) for key in int_keys]
         if (
             keys
             and all(isinstance(key, int) and key >= 1 for key in keys)
             and sorted(keys) == list(range(1, len(keys) + 1))
         ):
             # array-shaped table -> list
-            return [lua_to_python(val) for _, val in sorted(items)]
+            return [lua_to_python(val, lua) for _, val in sorted(items)]
         result = {}
         for key, val in items:
             python_key = key.decode("utf-8") if isinstance(key, bytes) else key
-            result[python_key] = lua_to_python(val)
+            result[python_key] = lua_to_python(val, lua)
         return result
     if isinstance(value, (list, tuple)):
-        return [lua_to_python(item) for item in value]
+        return [lua_to_python(item, lua) for item in value]
     return value
 
 
@@ -100,7 +110,7 @@ def install_bindings(engine: "LuaEngine") -> None:
     lua = engine.lua_runtime()
 
     def post(msg: object) -> None:
-        engine.post(lua_to_python(msg))
+        engine.post(lua_to_python(msg, lua))
 
     py = lua.table()
     py["post"] = post
@@ -118,8 +128,9 @@ def install_bindings(engine: "LuaEngine") -> None:
     py["render_html"] = engine.render_html
 
     # JSON for QA code and mobdebug's VSCODE protocol (json.lua delegates
-    # here). _json_to_python honors json.util.InitArray; lua_to_python (the
-    # message path) stays heuristic-only on purpose.
+    # here). Both converters honor json.util.InitArray's __isArray marker, so
+    # an empty marked table crosses as [] instead of {} — the one case the
+    # 1..n key heuristic cannot decide.
     def to_json(value: object) -> str:
         return json.dumps(_json_to_python(value, lua))
 
@@ -149,7 +160,7 @@ def install_bindings(engine: "LuaEngine") -> None:
     ) -> tuple[object, int]:
         if debug_flag(engine.config, "api"):
             engine.debug_log(f"api {method.upper()} {url}")
-        data, status = engine.api.dispatch(method, url, lua_to_python(body), qa_id=qa_id)
+        data, status = engine.api.dispatch(method, url, lua_to_python(body, lua), qa_id=qa_id)
         warn_api(method, url, status, qa_id)
         if data is None:
             return None, status
@@ -162,7 +173,7 @@ def install_bindings(engine: "LuaEngine") -> None:
     def api_hc3(method: str, url: str, body: object) -> tuple[object, int]:
         if debug_flag(engine.config, "api"):
             engine.debug_log(f"api.hc3 {method.upper()} {url}")
-        data, status = engine.api.dispatch_hc3(method, url, lua_to_python(body))
+        data, status = engine.api.dispatch_hc3(method, url, lua_to_python(body, lua))
         warn_api(method, url, status, None)
         if data is None:
             return None, status

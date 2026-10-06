@@ -134,6 +134,13 @@ offline playground):
 While you step through code, `print`/`self:debug` output appears **immediately**
 — logs never queue behind a paused program.
 
+**Lua Language Server support**: the repo's `.luarc.json` declares Lua 5.5
+with the HC3 globals and loads the bundled **`.luals/` type library** — LuaLS
+definitions for `QuickApp`, `fibaro`, `api` and `json` — so QA code in the
+repo gets autocomplete and parameter hints. `flua --tool setup` ships the
+same configuration (and the type library) into scaffolded projects for pip
+users; the two copies are kept byte-identical by a test.
+
 The fastest loop for tinkering:
 
 ```bash
@@ -320,6 +327,16 @@ don't. Long rows may continue on following comment lines. At runtime the
 device's `properties.viewLayout`, `properties.uiView`, and
 `properties.uiCallbacks` hold the generated structures, and
 `self:updateView(elm, prop, value)` updates them.
+
+At runtime a single select is set with `updateView(elm, "selectedItem", value)`
+and a multi select with `updateView(elm, "selectedItems", {value1, value2, …})`.
+Like on the HC3, an **empty** list must be `json.array()` — the marked empty
+array encodes as `[]`, while a plain empty table `{}` encodes as an object
+and breaks the UI. The HC3's own demos use `json.array()` for exactly this:
+
+```lua
+self:updateView("tagMulti", "selectedItems", json.array())  -- [] not {}
+```
 
 ### The UI viewer
 

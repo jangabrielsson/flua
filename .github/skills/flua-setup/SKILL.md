@@ -99,6 +99,12 @@ The repo ships `.vscode/launch.json` with three configurations:
 - **Flua: Debug Current File (mobdebug)** — remote Lua debugging through the
   mobdebug protocol (the Lua extension).
 
+**Lua Language Server**: `flua --tool setup` also writes a `.luarc.json`
+(Lua 5.5, HC3 globals) and the **`.luals/` type library** — LuaLS definitions
+for `QuickApp`, `fibaro`, `api` and `json` — so scaffolded projects get
+autocomplete and parameter hints on QA code. The repo carries the same
+configuration for contributors.
+
 Tasks in `.vscode/tasks.json` cover `--check`, `.fqa` export and unpack.
 
 ## Key CLI flags

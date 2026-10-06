@@ -396,19 +396,17 @@ end
 -- Programmatically triggers a UI action for testing purposes
 -- @param eventType - The type of UI event to trigger
 -- @param elementName - The name of the UI element
--- @param arg - Optional argument value for the event; a list means the event
---   carries those values (multi selects deliver every selected value)
+-- @param arg - Optional argument value for the event; like the HC3, the
+--   argument is wrapped once: event.values[1] is the scalar for sliders
+--   and single selects, and the whole selected-values list for multi
+--   selects
 function QuickAppBase:UIAction(eventType, elementName, arg)
   local event = {
     deviceId = self.id,
     eventType = eventType,
     elementName = elementName
   }
-  if type(arg) == "table" then
-    event.values = arg
-  else
-    event.values = arg ~= nil and  { arg } or json.util.InitArray({})
-  end
+  event.values = arg ~= nil and { arg } or json.util.InitArray({})
   onUIEvent(self.id, event)
 end
 
