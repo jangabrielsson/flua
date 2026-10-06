@@ -10,8 +10,9 @@ https://github.com/jangabrielsson/flua/blob/main/USAGE.md
 Lua QuickApps for a Fibaro HC3 controller. The files run **unchanged** on
 the HC3 and in the flua emulator — the same QA file works in both places.
 
-- Run a QA: `flua qa.lua` (defaults to online mode when HC3 credentials
-  exist; `--api local` or `--%%mode:offline` for the simulated HC3).
+- Run a QA: `flua qa.lua` (defaults to the **offline simulator**; declare
+  `--%%mode:online|proxy` in the header — or pass `--api remote` — to use
+  the real HC3).
 - Static check: `flua --check qa.lua` (no execution).
 - `--%%` directives in the file header drive flua (mode, db, name, type,
   variables, UI); the HC3 ignores them.

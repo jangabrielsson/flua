@@ -109,7 +109,10 @@ The two links at the end open in the browser with a cmd/ctrl-click — the
 Now open the folder in VS Code — **File → Open Folder… → `my-first-qa`**.
 A popup asks you to install the recommended extensions (**Python**,
 **Lua MobDebug**, **Lua Language Server**) — accept. They give you syntax
-coloring, error squiggles, and later a debugger.
+coloring, error squiggles, and later a debugger. The setup also installed a
+**type library** (the hidden `.luals/` folder): the language server now
+knows what `QuickApp`, `fibaro` and `api` look like, so from chapter 02 on
+you'll get autocomplete and parameter hints as you type QA code.
 
 The setup also installed **launch configurations** — small scripts that run
 your QuickApps when you press `F5`. From the next chapter on, F5 is how you

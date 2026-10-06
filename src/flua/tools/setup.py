@@ -21,6 +21,7 @@ HELP = "scaffold a QA project: .vscode configs + agent files"
 _TEMPLATES = {
     "vscode/launch.json": ".vscode/launch.json",
     "vscode/extensions.json": ".vscode/extensions.json",
+    "luals": ".luals",
     ".luarc.json": ".luarc.json",
     "AGENTS.md": "AGENTS.md",
     "github/copilot-instructions.md": ".github/copilot-instructions.md",

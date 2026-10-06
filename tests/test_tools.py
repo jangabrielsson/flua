@@ -362,11 +362,14 @@ def test_setup_tool_scaffolds_a_qa_project(tmp_path, capsys) -> None:
     module.add_arguments(parser)
     assert module.run(parser, parser.parse_args([str(tmp_path)])) == 0
     out = capsys.readouterr().out
-    # the VS Code configs and the agent files land (the viewer is NOT copied
-    # — flua --ui serves it from the package)
+    # the VS Code configs, the LuaLS type library, and the agent files land
+    # (the viewer is NOT copied — flua --ui serves it from the package)
     for path in (
         ".vscode/launch.json",
         ".vscode/extensions.json",
+        ".luals/QuickApp.lua",
+        ".luals/fibaro.lua",
+        ".luals/api.lua",
         ".luarc.json",
         "AGENTS.md",
         ".github/copilot-instructions.md",
@@ -375,6 +378,7 @@ def test_setup_tool_scaffolds_a_qa_project(tmp_path, capsys) -> None:
         ".github/skills/quickapp-api/SKILL.md",
     ):
         assert (tmp_path / path).exists(), path
+    assert "wrote .luals" in out
     assert "wrote .vscode/launch.json" in out
     # the reading links (clickable in the VS Code terminal)
     assert "github.com/jangabrielsson/flua/blob/main/USAGE.md" in out
@@ -438,6 +442,27 @@ def test_setup_reports_missing_templates_cleanly(tmp_path, capsys, monkeypatch) 
     assert "missing packaged templates" in err
     assert "reinstall fibaro-flua" in err
     assert not list((tmp_path / "proj").iterdir())  # nothing half-written
+
+
+def test_packaged_luarc_matches_the_repo() -> None:
+    # the setup template's LuaLS config must match the repo's (Lua 5.5 +
+    # HC3 globals + the .luals type library) so pip users get the same
+    # diagnostics and autocomplete as contributors
+    repo = Path(__file__).resolve().parent.parent
+    packaged = repo / "src" / "flua" / "setup_templates" / ".luarc.json"
+    origin = repo / ".luarc.json"
+    assert packaged.read_bytes() == origin.read_bytes(), "sync .luarc.json into setup_templates"
+
+
+def test_packaged_luals_library_matches_the_repo() -> None:
+    # the LuaLS type definitions ship in the wheel for --tool setup; a sync
+    # guard keeps the packaged copies identical to the repo's .luals/
+    repo = Path(__file__).resolve().parent.parent
+    packaged = repo / "src" / "flua" / "setup_templates" / "luals"
+    for origin in (repo / ".luals").rglob("*.lua"):
+        copy = packaged / origin.relative_to(repo / ".luals")
+        assert copy.exists(), f"missing packaged luals file: {copy}"
+        assert copy.read_bytes() == origin.read_bytes(), f"drifted: {copy}"
 
 
 def test_packaged_skills_match_the_repo() -> None:

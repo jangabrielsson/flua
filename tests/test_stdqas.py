@@ -64,6 +64,17 @@ def test_packaged_templates_match_the_skill_dir() -> None:
     }
 
 
+def test_luals_library_files_parse() -> None:
+    # the shipped LuaLS type definitions are valid Lua (they are --@meta
+    # stubs — flua's --check parser must accept them)
+    engine = LuaEngine()
+    lua = engine.lua_runtime()
+    for path in sorted((REPO / ".luals").glob("*.lua")):
+        findings = check_source(path.read_text(encoding="utf-8"), path.name, lua)
+        errors = [f for f in findings if ": error:" in f]
+        assert not errors, f"{path.name}: {errors}"
+
+
 def test_all_templates_pass_check() -> None:
     engine = LuaEngine()
     lua = engine.lua_runtime()

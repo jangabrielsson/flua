@@ -160,7 +160,9 @@ mobdebug, and mobdebug with the UI viewer), `.vscode/extensions.json`
 (VS Code will offer to install the **Python**, **Lua MobDebug**,
 **Lua Language Server** and **Markdown Preview Mermaid** extensions — the
 last one renders the diagrams in `docs/tutorial/`),
-`.luarc.json` (silences the HC3 globals for the language server), `AGENTS.md`
+`.luarc.json` (Lua 5.5 + the HC3 globals, with the bundled **`.luals/`
+type library** — LuaLS definitions for `QuickApp`, `fibaro`, `api` and
+`json`, so QA code gets autocomplete and parameter hints), `AGENTS.md`
 and the `.github/` skills, instructions and prompts. Existing files are
 kept; `--force` overwrites.
 

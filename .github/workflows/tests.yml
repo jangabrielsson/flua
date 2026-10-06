@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.13"]
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -19,3 +19,24 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: ruff check src/ tests/
       - run: pytest tests/ -q --ignore=tests/test_hc3_live.py --ignore=tests/test_hc3_compat.py
+
+  wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build
+      # install the built wheel into a clean venv and smoke-test the pip
+      # user's commands — catches packaging gaps (e.g. a template the
+      # package-data globs dropped, which the source-tree tests can't see)
+      - run: |
+          python -m venv /tmp/wheelvenv
+          /tmp/wheelvenv/bin/pip install dist/*.whl
+          /tmp/wheelvenv/bin/flua --version
+          mkdir -p /tmp/wheelsmoke && cd /tmp/wheelsmoke
+          /tmp/wheelvenv/bin/flua --tool setup project
+          /tmp/wheelvenv/bin/flua --tool newQA binarySwitch "Smoke QA"
+          /tmp/wheelvenv/bin/flua --check binarySwitch.lua
