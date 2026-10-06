@@ -56,7 +56,6 @@
       ".github/skills/quickapp-types/templates",
       ".venv",
       "src/flua/setup_templates/luals",
-      ".luals",
       "node_modules"
     ]
   },

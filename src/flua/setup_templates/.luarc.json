@@ -55,6 +55,7 @@
     "ignoreDir": [
       ".github/skills/quickapp-types/templates",
       ".venv",
+      "src/flua/setup_templates/luals",
       "node_modules"
     ]
   },
