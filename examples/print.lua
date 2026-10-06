@@ -1,3 +1,8 @@
+--%%name:PrintExample
+--%%type:com.fibaro.multilevelSwitch
+
+-- Example demonstrating various print and debug functions
+
 print("Hello")
 local a = {a =9}
 print("a=",a)

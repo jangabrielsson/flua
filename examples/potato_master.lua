@@ -3,6 +3,8 @@
 --%%offline:true
 -- %%debug:true
 
+-- Creates a master potato QA and 100 potato client QAs that passes the potato string between them
+
 local potato = "Potato"
 function QuickApp:onInit()
   self:debug("onInit",self.name,self.id)
