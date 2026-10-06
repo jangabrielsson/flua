@@ -4,6 +4,14 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.23] - 2026-10-06
+
+### Added
+- enhance Lua Language Server support and improve UI handling for multi-selects
+
+### Fixed
+- add comments to examples for clarity and remove unused image files
+
 ## [0.1.22] - 2026-10-06
 
 ### Fixed
