@@ -38,6 +38,7 @@ function QuickApp:onInit()
     -- Here you can assign how child instances will be created.
     -- If type is not defined, QuickAppChild will be used.
     self:initChildDevices({
+---@diagnostic disable-next-line: assign-type-mismatch
         ["com.fibaro.binarySwitch"] = MyBinarySwitch,
     })
 
