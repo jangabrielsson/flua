@@ -118,6 +118,23 @@ def test_cli_runs_multiple_qas_isolated(tmp_path) -> None:
     assert "B b qa-b" in result.stdout
 
 
+def test_example_self_test_passes_and_exits_zero() -> None:
+    # examples/selfTest.lua is the living fixture for the self-test pattern
+    # (assert inside the QA, exit with the failure count): the example must
+    # keep passing — it is the canonical sample agents copy from
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--api", "local", "examples/selfTest.lua"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASS: the device is visible in the sim" in result.stdout
+    assert "PASS: updateProperty round trip (50)" in result.stdout
+    assert "failures: 0" in result.stdout
+
+
 def test_examples_qa_pair_calls_each_other() -> None:
     # examples/qa3.lua + qa4.lua: QAs find each other by name and drive each
     # other through fibaro.call (device actions via the pump).

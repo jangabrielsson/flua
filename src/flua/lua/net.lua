@@ -301,6 +301,93 @@ local function handleWsEvent(msg)
   end
 end
 
+-- --------------------------------------------------------- net.*Server
+-- flua extension (no HC3 counterpart): mock servers for testing the net.*
+-- clients. The handler runs in this QA on every request; its return value
+-- is the reply. All servers bind 127.0.0.1; port 0 picks a free port
+-- (read server.port afterwards).
+--
+--   local http = net.HTTPServer()
+--   http:listen(0, function(req)  -- {method,url,headers,body} ->
+--     return {status=200, body="ok", headers={["X-Mock"]="1"}}  -- or a string
+--   end)
+--   local tcp = net.TCPServer()
+--   tcp:listen(0, function(data) return data:upper() end)  -- first package in, reply out, close
+--   local udp = net.UDPServer()
+--   udp:listen(0, function(data, ip, port) return "got "..data end)  -- nil = no reply
+--   local ws = net.WebSocketServer()
+--   ws:listen(0, function(message, isBinary) return "echo: "..message end)
+--   ...
+--   http:close()
+local servers = {}  -- id -> instance
+
+local ServerBase = {}
+ServerBase.__index = ServerBase
+
+function ServerBase:listen(port, handler)
+  assert(type(handler) == "function", "net.*Server:listen needs a handler function")
+  self._handler = handler
+  self._id, self.port = _PY.net_server_start(self._kind, tonumber(port) or 0, qaId)
+  servers[self._id] = self
+  return self
+end
+
+function ServerBase:close()
+  if self._id then
+    _PY.net_server_close(self._id)
+    servers[self._id] = nil
+    self._id = nil
+  end
+end
+
+local function serverClass(kind)
+  local cls = {}
+  setmetatable(cls, cls)
+  cls.__index = ServerBase
+  cls.__call = function()
+    return setmetatable({ _kind = kind }, cls)
+  end
+  return cls
+end
+
+local function handleServerRequest(msg)
+  local srv = servers[msg.server]
+  local handler = srv and srv._handler
+  if not handler then
+    _PY.net_server_reply(msg.server, msg.conn, nil)
+    return
+  end
+  local ok, resp = xpcall(function()
+    if msg.kind == "http" then
+      return handler{ method = msg.method, url = msg.url, headers = msg.headers or {}, body = msg.body or "" }
+    elseif msg.kind == "tcp" then
+      return handler(msg.data or "")
+    elseif msg.kind == "udp" then
+      return handler(msg.data or "", msg.addr, msg.port)
+    elseif msg.kind == "ws" then
+      return handler(msg.message or "", msg.binary == true)
+    end
+  end, function(err)
+    print("[net] server handler error: " .. tostring(err))
+    return tostring(err)
+  end)
+  if not ok then
+    if msg.kind == "http" then
+      _PY.net_server_reply(msg.server, msg.conn, { status = 500, body = "handler error: " .. tostring(resp) })
+    else
+      _PY.net_server_reply(msg.server, msg.conn, nil)
+    end
+    return
+  end
+  _PY.net_server_reply(msg.server, msg.conn, resp)
+end
+
+net = {}
+net.HTTPServer = serverClass("http")
+net.TCPServer = serverClass("tcp")
+net.UDPServer = serverClass("udp")
+net.WebSocketServer = serverClass("ws")
+
 -- ------------------------------------------------------------------ dispatch
 -- One handler per QA; the shared dispatch (init.lua) routes by the
 -- request's qa attribution.
@@ -313,13 +400,13 @@ _FLUA.netHandlers[qaId] = function(msg)
     handleTcpResult(msg)  -- same entry shape: {sock, kind, cb}
   elseif msg.type == "wsEvent" then
     handleWsEvent(msg)
+  elseif msg.type == "serverRequest" then
+    handleServerRequest(msg)
   end
 end
 
-net = {
-  HTTPClient = HTTPClient,
-  TCPSocket = TCPSocket,
-  UDPSocket = UDPSocket,
-  WebSocketClient = WebSocketClient,
-  WebSocketClientTls = WebSocketClientTls,
-}
+net.HTTPClient = HTTPClient
+net.TCPSocket = TCPSocket
+net.UDPSocket = UDPSocket
+net.WebSocketClient = WebSocketClient
+net.WebSocketClientTls = WebSocketClientTls

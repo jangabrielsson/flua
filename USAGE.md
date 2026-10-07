@@ -470,6 +470,12 @@ Files load in declaration order, **main loads last**. Paths resolve relative
 to the main file's directory. See `examples/multifile.lua`. The HC3's file
 API works offline too (`api.get('/quickApp/' .. _FLUA.qaId .. '/files')` etc.).
 
+`--%%file` files are the QA's *shipped* files — they travel into the `.fqa`
+(`--tool pack`, uploads). Test-only helpers (mock-server handlers, assertion
+libraries) can stay out of the package: plain Lua `require("name")` finds
+`name.lua` next to the main file at runtime, and require'd files are never
+packaged.
+
 ## The offline HC3
 
 ### Online mode — the real HC3
@@ -703,6 +709,35 @@ above 0x7F) cross the bridge byte-for-byte in both directions — a payload
 is escaped for the message bridge and un-escaped on the wire, so even a
 literal `\x` sequence in your data round-trips intact.
 
+### Mock servers (`net.*Server`)
+
+A flua extension (no HC3 counterpart): a QA can **host** mock servers so its
+`net.*` clients can be tested without a controller or Python. The handler
+runs in the QA on every request; its return value is the reply. All servers
+bind `127.0.0.1`; port 0 picks a free port (`server.port`).
+
+```lua
+local http = net.HTTPServer()
+http:listen(0, function(req)               -- {method,url,headers,body}
+  return {status = 200, body = "ok", headers = {["X-Mock"] = "1"}}  -- or a string, or nil (204)
+end)
+local tcp = net.TCPServer()
+tcp:listen(0, function(data) return data:upper() end)   -- first package in, reply out, close
+local udp = net.UDPServer()
+udp:listen(0, function(data, ip, port) return "got:" .. data end)  -- nil = no reply
+local ws = net.WebSocketServer()
+ws:listen(0, function(message, isBinary) return "echo:" .. message end)
+...
+http:close()
+```
+
+Semantics are deliberately one-shot (request/response): the TCP handler sees
+the first data package the peer sends, the UDP handler one datagram, the WS
+handler one message (binary messages echo back as binary frames, byte-safe).
+A handler that raises replies `500` (HTTP) or nothing; a handler that never
+returns answers `504` after 10 s. See `examples/mockServer.lua` — a QA that
+hosts all four and verifies its own clients against them.
+
 ## Deploying to the HC3
 
 ```bash
@@ -784,6 +819,26 @@ and one file per QA file, ready for editing and debugging.
 
 Checks syntax, unknown `--%%` directives (typos), and deprecated API calls.
 Warnings don't fail the run; syntax errors exit 1. Good in CI.
+
+### Self-testing a QA (no repo needed)
+
+A QA can be its own test suite — no pytest, no repo. Assert inside the QA,
+exit with the failure count, and let the caller (a shell, CI, or a coding
+agent) check the exit code:
+
+```bash
+.venv/bin/flua --api local examples/selfTest.lua   # prints PASS/FAIL lines
+echo $?                                           # 0 = pass, non-zero = fail
+```
+
+The exit code is the contract: an uncaught Lua error exits 1, and `exit(N)`
+(`os.exit(N)`) exits N — the QA must end with an explicit exit, or the run
+never finishes. When the logic under test needs interactions, serve the sim
+API with `--ui PORT` and drive it over HTTP (`/plugins/callUIEvent`,
+`/devices/<id>/action/<name>`, `/devices/<id>` for state), and keep timer
+logic deterministic with `--start`, `--speed`, `--instant`, and `--seed`.
+The `quickapp-test` skill installed by `--tool setup` documents the whole
+loop for coding agents.
 
 ## The HC3 REST API reference
 

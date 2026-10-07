@@ -39,6 +39,11 @@ def _custom_bin(value: Any) -> str:
     return BIN_TRUE if value else BIN_FALSE
 
 
+def _int_value(value: Any) -> str:
+    """A dimmer's value as an integer — the HC3 UI shows no decimals."""
+    return str(int(float(value) + 0.5))
+
+
 def _color_value(value: Any) -> str:
     """The colorController's state label: colored ON/OFF from the value table."""
     if not isinstance(value, dict):
@@ -139,8 +144,8 @@ EMBEDDED_WATCHES: dict[str, list[dict[str, Any]]] = {
         {"property": "value", "id": "__binarysensorValue", "prop": "text", "fmt": _custom_bin},
     ],
     "com.fibaro.multilevelSwitch": [
-        {"property": "value", "id": "__setValue", "prop": "value", "fmt": "%s"},
-        {"property": "value", "id": "__multiswitchValue", "prop": "text", "fmt": "%.3f"},
+        {"property": "value", "id": "__setValue", "prop": "value", "fmt": _int_value},
+        {"property": "value", "id": "__multiswitchValue", "prop": "text", "fmt": _int_value},
     ],
     "com.fibaro.colorController": [
         {"property": "value", "id": "__colorComponentValue", "prop": "text", "fmt": _color_value},

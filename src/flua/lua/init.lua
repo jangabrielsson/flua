@@ -609,7 +609,28 @@ local function qaEnvFor(qaId)
     __index = _G,
     __newindex = function(t, k, v) rawset(t, k, v) end,
   })
+  -- per-QA package table: require() finds files next to the QA (the main
+  -- file's directory is prepended at load, below), and a QA rewriting
+  -- package.path never leaks into other QAs or the runtime
+  env.package = setmetatable({ path = package.path }, { __index = package })
+  -- require() resolves its search path through the C-level global 'package',
+  -- so wrap it: swap in this QA's path for the (synchronous, single-threaded)
+  -- call — one QA's directories are never visible to another's require
+  local baseRequire = require
+  env.require = function(name)
+    local saved = package.path
+    package.path = env.package.path
+    local ok, res = pcall(baseRequire, name)
+    package.path = saved
+    if not ok then error(res, 2) end
+    return res
+  end
   return env
+end
+
+local function qaSourceDir(sourceName)
+  local dir = sourceName and sourceName:match("^(.*)[/\\][^/\\]*$")
+  return dir or "."
 end
 
 local function bootstrapQa(env, qaId, config)
@@ -667,6 +688,10 @@ end
 -- run the chunk + construct the QuickApp instance. Used by both the CLI
 -- start path (timer-wrapped) and dynamic loading (eager, via startQA).
 local function startQaInEnv(env, qaId, config, args, loader, sourceName)
+  -- require() finds files next to the QA (test helpers, local libraries)
+  -- without packaging them into the .fqa — only --%%file files are shipped
+  local dir = qaSourceDir(sourceName)
+  env.package.path = dir .. "/?.lua;" .. env.package.path
   -- each QA gets its own _FLUA: qaId, config and arg are per-QA (stable in
   -- deferred reads); the rest of the API (timers, async, json, qa(...),
   -- exit, ...) is the shared engine table, found through __index
@@ -963,6 +988,16 @@ handlers.udpResult = function(msg)
 end
 
 handlers.wsEvent = function(msg)
+  local h = _FLUA.netHandlers[msg.qa]
+  if h then
+    if sleeping[msg.qa] then queueFor(msg.qa, msg) return end
+    runInQa(msg.qa, function() h(msg) end)
+  end
+end
+
+handlers.serverRequest = function(msg)
+  -- net.*Server request (flua extension): the QA handler replies through
+  -- _PY.net_server_reply with its return value
   local h = _FLUA.netHandlers[msg.qa]
   if h then
     if sleeping[msg.qa] then queueFor(msg.qa, msg) return end

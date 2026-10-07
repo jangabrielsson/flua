@@ -182,6 +182,15 @@ In-flight work counts as **pending work** — the process stays alive until
 timers, queues, and open connections are all done. The debugger's sockets
 are the one main-thread exception (see §2).
 
+The mirror image is `net.*Server` (flua extension, `server.py`): mock
+servers hosted **on the loop** for QA-side testing. The socket is bound
+synchronously when the QA calls `listen` (port 0 resolves at once), and
+serving is asyncio-native. Each incoming request posts a `serverRequest`
+message into the pump; the QA handler runs there, and its return value
+comes back through the synchronous `net_server_reply` bridge call (the pump
+runs on the loop thread), resolving the connection's future. Servers die
+with their QA (exit/restart) and on engine stop.
+
 ## 8. Virtual time
 
 Timers run on `VirtualClock` (virtual seconds, epoch-aligned). Modes:

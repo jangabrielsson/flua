@@ -56,6 +56,7 @@ TCP_RESULT = (
 )
 UDP_RESULT = "udpResult"  # {"id": int, "qa": int?, "ok": bool, "data"?: str, "err"?: str}
 WS_EVENT = "wsEvent"  # {"qa": int, "conn": int, "event": str, "data"?: str}
+SERVER_REQUEST = "serverRequest"  # mock server -> QA handler (flua extension, net.*Server)
 MQTT_EVENT = "mqttEvent"  # {"qa": int, "conn": int, "event": str, "data"?: dict}
 REFRESH_STATE_EVENT = (
     "refreshStateEvent"  # {"event": {...}}  pump-delivered to RefreshStateSubscribers
@@ -190,6 +191,32 @@ def ws_event(
         msg["data"] = data
     if is_binary:
         msg["isBinary"] = True
+    return msg
+
+
+def server_request(
+    server: int,
+    conn: int,
+    kind: str,
+    qa: int,
+    **fields: Any,
+) -> dict[str, Any]:
+    """A mock-server request delivered to the hosting QA's handler.
+
+    flua extension (net.*Server): the Python host posts one of these for
+    every incoming request; the QA handler's return value flows back via
+    the net_server_reply bridge call. ``kind`` is http/tcp/udp/ws; the
+    remaining fields are kind-specific (http: method/url/headers/body;
+    tcp: data; udp: data/addr/port; ws: message/binary).
+    """
+    msg: dict[str, Any] = {
+        "type": SERVER_REQUEST,
+        "server": int(server),
+        "conn": int(conn),
+        "kind": kind,
+        "qa": int(qa),
+    }
+    msg.update(fields)
     return msg
 
 

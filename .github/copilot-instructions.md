@@ -78,4 +78,5 @@ Type a slash command in Copilot chat for detailed reference:
 - `/flua-setup` — install, HC3 credentials, modes, VS Code integration, CLI flags, directives
 - `/quickapp-troubleshooting` — HTML in labels, UI callbacks, property persistence, HC3 vs flua differences
 - `/qwikchild` — QwikAppChild library: UID-based children, declarative initChildren, per-child UI
+- `/quickapp-test` — offline verification: assert inside the QA, exit codes, driving the sim over HTTP
 - `/skill-creator` — create, improve, and evaluate skills

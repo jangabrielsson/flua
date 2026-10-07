@@ -127,6 +127,34 @@ def install_bindings(engine: "LuaEngine") -> None:
     py["color_enabled"] = engine.color_enabled
     py["render_html"] = engine.render_html
 
+    # net.*Server (flua extension): mock servers hosted on the engine's
+    # event loop. start binds synchronously (port 0 resolves immediately)
+    # and raises as a Lua error when the port is taken; reply carries the
+    # QA handler's return value back to the awaiting connection.
+    def net_server_start(kind: str, port: object, qa_id: object) -> tuple[int, int]:
+        try:
+            return engine.server_host.start(
+                str(kind), int(port or 0), int(qa_id) if qa_id is not None else 0
+            )
+        except OSError as exc:
+            names = {
+                "http": "HTTPServer",
+                "tcp": "TCPServer",
+                "udp": "UDPServer",
+                "ws": "WebSocketServer",
+            }
+            raise RuntimeError(f"net.{names.get(str(kind), str(kind) + 'Server')}: {exc}") from exc
+
+    def net_server_reply(server_id: object, conn_id: object, response: object) -> None:
+        engine.server_host.reply(int(server_id), int(conn_id), lua_to_python(response, lua))
+
+    def net_server_close(server_id: object) -> None:
+        engine.server_host.close_server(int(server_id))
+
+    py["net_server_start"] = net_server_start
+    py["net_server_reply"] = net_server_reply
+    py["net_server_close"] = net_server_close
+
     # JSON for QA code and mobdebug's VSCODE protocol (json.lua delegates
     # here). Both converters honor json.util.InitArray's __isArray marker, so
     # an empty marked table crosses as [] instead of {} — the one case the
@@ -151,9 +179,7 @@ def install_bindings(engine: "LuaEngine") -> None:
             if info is not None:
                 enabled = enabled or bool(info.get("config", {}).get("warn"))
         if enabled and (status >= 300 or status <= 0):
-            engine.flua_log(
-                "warning", qa_id, f"api {method.upper()} {url} -> {status}"
-            )
+            engine.flua_log("warning", qa_id, f"api {method.upper()} {url} -> {status}")
 
     def api_call(
         method: str, url: str, body: object, qa_id: int | None = None

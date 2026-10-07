@@ -12,6 +12,7 @@ fibaro_api_docs/
 dev/
 tmp/
 .directives
+forum\ posts/
 
 # agent tooling state
 .deepseek/state/

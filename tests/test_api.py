@@ -844,11 +844,12 @@ def test_embedded_ui_binary_switch(api: Api) -> None:
 
 
 def test_embedded_ui_multilevel_switch(api: Api) -> None:
-    api.state.register_qa(5001, "dimmer", "com.fibaro.multilevelSwitch", {"value": 0.5})
+    api.state.register_qa(5001, "dimmer", "com.fibaro.multilevelSwitch", {"value": 50.5})
     data, _ = api.dispatch("GET", "/flua/embeddedUI")
     view = data["5001"]
-    assert view["values"]["__setValue"]["value"] == "0.5"
-    assert view["values"]["__multiswitchValue"]["text"] == "0.500"
+    # the HC3 UI shows the dimmer value as an integer — no decimals
+    assert view["values"]["__setValue"]["value"] == "51"
+    assert view["values"]["__multiswitchValue"]["text"] == "51"
     slider = next(
         c for row in view["uiView"] for c in row["components"] if c["name"] == "__setValue"
     )

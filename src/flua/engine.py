@@ -58,6 +58,7 @@ from .http_server import ApiServer
 from .loghtml import render_html as render_html_tags
 from .mqtt import MqttPool
 from .proxy import PROXY_PORT_DEFAULT, connect_proxy, local_ip, resolve_proxy
+from .server import ServerHost
 from .sync_socket import SyncTCPSockets, SyncUDPSockets
 from .timers import TimerManager
 from .ui import compile_ui, lua_literal, ui_to_u_rows
@@ -252,6 +253,7 @@ class LuaEngine:
         self.qa_sockets = SyncTCPSockets()
         self.qa_udp = SyncUDPSockets()
         self.qa_websockets = WebSocketPool(self._on_ws_event)
+        self.server_host = ServerHost(self)  # net.*Server hosts (mock servers)
         self._loop: asyncio.AbstractEventLoop | None = None
         self.qa_mqtt = MqttPool(self._on_mqtt_event)
         # Proxy mode (--%%mode:proxy): the callback server the HC3 proxy
@@ -468,9 +470,7 @@ class LuaEngine:
         if proxy_enabled and self._db_persist:
             # proxy mode mirrors everything on the HC3 — the db file would
             # only fight the mirror
-            logger.warning(
-                "--%%db:+ persistence ignored in proxy mode (state lives on the HC3)"
-            )
+            logger.warning("--%%db:+ persistence ignored in proxy mode (state lives on the HC3)")
             self._db_persist = False
         self._normalize_files(qa_config)
         # Device properties: skeleton defaults < --%%properties < --%%property
@@ -835,6 +835,7 @@ class LuaEngine:
         info["files"] = self._build_files(info["path"], info["code"], info["config"])
         info["exited"] = None  # revive: the new code's timers must not be refused
         self._timers.cancel_qa(int(qa_id))
+        self.server_host.close_qa(int(qa_id))  # old code's mock servers die too
         self.enqueue_outbound(
             messages.restart_qa_msg(
                 int(qa_id), info["path"] or "", info["config"], info["path"] or ""
@@ -1122,9 +1123,7 @@ class LuaEngine:
             if isinstance(variables, list):
                 for var in variables:
                     if isinstance(var, dict) and var.get("name"):
-                        header.append(
-                            f"--%%var:{var['name']}={lua_literal(var.get('value'))}"
-                        )
+                        header.append(f"--%%var:{var['name']}={lua_literal(var.get('value'))}")
             if initial.get("useUiView") is False:
                 header.append("--%%useUiView:false")
             for row in ui_to_u_rows(
@@ -1219,6 +1218,7 @@ class LuaEngine:
         self._running = False
         self._timers.stop()
         self.sync_sockets.close_all()
+        self.server_host.close_all()
         if self._pump_task is not None:
             self._pump_task.cancel()
             try:
@@ -1655,6 +1655,7 @@ class LuaEngine:
             # is left.
             qa_id = int(msg["qa"])
             self._timers.cancel_qa(qa_id)
+            self.server_host.close_qa(qa_id)  # mock servers die with their QA
             info = self._qas.get(qa_id)
             if info is not None:
                 info["exited"] = code
@@ -1714,9 +1715,7 @@ class LuaEngine:
             if dev is None:
                 continue
             children = [
-                public(d)
-                for d in self.api.state.devices.values()
-                if d.get("parentId") == qa_id
+                public(d) for d in self.api.state.devices.values() if d.get("parentId") == qa_id
             ]
             qa_state[info["name"]] = {
                 "properties": public(dev.get("properties") or {}),
