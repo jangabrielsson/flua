@@ -411,6 +411,12 @@ GLOBAL_PARAMS = frozenset(
     {"speed", "instant", "maxhours", "time", "debug", "loglength", "warn"}
 )
 
+# Downloaded-file metadata directives (--tool downloadQA writes them, --tool
+# uploadFile reads them): the HC3 device id and QA file name a project file
+# belongs to, so a single file can be pushed back to its QA without a sidecar.
+DEVICE_ID_DIRECTIVE = "deviceId"
+QA_FILE_DIRECTIVE = "qaFile"
+
 # Every --%% directive flua understands (globals + locals). --check flags
 # anything else, and the runtime parser warns about it too — a typo like
 # --%%instnat:true no longer goes silently unnoticed.
@@ -439,6 +445,8 @@ KNOWN_DIRECTIVES = frozenset(
         "keep-alive",
         "u",
         "useUiView",
+        DEVICE_ID_DIRECTIVE,  # --%%deviceId:123 — downloaded-file metadata (--tool uploadFile)
+        QA_FILE_DIRECTIVE,  # --%%qaFile:main — the QA file name a downloaded file maps to
     }
 )
 

@@ -20,6 +20,7 @@ HELP = "scaffold a QA project: .vscode configs + agent files"
 # template path (inside the package) -> target path (relative to the project)
 _TEMPLATES = {
     "vscode/launch.json": ".vscode/launch.json",
+    "vscode/tasks.json": ".vscode/tasks.json",
     "vscode/extensions.json": ".vscode/extensions.json",
     "luals": ".luals",
     ".luarc.json": ".luarc.json",
@@ -113,6 +114,16 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
                 text.replace(
                     '"interpreter": "flua"',
                     f'"interpreter": {json.dumps(_flua_interpreter())}',
+                ),
+                encoding="utf-8",
+            )
+        if target == ".vscode/tasks.json":
+            # same PATH story as launch.json: the task runs flua directly
+            text = dst.read_text(encoding="utf-8")
+            dst.write_text(
+                text.replace(
+                    '"command": "flua"',
+                    f'"command": {json.dumps(_flua_interpreter())}',
                 ),
                 encoding="utf-8",
             )

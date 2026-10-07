@@ -7,6 +7,7 @@ from flua.config import (
     parse_annotations,
     parse_lua_literal,
     parse_scalar,
+    split_annotations,
 )
 
 
@@ -225,6 +226,20 @@ def test_parse_annotations_warns_on_unknown_directive(caplog) -> None:
             "--%%name:x\n--%%mode:offline\n--%%speed:2\n--%%u:{label=\"a\"}\n"
         )
     assert "unknown --%%" not in caplog.text
+
+
+def test_file_metadata_directives_are_known_and_local(caplog) -> None:
+    # --%%deviceId/--%%qaFile (downloaded-file metadata for --tool uploadFile)
+    # parse silently and stay local — they must never reach the shared config
+    import logging
+
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        annotations = parse_annotations("--%%deviceId:123\n--%%qaFile:main\n")
+    assert "unknown --%%" not in caplog.text
+    global_params, local_params = split_annotations(annotations)
+    assert global_params == {}
+    assert local_params == {"deviceId": 123, "qaFile": "main"}
 
 
 def test_eoh_stops_parsing() -> None:

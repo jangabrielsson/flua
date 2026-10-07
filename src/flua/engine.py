@@ -43,6 +43,8 @@ from .api.state import public
 from .bindings import install_bindings
 from .clock import VirtualClock
 from .config import (
+    DEVICE_ID_DIRECTIVE,
+    QA_FILE_DIRECTIVE,
     _apply_mode,
     _is_eoh,
     debug_flag,
@@ -1097,8 +1099,12 @@ class LuaEngine:
         With ``device_id`` (the downloadQA case) every file is named
         ``<sanitized-QA-name>_<file>_<id>.lua`` — several downloaded QAs can
         share one directory without colliding, and the file names carry the
-        HC3 id back for later updates. Without it (plain unpack), the extras
-        get a .lua extension and the main stays ``main.lua``.
+        HC3 id back for later updates. Each file also gets
+        ``--%%deviceId``/``--%%qaFile`` header lines (in the generated main
+        header, or atop each extra file) — the metadata --tool uploadFile
+        reads to push a single file back to its QA. Without it (plain
+        unpack), the extras get a .lua extension and the main stays
+        ``main.lua``.
 
         ``strip_header`` drops a leading --%% header from the main's content
         before the regenerated one is prepended (downloaded QAs may carry
@@ -1145,9 +1151,20 @@ class LuaEngine:
             else:
                 disk_name = f"{name}.lua"
             path = os.path.join(directory, disk_name)
+            content = str(entry.get("content") or "")
+            if device_id is not None:
+                # downloaded-file metadata: --tool uploadFile reads it to push
+                # this file back to its QA on the HC3 (comments there)
+                content = (
+                    f"--%%{DEVICE_ID_DIRECTIVE}:{device_id}\n"
+                    f"--%%{QA_FILE_DIRECTIVE}:{name}\n" + content
+                )
             with open(path, "w", encoding="utf-8") as handle:
-                handle.write(str(entry.get("content") or ""))
+                handle.write(content)
             header.append(f"--%%file:{disk_name},{name}")
+        if device_id is not None:
+            header.append(f"--%%{DEVICE_ID_DIRECTIVE}:{device_id}")
+            header.append(f"--%%{QA_FILE_DIRECTIVE}:main")
         header.append("-- --------------- EOH ---------------")
         content = str(main.get("content") or "")
         if strip_header:

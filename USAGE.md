@@ -759,6 +759,9 @@ format (individual `.lua` files) and only the HC3 sees `.fqa`:
 # update an existing QA's files from the unpacked project
 .venv/bin/flua --tool updateQA 123 script.lua
 
+# update ONE file in a downloaded QA (the VS Code task uses ${file})
+.venv/bin/flua --tool uploadFile MyQA_lib_123.lua
+
 # download a QA from the HC3 and unpack it into individual .lua files
 .venv/bin/flua --tool downloadQA 123 -d project/     # -d DIR (default: QA name)
 
@@ -794,6 +797,17 @@ dropped, since they may be outdated. `uploadQA` then takes either the QA
 name (it finds the project in the current directory) or the fully qualified
 `<QA-name>_main_<id>.lua` and updates that QA on the HC3; a plain
 `main.lua` uploads as a new QA.
+
+`downloadQA` also stamps every unpacked file with two metadata directives —
+`--%%deviceId:123` (the HC3 device id) and `--%%qaFile:lib` (the QA file
+name the file maps to). `uploadFile` reads them, so one file can be pushed
+back to its QA without re-uploading the whole project — the VS Code task
+"Flua: Upload file to HC3" (installed by `--tool setup`) runs it on the
+file you are editing (`${file}`). Files downloaded before the directives
+existed still work: the `<QA-name>_<file>_<id>.lua` file name is the
+fallback. Updating the main file restarts the QA on the HC3; the tool warns
+when the target QA's name no longer matches the file name (a file copied
+out of another QA's project).
 
 The tools need HC3 credentials (the `.env` chain, like online mode).
 `uploadQA` prints the new device id; `updateQA` puts all files at once;

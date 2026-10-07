@@ -92,12 +92,14 @@ Multi-file QAs declare their extra files in the main file:
 
 ## VS Code integration
 
-The repo ships `.vscode/launch.json` with three configurations:
+The repo ships `.vscode/launch.json` with five configurations:
 
 - **Flua: Run Current File** — plain run of the active `.lua` file.
 - **Flua: Run Current File (Terminal)** — same, in the integrated terminal.
+- **Flua: Run Current File (UI)** — run + the UI viewer in the browser.
 - **Flua: Debug Current File (mobdebug)** — remote Lua debugging through the
   mobdebug protocol (the Lua extension).
+- **Flua: Debug Current File (UI+mobdebug)** — debugger and viewer together.
 
 **Lua Language Server**: `flua --tool setup` also writes a `.luarc.json`
 (Lua 5.5, HC3 globals) and the **`.luals/` type library** — LuaLS definitions
@@ -105,7 +107,11 @@ for `QuickApp`, `fibaro`, `api` and `json` — so scaffolded projects get
 autocomplete and parameter hints on QA code. The repo carries the same
 configuration for contributors.
 
-Tasks in `.vscode/tasks.json` cover `--check`, `.fqa` export and unpack.
+`setup` also installs `.vscode/tasks.json` with one task:
+**Flua: Upload file to HC3** — runs `flua --tool uploadFile ${file}` on the
+file you are editing, pushing just that file to its QA (the target comes
+from the `--%%deviceId`/`--%%qaFile` directives `downloadQA` writes into
+every unpacked file).
 
 ## Key CLI flags
 

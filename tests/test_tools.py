@@ -29,6 +29,7 @@ def test_registry_discovers_all_tools() -> None:
         "unpack",
         "updateQA",
         "uploadFQA",
+        "uploadFile",
         "uploadQA",
     ]
     for name in tools.tool_names():
@@ -96,6 +97,13 @@ class _MockHc3(BaseHTTPRequestHandler):
         elif path.startswith("/api/devices/") and len(path.split("/")) == 4:
             device = type(self).devices.get(int(path.split("/")[3]))
             self._send(device if device is not None else {}, 200 if device else 404)
+        elif path.startswith("/api/quickApp/export/"):
+            qa_id = int(path.split("/")[-1])
+            fqa = self.fqas.get(qa_id)
+            if fqa is None:
+                self._send({}, 404)
+            else:
+                self._send(fqa)
         else:
             self._send({}, 404)
 
@@ -131,6 +139,14 @@ class _MockHc3(BaseHTTPRequestHandler):
             self.fqas[self.next_id] = fqa
             self._send({"id": self.next_id, "name": fqa["name"]})
             self.next_id += 1
+        elif path.startswith("/api/quickApp/export/"):
+            # downloadQA's export-by-id endpoint
+            qa_id = int(path.split("/")[-1])
+            fqa = self.fqas.get(qa_id)
+            if fqa is None:
+                self._send({}, 404)
+            else:
+                self._send(fqa)
         elif path.startswith("/api/quickApp/") and path.endswith("/export"):
             qa_id = int(path.split("/")[3])
             fqa = self.fqas.get(qa_id)
@@ -162,6 +178,170 @@ class _MockHc3(BaseHTTPRequestHandler):
 
     def log_message(self, *args) -> None:
         pass
+
+
+def _mock_hc3(tmp_path, monkeypatch) -> ThreadingHTTPServer:
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _MockHc3)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", f"http://127.0.0.1:{server.server_port}")
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    monkeypatch.chdir(tmp_path)
+    return server
+
+
+def test_download_qa_writes_file_metadata(tmp_path, monkeypatch, capsys) -> None:
+    # downloadQA stamps every unpacked file with --%%deviceId/--%%qaFile:
+    # the main file in its generated header, extras as header lines — the
+    # metadata --tool uploadFile reads for single-file updates
+    _MockHc3.fqas = {
+        100: {
+            "name": "MyQA",
+            "type": "com.fibaro.binarySwitch",
+            "apiVersion": "1.3",
+            "initialProperties": {"quickAppVariables": [], "useUiView": False},
+            "initialInterfaces": [],
+            "files": [
+                {
+                    "name": "main",
+                    "isMain": True,
+                    "isOpen": False,
+                    "content": "function QuickApp:onInit() end\n",
+                },
+                {
+                    "name": "lib",
+                    "isMain": False,
+                    "isOpen": False,
+                    "content": "function helper() return 1 end\n",
+                },
+            ],
+        }
+    }
+    server = _mock_hc3(tmp_path, monkeypatch)
+    try:
+        module = tools._TOOLS["downloadQA"]
+        parser = argparse.ArgumentParser()
+        module.add_arguments(parser)
+        assert module.run(parser, parser.parse_args(["100"])) == 0
+        capsys.readouterr()
+        # the default target directory is the QA's name
+        project = tmp_path / "MyQA"
+        main = (project / "MyQA_main_100.lua").read_text()
+        assert "--%%deviceId:100" in main
+        assert "--%%qaFile:main" in main
+        lib = (project / "MyQA_lib_100.lua").read_text()
+        assert lib.startswith("--%%deviceId:100\n--%%qaFile:lib\n")
+        assert "function helper() return 1 end" in lib
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_upload_file_pushes_single_file(tmp_path, monkeypatch, capsys) -> None:
+    # the VS Code task flow: edit one downloaded file, push just that file —
+    # the directives say which QA and which QA file name; isMain comes from
+    # the name, and a name mismatch on the HC3 warns (stale copy) but uploads
+    _MockHc3.requests = []
+    _MockHc3.devices = {
+        100: {"id": 100, "name": "MyQA", "type": "com.fibaro.binarySwitch", "properties": {}},
+    }
+    server = _mock_hc3(tmp_path, monkeypatch)
+    try:
+        edited = tmp_path / "MyQA_lib_100.lua"
+        edited.write_text(
+            "--%%deviceId:100\n--%%qaFile:lib\nfunction helper() return 2 end\n"
+        )
+        module = tools._TOOLS["uploadFile"]
+        parser = argparse.ArgumentParser()
+        module.add_arguments(parser)
+        assert module.run(parser, parser.parse_args(["MyQA_lib_100.lua"])) == 0
+        out = capsys.readouterr().out
+        assert "updated MyQA_lib_100.lua -> QA 100 file 'lib'" in out
+        puts = [r for r in _MockHc3.requests if r[0] == "PUT" and r[1] == "/api/quickApp/100/files"]
+        assert len(puts) == 1
+        assert puts[0][2] == [
+            {
+                "name": "lib",
+                "type": "lua",
+                "isMain": False,
+                "content": "--%%deviceId:100\n--%%qaFile:lib\nfunction helper() return 2 end\n",
+            }
+        ]
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_upload_file_main_and_mismatch_warning(tmp_path, monkeypatch, capsys) -> None:
+    # the main file: isMain=true and the message notes the restart; a device
+    # name that no longer matches the file name warns about a stale copy
+    _MockHc3.requests = []
+    _MockHc3.devices = {
+        100: {"id": 100, "name": "OtherName", "type": "com.fibaro.binarySwitch", "properties": {}},
+    }
+    server = _mock_hc3(tmp_path, monkeypatch)
+    try:
+        main = tmp_path / "MyQA_main_100.lua"
+        main.write_text(
+            "--%%name:MyQA\n--%%type:com.fibaro.binarySwitch\n"
+            "--%%deviceId:100\n--%%qaFile:main\nfunction QuickApp:onInit() end\n"
+        )
+        module = tools._TOOLS["uploadFile"]
+        parser = argparse.ArgumentParser()
+        module.add_arguments(parser)
+        assert module.run(parser, parser.parse_args(["MyQA_main_100.lua"])) == 0
+        out = capsys.readouterr().out
+        assert "warning: file name says 'MyQA' but device 100 is named 'OtherName'" in out
+        assert "the QA restarts" in out
+        puts = [r for r in _MockHc3.requests if r[0] == "PUT"]
+        assert puts and puts[0][2][0]["isMain"] is True
+        assert puts[0][2][0]["name"] == "main"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_upload_file_falls_back_to_filename_convention(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    # files downloaded before the directives existed still work: the
+    # <Name>_<file>_<id>.lua filename carries the same metadata
+    _MockHc3.requests = []
+    _MockHc3.devices = {
+        100: {"id": 100, "name": "MyQA", "type": "com.fibaro.binarySwitch", "properties": {}},
+    }
+    server = _mock_hc3(tmp_path, monkeypatch)
+    try:
+        legacy = tmp_path / "MyQA_util_100.lua"
+        legacy.write_text("function util() return 1 end\n")
+        module = tools._TOOLS["uploadFile"]
+        parser = argparse.ArgumentParser()
+        module.add_arguments(parser)
+        assert module.run(parser, parser.parse_args(["MyQA_util_100.lua"])) == 0
+        out = capsys.readouterr().out
+        assert "-> QA 100 file 'util'" in out
+        puts = [r for r in _MockHc3.requests if r[0] == "PUT"]
+        assert puts and puts[0][2][0]["name"] == "util"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_upload_file_without_target_errors(tmp_path, monkeypatch) -> None:
+    server = _mock_hc3(tmp_path, monkeypatch)
+    try:
+        stray = tmp_path / "random.lua"
+        stray.write_text("function x() end\n")
+        module = tools._TOOLS["uploadFile"]
+        parser = argparse.ArgumentParser()
+        module.add_arguments(parser)
+        with pytest.raises(SystemExit) as exc:
+            module.run(parser, parser.parse_args(["random.lua"]))
+        assert exc.value.code == 2
+    finally:
+        server.shutdown()
+        server.server_close()
 
 
 def test_pack_unpack_tools_roundtrip(tmp_path, capsys, monkeypatch) -> None:
