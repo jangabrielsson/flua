@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.24] - 2026-10-07
+
+### Added
+- implement uploadFile tool for single QA file updates and enhance VS Code integration
+- add net.*Server extension for mock server functionality
+
 ## [0.1.23] - 2026-10-06
 
 ### Added
