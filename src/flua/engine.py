@@ -237,6 +237,7 @@ class LuaEngine:
             messages.MQTT_PUBLISH: self._handle_mqtt_publish,
             messages.MQTT_DISCONNECT: self._handle_mqtt_disconnect,
             messages.CLEAR_TIMEOUT: self._handle_clear_timeout,
+            messages.API_CALL: self._handle_api_call,
             messages.QA_VARS: self._handle_qa_vars,
             messages.LOG: self._handle_log,
             messages.EXIT: self._handle_exit,
@@ -1375,6 +1376,52 @@ class LuaEngine:
         task = asyncio.create_task(self._run_http_request(msg), name="flua-http")
         self._http_tasks.add(task)
         task.add_done_callback(self._http_tasks.discard)
+
+    def _handle_api_call(self, msg: dict[str, Any]) -> None:
+        """A suspended QA's api.* call (remote mode): dispatch in a worker
+        thread so the slow HC3 part never freezes the pump — the calling QA
+        stays suspended, every other QA keeps running. The response resumes
+        the QA's coroutine via the apiResult message."""
+        qa = int(msg.get("qa") or 0)
+        method = str(msg.get("method") or "GET").upper()
+        url = str(msg.get("url") or "")
+        body = msg.get("body")
+        hc3_direct = bool(msg.get("hc3"))
+        if debug_flag(self.config, "api"):
+            self.debug_log(f"api {method} {url}")
+
+        def worker() -> None:
+            try:
+                if hc3_direct:
+                    data, status = self.api.dispatch_hc3(method, url, body)
+                else:
+                    data, status = self.api.dispatch(method, url, body, qa_id=qa)
+            except Exception:
+                logger.exception("async api dispatch failed for %s %s", method, url)
+                data, status = None, 0
+            # --%%warn:true — error status codes are easy to miss (the HC3
+            # stays silent, the emulator can shout)
+            enabled = bool(self.config.get("warn"))
+            info = self._qas.get(qa)
+            if info is not None:
+                enabled = enabled or bool(info.get("config", {}).get("warn"))
+            if enabled and (status >= 300 or status <= 0):
+                self.flua_log("warning", qa, f"api {method} {url} -> {status}")
+            info = self._qas.get(qa)
+            if info is not None and info.get("exited") is not None:
+                return  # the QA died while the call was in flight — drop it
+            out = messages.api_result(qa, data, status)
+            loop = self._loop
+            try:
+                running = asyncio.get_running_loop()
+            except RuntimeError:
+                running = None
+            if loop is not None and running is not loop:
+                loop.call_soon_threadsafe(self.enqueue_outbound, out)
+            else:
+                self.enqueue_outbound(out)
+
+        threading.Thread(target=worker, name="flua-api", daemon=True).start()
 
     # -- net.TCPSocket (worker threads over the dedicated qa_sockets pool) ------
 

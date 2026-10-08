@@ -39,6 +39,7 @@ class _MockHc3(BaseHTTPRequestHandler):
     uploaded: list[dict] = []  # decoded .fqa packages (POST /quickApp)
     file_updates: list[tuple[int, list]] = []  # (qa_id, files) for PUT /quickApp/{id}/files
     export_post_rejects = False  # bodyless export POSTs get 400 (real-HC3 behavior)
+    device_delay = 0.0  # hold /api/devices/45 this many seconds (async-dispatch tests)
 
     def _read_body(self):
         length = int(self.headers.get("Content-Length") or 0)
@@ -69,6 +70,8 @@ class _MockHc3(BaseHTTPRequestHandler):
             if not self._authed():
                 self._send_json({"error": "unauthorized"}, 401)
                 return
+            if type(self).device_delay:
+                time.sleep(type(self).device_delay)
             self._send_json({"id": 45, "name": "hc3-device", "type": "com.fibaro.binarySwitch"})
             return
         if self.path == "/api/devices" or self.path.startswith("/api/devices?"):
@@ -256,6 +259,7 @@ def mock_hc3() -> str:
     _MockHc3.refresh_polls = 0
     _MockHc3.auth_all = False
     _MockHc3.hold_refresh = 0.0
+    _MockHc3.device_delay = 0.0
     _MockHc3.uploaded = []
     _MockHc3.file_updates = []
     _MockHc3.export_post_rejects = False
@@ -311,6 +315,91 @@ async def test_hybrid_routing_local_sim_and_remote_hc3(
     out = capsys.readouterr().out
     assert "LOCAL 5000" in out  # served by the offline sim
     assert "REMOTE 200 hc3-device" in out  # served by the mock HC3
+
+
+@pytest.mark.asyncio
+async def test_slow_remote_call_does_not_freeze_other_qas(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # QA a makes a SLOW remote api.get; QA b's interval keeps ticking while
+    # a waits. The calling QA is suspended (its own messages defer), but the
+    # pump and every other QA keep running — with the old blocking dispatch
+    # b would tick zero times during a's ~0.8s call.
+    _MockHc3.device_delay = 0.8
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    slow = tmp_path / "slow.lua"
+    slow.write_text(
+        "--%%name:slowpoke\n"
+        "function QuickApp:onInit()\n"
+        "  local d, status = api.get('/devices/45')\n"
+        "  print('SLOW DONE', status, d.name)\n"
+        "  exit(0)\n"
+        "end\n"
+    )
+    tick = tmp_path / "tick.lua"
+    tick.write_text(
+        "--%%name:ticker\n"
+        "local n = 0\n"
+        "function QuickApp:onInit()\n"
+        "  setInterval(function()\n"
+        "    n = n + 1\n"
+        "    print('TICK', n)\n"
+        "  end, 100)\n"
+        "end\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        engine.start_qa(str(slow), None, {}, str(slow))
+        engine.start_qa(str(tick), None, {}, str(tick))
+        await asyncio.sleep(1.2)
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "SLOW DONE 200 hc3-device" in out
+    ticks = out.count("TICK ")
+    assert ticks >= 3, f"other QA frozen during the remote call ({ticks} ticks): {out}"
+
+
+@pytest.mark.asyncio
+async def test_remote_api_call_suspends_only_calling_qa(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # while the slow call is in flight, messages for the CALLING QA defer
+    # (the sleep machinery): its own timer fires only after the response
+    # resumes the coroutine — and api.get returns the response values in
+    # order, mid-callback
+    _MockHc3.device_delay = 0.4
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    script = tmp_path / "seq.lua"
+    script.write_text(
+        "--%%name:sequenced\n"
+        "function QuickApp:onInit()\n"
+        "  local events = {}\n"
+        "  setTimeout(function()\n"
+        "    events[#events + 1] = 'timer'\n"
+        "    print('ORDER', table.concat(events, ','))\n"
+        "    exit(0)\n"
+        "  end, 50)\n"
+        "  local d, status = api.get('/devices/45')\n"
+        "  events[#events + 1] = 'api:' .. status\n"
+        "end\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await asyncio.sleep(1.0)
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "ORDER api:200,timer" in out  # the call completed before the deferred timer
 
 
 @pytest.mark.asyncio

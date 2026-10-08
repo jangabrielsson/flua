@@ -499,7 +499,12 @@ alias for `--%%mode:offline`.
 With `--api remote`, the `api` table talks to the real HC3: everything your
 flua QAs own (devices from 5000, seeded sim state) is served locally, and
 anything the sim doesn't know is forwarded to the controller over HTTP —
-the same Lua surface, hybrid routing. Credentials come from the .env chain:
+the same Lua surface, hybrid routing. Remote calls are **asynchronous per
+QA**: a slow controller call suspends only the calling QA (its timers and
+events queue, like during `fibaro.sleep`) while the pump and every other
+emulated QA keep running — the response resumes the QA's code exactly where
+`api.get` was called. Offline (the default), calls stay synchronous — the
+fast path. Credentials come from the .env chain:
 
 ```bash
 # .env

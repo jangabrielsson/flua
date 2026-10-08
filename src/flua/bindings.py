@@ -123,6 +123,7 @@ def install_bindings(engine: "LuaEngine") -> None:
     py["log"] = engine.log_line
     py["flua_log"] = engine.flua_log
     py["getenv"] = engine.env.get
+    py["api_remote_mode"] = lambda: engine.hc3 is not None
     py["version"] = lambda: __version__
     py["color_enabled"] = engine.color_enabled
     py["render_html"] = engine.render_html

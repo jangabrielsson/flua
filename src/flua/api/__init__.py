@@ -14,6 +14,7 @@ import base64
 import json
 import logging
 import re
+import threading
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
@@ -58,6 +59,12 @@ class Api:
         self._remote = engine.hc3 if engine is not None else None  # M3: the real HC3
         self.state = SimState(seed)
         self.emitted: list[dict[str, Any]] = []  # every event enqueued (tests/introspection)
+        # SimState access is serialized: remote-mode QA api calls run in
+        # worker threads (async dispatch), the pump mutates state in
+        # between. Contention is rare (sim-side work is microseconds); the
+        # lock may be held across a remote HTTP call inside a handler's
+        # forwarding path — the pump keeps delivering timers regardless.
+        self._dispatch_lock = threading.RLock()
 
     def _emit(self, msg: dict[str, Any]) -> None:
         """Hand a pump-delivered event to the engine (and record it)."""
@@ -115,7 +122,21 @@ class Api:
         ``external`` marks requests that arrived over HTTP from outside the
         emulator (viewer, proxy callbacks): the real HC3 recorded their
         events already, so handlers must not emit duplicates.
+
+        Serialized against other dispatches: remote-mode QA calls arrive
+        from worker threads while the pump mutates the sim in between.
         """
+        with self._dispatch_lock:
+            return self._dispatch(method, url, body, qa_id, external)
+
+    def _dispatch(
+        self,
+        method: str,
+        url: str,
+        body: Any = None,
+        qa_id: int | None = None,
+        external: bool = False,
+    ) -> tuple[Any, int]:
         if self._engine is not None:
             self._engine.mark_db_dirty()  # may mutate the sim (--%%db:+)
         method = method.upper()
@@ -179,6 +200,10 @@ class Api:
         """api.hc3.*: force the REAL HC3, bypassing the hybrid dispatch —
         used by fibaro.callhc3 and test code that wants ground-truth data.
         Without a remote backend (local mode) the sim stands in."""
+        with self._dispatch_lock:
+            return self._dispatch_hc3(method, url, body)
+
+    def _dispatch_hc3(self, method: str, url: str, body: Any = None) -> tuple[Any, int]:
         if self._remote is None:
             return self.dispatch(method, url, body)
         segments, query = parse_url(url)

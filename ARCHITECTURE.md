@@ -182,6 +182,16 @@ In-flight work counts as **pending work** — the process stays alive until
 timers, queues, and open connections are all done. The debugger's sockets
 are the one main-thread exception (see §2).
 
+A QA's `api.*` calls with a remote backend (online/proxy mode) use the
+same worker-thread pattern via the `apiCall`/`apiResult` messages: the Lua
+side yields a request table, the pump spawns a worker thread running the
+hybrid dispatch (serialized against other dispatches by `Api`'s lock — the
+sim side is shared state), and the response resumes the QA's coroutine
+with `(data, status)`. The QA stays suspended meanwhile — its own messages
+defer through the same `sleeping`/`workQueues` machinery as
+`fibaro.sleep` — while the pump and every other QA keep running. Offline,
+the synchronous `_PY.api` bridge remains the fast path.
+
 The mirror image is `net.*Server` (flua extension, `server.py`): mock
 servers hosted **on the loop** for QA-side testing. The socket is bound
 synchronously when the QA calls `listen` (port 0 resolves at once), and

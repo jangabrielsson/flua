@@ -223,6 +223,8 @@ end
 local sleeping = {}    -- qaId -> true while a sleep is active (messages defer)
 local wakeTimers = {}  -- timer ids that end a sleep (never deferred)
 local workQueues = {}  -- qaId -> FIFO of messages deferred during the sleep
+local pendingApi = {}  -- qaId -> suspended coroutine awaiting an apiResult
+local qaRunners = {}  -- qaId -> the QA callback coroutine currently running (nil while none)
 
 -- forward slots: handlers, qaInstances and the mutually recursive runners
 -- are declared later in this chunk
@@ -273,27 +275,43 @@ resumeQa = function(qaId, co, ...)
   if not ok then
     postLog("error", tostring(res))
     postLog("error", debug.traceback(co, nil, 2))
+    if qaRunners[qaId] == co then qaRunners[qaId] = nil end
+    return
+  end
+  if coroutine.status(co) == "dead" then
+    if qaRunners[qaId] == co then qaRunners[qaId] = nil end
     return
   end
   if coroutine.status(co) == "suspended" then
-    if type(res) ~= "number" then
+    local rt = type(res)
+    if rt == "number" then
+      -- fibaro.sleep(ms): suspend on the virtual clock
+      sleeping[qaId] = true
+      -- declare id first: a closure inside a `local id = ...` initializer binds
+      -- to an outer id in this Lua version (Lua 5.5 initializer scoping)
+      local id
+      id = _FLUA.setTimeout(function()
+        wakeTimers[id] = nil
+        if sleeping[qaId] then
+          sleeping[qaId] = nil
+          resumeQa(qaId, co) -- the sleeping callback continues first
+          processWork(qaId)  -- then whatever was deferred during the sleep
+        end
+      end, res, qaId)
+      wakeTimers[id] = true
+    elseif rt == "table" and res.type == "apiCall" then
+      -- api.* with a remote backend: suspend the calling QA while the
+      -- engine dispatches the call in a worker thread (the pump and every
+      -- other QA keep running); handlers.apiResult resumes this coroutine
+      -- with (data, status). The shared sleeping flag defers the QA's
+      -- messages while the call is in flight — same machinery as sleep.
+      sleeping[qaId] = true
+      pendingApi[qaId] = co
+      _PY.post(res)
+    else
       -- yield protocol violation (e.g. async.await outside async.run)
       _PY.flua_log("error", qaId, "unexpected yield from QA callback (fibaro.sleep expects ms)")
-      return
     end
-    sleeping[qaId] = true
-    -- declare id first: a closure inside a `local id = ...` initializer binds
-    -- to an outer id in this Lua version (Lua 5.5 initializer scoping)
-    local id
-    id = _FLUA.setTimeout(function()
-      wakeTimers[id] = nil
-      if sleeping[qaId] then
-        sleeping[qaId] = nil
-        resumeQa(qaId, co) -- the sleeping callback continues first
-        processWork(qaId)  -- then whatever was deferred during the sleep
-      end
-    end, res, qaId)
-    wakeTimers[id] = true
   end
 end
 
@@ -306,6 +324,7 @@ runInQa = function(qaId, fn, ...)
     return
   end
   local co = coroutine.create(fn)
+  qaRunners[qaId] = co
   -- Lua 5.5 does not inherit debug hooks into new coroutines: mirror the
   -- current thread's hook (mobdebug breakpoints/stepping) onto the callback
   -- coroutine, so debugged QAs behave like they ran on the main thread.
@@ -519,8 +538,27 @@ local function installQaGlobals(env)
   -- HC3 REST API. Offline, _PY.api dispatches to the simulated HC3
   -- (running QAs plus seeded state); online mode will route to the real
   -- HC3. Contract: (data, status) — data is nil on errors.
+  --
+  -- With a remote backend (online/proxy mode), calls from the QA's own
+  -- callback coroutine suspend the CALLING QA while the engine dispatches
+  -- in a worker thread — the pump and every other QA keep running, and the
+  -- apiResult message resumes this coroutine with (data, status) (the same
+  -- per-QA suspension machinery fibaro.sleep uses). Calls from anywhere
+  -- else (nested coroutines like async.run, non-QA code) stay synchronous.
   local function apiCall(method)
-    return function(url, body) return _PY.api(method, url, body, env._FLUA.qaId) end
+    return function(url, body)
+      local qaId = env._FLUA.qaId
+      if _PY.api_remote_mode() and coroutine.running() == qaRunners[qaId] then
+        return coroutine.yield{
+          type = "apiCall",
+          method = method,
+          url = tostring(url),
+          body = body,
+          qa = qaId,
+        }
+      end
+      return _PY.api(method, url, body, qaId)
+    end
   end
   env.api = {
     get = apiCall("GET"),
@@ -533,7 +571,20 @@ local function installQaGlobals(env)
   -- dispatch and always talks to the real HC3 (useful in test code that
   -- wants ground-truth data).
   local function apiCallHC3(method)
-    return function(url, body) return _PY.api_hc3(method, url, body) end
+    return function(url, body)
+      local qaId = env._FLUA.qaId
+      if _PY.api_remote_mode() and coroutine.running() == qaRunners[qaId] then
+        return coroutine.yield{
+          type = "apiCall",
+          method = method,
+          url = tostring(url),
+          body = body,
+          qa = qaId,
+          hc3 = true,
+        }
+      end
+      return _PY.api_hc3(method, url, body)
+    end
   end
   env.api.hc3 = {
     get = apiCallHC3("GET"),
@@ -1003,6 +1054,23 @@ handlers.serverRequest = function(msg)
     if sleeping[msg.qa] then queueFor(msg.qa, msg) return end
     runInQa(msg.qa, function() h(msg) end)
   end
+end
+
+handlers.apiResult = function(msg)
+  -- the response to a suspended QA's api.* call: resume its coroutine with
+  -- (data, status) — the api.get that yielded returns these values. This is
+  -- the wake message, so it bypasses the sleeping deferral like sleep's
+  -- wake timer does.
+  local qaId = msg.qa
+  local co = pendingApi[qaId]
+  pendingApi[qaId] = nil
+  if co == nil then
+    _PY.flua_log("warning", qaId, "apiResult for a QA with no pending api call — dropped")
+    return
+  end
+  sleeping[qaId] = nil
+  resumeQa(qaId, co, msg.data, msg.status)
+  processWork(qaId)
 end
 
 handlers.mqttEvent = function(msg)

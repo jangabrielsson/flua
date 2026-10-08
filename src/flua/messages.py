@@ -57,6 +57,12 @@ TCP_RESULT = (
 UDP_RESULT = "udpResult"  # {"id": int, "qa": int?, "ok": bool, "data"?: str, "err"?: str}
 WS_EVENT = "wsEvent"  # {"qa": int, "conn": int, "event": str, "data"?: str}
 SERVER_REQUEST = "serverRequest"  # mock server -> QA handler (flua extension, net.*Server)
+API_CALL = (
+    # QA -> engine: async api dispatch (remote mode)
+    # {"method": str, "url": str, "body": any, "qa": int, "hc3"?: bool}
+    "apiCall"
+)
+API_RESULT = "apiResult"  # engine -> QA: the response — {"qa", "data", "status"}
 MQTT_EVENT = "mqttEvent"  # {"qa": int, "conn": int, "event": str, "data"?: dict}
 REFRESH_STATE_EVENT = (
     "refreshStateEvent"  # {"event": {...}}  pump-delivered to RefreshStateSubscribers
@@ -217,6 +223,15 @@ def server_request(
         "qa": int(qa),
     }
     msg.update(fields)
+    return msg
+
+
+def api_result(qa: int, data: Any, status: int) -> dict[str, Any]:
+    """The response to a suspended QA's async api call (remote mode)."""
+    msg: dict[str, Any] = {"type": API_RESULT, "qa": int(qa)}
+    if data is not None:
+        msg["data"] = data
+    msg["status"] = int(status)
     return msg
 
 

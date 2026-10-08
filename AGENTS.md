@@ -104,8 +104,11 @@ Python 3.11+. `lupa` is the only runtime dependency.
   `req.remote` / `forward_to_proxy`.
 - QA ids: engine-assigned from 5000; proxy QAs run under their HC3 id; the
   sim shadow and the HC3 device are the *same* id.
-- Synchronous blocking (remote HC3 calls, debugger sockets) is a documented
-  exception that freezes the pump — keep it LAN-local and rare.
+- A QA's `api.*` calls with a remote backend (online/proxy mode) suspend
+  only the calling QA — the pump and other QAs keep running (per-QA
+  coroutines + the shared deferral machinery, `init.lua`). Engine-side
+  remote calls and the debugger still block the pump — keep those
+  LAN-local and rare.
 - Keep `_PY` (the Lua↔Python bridge surface) minimal; convenience lives in Lua.
 - `dev/` is scratch. Do not commit probes.
 - Docs: behavior changes belong in `USAGE.md` (user-facing) and/or
