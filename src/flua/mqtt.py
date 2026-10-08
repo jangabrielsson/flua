@@ -10,7 +10,8 @@ pump. Implements the HC3's documented mqtt.* surface:
   (PUBREC/PUBREL/PUBCOMP), send-side downgraded to QoS 1 (documented)
 - keep-alive pings when idle (options.keepAlivePeriod)
 - TLS via mqtts:// and options.tls (allowUnauthorized, clientCertificate,
-  certificateAuthority), username/password, clientId, cleanSession, lastWill
+  certificateAuthority, useSNI — SNI on by default, like the HC3 since
+  firmware 5.191), username/password, clientId, cleanSession, lastWill
 """
 
 from __future__ import annotations
@@ -110,7 +111,14 @@ class MqttClient:
 
     # -- connect / MQTT handshake ------------------------------------------------
 
-    def _wrap_tls(self, sock: socket.socket) -> socket.socket:
+    def _tls_context(self) -> tuple[ssl.SSLContext, str | None]:
+        """The TLS context and server_hostname for this connection's options.
+
+        SNI is on by default (the HC3 enables it since firmware 5.191);
+        tls.useSNI = false switches it off. Without a server_hostname Python
+        cannot do hostname verification — disable it (the chain is still
+        verified), matching the HC3's SNI-off semantics.
+        """
         tls = self._options.get("tls") or {}
         context = ssl.create_default_context()
         allow_unauthorized = bool(tls.get("allowUnauthorized"))
@@ -133,7 +141,14 @@ class MqttClient:
                 handle.write(client_cert)
                 cert_path = handle.name
             context.load_cert_chain(cert_path)
-        return context.wrap_socket(sock, server_hostname=self._host)
+        if tls.get("useSNI", True):
+            return context, self._host
+        context.check_hostname = False
+        return context, None
+
+    def _wrap_tls(self, sock: socket.socket) -> socket.socket:
+        context, server_hostname = self._tls_context()
+        return context.wrap_socket(sock, server_hostname=server_hostname)
 
     def connect(self) -> None:
         sock = socket.create_connection((self._host, self._port), timeout=self._timeout)

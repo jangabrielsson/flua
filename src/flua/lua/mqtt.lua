@@ -6,6 +6,11 @@
 --     lastWill = { topic = "qa/status", payload = "offline", qos = mqtt.QoS.AT_LEAST_ONCE, retain = true },
 --     callback = function(errorCode) ... end,   -- connect completion (not broker ack)
 --   })
+--
+-- TLS (mqtts:// or a tls option): SNI is sent by default, like the HC3 since
+-- firmware 5.191; tls = { useSNI = false } switches it off (and skips
+-- hostname verification). Also: tls.allowUnauthorized, tls.certificateAuthority,
+-- tls.clientCertificate.
 --   client:addEventListener("connected", function(e) ... e.sessionPresent, e.returnCode ... end)
 --   client:addEventListener("message", function(e) ... e.topic, e.payload, e.qos, e.retain, e.packetId, e.dup ... end)
 --   client:subscribe("lights/#", { qos = mqtt.QoS.EXACTLY_ONCE })   -- returns packetId

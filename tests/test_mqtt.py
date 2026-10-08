@@ -282,3 +282,20 @@ def test_example_mqtt_runs_cleanly() -> None:
     assert "connect result: ok" in result.stdout
     assert "mqtt echo: flua/demo hello from flua qos=1" in result.stdout
     assert "mqtt error" not in result.stdout
+
+
+def test_tls_use_sni_option() -> None:
+    # the HC3 sends SNI by default (since firmware 5.191); tls.useSNI = false
+    # switches it off — server_hostname=None, which also disables hostname
+    # verification (the chain is still verified)
+    from flua.mqtt import MqttClient
+
+    for options, expected_host, expect_check in (
+        ({"tls": {"useSNI": False}}, None, False),
+        ({"tls": {}}, "broker.example", True),
+        ({}, "broker.example", True),
+    ):
+        client = MqttClient("mqtts://broker.example:8883", options, 5.0, lambda e, d: None)
+        context, server_hostname = client._tls_context()
+        assert server_hostname == expected_host
+        assert context.check_hostname is expect_check
