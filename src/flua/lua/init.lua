@@ -660,6 +660,10 @@ local function qaEnvFor(qaId)
     __index = _G,
     __newindex = function(t, k, v) rawset(t, k, v) end,
   })
+  -- The HC3 model: each QA is its own Lua state, so its _G IS its own
+  -- globals. Alias _G to this QA's environment — QA code reading or
+  -- writing _G.xxx sees its own globals, never the shared state table.
+  env._G = env
   -- per-QA package table: require() finds files next to the QA (the main
   -- file's directory is prepended at load, below), and a QA rewriting
   -- package.path never leaks into other QAs or the runtime

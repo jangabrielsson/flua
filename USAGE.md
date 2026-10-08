@@ -881,8 +881,10 @@ when regenerating the reference:
 ## flua extensions (`_FLUA`)
 
 Everything HC3-compatible is a plain global (`QuickApp`, `fibaro`, `api`,
-`net`, `mqtt`, `json`, …). flua-specific helpers live on `_FLUA` so your code
-stays portable:
+`net`, `mqtt`, `json`, …) — and like on the HC3 (one Lua state per QA), a
+QA's `_G` **is** its own environment: `_G.x = 1` writes the QA's global
+`x`, invisible to other QAs and the shared runtime. flua-specific helpers
+live on `_FLUA` so your code stays portable:
 
 - `_FLUA.qaId` — this QA's id; `_FLUA.config` — this QA's config table
 - `_FLUA.arg` — the file path / `-e` marker

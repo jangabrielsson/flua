@@ -118,6 +118,35 @@ def test_cli_runs_multiple_qas_isolated(tmp_path) -> None:
     assert "B b qa-b" in result.stdout
 
 
+def test_qa_g_aliases_its_own_environment(tmp_path) -> None:
+    # the HC3 model: each QA is its own Lua state, _G IS its globals.
+    # QA code using _G.xxx sees its own environment — writes stay inside
+    # the QA, standard globals resolve through the same table
+    a = tmp_path / "a.lua"
+    a.write_text(
+        "--%%name:g_a\n"
+        "_G.marker = 'A'\n"
+        "print('A', _G.marker, _G.print == print)\n"
+        "exit(0)\n"
+    )
+    b = tmp_path / "b.lua"
+    b.write_text(
+        "--%%name:g_b\n"
+        "print('B', tostring(_G.marker))\n"
+        "exit(0)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--api", "local", str(a), str(b)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "A A true" in result.stdout  # _G is the QA's own environment
+    assert "B nil" in result.stdout  # writes never leak into another QA
+
+
 def test_include_directive_adds_files_to_a_qa(tmp_path) -> None:
     # a QA includes a defaults file whose --%%file entries append to the
     # QA's own files; both paths resolve relative to the main file
