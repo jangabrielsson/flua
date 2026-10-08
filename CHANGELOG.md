@@ -4,6 +4,15 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.26] - 2026-10-08
+
+### Added
+- implement --%%include directive for default configuration management and enhance directive handling
+- update config pipeline documentation to clarify directive handling and include expansion
+
+### Changed
+- remove offline mode directive from .directives file
+
 ## [0.1.25] - 2026-10-08
 
 ### Added
