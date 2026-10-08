@@ -215,9 +215,11 @@ receive).
 ## 9. Config pipeline
 
 ```
-  .directives file  ->  defaults for the MAIN QA (QA header overrides)
   raw file header   ->  parse_annotations()  (--%% directives, EOH header)
-  --%%mode:...      ->  mode decision: --api flag > main QA's merged mode > online
+  --%%include:...   ->  expand_includes(): the included files' directives
+                       become defaults (QA header wins, files append, nested
+                       includes resolve relative to the including file)
+  --%%mode:...      ->  mode decision: --api flag > main QA's mode > online
   per-QA config     <-  CLI flags + globals + locals + .flua.lua base
   --%%var:name=expr    ->  evaluated in Lua with {config, os} in scope
   os.getenv(name)      ->  EnvChain: local .env > ~/.env > process env
