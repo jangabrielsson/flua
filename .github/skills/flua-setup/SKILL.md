@@ -50,8 +50,7 @@ failed attempts, so flua never retries a 401/403).
 ## Modes — how the emulator talks to the HC3
 
 One directive decides it all, `--%%mode:online|offline|proxy` (placed in
-the QA's header, or as a default in a `.directives` file in the working
-directory):
+the QA's header, or in a defaults file pulled in with `--%%include:<file>`):
 
 - `--%%mode:offline` — run against the simulated HC3 only (the default; no
   credentials needed).
@@ -62,7 +61,7 @@ directory):
   (you edit it in the HC3's own UI editor; the connect doesn't clobber it).
 
 Resolution order: explicit `--api local|remote` flag → the main QA's
-directives (merged over the `.directives` defaults) → default offline.
+directives (over any `--%%include`'d defaults) → default offline.
 
 ## Scaffold a QuickApp project
 
@@ -150,16 +149,26 @@ every unpacked file).
 A typo'd directive warns at runtime (`unknown --%% directive`) and
 `flua --check` flags it with the file context.
 
-## The `.directives` defaults file
+## The `--%%include` defaults directive
 
-A `.directives` file in the working directory supplies defaults for the
-main QA (same `--%%` syntax; the QA's own directives override). The usual
-content: a default mode and log/trace defaults.
+A QA can pull its defaults from another file — explicit and per-QA, the
+path relative to the main file (like `--%%file`):
 
+```lua
+--%%include:defaults.lua      -- the file's directives become defaults
+--%%name:LocalName            -- this QA's own directives override them
 ```
-# .directives — defaults for the main QA
---%%mode:offline      # this project normally runs offline
+
+```lua
+-- defaults.lua
+--%%mode:offline              # this project normally runs offline
 ```
+
+The QA's own directives win per key (the mode family as a whole — a QA can
+opt out of an included `--%%mode:offline`); `--%%file` lists append;
+includes nest and a missing include is an error. This replaced the old
+`.directives` working-directory file (ambiguous with QAs in different
+subdirectories — each QA now declares its defaults explicitly).
 
 ## Working with agents
 

@@ -27,8 +27,7 @@ from typing import Any
 from . import __version__, messages
 from .clock import parse_start_time
 from .config import (
-    load_directives_file,
-    merge_directives,
+    expand_includes,
     parse_annotations,
     split_annotations,
 )
@@ -180,14 +179,6 @@ def _load_qas(
     """
     global_config: dict[str, Any] = {}
     specs: list[tuple[str | None, str | None, dict[str, Any]]] = []
-    # .directives in the working directory: defaults for the MAIN QA (the
-    # first file spec — pure -e runs get none). The QA's own directives
-    # override them (mode as a whole).
-    try:
-        defaults = load_directives_file(Path.cwd())
-    except ValueError as exc:
-        parser.error(f"error in .directives: {exc}")
-    main_index = 1 if args.code is not None else 0  # the first script
     if args.code is not None:
         global_params, local_params = split_annotations(parse_annotations(args.code))
         global_config.update(global_params)
@@ -197,9 +188,10 @@ def _load_qas(
         if not path.exists():
             parser.error(f"cannot open {script}: no such file")
         source = path.read_text(encoding="utf-8")
-        annotations = parse_annotations(source)
-        if len(specs) == main_index:
-            annotations = merge_directives(defaults, annotations)
+        try:
+            annotations = expand_includes(parse_annotations(source), path.parent)
+        except ValueError as exc:
+            parser.error(f"error in {script}: {exc}")
         global_params, local_params = split_annotations(annotations)
         global_config.update(global_params)  # last file wins
         specs.append((str(path.resolve()), None, local_params))
@@ -337,11 +329,11 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             location = loc_cfg
         break
     try:
-        # The engine mode follows the MAIN QA's merged directives (its
-        # header over the .directives defaults) — --%%mode:offline selects
-        # the sim, --%%mode:online|proxy the HC3. An explicit --api flag
-        # always wins, and the default (no directive anywhere) is ONLINE —
-        # offline is opt-in.
+        # The engine mode follows the MAIN QA's directives (its header over
+        # any --%%include'd defaults) — --%%mode:offline selects the sim,
+        # --%%mode:online|proxy the HC3. An explicit --api flag always
+        # wins, and the default (no directive anywhere) is ONLINE — offline
+        # is opt-in.
         api_mode = args.api
         if api_mode is None and qa_specs:
             # the FIRST spec may be an injected -e bootstrap (the mobdebug

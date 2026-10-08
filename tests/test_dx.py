@@ -271,16 +271,16 @@ def test_getenv_falls_back_to_process_env(tmp_path, monkeypatch) -> None:
     assert "PROC from-shell" in result.stdout
 
 
-# -- .directives defaults -------------------------------------------------------
+# -- include directives --------------------------------------------------------
 
 
-def test_directives_file_supplies_main_qa_defaults(tmp_path) -> None:
-    # a .directives file in the working directory is read as defaults for the
-    # MAIN QA: the engine follows its mode (offline here) and the QA sees
-    # the default name
-    (tmp_path / ".directives").write_text("--%%name:Default\n--%%mode:offline\n")
+def test_include_directive_supplies_defaults(tmp_path) -> None:
+    # --%%include:<file> inserts the file's directives as defaults: the
+    # engine follows the included mode (offline here) and the QA sees the
+    # included name; the QA's own directives override them
+    (tmp_path / "defaults.lua").write_text("--%%name:Default\n--%%mode:offline\n")
     script = tmp_path / "main.lua"
-    script.write_text("print('NAME', _FLUA.config.name)\n")
+    script.write_text("--%%include:defaults.lua\nprint('NAME', _FLUA.config.name)\n")
     result = subprocess.run(
         [*FLOA, str(script)],
         cwd=tmp_path,
@@ -289,16 +289,16 @@ def test_directives_file_supplies_main_qa_defaults(tmp_path) -> None:
         timeout=60,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "mode offline" in result.stdout  # the file's mode picked the sim
+    assert "mode offline" in result.stdout  # the included mode picked the sim
     assert "NAME Default" in result.stdout
 
 
-def test_directives_file_qa_overrides_defaults(tmp_path) -> None:
-    # the QA's own directives override the file's; the mode family overrides
-    # as a whole, so an explicit opt-out beats the file's offline default
-    (tmp_path / ".directives").write_text("--%%mode:offline\n")
+def test_include_directive_qa_overrides_defaults(tmp_path) -> None:
+    # the QA's own directives override the included file's; the mode family
+    # overrides as a whole, so an explicit opt-out beats the included mode
+    (tmp_path / "defaults.lua").write_text("--%%mode:offline\n")
     script = tmp_path / "main.lua"
-    script.write_text("--%%name:Mine\n--%%offline:false\nprint('RAN')\n")
+    script.write_text("--%%include:defaults.lua\n--%%name:Mine\n--%%offline:false\nprint('RAN')\n")
     result = subprocess.run(
         [*FLOA, str(script)],
         cwd=tmp_path,
@@ -306,17 +306,17 @@ def test_directives_file_qa_overrides_defaults(tmp_path) -> None:
         text=True,
         timeout=60,
     )
-    # opting out of the file's offline default -> online, which needs HC3
+    # opting out of the included offline default -> online, which needs HC3
     # credentials — the loud error proves the override took effect
     assert result.returncode == 2
     assert "HC3_URL" in result.stderr
 
 
-def test_directives_file_applies_to_main_qa_only(tmp_path) -> None:
-    # secondary QAs do not inherit the file's defaults
-    (tmp_path / ".directives").write_text("--%%name:Default\n--%%mode:offline\n")
+def test_include_directive_applies_to_each_qa_that_includes(tmp_path) -> None:
+    # every QA resolves its own include — a QA without one stays untouched
+    (tmp_path / "defaults.lua").write_text("--%%name:Default\n--%%mode:offline\n")
     a = tmp_path / "a.lua"
-    a.write_text("print('A', _FLUA.config.name)\n")
+    a.write_text("--%%include:defaults.lua\nprint('A', _FLUA.config.name)\n")
     b = tmp_path / "b.lua"
     b.write_text("print('B', _FLUA.config.name)\n")
     result = subprocess.run(
@@ -327,8 +327,23 @@ def test_directives_file_applies_to_main_qa_only(tmp_path) -> None:
         timeout=60,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "A Default" in result.stdout  # the main QA got the file's name
-    assert "B b" in result.stdout  # the secondary QA kept its own name
+    assert "A Default" in result.stdout  # the including QA got the defaults
+    assert "B b" in result.stdout  # the other QA kept its own name
+
+
+def test_include_directive_missing_file_errors(tmp_path) -> None:
+    # an explicit include that cannot be read is a loud error, not silence
+    script = tmp_path / "main.lua"
+    script.write_text("--%%include:missing.lua\nprint('RAN')\n")
+    result = subprocess.run(
+        [*FLOA, str(script)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 2
+    assert "cannot read" in result.stderr
 
 
 # -- debug directives ------------------------------------------------------------

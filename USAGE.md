@@ -257,7 +257,8 @@ flags it too.
 ### Debug logging
 
 `--%%debug:refreshState=true,api=true,http=true` turns on per-category debug
-logging (any subset; it is a global directive, so `.directives` can carry
+logging (any subset; it is a global directive, so an `--%%include`'d file
+can carry
 it). `--%%debug:true` is shorthand for all three channels on:
 
 - `refreshState=true` logs every refreshStates event flua sees in a short
@@ -434,25 +435,30 @@ Files are plain `KEY=value` lines (comments and quotes supported) and are
 re-read when they change — handy for API tokens and per-machine settings
 that don't belong in the QA code.
 
-### The `.directives` defaults file
+### The `--%%include` defaults directive
 
-A `.directives` file in the directory you run from is read in as **defaults
-for the main QA file**: the same `--%%` directive syntax as a QA header
-(`-- --------------- EOH ---------------` stops parsing, full-line `#`
-comments are ignored). A directive set in the QA itself overrides the file's
-value — the `mode` family (`--%%mode`/`--%%offline`/`--%%proxy`) overrides
-as a whole, so a QA can opt out of a default too.
+A QA can pull its defaults from another file — per-QA, explicit, and the
+path resolves relative to the main file (like `--%%file`):
 
+```lua
+--%%include:defaults.lua      -- inserts that file's directives as defaults
+--%%name:LocalName            -- this QA's own directives override them
 ```
-# .directives — defaults for the main QA
---%%mode:offline      # this project normally runs offline
+
+```lua
+-- defaults.lua — same --%% directive syntax as a QA header
+--%%mode:offline              # this project normally runs offline
 --%%description:local playground QA
 ```
 
-This is the place for per-project defaults: run offline by default (and
-override with `--%%mode:online` in a QA when you want the HC3), shared
-names/descriptions, and log/trace defaults via `--%%debug`/`--%%loglength`.
-Unknown directives in the file warn at runtime, like typos in QA headers.
+The included file's directives are defaults: the QA's own win per key, the
+`mode` family overrides as a whole (a QA can opt out of an included
+`--%%mode:offline`), and `--%%file` lists append (defaults first, a
+redeclared name wins). Includes nest — each path relative to the file
+carrying the include line — and cycles are skipped; a missing include is a
+loud error. This replaces the old `.directives` working-directory defaults
+(the file was ambiguous when QAs lived in different subdirectories — each
+QA now declares its own defaults explicitly).
 
 ## Multi-file QAs
 
@@ -480,8 +486,8 @@ packaged.
 
 ### Online mode — the real HC3
 
-The backend is picked from the **main QA's directives — its header merged
-over the `.directives` defaults** (see below), before the engine starts:
+The backend is picked from the **main QA's directives — its header over
+any `--%%include`'d defaults** (see below), before the engine starts:
 
 1. an explicit `--api local|remote` always wins;
 2. otherwise, `--%%mode:online`/`--%%mode:proxy` in the **main** QA's
@@ -585,7 +591,7 @@ and your firewall must let the controller reach that port.
 ### Mode comparison
 
 flua picks one of three modes per run: an explicit `--api local|remote` wins,
-then the main QA's directives (`--%%mode:...`, merged over the `.directives`
+then the main QA's directives (`--%%mode:...`, over any `--%%include`'d
 defaults), then the default — `offline` (the simulated HC3).
 
 | Aspect | `offline` | `online` | `proxy` |

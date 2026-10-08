@@ -118,6 +118,35 @@ def test_cli_runs_multiple_qas_isolated(tmp_path) -> None:
     assert "B b qa-b" in result.stdout
 
 
+def test_include_directive_adds_files_to_a_qa(tmp_path) -> None:
+    # a QA includes a defaults file whose --%%file entries append to the
+    # QA's own files; both paths resolve relative to the main file
+    (tmp_path / "defaults.lua").write_text("--%%file:extra.lua,extra\n")
+    (tmp_path / "extra.lua").write_text("print('EXTRA LOADED')\nfibaro.foo = 'FOO'\n")
+    (tmp_path / "lib.lua").write_text("print('LIB LOADED')\nfunction helper() return 42 end\n")
+    (tmp_path / "main.lua").write_text(
+        "--%%name:with_defaults\n"
+        "--%%type:com.fibaro.binarySwitch\n"
+        "--%%include:defaults.lua\n"
+        "--%%file:lib.lua,lib\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit()\n"
+        "  print('MAIN', fibaro.foo, helper())\n"
+        "end\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--api", "local", "main.lua"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "EXTRA LOADED" in result.stdout  # the included file's file loads first
+    assert "LIB LOADED" in result.stdout  # the QA's own file still loads
+    assert "MAIN FOO 42" in result.stdout  # both sets are available in main
+
+
 def test_example_self_test_passes_and_exits_zero() -> None:
     # examples/selfTest.lua is the living fixture for the self-test pattern
     # (assert inside the QA, exit with the failure count): the example must

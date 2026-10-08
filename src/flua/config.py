@@ -38,47 +38,82 @@ def _is_eoh(line: str) -> bool:
     return bool(_EOH_RE.fullmatch(stripped[2:].strip()))
 
 
-_DIRECTIVES_FILE = ".directives"
-
 # --%%mode and its legacy aliases form one directive family: a QA that says
 # anything about its mode replaces the defaults' mode entirely.
+# --%%mode and its legacy aliases form one directive family: a QA that says
+# anything about its mode replaces any included file's mode entirely.
 _MODE_KEYS = ("mode", "offline", "proxy")
 
+# --%%include:<filepath> — insert another file's directives as defaults for
+# this QA (the QA header wins; later includes override earlier ones). The
+# path resolves relative to the file that carries the include line.
+INCLUDE_DIRECTIVE = "include"
 
-def merge_directives(defaults: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-    """QA directives override the ``.directives`` defaults.
 
-    Per-key override (a QA's --%%u/--%%var/--%%name replaces the file's whole
-    value); the mode family (--%%mode/--%%offline/--%%proxy) is treated as
-    one directive, so a QA that says anything about its mode replaces the
-    file's mode default entirely.
+def _merge_defaults(merged: dict[str, Any], incoming: dict[str, Any]) -> None:
+    """Merge ``incoming`` directives over the accumulated defaults.
+
+    Per-key override (a QA's --%%u/--%%var/--%%name replaces the whole
+    value); the mode family overrides as a whole; --%%file lists append
+    (defaults first, a redeclared file name wins with the later entry).
     """
-    merged = dict(defaults)
-    if any(key in override for key in _MODE_KEYS):
+    if any(key in incoming for key in _MODE_KEYS):
         for key in (*_MODE_KEYS, "proxyNoUI"):
             merged.pop(key, None)
-    merged.update(override)
-    return _apply_mode(merged)
+    default_files = merged.get("file")
+    incoming_files = incoming.get("file")
+    merged.update(incoming)
+    if default_files or incoming_files:
+        entries = [default_files] if isinstance(default_files, str) else list(default_files or [])
+        entries += (
+            [incoming_files] if isinstance(incoming_files, str) else list(incoming_files or [])
+        )
+        by_name: dict[str, str] = {}
+        for entry in entries:
+            name = entry.partition(",")[2].strip()
+            by_name[name] = entry  # later entries win, position stays
+        merged["file"] = list(by_name.values())
 
 
-def load_directives_file(directory: str | Path) -> dict[str, Any]:
-    """Defaults from a ``.directives`` file in ``directory``.
+def expand_includes(annotations: dict[str, Any], base_dir: str | Path) -> dict[str, Any]:
+    """Expand --%%include directives: insert the included files' directives
+    as defaults for this QA's own header.
 
-    Same ``--%%`` directive syntax as a QA header (end-of-header stops
-    parsing); full-line ``#`` comments are ignored. A missing file yields
-    {}. The file supplies DEFAULTS for the main QA — the QA's own directives
-    override them (see merge_directives).
+    Include paths resolve relative to the file carrying the include line
+    (the QA's own includes: relative to the main file's directory); nested
+    includes are allowed and resolve the same way. A later include
+    overrides an earlier one, and the QA's own directives override all of
+    them — the ``--%%file`` lists append (defaults first). Include cycles
+    are resolved by skipping the already-included file. A missing or
+    unreadable include is an error (it is explicit, unlike the old
+    .directives lookup).
     """
-    path = Path(directory) / _DIRECTIVES_FILE
-    if not path.exists():
-        return {}
-    try:
-        source = path.read_text(encoding="utf-8")
-    except OSError as exc:
-        logger.warning("cannot read %s: %s", path, exc)
-        return {}
-    lines = [line for line in source.splitlines() if not line.strip().startswith("#")]
-    return parse_annotations("\n".join(lines))
+    merged: dict[str, Any] = {}
+    seen: set[str] = set()
+
+    def absorb(anns: dict[str, Any], directory: Path) -> None:
+        includes = anns.pop(INCLUDE_DIRECTIVE, None)
+        if includes:
+            entries = [includes] if isinstance(includes, str) else list(includes)
+            for entry in entries:
+                include_path = Path(str(entry).strip())
+                if not include_path.is_absolute():
+                    include_path = directory / include_path
+                resolved = str(include_path.resolve())
+                if resolved in seen:
+                    continue  # include cycle — the first inclusion wins
+                seen.add(resolved)
+                try:
+                    source = include_path.read_text(encoding="utf-8")
+                except OSError as exc:
+                    raise ValueError(
+                        f"--%%include:{entry}: cannot read {include_path}: {exc}"
+                    ) from exc
+                absorb(parse_annotations(source), include_path.parent)
+        _merge_defaults(merged, anns)
+
+    absorb(dict(annotations), Path(base_dir))
+    return _apply_mode(merged)
 
 
 def parse_scalar(text: str) -> Any:
@@ -447,6 +482,7 @@ KNOWN_DIRECTIVES = frozenset(
         "useUiView",
         DEVICE_ID_DIRECTIVE,  # --%%deviceId:123 — downloaded-file metadata (--tool uploadFile)
         QA_FILE_DIRECTIVE,  # --%%qaFile:main — the QA file name a downloaded file maps to
+        INCLUDE_DIRECTIVE,  # --%%include:defaults.lua — insert another file's directives
     }
 )
 

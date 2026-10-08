@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 from typing import Any
 
-from ..config import parse_annotations, split_annotations
+from ..config import expand_includes, parse_annotations, split_annotations
 from ..engine import LuaEngine
 
 
@@ -16,7 +16,8 @@ def build_fqa(script: str) -> tuple[dict[str, Any], None]:
     if not path.exists():
         raise FileNotFoundError(f"cannot open {script}: no such file")
     source = path.read_text(encoding="utf-8")
-    _, local_params = split_annotations(parse_annotations(source))
+    annotations = expand_includes(parse_annotations(source), path.parent)
+    _, local_params = split_annotations(annotations)
     engine = LuaEngine()
     qa_id = engine._prepare_qa(str(path.resolve()), None, local_params, str(path.resolve()))
     fqa = engine.qa_export(qa_id)

@@ -17,7 +17,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .config import KNOWN_DIRECTIVES, parse_annotations
+from .config import KNOWN_DIRECTIVES, expand_includes, parse_annotations
 
 # (http method, path prefix, advice) — derived from the distilled API
 # reference, docs/specs/hc3-api.json.
@@ -26,7 +26,7 @@ DEPRECATED_API = [
 ]
 
 
-def check_source(source: str, name: str, lua: Any) -> list[str]:
+def check_source(source: str, name: str, lua: Any, base_dir: str | Path = ".") -> list[str]:
     """Findings for one QA source: "name: error: ..." or "name: warning: ..."."""
     findings: list[str] = []
     try:
@@ -34,7 +34,14 @@ def check_source(source: str, name: str, lua: Any) -> list[str]:
     except Exception as exc:
         findings.append(f"{name}: error: syntax: {exc}")
         return findings
-    for key in parse_annotations(source, warn_unknown=False):
+    try:
+        annotations = expand_includes(
+            parse_annotations(source, warn_unknown=False), base_dir
+        )
+    except ValueError as exc:
+        findings.append(f"{name}: error: {exc}")
+        return findings
+    for key in annotations:
         if key not in KNOWN_DIRECTIVES:
             findings.append(f"{name}: warning: unknown directive --%%{key}")
     for method, prefix, advice in DEPRECATED_API:
@@ -48,4 +55,4 @@ def check_source(source: str, name: str, lua: Any) -> list[str]:
 
 def check_file(path: str, lua: Any) -> list[str]:
     source = Path(path).read_text(encoding="utf-8")
-    return check_source(source, path, lua)
+    return check_source(source, path, lua, Path(path).parent)

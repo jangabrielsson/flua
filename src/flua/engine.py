@@ -48,6 +48,7 @@ from .config import (
     _apply_mode,
     _is_eoh,
     debug_flag,
+    expand_includes,
     merge_annotations,
     parse_annotations,
     split_annotations,
@@ -631,8 +632,8 @@ class LuaEngine:
         path = str(Path(path))
         try:
             source = Path(path).read_text(encoding="utf-8")
-            annotations = parse_annotations(source)
-        except Exception as exc:  # missing file, bad encoding, ...
+            annotations = expand_includes(parse_annotations(source), Path(path).parent)
+        except Exception as exc:  # missing file, bad encoding, bad include, ...
             return None, str(exc)
         if directives:
             if not isinstance(directives, (list, tuple)) or not all(

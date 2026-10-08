@@ -1,0 +1,1 @@
+fibaro.foo = "FOO"

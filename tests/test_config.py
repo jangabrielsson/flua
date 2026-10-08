@@ -2,8 +2,7 @@
 
 from flua.config import (
     _apply_mode,
-    load_directives_file,
-    merge_directives,
+    expand_includes,
     parse_annotations,
     parse_lua_literal,
     parse_scalar,
@@ -84,35 +83,70 @@ def test_property_directives_merge_with_scalar_values() -> None:
     assert parse_annotations(source) == {"property": {"value": True, "delay": 30, "x": 1, "y": 2}}
 
 
-def test_directives_file_provides_defaults(tmp_path) -> None:
-    (tmp_path / ".directives").write_text(
-        "--%%name:Default\n--%%mode:offline\n--%%u:{label=\"d\",text=\"D\"}\n"
+def test_include_expands_as_defaults(tmp_path) -> None:
+    # --%%include inserts the file's directives as defaults: the QA's own
+    # win per key, the mode family overrides as a whole, and --%%file lists
+    # append (defaults first, redeclared names win)
+    (tmp_path / "defaults.lua").write_text(
+        "--%%name:Default\n--%%mode:offline\n--%%file:extra.lua,extra\n--%%file:util.lua,util\n"
     )
-    assert load_directives_file(tmp_path) == {
-        "name": "Default",
-        "mode": "offline",
-        "offline": True,
-        "proxy": False,
-        "u": [{"label": "d", "text": "D"}],
-    }
-    assert load_directives_file(tmp_path / "missing") == {}
+    source = (
+        "--%%include:defaults.lua\n"
+        "--%%name:Mine\n"
+        "--%%file:lib.lua,lib\n"
+        "--%%file:util.lua,util\n"
+    )
+    merged = expand_includes(parse_annotations(source), tmp_path)
+    assert merged["name"] == "Mine"  # the QA's own directive wins
+    assert merged["mode"] == "offline"  # the included mode was kept
+    # files append; the QA's redeclaration of util wins at its position
+    assert merged["file"] == ["extra.lua,extra", "util.lua,util", "lib.lua,lib"]
+    assert "include" not in merged  # consumed during expansion
 
 
-def test_merge_directives_qa_overrides_defaults() -> None:
-    defaults = _apply_mode({"mode": "offline", "name": "Default"})
-    # a QA directive overrides the file's value for that key
-    merged = merge_directives(defaults, {"name": "Mine"})
-    assert merged == {"mode": "offline", "offline": True, "proxy": False, "name": "Mine"}
-    # the mode family overrides as a whole: any QA mode directive replaces
-    # the file's mode default — --%%offline:false opts into online
-    merged = merge_directives(defaults, {"offline": False})
+def test_include_resolves_nested_and_guards_cycles(tmp_path) -> None:
+    # nested includes resolve relative to the including file, later
+    # directives override earlier ones, and cycles are skipped
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "base.lua").write_text("--%%name:Base\n--%%include:../a.lua\n")
+    (tmp_path / "a.lua").write_text("--%%name:A\n--%%include:b.lua\n--%%include:sub/base.lua\n")
+    (tmp_path / "b.lua").write_text("--%%name:B\n--%%include:a.lua\n")
+    merged = expand_includes(parse_annotations("--%%include:a.lua\n--%%name:QA\n"), tmp_path)
+    assert merged["name"] == "QA"
+
+
+def test_include_missing_file_is_an_error(tmp_path) -> None:
+    import pytest
+
+    with pytest.raises(ValueError, match="cannot read"):
+        expand_includes(parse_annotations("--%%include:nope.lua\n"), tmp_path)
+
+
+def test_include_is_a_known_directive(caplog) -> None:
+    import logging
+
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        parse_annotations("--%%include:defaults.lua\n")
+    assert "unknown --%%" not in caplog.text
+
+
+def test_include_mode_family_overrides_as_a_whole(tmp_path) -> None:
+    # the QA's mode directives replace the included file's mode entirely:
+    # --%%offline:false opts out of an included --%%mode:offline
+    (tmp_path / "defaults.lua").write_text("--%%mode:offline\n--%%name:Default\n")
+    merged = expand_includes(
+        parse_annotations("--%%include:defaults.lua\n--%%offline:false\n"), tmp_path
+    )
     assert merged == {
         "mode": "online",
         "offline": False,
         "proxy": False,
         "name": "Default",
     }
-    merged = merge_directives(defaults, {"mode": "proxy"})
+    merged = expand_includes(
+        parse_annotations("--%%include:defaults.lua\n--%%mode:proxy\n"), tmp_path
+    )
     assert merged == {"mode": "proxy", "offline": False, "proxy": True, "name": "Default"}
 
 
