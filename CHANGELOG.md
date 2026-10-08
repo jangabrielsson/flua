@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.25] - 2026-10-08
+
+### Added
+- implement asynchronous API calls for remote backends, allowing non-blocking QA execution
+- enhance MQTT TLS support with SNI configuration and add tests
+
 ## [0.1.24] - 2026-10-07
 
 ### Added
