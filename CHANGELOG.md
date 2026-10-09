@@ -4,6 +4,15 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.28] - 2026-10-09
+
+### Added
+- add custom event handler and update test for custom events in event_tests
+- add global variable event handler and update test timing for improved execution flow
+- update weather event handling methods to setTemperature, setHumidity, and setWind for consistency
+- add bundled library support with $ prefix for event handling and improve QA file management
+- add support for _FLUA.postRefreshEvent and qa_mode, enhancing event handling and runtime mode reporting
+
 ## [0.1.27] - 2026-10-08
 
 ### Added
