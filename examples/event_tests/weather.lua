@@ -32,17 +32,17 @@ function QuickApp:setCondition(condition)
   end
 end
 
-function QuickApp:updateTemperature(value, unit)
+function QuickApp:setTemperature(value, unit)
   _FLUA.postRefreshEvent({type='WeatherChangedEvent',data={change='Temperature', newValue=value, oldValue=self.properties.Temperature}})
   self:updateProperty("Temperature", value)
 end
 
-function QuickApp:updateHumidity(value)
+function QuickApp:setHumidity(value)
   _FLUA.postRefreshEvent({type='WeatherChangedEvent',data={change='Humidity', newValue=value, oldValue=self.properties.Humidity}})
   self:updateProperty("Humidity", value)
 end
 
-function QuickApp:updateWind(value)
+function QuickApp:setWind(value)
   _FLUA.postRefreshEvent({type='WeatherChangedEvent',data={change='Wind', newValue=value, oldValue=self.properties.Wind}})
   self:updateProperty("Wind", value)
 end

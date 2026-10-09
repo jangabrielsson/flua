@@ -32,7 +32,7 @@ function QuickApp:onInit()
   self:test(function() fibaro.call(alarmPartition, "disarm") end)
 
   self:test(function() fibaro.call(weather, "setCondition", "clear") end)
-  self:test(function() fibaro.call(weather, "updateTemperature", 18.12, "C") end)
-  self:test(function() fibaro.call(weather, "updateHumidity", 55) end)
-  self:test(function() fibaro.call(weather, "updateWind", 10) end)
+  self:test(function() fibaro.call(weather, "setTemperature", 18.12, "C") end)
+  self:test(function() fibaro.call(weather, "setHumidity", 55) end)
+  self:test(function() fibaro.call(weather, "setWind", 10) end)
 end
