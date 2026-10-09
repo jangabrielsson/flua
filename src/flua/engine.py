@@ -239,6 +239,7 @@ class LuaEngine:
             messages.MQTT_DISCONNECT: self._handle_mqtt_disconnect,
             messages.CLEAR_TIMEOUT: self._handle_clear_timeout,
             messages.API_CALL: self._handle_api_call,
+            messages.POST_REFRESH_EVENT: self._handle_post_refresh_event,
             messages.QA_VARS: self._handle_qa_vars,
             messages.LOG: self._handle_log,
             messages.EXIT: self._handle_exit,
@@ -282,6 +283,17 @@ class LuaEngine:
             return False
         info = self._qas.get(int(qa_id))
         return bool(info and info.get("config", {}).get("offline"))
+
+    def qa_mode(self, qa_id: int) -> str:
+        """The QA's effective runtime mode ("proxy" | "online" | "offline"):
+        a proxy QA in a remote run is proxy; otherwise remote, unless the QA
+        pinned itself offline (--%%mode:offline) or no HC3 backend exists."""
+        info = self._qas.get(int(qa_id))
+        if info is not None and info.get("proxy"):
+            return "proxy"
+        if self.hc3 is not None and not self.qa_is_offline(qa_id):
+            return "online"
+        return "offline"
 
     def _keep_alive_active(self) -> bool:
         """Any loaded QA with --%%keep-alive:true that hasn't exited keeps the
@@ -742,6 +754,25 @@ class LuaEngine:
                 await asyncio.sleep(5)
             # keep the retry tight; the HC3 itself holds the long poll open
             await asyncio.sleep(1)
+
+    def _handle_post_refresh_event(self, msg: dict[str, Any]) -> None:
+        """_FLUA.postRefreshEvent(event): inject a fake refreshStates event
+        (alarm, weather, device property change, ...) — it lands in the sim
+        feed (api.get('/refreshStates')) and reaches every
+        RefreshStateSubscriber, and DevicePropertyUpdatedEvents update the
+        shadowed device like a mirrored real-HC3 event. Missing timestamps
+        are filled from the virtual clock."""
+        entry = msg.get("event")
+        if not isinstance(entry, dict):
+            logger.warning("postRefreshEvent: event must be a table, got %r", entry)
+            return
+        if entry.get("created") is None:
+            created = int(self.clock.time)
+            entry["created"] = created
+            entry["createdMillis"] = created * 1000
+        if entry.get("sourceType") is None:
+            entry["sourceType"] = "system"
+        self._mirror_event(entry)
 
     def _mirror_event(self, entry: dict[str, Any]) -> None:
         """Into the local buffer (merged api.get feed) + the pump-delivered

@@ -154,6 +154,17 @@ function _FLUA.millitime()
   return math.floor(_PY.vtime() * 1000)
 end
 
+-- _FLUA.postRefreshEvent(event): inject a fake refreshStates event (flua
+-- extension) — fake alarms, weather changes or device property updates to
+-- debug QAs that react to them. The event lands in the sim feed
+-- (api.get('/refreshStates')) and reaches every RefreshStateSubscriber;
+-- DevicePropertyUpdatedEvents also update the shadowed device. The engine
+-- fills created/sourceType when omitted.
+function _FLUA.postRefreshEvent(event)
+  assert(type(event) == "table", "_FLUA.postRefreshEvent: event must be a table")
+  _PY.post{ type = "postRefreshEvent", event = event }
+end
+
 local function traceback(err)
   postLog("error", tostring(err))
   postLog("error", debug.traceback(nil, 2))
@@ -754,6 +765,9 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
     qaId = qaId,
     config = config or {},
     arg = args,
+    -- the effective runtime mode (offline|online|proxy) — vs
+    -- config.mode/offline/proxy, which are the QA's declared directives
+    mode = _PY.qa_mode(qaId),
   }, { __index = _FLUA })
   -- merge the Lua config file (.flua.lua) into this QA's config: the file
   -- is the base, --%% annotations win

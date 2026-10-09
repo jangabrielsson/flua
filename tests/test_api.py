@@ -340,6 +340,46 @@ def test_global_variable_events(api: Api) -> None:
 
 
 @pytest.mark.asyncio
+async def test_post_refresh_event_fakes_events(tmp_path, capsys) -> None:
+    # _FLUA.postRefreshEvent: fake refreshStates events to debug reactive
+    # QAs — they reach subscribers, the api feed, and DevicePropertyUpdated-
+    # events update the shadowed device like a mirrored real-HC3 event
+    script = tmp_path / "fake.lua"
+    script.write_text(
+        "local sub = RefreshStateSubscriber()\n"
+        "sub:subscribe(function(e) return true end, "
+        "function(e) print('EV', e.type, e.data and e.data.property) end)\n"
+        "sub:run()\n"
+        "function QuickApp:onInit()\n"
+        "  _FLUA.postRefreshEvent{type='AlarmStateChangedEvent', data={id=45, armed=false}}\n"
+        "  _FLUA.postRefreshEvent{type='DevicePropertyUpdatedEvent', "
+        "data={id=_FLUA.qaId, property='value', newValue=true}}\n"
+        "  setTimeout(function()\n"
+        "    local feed = api.get('/refreshStates?last=0')\n"
+        "    local n = 0\n"
+        "    for _, e in ipairs(feed.events or {}) do\n"
+        "      if e.type == 'AlarmStateChangedEvent' then n = n + 1 end\n"
+        "    end\n"
+        "    local dev = api.get('/devices/' .. _FLUA.qaId)\n"
+        "    print('FEED', n, dev.properties.value)\n"
+        "    exit(0)\n"
+        "  end, 50)\n"
+        "end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await asyncio.sleep(0.4)
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "EV AlarmStateChangedEvent" in out
+    assert "EV DevicePropertyUpdatedEvent value" in out
+    assert "FEED 1 true" in out  # the feed holds the fake; the shadow updated
+
+
+@pytest.mark.asyncio
 async def test_global_variable_events_reach_subscribers(tmp_path, capsys) -> None:
     # the events ride the pump: a RefreshStateSubscriber sees them
     script = tmp_path / "gv.lua"

@@ -403,6 +403,38 @@ async def test_remote_api_call_suspends_only_calling_qa(
 
 
 @pytest.mark.asyncio
+async def test_flua_mode_reports_effective_runtime_mode(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # _FLUA.mode: the effective runtime mode — online in a remote run,
+    # offline for a QA that pinned itself offline, offline without a backend
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    online = tmp_path / "online.lua"
+    online.write_text(
+        "function QuickApp:onInit() print('MODE', _FLUA.mode); exit(0) end\n"
+    )
+    pinned = tmp_path / "pinned.lua"
+    pinned.write_text(
+        "--%%mode:offline\nfunction QuickApp:onInit() print('PINNED', _FLUA.mode); exit(0) end\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        # load_qa_file parses the --%% header (start_qa takes a raw config)
+        assert engine.load_qa_file(str(online))[1] is None
+        assert engine.load_qa_file(str(pinned))[1] is None
+        await asyncio.sleep(0.4)
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "MODE online" in out
+    assert "PINNED offline" in out
+
+
+@pytest.mark.asyncio
 async def test_auth_failure_aborts_immediately(
     tmp_path, capsys, caplog, mock_hc3, monkeypatch
 ) -> None:

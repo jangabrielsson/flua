@@ -63,6 +63,10 @@ API_CALL = (
     "apiCall"
 )
 API_RESULT = "apiResult"  # engine -> QA: the response — {"qa", "data", "status"}
+POST_REFRESH_EVENT = (
+    # QA -> engine: fake a refreshStates event — {"event": {...}}
+    "postRefreshEvent"
+)
 MQTT_EVENT = "mqttEvent"  # {"qa": int, "conn": int, "event": str, "data"?: dict}
 REFRESH_STATE_EVENT = (
     "refreshStateEvent"  # {"event": {...}}  pump-delivered to RefreshStateSubscribers

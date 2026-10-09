@@ -316,6 +316,27 @@ def write_script(tmp_path, content: str = PROXY_SCRIPT) -> Path:
 
 
 @pytest.mark.asyncio
+async def test_proxy_flua_mode_reports_proxy(tmp_path, capsys, mock_hc3, monkeypatch) -> None:
+    # _FLUA.mode reflects the effective runtime mode — a proxy QA says proxy
+    set_hc3_env(monkeypatch, tmp_path, mock_hc3)
+    script = write_script(
+        tmp_path,
+        "--%%name:sw\n--%%mode:proxy\n"
+        "function QuickApp:onInit()\n"
+        "  print('MODE', _FLUA.mode)\n"
+        "end\n",
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        qa_id, err = engine.load_qa_file(str(script))
+        assert err is None, err
+        await wait_until(lambda: "MODE proxy" in capsys.readouterr().out)
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
 async def test_proxy_fresh_deploy_reuses_id_and_connects(
     tmp_path, capsys, mock_hc3, monkeypatch
 ) -> None:

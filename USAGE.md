@@ -887,11 +887,20 @@ QA's `_G` **is** its own environment: `_G.x = 1` writes the QA's global
 live on `_FLUA` so your code stays portable:
 
 - `_FLUA.qaId` — this QA's id; `_FLUA.config` — this QA's config table
+- `_FLUA.mode` — this QA's effective runtime mode: `"offline"`, `"online"`
+  or `"proxy"` (vs `config.mode`/`config.offline`/`config.proxy`, which are
+  the directives the QA declared — a QA can pin itself offline in an online
+  run)
 - `_FLUA.arg` — the file path / `-e` marker
 - `_FLUA.exit(code)` — stop the engine (vs `exit(code)` / `os.exit()` in a QA, which stop only that QA — `os.exit()` is the name real HC3 QAs use)
 - `_FLUA.qa(id)` — another QA's QuickApp instance (lupa proxy)
 - `_FLUA.loadQAfromFile(path, directives?)` / `_FLUA.loadQAfromString(code, directives?)` — dynamic QA loading; `directives` is an optional table of directive strings added to the loaded QA's config
 - `_FLUA.async.run(fn)` / `_FLUA.async.await(worker)` / `_FLUA.async.wait(ms)` — coroutine awaits
 - `_FLUA.millitime()` — virtual time in whole milliseconds (sub-second timing; `os.time()` is whole seconds, `os.clock()` is real CPU time)
+- `_FLUA.postRefreshEvent(event)` — inject a fake refreshStates event
+  (alarm, weather, device property change, …) to debug reactive QAs: it
+  lands in the sim feed (`api.get('/refreshStates')`) and reaches every
+  `RefreshStateSubscriber`; a `DevicePropertyUpdatedEvent` also updates the
+  shadowed device. `created`/`sourceType` are filled in when omitted.
 - `_FLUA.setTimeout(fn, ms, qaId)` — timer with explicit QA attribution
 - `if _FLUA then` — detect flua at runtime
