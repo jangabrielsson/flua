@@ -147,6 +147,58 @@ def test_qa_g_aliases_its_own_environment(tmp_path) -> None:
     assert "B nil" in result.stdout  # writes never leak into another QA
 
 
+@pytest.mark.asyncio
+async def test_bundled_library_dollar_files(tmp_path, capsys) -> None:
+    # --%%file:$name.lua loads a library bundled WITH flua
+    # (src/flua/lua/lib, shipped in the wheel) — it behaves like any QA
+    # file: loads before main, travels in the .fqa export
+    script = tmp_path / "bundled.lua"
+    script.write_text(
+        "--%%name:bundled_test\n"
+        "--%%type:com.fibaro.binarySwitch\n"
+        "--%%file:$event_mgr.lua,em\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit()\n"
+        "  print('HAS', fibaro.EventMgr ~= nil, fibaro.midnight ~= nil)\n"
+        "  exit(0)\n"
+        "end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        qa_id, err = engine.load_qa_file(str(script))
+        assert err is None, err
+        await asyncio.sleep(0.3)
+        # the bundled file is part of the QA's file set (it ships in .fqa)
+        files = engine.qa_file_list(qa_id)
+        assert {f["name"] for f in files} == {"main", "em"}
+        export = engine.qa_export(qa_id)
+        assert "EventMgr" in next(f["content"] for f in export["files"] if f["name"] == "em")
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "HAS true true" in out  # the bundled lib's globals are available
+
+
+def test_bundled_library_errors(tmp_path) -> None:
+    # a missing bundled lib or a path-escape attempt is a loud error
+    engine = LuaEngine()
+    bad = tmp_path / "bad.lua"
+    bad.write_text(
+        "--%%name:bad\n--%%file:$nope.lua,x\n-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() end\n"
+    )
+    _qa_id, err = engine.load_qa_file(str(bad))
+    assert err and "bundled library not found" in err
+    escape = tmp_path / "esc.lua"
+    escape.write_text(
+        "--%%name:esc\n--%%file:$../evil.lua,x\n-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() end\n"
+    )
+    _qa_id2, err2 = engine.load_qa_file(str(escape))
+    assert err2 and "bad bundled library name" in err2
+
+
 def test_include_directive_adds_files_to_a_qa(tmp_path) -> None:
     # a QA includes a defaults file whose --%%file entries append to the
     # QA's own files; both paths resolve relative to the main file

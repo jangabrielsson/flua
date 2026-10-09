@@ -58,6 +58,7 @@ include = ["flua*"]
 [tool.setuptools.package-data]
 flua = [
     "lua/*.lua",
+    "lua/lib/*.lua",
     "devices/*.json",
     "setup_templates/**/*",
     # globs don't match dotfiles — .luarc.json would be dropped from the wheel

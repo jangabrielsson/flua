@@ -69,6 +69,10 @@ from .websocket import WebSocketPool
 
 logger = logging.getLogger(__name__)
 
+# Libraries bundled with flua (--%%file:$name.lua loads from here). The
+# directory ships in the wheel (pyproject package-data: lua/lib/*.lua).
+BUNDLED_LIB_DIR = Path(__file__).parent / "lua" / "lib"
+
 # --%% directives that map directly onto device properties (local per QA)
 _PROPERTY_DIRECTIVES = {
     "uid": "quickAppUuid",
@@ -515,11 +519,29 @@ class LuaEngine:
             # captured instance value, which says true from its donor device
             device_properties["useUiView"] = False
         if path is not None:
-            # --%%file paths resolve relative to the main file's directory
+            # --%%file paths resolve relative to the main file's directory;
+            # a $ prefix (--%%file:$lib.lua,name) loads a library BUNDLED
+            # with flua (src/flua/lua/lib, shipped in the wheel) — plain
+            # Lua that also runs on the HC3, so it travels in the .fqa like
+            # any QA file
             base = Path(path).parent
             for entry in qa_config.get("files") or []:
-                if entry.get("path") and not Path(entry["path"]).is_absolute():
-                    entry["path"] = str(base / entry["path"])
+                entry_path = entry.get("path")
+                if not entry_path:
+                    continue
+                if entry_path.startswith("$"):
+                    lib_name = entry_path[1:].lstrip("/")
+                    if Path(lib_name).name != lib_name or lib_name in ("", ".", ".."):
+                        raise ValueError(f"bad bundled library name: {entry_path!r}")
+                    bundled = BUNDLED_LIB_DIR / lib_name
+                    if not bundled.is_file():
+                        raise ValueError(
+                            f"bundled library not found: {entry_path!r} "
+                            f"(not in {BUNDLED_LIB_DIR})"
+                        )
+                    entry["path"] = str(bundled)
+                elif not Path(entry_path).is_absolute():
+                    entry["path"] = str(base / entry_path)
         if proxy_enabled:
             # reuse or deploy the proxy FIRST: its HC3 id becomes the QA's id
             proxy_device = resolve_proxy(

@@ -645,6 +645,20 @@ def test_packaged_luals_library_matches_the_repo() -> None:
         assert copy.read_bytes() == origin.read_bytes(), f"drifted: {copy}"
 
 
+def test_wheel_ships_bundled_lua_libraries() -> None:
+    # --%%file:$name.lua resolves against src/flua/lua/lib — pyproject's
+    # package-data must ship that directory, or pip users lose the libs
+    import tomllib
+
+    repo = Path(__file__).resolve().parent.parent
+    with open(repo / "pyproject.toml", "rb") as handle:
+        pyproject = tomllib.load(handle)
+    flua_data = pyproject["tool"]["setuptools"]["package-data"]["flua"]
+    assert "lua/lib/*.lua" in flua_data
+    lib_dir = repo / "src" / "flua" / "lua" / "lib"
+    assert lib_dir.is_dir() and list(lib_dir.glob("*.lua"))
+
+
 def test_packaged_skills_match_the_repo() -> None:
     # the wheel ships the skills; a sync guard keeps the copies honest
     repo = Path(__file__).resolve().parent.parent

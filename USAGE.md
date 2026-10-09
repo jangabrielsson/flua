@@ -473,8 +473,17 @@ print(helper())
 ```
 
 Files load in declaration order, **main loads last**. Paths resolve relative
-to the main file's directory. See `examples/multifile.lua`. The HC3's file
-API works offline too (`api.get('/quickApp/' .. _FLUA.qaId .. '/files')` etc.).
+to the main file's directory. A `$` prefix instead loads a library **bundled
+with flua** (`src/flua/lua/lib/`, shipped in the wheel — plain Lua, so it
+also runs on the HC3 and travels in the `.fqa` like any QA file):
+
+```lua
+--%%file:$event_mgr.lua,em   -- flua's bundled event-manager library
+```
+
+A missing bundled library (or a path-escape attempt like `$../x.lua`) is a
+loud load error. See `examples/multifile.lua`. The HC3's file API works
+offline too (`api.get('/quickApp/' .. _FLUA.qaId .. '/files')` etc.).
 
 `--%%file` files are the QA's *shipped* files — they travel into the `.fqa`
 (`--tool pack`, uploads). Test-only helpers (mock-server handlers, assertion
