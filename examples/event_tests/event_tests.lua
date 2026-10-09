@@ -24,6 +24,10 @@ EM:addHandler({type='global-variable'},function(event)
   print(json.encode(event))
 end)
 
+EM:addHandler({type='custom-event'},function(event)
+  print(json.encode(event))
+end)
+
 local t = 1000
 function QuickApp:test(fun)
   setTimeout(fun, t)
@@ -42,4 +46,6 @@ function QuickApp:onInit()
 
   self:test(function() api.post("/globalVariables",{name="TestVariable", value="123"}) end) -- create global
   self:test(function() fibaro.setGlobalVariable("TestVariable", "321") end) -- update global
+
+  self:test(function() api.post("customEvents", {name="TestVariable", userDescription="CE"}) end) 
 end
