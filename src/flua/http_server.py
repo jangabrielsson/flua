@@ -40,8 +40,8 @@ _CORS = {
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
 }
 
-# The viewer page, read once at import: the packaged copy (what --tool setup
-# installs, sync-guarded against the repo's viewer/index.html by tests).
+# The viewer page, read once at import — the packaged copy (what --tool
+# setup installs and --ui serves; the repo's single source of truth).
 _VIEWER_PATH = Path(__file__).parent / "setup_templates" / "viewer" / "index.html"
 
 

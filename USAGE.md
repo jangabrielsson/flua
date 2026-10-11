@@ -352,9 +352,9 @@ open http://127.0.0.1:8090/               # press Connect; the base URL matches
 
 The page defaults its API address to its own origin, so a busy port falling
 back to the next free one needs no editing. The page ships inside the flua
-package (`viewer/index.html` in the repo is the source); `--tool setup` does
-not copy it — the served page can also point at another machine running
-flua.
+package (`src/flua/setup_templates/viewer/index.html` is the source);
+`--tool setup` does not copy it — the served page can also point at another
+machine running flua.
 
 The viewer polls `GET /flua/devices` (the emulated devices only — in online
 mode the HC3's own QAs stay out of the list), renders `properties.uiView`

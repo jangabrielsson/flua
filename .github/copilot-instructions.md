@@ -18,7 +18,7 @@ or scripts unless the user explicitly asks for it.
 - **`src/flua/cli.py`** — the `flua` command.
 - **`src/flua/proxy.py`** — proxy mode (`--%%mode:proxy`): deploy/reuse a `<name>_Proxy` QA on the HC3, sync properties/UI, funnel actions/UI events back.
 - **`src/flua/config.py`** — `--%%` directive parsing (plus `.directives` defaults).
-- **`viewer/`** — static UI viewer served by `--ui`.
+- **`src/flua/setup_templates/viewer/index.html`** — the UI viewer served by `--ui` (shipped in the wheel; `--tool setup` does not copy it — flua serves it from the package).
 
 ## Running flua
 

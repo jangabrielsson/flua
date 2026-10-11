@@ -686,15 +686,13 @@ def test_sync_skills_script_restores_drift() -> None:
     assert "synced .github/skills" in result.stdout
 
 
-def test_packaged_viewer_matches_the_repo() -> None:
-    # the wheel ships the UI viewer for --tool setup; a sync guard keeps the
-    # packaged copy identical to the repo's viewer/index.html
+def test_packaged_viewer_serves_from_the_package() -> None:
+    # the wheel ships the UI viewer for --tool setup; --ui serves that same
+    # packaged copy (src/flua/setup_templates/viewer/index.html) — the
+    # repo's single source of truth for the viewer page
     repo = Path(__file__).resolve().parent.parent
     packaged = repo / "src" / "flua" / "setup_templates" / "viewer" / "index.html"
-    origin = repo / "viewer" / "index.html"
-    assert packaged.read_bytes() == origin.read_bytes(), (
-        "viewer drift — copy viewer/index.html into setup_templates/viewer/"
-    )
+    assert packaged.is_file()
 
 
 def test_sanitize_filename() -> None:

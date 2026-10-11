@@ -1,6 +1,7 @@
 """ApiServer tests — the UI viewer's channel: the sim API over HTTP.
 
-These pin the contract the viewer (viewer/index.html) relies on: device/UI
+These pin the contract the viewer (src/flua/setup_templates/viewer/index.html)
+relies on: device/UI
 state over ``GET /devices``, interactions over ``GET /plugins/callUIEvent``,
 runtime UI state over ``/plugins/updateView`` + ``device.view``, CORS, and
 the rule that the listener is never pending work.
