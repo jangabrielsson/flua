@@ -192,7 +192,8 @@ Parsing stops at the end-of-header marker:
 | `--%%type:com.fibaro.binarySwitch` | device type (defaults to binarySwitch; unknown types are an error) |
 | `--%%properties:value=false` | default device properties (plural form) |
 | `--%%property:value=true` | raw property, scalar values; repeatable, merges |
-| `--%%var:name=expr` | initializes a **QuickApp variable**; `expr` is a Lua expression — `'text'`, `42`, `{a=1}`, `config.color`, `os.getenv("X")` (one per line) |
+| `--%%var:name=expr` | initializes a **QuickApp variable**; `expr` is a Lua expression — `'text'`, `42`, `{a=1}`, `config.color`, `os.getenv("X")` (one per line). An optional quoted string after a top-level comma is the **package value** distribution packages get: `--%%var:name=expr,"<placeholder>"` |
+| `--%%clobber:name=value` | Plua-compatible spelling of the package value (replaces `--%%var:name`'s value in distribution packages) |
 | `--%%uid:...` | sets `quickAppUuid` |
 | `--%%description:...` | sets `userDescription` |
 | `--%%model:...` | sets `model` |
@@ -414,6 +415,32 @@ faulty `--%%var` expression (a syntax error, indexing a nil key) is a
 startup error — flua names the variable and exits 1 — but an expression
 that evaluates to nil (`config.foo`, `os.getenv("MISSING")`) simply leaves
 the variable unset.
+
+### Variables in packages
+
+A `--%%var` can declare a **package value**: a quoted string after the last
+top-level comma of the expression —
+`--%%var:pwd=config.secretPwd,"<set to service password>"`. Commas inside
+the expression (table literals) or inside the placeholder itself are fine.
+`--%%clobber:name=value` is the legacy Plua spelling of the same thing.
+
+Which value lands in a package depends on where the package goes:
+
+- **Distribution** (`--tool pack`, `flua export`, the `.fqa` you share or
+  post on the forum): the package value, the evaluated value when no
+  package value was declared. The main file's `--%%var` header lines are
+  rewritten to these literals, so no expression — and no secret literal —
+  travels in the file content.
+- **Your own HC3** (`--tool uploadQA` as a new QA): always the real
+  evaluated values — the placeholder is a distribution concern, your
+  controller gets the credentials the QA needs.
+- `--tool updateQA` never syncs variables: they are initializers, and the
+  runtime values on your HC3 win.
+
+Packaging evaluates the expressions the same way bootstrap does (`{config,
+os}` in scope) but never loads or runs QA code — a faulty expression is a
+loud packaging error naming the variable, and an expression that evaluates
+to nil leaves the variable out of the package.
 
 A `location` table configures the simulated controller's location — device
 1's `sunriseHour`/`sunsetHour` are computed from it:

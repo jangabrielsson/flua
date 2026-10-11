@@ -510,7 +510,7 @@ def _export_cli(parser: argparse.ArgumentParser, args: argparse.Namespace) -> in
     """flua export script.lua -o out.fqa — the deploy artifact, without running."""
     path = Path(args.script)
     try:
-        fqa, _ = build_fqa(args.script)
+        fqa, _ = build_fqa(args.script, dist=True)
     except (FileNotFoundError, ValueError) as exc:
         parser.error(str(exc))
     output = Path(args.output) if args.output else path.with_suffix(".fqa")

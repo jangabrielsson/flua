@@ -224,6 +224,25 @@ function _FLUA.exit(code, qaId)
   _PY.post{ type = "exit", code = code or 0, qa = qaId }
 end
 
+-- Packaging tools evaluate --%%var expressions WITHOUT loading or running
+-- any QA code (pack/export bake variable values into the .fqa). Same scope
+-- and rules as QA bootstrap: {config, os} in scope, config = the .flua.lua
+-- config file (with _FLUA as fallback), os.getenv reads the .env chain.
+-- A faulty expression raises; nil results are left out (variable unset).
+function _FLUA.evalVars(varExprs)
+  local config = setmetatable({}, { __index = _FLUA })
+  for k, v in pairs(_FLUA.configFile or {}) do config[k] = v end
+  local out = {}
+  for name, expr in pairs(varExprs or {}) do
+    local ok, value = pcall(load("return " .. tostring(expr), nil, "t", { config = config, os = os }))
+    if not ok then
+      error("error in --%%var:" .. tostring(name) .. ": " .. tostring(expr) .. " — " .. tostring(value), 0)
+    end
+    if value ~= nil then out[name] = value end
+  end
+  return out
+end
+
 -- ------------------------------------------------------------------- sleep
 -- fibaro.sleep(ms): suspend the CALLING QA for ms of virtual time (fibaro.lua
 -- implements the API surface). Callbacks run as per-QA coroutines (runInQa);

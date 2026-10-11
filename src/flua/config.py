@@ -298,6 +298,67 @@ def _join_ui_continuations(source: str) -> str:
     return "\n".join(out)
 
 
+def _split_var_package_value(text: str) -> tuple[str, str | None]:
+    """Split ``--%%var``'s value into (expr, package value).
+
+    ``--%%var:name=expr,"<placeholder>"``: everything after the LAST
+    top-level comma is the package value (a quoted Lua string literal, the
+    value distribution packages get instead of the evaluated expression).
+    No top-level comma -> no package value. The scan tracks bracket depth
+    and skips quoted strings and Lua long strings, so commas inside table
+    literals (``{a=1,b=2}``) or inside the placeholder itself are safe.
+    """
+    depth = 0
+    long_close: str | None = None
+    last_comma = -1
+    i = 0
+    n = len(text)
+    while i < n:
+        c = text[i]
+        if long_close is not None:
+            if text.startswith(long_close, i):
+                i += len(long_close)
+                long_close = None
+                continue
+            i += 1
+            continue
+        if c == "'" or c == '"':
+            quote = c
+            i += 1
+            while i < n:
+                c2 = text[i]
+                if c2 == "\\":
+                    i += 2
+                    continue
+                if c2 == quote:
+                    i += 1
+                    break
+                i += 1
+            continue
+        if c == "[":
+            long_match = re.match(r"\[(=*)\[", text[i:])
+            if long_match:
+                long_close = "]" + long_match.group(1) + "]"
+                i += long_match.end()
+                continue
+            depth += 1
+        elif c == "(" or c == "{":
+            depth += 1
+        elif c == "]" or c == ")" or c == "}":
+            depth -= 1
+        elif c == "," and depth == 0:
+            last_comma = i
+        i += 1
+    if last_comma < 0:
+        return text.strip(), None
+    expr = text[:last_comma].strip()
+    pkg_literal = text[last_comma + 1 :].strip()
+    tokens = _tokenize_lua_literal(pkg_literal)
+    if len(tokens) != 1 or tokens[0][0] != "str":
+        raise ValueError(f"--%%var package value must be a quoted string: {pkg_literal}")
+    return expr, tokens[0][1]
+
+
 def parse_annotations(source: str, warn_unknown: bool = True) -> dict[str, Any]:
     """Extract ``--%%`` annotations; later lines override earlier ones.
 
@@ -339,15 +400,39 @@ def parse_annotations(source: str, warn_unknown: bool = True) -> dict[str, Any]:
             # --%%var:name=expr — QuickApp variable initializers. The value is
             # a Lua expression, evaluated at bootstrap with {config, os} in
             # scope (so tables like {a=1,b=2} are legal); repeated directives
-            # merge, one variable per line.
+            # merge, one variable per line. An optional trailing quoted
+            # string after a top-level comma is the PACKAGE value
+            # (--%%var:name=expr,"<placeholder>") — distribution packages
+            # (.fqa built by --tool pack / flua export) get it instead of
+            # the evaluated value; uploadQA to your own HC3 gets the real
+            # value.
             sub = config.get("var")
             if not isinstance(sub, dict):
                 sub = {}
             key, _, val = value.partition("=")
             key = key.strip()
             if key:
-                sub[key] = val.strip()
+                expr, pkg = _split_var_package_value(val)
+                sub[key] = expr
+                if pkg is not None:
+                    pkgs = config.get("varPkg")
+                    if not isinstance(pkgs, dict):
+                        pkgs = {}
+                    pkgs[key] = pkg
+                    config["varPkg"] = pkgs
             config["var"] = sub
+        elif name == "clobber":
+            # --%%clobber:name=value — the legacy Plua spelling for the
+            # package value: replace --%%var:name's value with this string
+            # in distribution packages. One variable per line.
+            sub = config.get("clobber")
+            if not isinstance(sub, dict):
+                sub = {}
+            key, _, val = value.partition("=")
+            key = key.strip()
+            if key:
+                sub[key] = val.strip()
+            config["clobber"] = sub
         elif name == "property":
             # --%%property:name=value — raw device property initializers
             # (e.g. value=true). Values parse as scalars; repeated
@@ -442,9 +527,7 @@ def _apply_mode(config: dict[str, Any]) -> dict[str, Any]:
 # Parameter names that belong to the global (shared) config. When a QA file
 # sets one of these, it is copied up to the global config — the last file
 # that sets it wins. Everything else stays local to the QA's config copy.
-GLOBAL_PARAMS = frozenset(
-    {"speed", "instant", "maxhours", "time", "debug", "loglength", "warn"}
-)
+GLOBAL_PARAMS = frozenset({"speed", "instant", "maxhours", "time", "debug", "loglength", "warn"})
 
 # Downloaded-file metadata directives (--tool downloadQA writes them, --tool
 # uploadFile reads them): the HC3 device id and QA file name a project file
@@ -463,6 +546,7 @@ KNOWN_DIRECTIVES = frozenset(
         "properties",
         "property",
         "var",
+        "clobber",  # --%%clobber:name=value — Plua-compatible package value
         "file",
         "mode",
         "offline",  # legacy alias for --%%mode:offline
@@ -519,7 +603,7 @@ def merge_annotations(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, 
     """
     merged = dict(base)
     for key, value in extra.items():
-        if key in ("var", "property"):
+        if key in ("var", "property", "varPkg", "clobber"):
             sub = dict(merged.get(key) or {})
             sub.update(value or {})
             merged[key] = sub

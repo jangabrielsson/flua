@@ -76,6 +76,37 @@ def test_var_directives_merge_with_string_values() -> None:
     assert parse_annotations(source) == {"var": {"x": "1", "y": "'hello'", "t": "{a=1,b=2}"}}
 
 
+def test_var_package_value_splits_at_top_level_comma() -> None:
+    # --%%var:name=expr,"<placeholder>" — the trailing quoted string after
+    # the LAST top-level comma is the distribution package value; commas
+    # inside table literals or inside the placeholder string are safe.
+    cfg = parse_annotations(
+        "--%%var:pwd=config.password,'<set to service password>'\n"
+        "--%%var:policy={a=1,b=2}\n"
+        "--%%var:msg=config.greeting,'<set, me>'\n"
+        "--%%clobber:pwd=<legacy>\n"
+    )
+    assert cfg["var"] == {
+        "pwd": "config.password",
+        "policy": "{a=1,b=2}",
+        "msg": "config.greeting",
+    }
+    assert cfg["varPkg"] == {"pwd": "<set to service password>", "msg": "<set, me>"}
+    assert cfg["clobber"] == {"pwd": "<legacy>"}
+
+
+def test_var_package_value_must_be_a_quoted_string() -> None:
+    import pytest
+
+    for bad in (
+        "--%%var:x=1,{a=1}",  # a table is not a placeholder
+        "--%%var:x=1,plain",  # unquoted words are not placeholders
+        "--%%var:x=1,42",  # nor numbers
+    ):
+        with pytest.raises(ValueError):
+            parse_annotations(bad)
+
+
 def test_property_directives_merge_with_scalar_values() -> None:
     # --%%property:name=value — raw device properties, values parse as
     # scalars, repeated directives merge
@@ -91,10 +122,7 @@ def test_include_expands_as_defaults(tmp_path) -> None:
         "--%%name:Default\n--%%mode:offline\n--%%file:extra.lua,extra\n--%%file:util.lua,util\n"
     )
     source = (
-        "--%%include:defaults.lua\n"
-        "--%%name:Mine\n"
-        "--%%file:lib.lua,lib\n"
-        "--%%file:util.lua,util\n"
+        "--%%include:defaults.lua\n--%%name:Mine\n--%%file:lib.lua,lib\n--%%file:util.lua,util\n"
     )
     merged = expand_includes(parse_annotations(source), tmp_path)
     assert merged["name"] == "Mine"  # the QA's own directive wins
@@ -220,9 +248,7 @@ def test_mode_directive_parsed_with_legacy_aliases() -> None:
 
 
 def test_debug_directive_parses_subflags() -> None:
-    config = parse_annotations(
-        "--%%debug:refreshState=true,api=true,http=true\n--%%loglength:60\n"
-    )
+    config = parse_annotations("--%%debug:refreshState=true,api=true,http=true\n--%%loglength:60\n")
     assert config == {
         "debug": {"refreshState": True, "api": True, "http": True},
         "loglength": 60,
@@ -256,9 +282,7 @@ def test_parse_annotations_warns_on_unknown_directive(caplog) -> None:
     # known directives stay quiet
     caplog.clear()
     with caplog.at_level(logging.WARNING):
-        parse_annotations(
-            "--%%name:x\n--%%mode:offline\n--%%speed:2\n--%%u:{label=\"a\"}\n"
-        )
+        parse_annotations('--%%name:x\n--%%mode:offline\n--%%speed:2\n--%%u:{label="a"}\n')
     assert "unknown --%%" not in caplog.text
 
 

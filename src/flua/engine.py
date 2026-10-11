@@ -40,7 +40,7 @@ import lupa
 from . import messages
 from .api import Api
 from .api.state import public
-from .bindings import install_bindings
+from .bindings import install_bindings, lua_to_python
 from .clock import VirtualClock
 from .config import (
     DEVICE_ID_DIRECTIVE,
@@ -419,6 +419,23 @@ class LuaEngine:
         """The Lua interpreter version string (e.g. "Lua 5.4")."""
         return self._lua.execute("return _VERSION")
 
+    def evaluate_vars(self, var_exprs: dict[str, str]) -> dict[str, Any]:
+        """Evaluate ``--%%var`` expressions without loading or running QA
+        code — the packaging tools' bake step. Same scope and rules as QA
+        bootstrap: ``{config, os}`` in scope, ``config`` = the .flua.lua
+        config file, ``os.getenv`` reads the .env chain. A faulty expression
+        raises ValueError (naming the variable); an expression that
+        evaluates to nil leaves the variable out of the result."""
+        if not var_exprs:
+            return {}
+        try:
+            flua = self._lua.globals()["_FLUA"]
+            result = flua["evalVars"](self._lua.table_from(var_exprs, recursive=True))
+        except Exception as exc:
+            message = str(exc).splitlines()[0] if str(exc) else "--%%var evaluation failed"
+            raise ValueError(message) from exc
+        return {str(key): lua_to_python(value, self._lua) for key, value in (result or {}).items()}
+
     def execute(self, lua_code: str) -> Any:
         """Execute Lua code synchronously at the top level.
 
@@ -536,8 +553,7 @@ class LuaEngine:
                     bundled = BUNDLED_LIB_DIR / lib_name
                     if not bundled.is_file():
                         raise ValueError(
-                            f"bundled library not found: {entry_path!r} "
-                            f"(not in {BUNDLED_LIB_DIR})"
+                            f"bundled library not found: {entry_path!r} (not in {BUNDLED_LIB_DIR})"
                         )
                     entry["path"] = str(bundled)
                 elif not Path(entry_path).is_absolute():

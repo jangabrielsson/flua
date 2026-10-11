@@ -33,7 +33,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
 def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     try:
-        fqa, _ = build_fqa(args.script)
+        fqa, _ = build_fqa(args.script, dist=True)
     except (FileNotFoundError, ValueError) as exc:
         parser.error(str(exc))
     output = Path(args.output) if args.output else Path(args.script).with_suffix(".fqa")

@@ -249,9 +249,7 @@ def test_upload_file_pushes_single_file(tmp_path, monkeypatch, capsys) -> None:
     server = _mock_hc3(tmp_path, monkeypatch)
     try:
         edited = tmp_path / "MyQA_lib_100.lua"
-        edited.write_text(
-            "--%%deviceId:100\n--%%qaFile:lib\nfunction helper() return 2 end\n"
-        )
+        edited.write_text("--%%deviceId:100\n--%%qaFile:lib\nfunction helper() return 2 end\n")
         module = tools._TOOLS["uploadFile"]
         parser = argparse.ArgumentParser()
         module.add_arguments(parser)
@@ -302,9 +300,7 @@ def test_upload_file_main_and_mismatch_warning(tmp_path, monkeypatch, capsys) ->
         server.server_close()
 
 
-def test_upload_file_falls_back_to_filename_convention(
-    tmp_path, monkeypatch, capsys
-) -> None:
+def test_upload_file_falls_back_to_filename_convention(tmp_path, monkeypatch, capsys) -> None:
     # files downloaded before the directives existed still work: the
     # <Name>_<file>_<id>.lua filename carries the same metadata
     _MockHc3.requests = []
@@ -381,9 +377,7 @@ def test_upload_and_download_fqa_tools(tmp_path, monkeypatch, capsys) -> None:
         monkeypatch.setenv("HC3_PASSWORD", "secret")
         monkeypatch.chdir(tmp_path)
         (tmp_path / "qa.lua").write_text(
-            "--%%name:roundtrip\n"
-            "--%%type:com.fibaro.binarySwitch\n"
-            "function QuickApp:onInit() end\n"
+            "--%%name:roundtrip\n--%%type:com.fibaro.binarySwitch\nfunction QuickApp:onInit() end\n"
         )
         pack = tools._TOOLS["pack"]
         parser = argparse.ArgumentParser()
@@ -591,9 +585,7 @@ def test_setup_tool_scaffolds_a_qa_project(tmp_path, capsys) -> None:
     assert "flua" in (tmp_path / "AGENTS.md").read_text()
 
 
-def test_setup_falls_back_to_bare_flua_when_not_on_path(
-    tmp_path, capsys, monkeypatch
-) -> None:
+def test_setup_falls_back_to_bare_flua_when_not_on_path(tmp_path, capsys, monkeypatch) -> None:
     monkeypatch.setattr("shutil.which", lambda _name: None)
     module = tools._TOOLS["setup"]
     parser = argparse.ArgumentParser()
@@ -711,3 +703,85 @@ def test_sanitize_filename() -> None:
     assert sanitize_filename("My QA!") == "My_QA"
     assert sanitize_filename("compiler-qa.v2") == "compiler_qa_v2"
     assert sanitize_filename("  ") == "qa"  # nothing usable left -> "qa"
+
+
+def test_pack_bakes_package_values_into_dist_fqa(tmp_path, monkeypatch) -> None:
+    # A distribution package (--tool pack / flua export) gets each --%%var's
+    # PACKAGE value where declared (--%%var:name=expr,"<placeholder>" and the
+    # --%%clobber alias), the evaluated value otherwise; unset (nil) variables
+    # are dropped, and the main file's --%%var header lines are scrubbed to
+    # the baked literals (no expression or secret literal travels).
+    from flua.tools import common
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".flua.lua").write_text("return { secretPwd = 'hunter2', apiKey = 'sk-real' }\n")
+    (tmp_path / "main.lua").write_text(
+        "--%%name:pkg\n"
+        "--%%type:com.fibaro.binarySwitch\n"
+        "--%%var:pwd=config.secretPwd,'<set to service password>'\n"
+        "--%%var:key=config.apiKey\n"
+        "--%%var:legacy=config.legacyKey\n"
+        "--%%clobber:legacy=<set in Plua>\n"
+        "--%%var:opt=config.nothere\n"
+        "--%%var:policy={alerts=true,units='C'}\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() end\n"
+    )
+    fqa, _ = common.build_fqa("main.lua", dist=True)
+    qv = {v["name"]: v["value"] for v in fqa["initialProperties"]["quickAppVariables"]}
+    assert qv["pwd"] == "<set to service password>"
+    assert qv["key"] == "sk-real"  # no package value -> the evaluated value
+    assert qv["legacy"] == "<set in Plua>"  # --%%clobber is the same thing
+    assert json.loads(qv["policy"]) == {"alerts": True, "units": "C"}
+    assert "opt" not in qv  # evaluated nil -> not packaged
+    main = next(f for f in fqa["files"] if f["isMain"])["content"]
+    assert "--%%var:pwd='<set to service password>'" in main
+    assert "config.secretPwd" not in main
+    assert "hunter2" not in main
+    assert "--%%clobber" not in main
+    assert "--%%var:opt" not in main
+
+
+def test_build_fqa_upload_bakes_real_values(tmp_path, monkeypatch) -> None:
+    # A personal upload (--tool uploadQA) bakes the REAL evaluated values —
+    # the placeholder is a distribution concern, your own HC3 gets the
+    # credentials the QA needs.
+    from flua.tools import common
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".flua.lua").write_text("return { secretPwd = 'hunter2' }\n")
+    (tmp_path / "main.lua").write_text(
+        "--%%name:up\n"
+        "--%%var:pwd=config.secretPwd,'<placeholder>'\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() end\n"
+    )
+    fqa, _ = common.build_fqa("main.lua", dist=False)
+    assert fqa["initialProperties"]["quickAppVariables"] == [{"name": "pwd", "value": "hunter2"}]
+    main = next(f for f in fqa["files"] if f["isMain"])["content"]
+    assert "--%%var:pwd='hunter2'" in main
+
+
+def test_packaged_var_errors_are_loud(tmp_path, monkeypatch) -> None:
+    from flua.tools import common
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "main.lua").write_text(
+        "--%%clobber:nope=<x>\n-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() end\n"
+    )
+    with pytest.raises(ValueError, match="names a variable without"):
+        common.build_fqa("main.lua", dist=True)
+    (tmp_path / "main.lua").write_text(
+        "--%%var:pwd=config.x,'<a>'\n--%%clobber:pwd=<b>\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() end\n"
+    )
+    with pytest.raises(ValueError, match="use one"):
+        common.build_fqa("main.lua", dist=True)
+    (tmp_path / "main.lua").write_text(
+        "--%%var:boom=config.foo.bar.baz\n-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() end\n"
+    )
+    with pytest.raises(ValueError, match="--%%var:boom"):
+        common.build_fqa("main.lua", dist=True)
