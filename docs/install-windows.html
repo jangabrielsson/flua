@@ -40,33 +40,46 @@ manager. See the
 installation guide</a> if the commands conflict.</p>
 
 <p>The <code>py -3.13 -m pip</code> form matters: it uses the pip that
-belongs to that Python, even when several Pythons are installed. We will
-use an even more explicit path after creating the project environment.</p>
+belongs to that Python, even when several Pythons are installed.</p>
 
-<h3>2. Install flua in a project environment</h3>
+<h3>2. Install flua</h3>
 
-<p>A <b>virtual environment</b> keeps this project's Python packages
-separate from other projects. Create a QA folder under your home directory,
-then install flua into its <code>.venv</code> folder:</p>
+<p>You do not need to download the repository or create a virtual
+environment to use flua. Install the published package with pip:</p>
 
 <pre>
-New-Item -ItemType Directory -Force "$HOME\flua-qas"
-Set-Location "$HOME\flua-qas"
-py -3.13 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install fibaro-flua
+py -3.13 -m pip install fibaro-flua
 </pre>
+
+<p>If pip reports a permissions error for a shared Python installation,
+use <code>py -3.13 -m pip install --user fibaro-flua</code> or the optional
+virtual environment below, rather than running as administrator.</p>
 
 <p>Test it:</p>
 
 <pre>
-.\.venv\Scripts\flua.exe --version
+flua --version
 </pre>
 
-<p><b>Windows uses <code>.venv\Scripts\flua.exe</code>, not
-<code>.venv/bin/flua</code>.</b> The latter is the macOS/Linux path.
-Using the full relative path also avoids PATH problems and does not
-require activating the environment.</p>
+<p><b><code>flua</code> is not recognized?</b> The install may have
+succeeded, but Python's executable directory for scripts is not on PATH.
+This form runs the package through the Python you installed it with,
+without needing to find <code>flua.exe</code>:</p>
+
+<pre>
+py -3.13 -m flua --version
+</pre>
+
+<p>Wherever this guide says <code>flua ...</code>, you can use
+<code>py -3.13 -m flua ...</code> instead. Step 5 explains the extra PATH
+step needed to let setup locate the debugger executable.</p>
+
+<p>Create a folder for your QuickApps:</p>
+
+<pre>
+New-Item -ItemType Directory -Force "$HOME\flua-qas"
+Set-Location "$HOME\flua-qas"
+</pre>
 
 <p>And a real smoke test. Save this as <code>hello.lua</code> in your QA
 folder, using VS Code or another text editor. Make sure the filename is
@@ -83,17 +96,22 @@ end
 <p>Run it from the same folder:</p>
 
 <pre>
-.\.venv\Scripts\flua.exe --api local hello.lua
+flua --api local hello.lua
 </pre>
 
 <p>You should see <code>QuickApp initialized</code> in the log.
 No HC3 needed: <code>--api local</code> explicitly selects the emulated
 controller.</p>
 
-<p><b>Optional: shorter commands.</b> Activate the environment in each
-new PowerShell session:</p>
+<h4>Optional: keep flua in a virtual environment</h4>
+
+<p>A <b>virtual environment</b> keeps this project's packages separate
+from other projects. This is useful for pip users too, not just people
+working from the repository. In your QA folder:</p>
 
 <pre>
+py -3.13 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install fibaro-flua
 .\.venv\Scripts\Activate.ps1
 flua --version
 flua --api local hello.lua
@@ -104,21 +122,27 @@ using <code>.\.venv\Scripts\flua.exe</code>. You do not need to change
 your machine's security settings to run flua. <code>deactivate</code>
 leaves an activated environment.</p>
 
+<p>Windows uses <code>.venv\Scripts\flua.exe</code>, not the macOS/Linux
+path <code>.venv/bin/flua</code>. For this route, use
+<code>.\.venv\Scripts\python.exe</code> in place of
+<code>py -3.13</code> for the pip and Python commands below; the launcher
+command explicitly selects the base Python, not your project's environment.</p>
+
 <h3>3. Upgrade flua — and back down if needed</h3>
 
-<p>From the QA folder, use the Python inside that project's environment:</p>
+<p>Use the same Python you installed flua with:</p>
 
 <pre>
-.\.venv\Scripts\python.exe -m pip install --upgrade fibaro-flua
-.\.venv\Scripts\flua.exe --version
+py -3.13 -m pip install --upgrade fibaro-flua
+py -3.13 -m flua --version
 </pre>
 
 <p>If a version turns out to have bugs, list the available versions and
 install the one you want:</p>
 
 <pre>
-.\.venv\Scripts\python.exe -m pip index versions fibaro-flua
-.\.venv\Scripts\python.exe -m pip install "fibaro-flua==VERSION"
+py -3.13 -m pip index versions fibaro-flua
+py -3.13 -m pip install "fibaro-flua==VERSION"
 </pre>
 
 <p>Replace <code>VERSION</code> with a version number from the list.
@@ -128,13 +152,12 @@ belong to another Python.</p>
 <h3>4. Where is it installed?</h3>
 
 <pre>
-.\.venv\Scripts\python.exe -c "import sys; print(sys.executable)"
-.\.venv\Scripts\python.exe -m pip show fibaro-flua
-Get-Item .\.venv\Scripts\flua.exe
+py -3.13 -c "import sys; print(sys.executable)"
+py -3.13 -m pip show fibaro-flua
 py -0p
 </pre>
 
-<p>The first command identifies the Python running this project.
+<p>The first command identifies the Python selected by the launcher.
 <code>pip show</code> shows the package version and location.
 <code>py -0p</code> lists the Python installations known to the launcher
 or install manager.</p>
@@ -145,8 +168,8 @@ or install manager.</p>
 Get-Command flua -All
 </pre>
 
-<p>If the environment is not activated or on PATH, that command may find
-nothing — the explicit <code>.\.venv\Scripts\flua.exe</code> still works.
+<p>If Python's scripts directory is not on PATH, that command may find
+nothing — <code>py -3.13 -m flua</code> still works.
 Unlike the macOS command, <code>flua.exe</code> is a launcher executable;
 there is no text shebang to inspect.</p>
 
@@ -158,16 +181,34 @@ and use <i>File → Open Folder</i> to open your QA folder, not just
 project:</p>
 
 <pre>
+flua --tool setup
+</pre>
+
+<p>Setup writes <code>.vscode/launch.json</code>,
+<code>.vscode/tasks.json</code>, extension recommendations, Lua completion
+definitions, and agent files.</p>
+
+<p><b>If <code>flua</code> is not on PATH:</b> setup currently searches
+PATH to locate <code>flua.exe</code>. Merely running
+<code>py -3.13 -m flua --tool setup</code> does not fix that search;
+setup warns and falls back to the bare name. Find the installed launcher
+and temporarily add its directory first:</p>
+
+<pre>
+$fluaExe = py -3.13 -c "from importlib.metadata import distribution; d = distribution('fibaro-flua'); print(next(str(d.locate_file(f).resolve()) for f in d.files if f.name == 'flua.exe')))"
+$env:Path = "$(Split-Path -Parent $fluaExe);$env:Path"
+py -3.13 -m flua --tool setup
+</pre>
+
+<p>This reads the installed package's file list, so it also finds
+launchers from a <code>pip --user</code> installation. The PATH change
+applies to <b>this PowerShell session only</b>; it is not a permanent
+system change. For the optional virtual environment route, instead use:</p>
+
+<pre>
 $env:Path = "$(Resolve-Path .\.venv\Scripts);$env:Path"
 .\.venv\Scripts\flua.exe --tool setup
 </pre>
-
-<p>The first line puts this environment's executable directory on PATH
-for <b>this PowerShell session only</b>. It lets setup discover the
-absolute path to <code>flua.exe</code>, even if you did not activate the
-environment. Setup writes <code>.vscode/launch.json</code>,
-<code>.vscode/tasks.json</code>, extension recommendations, Lua completion
-definitions, and agent files.</p>
 
 <ul>
 <li>Install the recommended <b>Python</b>, <b>Lua MobDebug</b>
@@ -175,9 +216,10 @@ definitions, and agent files.</p>
 extensions when VS Code offers them.</li>
 <li>The <b>Run</b> configurations launch flua through VS Code's selected
 <b>Python interpreter</b>. Open the command palette with Ctrl+Shift+P,
-run <i>Python: Select Interpreter</i>, and choose your project's
-<code>.venv\Scripts\python.exe</code>. If it is not listed, use
-<i>Enter interpreter path</i>.</li>
+run <i>Python: Select Interpreter</i>, and choose the Python you installed
+flua with. Step 4 prints its exact path. For the optional environment,
+choose <code>.venv\Scripts\python.exe</code> instead. If it is not listed,
+use <i>Enter interpreter path</i>.</li>
 <li>The <b>Debug</b> configurations use mobdebug for Lua breakpoints,
 stepping, and variable inspection. Setup writes the absolute path to
 <code>flua.exe</code> into these configurations. Open your Lua file,
@@ -203,16 +245,18 @@ environment on each machine.</p>
 <li><b><code>py</code> is not recognized</b> — reopen PowerShell after
 installing Python. If you only have a traditional Python installation
 without the launcher, check <code>python --version</code> and use
-<code>python -m venv .venv</code> instead, provided it is Python 3.11
-or newer.</li>
+<code>python</code> in place of <code>py -3.13</code> in this guide,
+provided it is Python 3.11 or newer.</li>
 <li><b><code>python</code> opens the Microsoft Store</b> — this can be a
 Windows app execution alias rather than your installed Python.
 Use the working <code>py -3.13</code> command, or inspect <i>Manage app
 execution aliases</i> from Start. Do not disable the install manager's
 aliases indiscriminately — they may be the commands you need.</li>
 <li><b><code>flua</code> is not recognized</b> — use
-<code>.\.venv\Scripts\flua.exe</code>, or activate the environment.
-<code>.\.venv\Scripts\python.exe -m flua ...</code> also works.</li>
+<code>py -3.13 -m flua ...</code>. To make the bare command available,
+add its scripts directory to your user PATH, then reopen PowerShell
+and VS Code. With a virtual environment, activate it or use
+<code>.\.venv\Scripts\flua.exe</code>.</li>
 <li><b><code>Activate.ps1 cannot be loaded because running scripts is
 disabled</code></b> — activation is optional. Use the explicit executable
 paths above. On a managed work computer, follow your administrator's
@@ -223,7 +267,8 @@ For Run configurations, check <i>Python: Select Interpreter</i>.
 If you edit JSON paths by hand, escape backslashes:
 <code>"C:\\Users\\YourName\\flua-qas\\.venv\\Scripts\\flua.exe"</code>.</li>
 <li><b>pip tries to compile <code>lupa</code> and fails</b> — first
-upgrade pip using the environment's Python. Prefer regular 64-bit
+upgrade pip with <code>py -3.13 -m pip install --upgrade pip</code>
+(or the virtual environment's Python). Prefer regular 64-bit
 Python on an Intel/AMD PC; wheels depend on Python version and CPU
 architecture. If no wheel is available for your combination, try a
 supported Python with a matching wheel rather than immediately installing
@@ -238,8 +283,9 @@ PowerShell session with <code>code .</code>, so it inherits the setting
 rocket can also mean your font lacks that glyph.</li>
 <li><b>Several Pythons, one flua</b> — use <code>py -0p</code> and
 <code>Get-Command flua -All</code> to see what is installed and on PATH.
-Using <code>.\.venv\Scripts\python.exe -m pip</code> ensures upgrades
-go into this project, not somewhere else.</li>
+Use the same Python for installation, upgrades, and VS Code's Run
+configurations: <code>py -3.13 -m pip</code> for the main route, or
+<code>.\.venv\Scripts\python.exe -m pip</code> for the optional environment.</li>
 </ul>
 
 <h3>7. What is different on Windows 10?</h3>
