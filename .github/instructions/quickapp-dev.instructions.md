@@ -69,6 +69,16 @@ json.encode(table)  /  json.decode(string)
 - Private helpers should be `local function`s **outside** the `QuickApp:` methods
 - Use `pcall` to guard JSON parsing and HTTP responses
 
+## Verify (virtual time)
+Run the QA to verify a change; timer logic must not wait for real time:
+```bash
+flua --api local --instant qa.lua                 # timers fire immediately
+flua --api local --start '2027/10/6 12:00:00' qa.lua   # pin the virtual date
+flua --api local --speed 60 qa.lua                # 60x virtual speed
+```
+Use `exit(failures > 0 and 1 or 0)` in self-asserting QAs so the exit code
+is the verdict (see `/quickapp-test`).
+
 ## Common device types
 `com.fibaro.binarySwitch` · `com.fibaro.multilevelSwitch` · `com.fibaro.binarySensor`
 `com.fibaro.temperatureSensor` · `com.fibaro.humiditySensor` · `com.fibaro.motionSensor`

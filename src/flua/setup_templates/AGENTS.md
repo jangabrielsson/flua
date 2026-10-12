@@ -43,4 +43,11 @@ work.
 
 QuickApp projects are usually QA files, not test suites. When a change
 needs verification, prefer a small terminating QA that prints its results
-and run it with `flua --api local qa.lua`.
+and run it with `flua --api local qa.lua` — with virtual time for timer
+logic, so tests never wait for real time:
+
+```bash
+flua --api local --instant qa.lua                 # timers fire immediately
+flua --api local --start '2027/10/6 12:00:00' qa.lua   # pin the virtual date
+flua --api local --speed 60 qa.lua                # 60x virtual speed
+```

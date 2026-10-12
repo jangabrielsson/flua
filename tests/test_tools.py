@@ -662,6 +662,19 @@ def test_packaged_skills_match_the_repo() -> None:
             assert copy.read_bytes() == origin.read_bytes(), f"drifted: {copy}"
 
 
+def test_packaged_instructions_match_the_repo() -> None:
+    # quickapp-dev.instructions.md lives in the repo (.github/instructions,
+    # auto-applied to all *.lua work) and ships in the wheel — keep the
+    # copies identical like the skills
+    repo = Path(__file__).resolve().parent.parent
+    packaged = repo / "src" / "flua" / "setup_templates" / "github" / "instructions"
+    for origin in (repo / ".github" / "instructions").rglob("*"):
+        if origin.is_file():
+            copy = packaged / origin.relative_to(repo / ".github" / "instructions")
+            assert copy.exists(), f"missing packaged instructions file: {copy}"
+            assert copy.read_bytes() == origin.read_bytes(), f"drifted: {copy}"
+
+
 def test_sync_skills_script_restores_drift() -> None:
     # scripts/sync-skills.sh is the manual way back in sync: run it after a
     # deliberate drift and the packaged copies match the repo again
