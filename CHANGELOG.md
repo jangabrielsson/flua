@@ -4,6 +4,19 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.31] - 2026-10-12
+
+### Added
+- add installation guide for Windows 11 including Python, pip, and VS Code setup
+- add installation guide for macOS including Python, pip, and VS Code setup
+- enhance Windows compatibility and UTF-8 handling in CLI and logging
+- add verification instructions for virtual time in QuickApp development
+- add initial documentation for MQTT broker concept to aid testing
+
+### Changed
+- remove outdated Windows installation guide
+- update viewer path references and remove obsolete index.html
+
 ## [0.1.30] - 2026-10-11
 
 ### Added
