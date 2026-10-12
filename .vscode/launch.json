@@ -41,6 +41,9 @@
       "stopOnEntry": false,
       "sourceEncoding": "UTF-8",
       "interpreter": ".venv/bin/flua",
+      "windows": {
+        "interpreter": "${workspaceFolder}\\.venv\\Scripts\\flua.exe"
+      },
       "arguments": [
         "${relativeFile}"
       ],
@@ -56,6 +59,9 @@
       "stopOnEntry": false,
       "sourceEncoding": "UTF-8",
       "interpreter": ".venv/bin/flua",
+      "windows": {
+        "interpreter": "${workspaceFolder}\\.venv\\Scripts\\flua.exe"
+      },
       "arguments": [
         "--ui", "8090",
         "${relativeFile}"

@@ -125,14 +125,19 @@ offline playground):
 - **Flua: Debug Current File (mobdebug)** — real debugging: breakpoints,
   stepping, variable inspection. Install the VS Code extension
   **Lua MobDebug** (`alexeymelnichuk.lua-mobdebug`), open your QA, press F5
-  with the mobdebug configuration selected. flua waits for the debugger
-  before running your code.
+  with the mobdebug configuration selected. It uses the project venv's
+  `flua` executable on macOS and `flua.exe` on Windows. flua waits for the
+  debugger before running your code.
 - **Flua: Debug Current File (UI+mobdebug)** — the same, plus the UI
   viewer server (`--ui 8090`): debug your QA while its UI is rendered at
   `http://127.0.0.1:8090/`.
 
 While you step through code, `print`/`self:debug` output appears **immediately**
 — logs never queue behind a paused program.
+
+The flua CLI writes stdout and stderr as UTF-8 on all platforms, including
+when a debugger captures output through pipes on Windows. This preserves
+Unicode text and the startup rocket in VS Code's debug console.
 
 **Lua Language Server support**: the repo's `.luarc.json` declares Lua 5.5
 with the HC3 globals and loads the bundled **`.luals/` type library** — LuaLS

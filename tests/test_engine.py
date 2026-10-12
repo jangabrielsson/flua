@@ -1,6 +1,7 @@
 """Integration tests through a real lupa VM: message round-trips, timers, exit."""
 
 import asyncio
+import io
 import time
 from collections.abc import Callable
 
@@ -123,6 +124,24 @@ def test_log_line_prints_immediately_without_pump(capsys) -> None:
     engine.log_line("info", "IMMEDIATE")
     assert "IMMEDIATE" in capsys.readouterr().out
     assert not engine._inbound  # never queued
+
+
+def test_log_line_escapes_characters_unsupported_by_stdout(monkeypatch) -> None:
+    class Cp1252Stream(io.StringIO):
+        @property
+        def encoding(self) -> str:
+            return "cp1252"
+
+        def write(self, text: str) -> int:
+            text.encode(self.encoding)
+            return super().write(text)
+
+    stream = Cp1252Stream()
+    monkeypatch.setattr("sys.stdout", stream)
+
+    LuaEngine().log_line("info", "🚀 flua")
+
+    assert stream.getvalue() == "\\U0001f680 flua\n"
 
 
 def test_log_message_from_engine_still_queues(capsys) -> None:

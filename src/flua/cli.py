@@ -16,6 +16,7 @@ last file that sets one wins.
 import argparse
 import asyncio
 import contextlib
+import io
 import json
 import logging
 import os
@@ -585,6 +586,10 @@ def _examples_dir() -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Debug adapters capture pipes, whose Windows default encoding is not UTF-8.
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(encoding="utf-8", errors="backslashreplace")
     raw = sys.argv[1:] if argv is None else argv
     # Tool commands get their own parsers — argparse subparsers would swallow
     # the run mode's first positional script. --tool/-t (downloadQA, uploadQA,

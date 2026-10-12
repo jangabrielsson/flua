@@ -69,6 +69,15 @@ from .websocket import WebSocketPool
 
 logger = logging.getLogger(__name__)
 
+
+def _print_stdout(text: str) -> None:
+    """Print text even when stdout's encoding cannot represent every character."""
+    encoding = sys.stdout.encoding
+    if encoding:
+        text = text.encode(encoding, errors="backslashreplace").decode(encoding)
+    print(text, flush=True)
+
+
 # Libraries bundled with flua (--%%file:$name.lua loads from here). The
 # directory ships in the wheel (pyproject package-data: lua/lib/*.lua).
 BUNDLED_LIB_DIR = Path(__file__).parent / "lua" / "lib"
@@ -378,9 +387,9 @@ class LuaEngine:
         text = str(message)
         logger.debug("Flua [%s]: %s", level, text)
         if self.color_enabled():
-            print(f"\x1b[37m{date}\x1b[35m[FLUA   ]\x1b[37m[{tag}]: {text}\x1b[0m", flush=True)
+            _print_stdout(f"\x1b[37m{date}\x1b[35m[FLUA   ]\x1b[37m[{tag}]: {text}\x1b[0m")
         else:
-            print(f"{date}[FLUA   ][{tag}]: {text}", flush=True)
+            _print_stdout(f"{date}[FLUA   ][{tag}]: {text}")
 
     def render_html(self, text: str) -> str:
         """Render the HTML subset the HC3 console supports in QA log
@@ -1766,7 +1775,7 @@ class LuaEngine:
         text = str(msg.get("text", ""))
         logger.debug("Lua [%s]: %s", level, text)
         # colors (if enabled) are embedded in the text by the Lua side
-        print(text, flush=True)
+        _print_stdout(text)
 
     def color_enabled(self) -> bool:
         """Whether QA log lines should carry ANSI colors.

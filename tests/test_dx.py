@@ -1,11 +1,14 @@
 """Phase-1 developer tools: --check, export/unpack, --watch, the house seed."""
 
 import json
+import os
 import subprocess
 import sys
 import threading
 import time
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -18,8 +21,34 @@ def _run(*args: str, timeout: int = 60) -> subprocess.CompletedProcess:
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         timeout=timeout,
     )
+
+
+@pytest.mark.parametrize("initial_encoding", ["cp1252", "utf-8"])
+def test_cli_uses_utf8_output(initial_encoding) -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; from flua.cli import main; "
+            "code = main(['--api', 'local', '--color', 'never', '-e', "
+            "\"print('\\U0001f680 QA'); exit(0)\"]); "
+            "print('\\U0001f680 stderr', file=sys.stderr); sys.exit(code)",
+        ],
+        cwd=REPO_ROOT,
+        env={**os.environ, "PYTHONIOENCODING": initial_encoding},
+        capture_output=True,
+        timeout=30,
+    )
+    stdout = result.stdout.decode("utf-8")
+    stderr = result.stderr.decode("utf-8")
+    assert result.returncode == 0, stdout + stderr
+    assert "\U0001f680 flua" in stdout
+    assert "\U0001f680 QA" in stdout
+    assert stderr.strip() == "\U0001f680 stderr"
+    assert "\\U0001f680" not in stdout
 
 
 # -- --check ------------------------------------------------------------------
