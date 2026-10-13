@@ -4,6 +4,15 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.33] - 2026-10-13
+
+### Added
+- enhance flua-test library with support for assertions on HC3 and add new documentation for agent features
+
+### Fixed
+- update lupa dependency to version 2.8 for improved compatibility with Lua 5.5
+- comment out unused variable assignment in potato_client.lua
+
 ## [0.1.32] - 2026-10-13
 
 ### Added
