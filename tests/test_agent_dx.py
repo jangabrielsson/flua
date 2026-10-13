@@ -161,6 +161,59 @@ def test_ui_event_and_getview_helpers(tmp_path) -> None:
     assert "PASS: button callback fired" in result.stdout
 
 
+def test_flua_test_shipped_file_works_like_require(tmp_path) -> None:
+    # --%%file:$flua-test.lua ships the same library as a QA file: require
+    # still works (the file registers itself in package.preload) and the
+    # global spelling (fluaTest.new()) works too — all asserts active in flua
+    (tmp_path / "qa.lua").write_text(
+        "--%%name:shipped\n"
+        "--%%file:$flua-test.lua,flua_test\n"
+        "-- --------------- EOH ---------------\n"
+        "local Test = require('flua-test')\n"
+        "local t = Test.new()\n"
+        "t:expect(1 == 1, 'require works with shipped file')\n"
+        "t:expect(1 == 2, 'this must fail')\n"
+        "local gt = fluaTest.new()\n"
+        "gt:expect(true, 'global spelling works')\n"
+        "t:finish()\n"
+    )
+    result = _run("qa.lua", cwd=tmp_path)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "PASS: require works with shipped file" in result.stdout
+    assert "FAIL: this must fail" in result.stdout
+    assert "PASS: global spelling works" in result.stdout
+    assert "failures: 1" in result.stdout
+
+
+def test_flua_test_noop_without_flua_runtime() -> None:
+    # the HC3 path: shipped as a QA file on a real controller there is no
+    # _FLUA, so every assertion is inert — no printing, no counting,
+    # finish() returns 0. Model it with a bare env (package present, like
+    # the HC3's stdlib).
+    from flua.engine import LuaEngine
+
+    lib = REPO_ROOT / "src" / "flua" / "lua" / "lib" / "flua-test.lua"
+    engine = LuaEngine()
+    lua = engine.lua_runtime()
+    result = lua.execute(
+        "-- a full Lua env MINUS flua's _FLUA: the real-HC3 model\n"
+        "local env = setmetatable({ package = { preload = {} } }, { __index = _G })\n"
+        "env._FLUA = false  -- shadow the runtime's _FLUA (a table -> asserts on)\n"
+        "local chunk = assert(loadfile('" + str(lib) + "', 'bt', env))\n"
+        "local Test = chunk()\n"
+        "local t = Test.new()\n"
+        "assert(t:expect(1 == 2, 'x') == false)  -- returns the condition\n"
+        "assert(t:assert_eq({a=1}, {a=2}, 'x') == true)\n"
+        "assert(t:assert_json('{bad', 'x') == true)\n"
+        "assert(t:results().failures == 0)       -- nothing counted\n"
+        "assert(t:finish() == 0)                 -- no summary, no exit\n"
+        "assert(env.fluaTest == Test)            -- the shared-file global\n"
+        "assert(env.package.preload['flua-test']() == Test)  -- HC3 require\n"
+        "return true"
+    )
+    assert result is True
+
+
 def test_tool_ui_renders_elements(tmp_path) -> None:
     (tmp_path / "qa.lua").write_text(
         "--%%name:uitool\n"

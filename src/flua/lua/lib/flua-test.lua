@@ -1,23 +1,34 @@
 -- flua-test — the verify-loop assertions library.
 --
---   local Test = require("flua-test")
---   local t = Test.new()          -- fresh counters
---   t:expect(cond, "msg")         -- prints PASS:/FAIL:, counts failures
---   t:assert_eq(got, want, "msg") -- deep compare (tables included)
---   t:assert_json(text, "msg")    -- json.decode succeeds
---   t:finish()                    -- summary + exit code (failures>0 -> 1)
+-- Two entry paths, one file:
 --
--- flua provides this module through package.preload, so require() works
--- with no files on disk — and, being require'd rather than --%%file'd, it
--- never travels in a packaged .fqa. The library is plain Lua (no flua-only
--- APIs, exit() guarded), so --%%file:$flua-test.lua,test makes the same
--- assertions available on a real HC3 if a QA wants to self-check there.
+--   local Test = require("flua-test")   -- provided by flua itself; no files
+--   local t = Test.new()                -- on disk, nothing travels in the .fqa
+--   t:expect(cond, "msg")               -- prints PASS:/FAIL:, counts failures
+--   t:assert_eq(got, want, "msg")       -- deep compare (tables included)
+--   t:assert_json(text, "msg")          -- json.decode succeeds
+--   t:finish()                          -- summary + exit(failures>0 and 1 or 0)
 --
--- Output is deliberately lean: PASS:/FAIL: lines via the plain print (no
--- date/tag decoration), a "failures: N" summary from finish(). The exit
--- code is the verdict — agents read that, not the text.
+-- For asserts that may TRAVEL to a real HC3, declare the library as a QA
+-- file — it ships in the .fqa like any --%%file, and on the HC3 every
+-- assertion becomes a no-op (the module detects the HC3 by the absence of
+-- flua's _FLUA global: no printing, no counting, finish() returns 0):
+--
+--   --%%file:$flua-test.lua,flua_test   -- loads before main, on flua and HC3
+--   local Test = require("flua-test")   -- works on the HC3 too: the file
+--                                       -- registered itself in package.preload
+--
+-- The shipped file also sets the global fluaTest (the classic HC3
+-- shared-file idiom) — use fluaTest:expect(...) if you prefer no require.
+-- In flua, the shipped copy is the same full-featured library either way;
+-- the no-op path only exists where _FLUA does not (a real HC3).
+--
+-- Output is deliberately lean: PASS:/FAIL: lines via the QA's print (with
+-- the log tag), a "failures: N" summary from finish(). The exit code is
+-- the verdict — agents read that, not the text.
 
 local json_decode = json and json.decode or nil
+local isFlua = type(_FLUA) == "table"
 
 local Test = {}
 Test.__index = Test
@@ -56,6 +67,9 @@ function Test.new()
 end
 
 function Test:expect(cond, msg)
+  if not isFlua then
+    return cond and true or false  -- HC3: inert (arguments still evaluate)
+  end
   msg = tostring(msg or "")
   if cond then
     self.passes = self.passes + 1
@@ -68,11 +82,17 @@ function Test:expect(cond, msg)
 end
 
 function Test:assert_eq(got, want, msg)
+  if not isFlua then
+    return true
+  end
   return self:expect(deep_eq(got, want), (msg and msg .. " — " or "") .. "expected "
     .. tostring(want) .. ", got " .. tostring(got))
 end
 
 function Test:assert_json(text, msg)
+  if not isFlua then
+    return true
+  end
   if not json_decode then
     return self:expect(false, (msg and msg .. " — " or "") .. "json module unavailable")
   end
@@ -88,11 +108,25 @@ function Test:results()
 end
 
 function Test:finish()
+  if not isFlua then
+    return 0  -- HC3: no summary, no exit
+  end
   print("failures: " .. tostring(self.failures))
   if type(exit) == "function" then
     exit(self.failures > 0 and 1 or 0)
   end
   return self.failures
 end
+
+-- The shipped-file path: register the module so require("flua-test") works
+-- in files loaded after this one (main loads last) — on the HC3 this is
+-- what makes the require spelling work at all. In flua the runtime already
+-- provides the module; re-registering is harmless and idempotent.
+if type(package) == "table" then
+  package.preload["flua-test"] = function()
+    return Test
+  end
+end
+fluaTest = Test  -- the HC3 shared-file idiom (a global in the QA's state)
 
 return Test

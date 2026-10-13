@@ -40,8 +40,15 @@ t:assert_json(text, "msg")     -- json.decode succeeds
 t:finish()                     -- "failures: N" + exit(failures > 0 and 1 or 0)
 ```
 
-The hand-rolled equivalent (works on a real HC3 too, e.g. via
-`--%%file:$flua-test.lua,test` — the library is plain Lua):
+Asserts can travel to a real HC3 without editing the QA: add
+`--%%file:$flua-test.lua,flua_test` to the header — the library ships in
+the .fqa, `require("flua-test")` works there too (the file registers
+itself in package.preload; main loads last), and on the controller every
+assertion is a no-op (flua-only `_FLUA` is absent: no printing, no
+counting, `finish()` returns 0). In flua the shipped copy is the full
+library. Global spelling: `fluaTest.new()`.
+
+The hand-rolled equivalent (plain Lua, for QAs that must stay dependency-free):
 
 ```lua
 --%%name:my_qa_test

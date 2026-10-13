@@ -910,6 +910,19 @@ t:assert_json(text, "msg")     -- json.decode succeeds
 t:finish()                     -- "failures: N" + exit(failures > 0 and 1 or 0)
 ```
 
+Asserts can also TRAVEL to a real HC3 — declare the library as a QA file
+and the same code needs no editing: on the controller every assertion
+becomes a no-op (no printing, no counting, `finish()` returns 0), because
+the module detects the HC3 by the absence of flua's `_FLUA` global. In
+flua the shipped copy is the full library either way:
+
+```lua
+--%%file:$flua-test.lua,flua_test   -- ships in the .fqa; loads before main
+local Test = require("flua-test")   -- works on the HC3 too (the file
+                                    -- registers itself in package.preload)
+-- ...or the shared-file idiom, no require: local t = fluaTest.new()
+```
+
 The exit code is the contract: an uncaught Lua error exits 1, and `exit(N)`
 (`os.exit(N)`) exits N — the QA must end with an explicit exit, or the run
 never finishes. A failing QA in a multi-QA run fails the process (the last

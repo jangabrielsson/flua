@@ -1,0 +1,141 @@
+<h2>flua for AI agents — every agent-friendly feature in one place</h2>
+
+<p>flua is a QuickApp engine: a bundled Lua interpreter with a built-in
+emulation of an HC3, so QAs run offline on the laptop. This post is the
+checklist of everything flua offers a coding agent — Copilot, Claude,
+ChatGPT, DeepSeek, or whatever sits in your editor. Everything below works
+from a bare <code>pip install fibaro-flua</code> (v0.1.32+), no repo, no
+controller.</p>
+
+<h3>1. Domain knowledge, installed by one command</h3>
+
+<p><code>flua --tool setup</code> scaffolds a QA project with the agent's
+knowledge base: skills covering the full HC3 REST API reference, QA
+patterns, testing, and troubleshooting, plus Lua language-server types for
+<code>QuickApp</code>, <code>fibaro</code>, <code>api</code> and
+<code>json</code>, plus project instructions (AGENTS.md). The agent then
+answers from the API reference instead of its training data.</p>
+
+<h3>2. The verify loop: the QA is its own test</h3>
+
+<p>No pytest, no harness. Assert inside the QA with the built-in library,
+and the exit code is the verdict:</p>
+
+<pre>
+--%%name:lamp
+--%%type:com.fibaro.binarySwitch
+--%%u:{button="onBtn",text="On",onReleased="turnOn"}
+--%%u:{label="state",text="Off"}
+-- --------------- EOH ---------------
+local Test = require("flua-test")
+local t = Test.new()
+
+function QuickApp:onInit()
+  _FLUA.uiEvent("onBtn", "onReleased")     -- press the button, like the HC3 UI
+end
+
+function QuickApp:turnOn()
+  self:updateProperty("value", true)
+  self:updateView("state", "text", "On")
+  t:expect(self.properties.value == true, "lamp on")
+  local view = self:getView()
+  local comps = view["$jason"].body.sections.items[2].components
+  t:expect(comps[1].text == "On", "view shows On")
+  t:finish()
+end
+</pre>
+
+<pre>
+flua --api local --instant lamp.lua
+echo $?          # 0 = all assertions held
+
+[lamp5000]: PASS: lamp on
+[lamp5000]: PASS: view shows On
+[lamp5000]: failures: 0
+</pre>
+
+<ul>
+<li><b>Built-in assertions</b> — <code>require("flua-test")</code>: expect,
+deep compare, JSON checks, failure counting, exit wiring. No boilerplate,
+no files, never travels in a packaged .fqa. Want the asserts to travel?
+Declare <code>--%%file:$flua-test.lua,flua_test</code> — the QA body stays
+unchanged, and on the HC3 every assertion becomes a no-op.</li>
+<li><b>Virtual clock</b> — <code>--instant</code> fires timers immediately,
+<code>--start '2027/06/21 05:00:00'</code> pins the date,
+<code>--speed 60</code> runs 60× — timer logic is tested without waiting
+for real time.</li>
+<li><b>Exit code contract</b> — a failing QA fails the process, even among
+many QAs, and flua prints the verdict on stderr:
+<code>flua: QA lamp (5000) exited with code 1</code>.</li>
+</ul>
+
+<h3>3. Machine-readable logs</h3>
+
+<p>For agents parsing output, <code>--log json</code> emits one JSON object
+per line — stdout stays pure JSON, flua's own notices go to stderr:</p>
+
+<pre>
+flua --api local --log json lamp.lua
+
+{"time": "2026-10-13T11:15:36", "level": "DEBUG", "tag": "lamp5000", "qaid": 5000, "msg": "PASS: lamp on"}
+</pre>
+
+<p><code>--logfile run.log</code> appends a copy of the log (ANSI colors
+stripped) for post-mortems.</p>
+
+<h3>4. UI without a browser</h3>
+
+<ul>
+<li><b>Inject events from Lua</b> — <code>_FLUA.uiEvent(element, eventType,
+value)</code> delivers a UI event exactly as the HC3 UI would (values
+arrive as strings, callbacks fire async).</li>
+<li><b>Read the rendered view</b> — <code>self:getView()</code> returns the
+current viewLayout, <code>updateView</code> changes included.</li>
+<li><b>Render the UI as text</b> — <code>flua --tool ui qa.lua</code>:</li>
+</ul>
+
+<pre>
+QA "lamp" (com.fibaro.binarySwitch)
+  button onBtn "On" -> onReleased=turnOn
+  label state "Off"
+</pre>
+
+<h3>5. The rest of the toolbox</h3>
+
+<ul>
+<li><b>Static checks</b> — <code>flua --check qa.lua</code> catches syntax
+errors, unknown <code>--%%</code> directives, deprecated APIs before the
+first run.</li>
+<li><b>Mock servers in Lua</b> — <code>net.HTTPServer</code>,
+<code>net.TCPServer</code>, <code>net.UDPServer</code>,
+<code>net.WebSocketServer</code>: the agent writes a mock from a service's
+protocol and the QA's real client code runs against it.</li>
+<li><b>Real integrations offline</b> — <code>net.HTTPClient</code> and
+<code>mqtt.Client</code> make real network calls, so the agent tests
+against the actual service API (or a mock) without the controller.</li>
+<li><b>Test scaffolding stays home</b> — files loaded with
+<code>require("testlib")</code> are never packaged into the .fqa; only
+<code>--%%file</code> files travel.</li>
+<li><b>Whole-house runs</b> — several QAs in one process, isolated, with
+ids from 5000, can talk to each other; <code>--seed house.json</code> or
+an offline db provides rooms/devices/scenes, and
+<code>_FLUA.postRefreshEvent(...)</code> injects fake refreshState events
+(alarm, weather) to debug reactive QAs.</li>
+<li><b>Secrets stay home</b> — <code>--%%var:pwd=config.secretPwd</code>
+reads a <code>.flua.lua</code> config file; the packaging value
+(<code>--%%var:pwd=config.secretPwd,"&lt;set to service password&gt;"</code>)
+scrubs it from distribution .fqa files.</li>
+<li><b>The final mile</b> — <code>--tool downloadQA/updateQA/uploadQA</code>
+deploy to the real HC3 when the agent is done; online/proxy modes let the
+QA talk to a real controller from flua.</li>
+</ul>
+
+<h3>The loop, end to end</h3>
+
+<p>A typical agent session: <code>flua --check</code>, edit, run with
+<code>--api local --instant</code>, read the JSON log and the exit code,
+fix, repeat — and the controller is never touched until you decide the QA
+is ready.</p>
+
+<p><small>flua: https://github.com/jangabrielsson/flua · docs: USAGE.md ·
+tutorial series: see the other threads in this forum section</small></p>
