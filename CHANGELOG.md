@@ -4,6 +4,13 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.32] - 2026-10-13
+
+### Added
+- add structured logging and UI helpers for QAs
+- simplify flua installation instructions for Windows 11 and clarify usage without a virtual environment
+- add comprehensive installation guide for flua on Windows 11
+
 ## [0.1.31] - 2026-10-12
 
 ### Added
