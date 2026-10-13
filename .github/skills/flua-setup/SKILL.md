@@ -127,6 +127,8 @@ every unpacked file).
 | `--start WHEN` | virtual start time, e.g. `2027/10/6 12:00:20` |
 | `--debugger [PORT]` | attach the mobdebug remote debugger (default 8172) |
 | `--color always\|auto\|never` | ANSI colors on QA log lines |
+| `--log text\|json` | QA log format: human text (default) or JSON lines `{time, level, tag, qaid, msg}` — machine-readable for agents |
+| `--logfile FILE` | append a copy of the log to FILE (ANSI stripped; JSON lines with `--log json`) |
 
 `flua export script.lua -o script.fqa` builds the HC3 deploy artifact;
 `flua unpack script.fqa -d project/` reverses it.

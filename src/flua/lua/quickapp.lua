@@ -155,6 +155,16 @@ function QuickAppBase:updateView(elm,prop,value)
   })
 end
 
+-- Returns the QA's current rendered view (the $jason viewLayout, including
+-- updateView changes). Same API as the HC3; handy for asserting UI state
+-- from inside a verify QA.
+function QuickAppBase:getView()
+  local data, status = api.get("/plugins/getView?id=" .. self.id)
+  if status == 200 then
+    return data
+  end
+end
+
 -- Checks if the device has a specific interface
 -- @param name - The interface name to check for
 -- @return True if the device has the interface, false otherwise

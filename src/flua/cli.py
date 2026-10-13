@@ -133,6 +133,20 @@ def _build_parser() -> argparse.ArgumentParser:
         help="skip the startup greeting line",
     )
     parser.add_argument(
+        "--log",
+        choices=["text", "json"],
+        default="text",
+        help="QA log format: human text (default) or JSON lines "
+        "({time, level, tag, qaid, msg}) — machine-readable for agents",
+    )
+    parser.add_argument(
+        "--logfile",
+        metavar="FILE",
+        default=None,
+        help="write a copy of the log to FILE (appended; ANSI colors stripped; "
+        "JSON lines with --log json)",
+    )
+    parser.add_argument(
         "--examples",
         action="store_true",
         help="print the installed examples directory and exit",
@@ -362,7 +376,8 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             db_persist=db_persist,
             location=location,
         )
-    except ValueError as exc:
+        engine.set_log_mode(args.log, args.logfile)
+    except (ValueError, OSError) as exc:
         parser.error(str(exc))
     await engine.start()
     ui_server: ApiServer | None = None
@@ -482,6 +497,9 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             await ui_server.stop()
     if max_virtual_seconds is not None and engine.clock.elapsed() >= max_virtual_seconds:
         print(f"flua: virtual time limit reached ({max_hours}h)", file=sys.stderr)
+    for qa_id, name, code in engine.failed_qas():
+        # the final verdict: agents read stderr to attribute a bare exit code
+        print(f"flua: QA {name} ({qa_id}) exited with code {code}", file=sys.stderr)
     return engine.exit_code
 
 

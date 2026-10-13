@@ -51,3 +51,15 @@ flua --api local --instant qa.lua                 # timers fire immediately
 flua --api local --start '2027/10/6 12:00:00' qa.lua   # pin the virtual date
 flua --api local --speed 60 qa.lua                # 60x virtual speed
 ```
+
+Use the built-in assertions library instead of hand-rolled expect():
+`local Test = require("flua-test"); local t = Test.new()` — `t:expect`,
+`t:assert_eq`, `t:assert_json`, `t:finish()` (prints the summary and exits
+with the failure count). It is provided by flua itself and never travels in
+a packaged .fqa. UI behavior folds into the same QA:
+`_FLUA.uiEvent(element, eventType[, value])` injects a UI event (values
+arrive as strings), `self:getView()` reads the rendered view, and
+`flua --tool ui qa.lua` prints the UI as text. For machine-readable runs,
+`--log json` emits one JSON object per log line (`{time, level, tag, qaid,
+msg}`) with the verdict on stderr; `--logfile FILE` writes a log copy. The
+`quickapp-test` skill has the full loop.

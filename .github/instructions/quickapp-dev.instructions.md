@@ -75,9 +75,15 @@ Run the QA to verify a change; timer logic must not wait for real time:
 flua --api local --instant qa.lua                 # timers fire immediately
 flua --api local --start '2027/10/6 12:00:00' qa.lua   # pin the virtual date
 flua --api local --speed 60 qa.lua                # 60x virtual speed
+flua --api local --log json qa.lua                # machine-readable logs
 ```
-Use `exit(failures > 0 and 1 or 0)` in self-asserting QAs so the exit code
-is the verdict (see `/quickapp-test`).
+Use the built-in assertions instead of hand-rolled expect():
+`local Test = require("flua-test"); local t = Test.new()` — `t:expect`,
+`t:assert_eq` (deep), `t:assert_json`, `t:finish()` (summary + exit code).
+UI from Lua: `_FLUA.uiEvent(element, eventType[, value])` injects a UI
+event, `self:getView()` reads the rendered view, `flua --tool ui qa.lua`
+prints the UI as text. Use `exit(failures > 0 and 1 or 0)` (or
+`t:finish()`) so the exit code is the verdict (see `/quickapp-test`).
 
 ## Common device types
 `com.fibaro.binarySwitch` · `com.fibaro.multilevelSwitch` · `com.fibaro.binarySensor`

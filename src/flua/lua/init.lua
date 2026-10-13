@@ -111,7 +111,13 @@ print = function(...)
   end
   -- the HC3 console renders a small HTML subset in log messages; flua
   -- renders it to the terminal (ANSI with colors on, tags stripped off)
-  _PY.log("info", _PY.render_html(sanitizeMsg(table.concat(parts, "\t"))))
+  local text = sanitizeMsg(table.concat(parts, "\t"))
+  if _FLUA.logJson then
+    -- no tag/qaid outside QA code (-e, the runtime itself)
+    _PY.log_structured("info", nil, nil, _PY.render_html(text, true))
+  else
+    _PY.log("info", _PY.render_html(text))
+  end
 end
 _FLUA.print = print
 
@@ -372,6 +378,15 @@ end
 json = require("json")
 _FLUA.json = json
 
+-- flua-test: the verify-loop assertions library (see docs/notes-agents.md).
+-- Registered via package.preload, so require("flua-test") works with no
+-- files on disk and, being require'd rather than --%%file'd, never travels
+-- in a packaged .fqa. The library file itself is plain Lua (exit() guarded),
+-- so --%%file:$flua-test.lua,test can ship the same assertions to an HC3.
+package.preload["flua-test"] = function()
+  return assert(loadfile(_PY.runtime_dir .. "/lib/flua-test.lua"))()
+end
+
 -- --------------------------------------------------------------- debugger
 -- The VS Code mobdebug extension (alexeymelnichuk.lua-mobdebug) launches the
 -- interpreter with `-l package -e "<bootstrap>"` where the bootstrap prepends
@@ -540,11 +555,17 @@ local LEVEL_COLORS = {
 }
 local LOG_GRAY, LOG_RESET = "\27[37m", "\27[0m"
 
-local function formatLogLine(tag, level, msg)
-  local date = os.date("[%d.%m.%Y][%H:%M:%S]")
+local function formatLogLine(tag, level, msg, qaid)
   -- render the HC3 console's HTML subset (fibaro.debug supports it there);
-  -- sanitize first so raw bytes never cross the bridge
-  msg = _PY.render_html(sanitizeMsg(tostring(msg)))
+  -- sanitize first so raw bytes never cross the bridge. JSON mode: plain
+  -- text (no colors) and the structured fields go to Python, which emits
+  -- the JSON line — nothing to format here.
+  msg = _PY.render_html(sanitizeMsg(tostring(msg)), _FLUA.logJson == true)
+  if _FLUA.logJson then
+    _PY.log_structured(level, tag, qaid, msg)
+    return nil
+  end
+  local date = os.date("[%d.%m.%Y][%H:%M:%S]")
   if _PY.color_enabled() then
     return string.format(
       "%s%s%s[%-7s]%s[%s]: %s%s",
@@ -561,8 +582,12 @@ local function installQaGlobals(env)
   -- these as Lua globals; flua installs them into each QA's environment.
   function env.__fibaro_add_debug_message(tag, msg, level)
     -- print directly with the real level (the global print always logs as
-    -- "info"), so the engine's log handler can colorize by level
-    _PY.log(level, sanitizeMsg(formatLogLine(tag, level, msg)))
+    -- "info"), so the engine's log handler can colorize by level. JSON
+    -- mode: formatLogLine posts the structured fields itself.
+    local line = formatLogLine(tag, level, msg, env._FLUA.qaId)
+    if line ~= nil then
+      _PY.log(level, sanitizeMsg(line))
+    end
   end
 
   -- HC3 REST API. Offline, _PY.api dispatches to the simulated HC3
@@ -696,13 +721,37 @@ local function qaEnvFor(qaId)
   env._G = env
   -- per-QA package table: require() finds files next to the QA (the main
   -- file's directory is prepended at load, below), and a QA rewriting
-  -- package.path never leaks into other QAs or the runtime
-  env.package = setmetatable({ path = package.path }, { __index = package })
+  -- package.path never leaks into other QAs or the runtime. loaded and
+  -- preload are per-QA too (the HC3 model: each QA is its own Lua state) —
+  -- so modules load per QA, and the preload below binds this QA's env.
+  env.package = setmetatable(
+    { path = package.path, loaded = {}, preload = {} },
+    { __index = package }
+  )
+  -- flua-test: the verify-loop assertions library. Loaded into THIS QA's
+  -- env so its print and exit resolve to the QA's own (correct log tag and
+  -- exit attribution in multi-QA runs); cached per QA.
+  env.package.preload["flua-test"] = function()
+    local chunk = assert(loadfile(_PY.runtime_dir .. "/lib/flua-test.lua", "bt", env))
+    return chunk()
+  end
   -- require() resolves its search path through the C-level global 'package',
   -- so wrap it: swap in this QA's path for the (synchronous, single-threaded)
-  -- call — one QA's directories are never visible to another's require
+  -- call — one QA's directories are never visible to another's require.
+  -- (require consults the registry tables for loaded/preload, not the
+  -- package.* globals, so those can't be swapped — flua-test gets its own
+  -- env-bound path below.)
   local baseRequire = require
   env.require = function(name)
+    if name == "flua-test" then
+      local cached = env.package.loaded[name]
+      if cached == nil then
+        local chunk = assert(loadfile(_PY.runtime_dir .. "/lib/flua-test.lua", "bt", env))
+        cached = chunk()
+        env.package.loaded[name] = cached
+      end
+      return cached
+    end
     local saved = package.path
     package.path = env.package.path
     local ok, res = pcall(baseRequire, name)
@@ -787,6 +836,19 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
     -- the effective runtime mode (offline|online|proxy) — vs
     -- config.mode/offline/proxy, which are the QA's declared directives
     mode = _PY.qa_mode(qaId),
+    -- uiEvent(elementName, eventType[, value]): inject a UI event exactly
+    -- as the HC3 UI would deliver it (the same REST route the viewer uses)
+    -- so verify QAs can drive and assert UI behavior without a browser.
+    -- Returns (data, status) like api.get; the callback fires async.
+    uiEvent = function(elementName, eventType, value)
+      local url = "/plugins/callUIEvent?deviceID=" .. tostring(qaId)
+        .. "&elementName=" .. tostring(elementName)
+        .. "&eventType=" .. tostring(eventType)
+      if value ~= nil then
+        url = url .. "&value=" .. tostring(value)
+      end
+      return env.api.get(url)
+    end,
   }, { __index = _FLUA })
   -- merge the Lua config file (.flua.lua) into this QA's config: the file
   -- is the base, --%% annotations win

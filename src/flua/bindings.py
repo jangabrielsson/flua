@@ -121,6 +121,7 @@ def install_bindings(engine: "LuaEngine") -> None:
     py["vclock"] = lambda: engine.clock.elapsed()
     py["note_debugger_pause"] = engine.note_debugger_pause
     py["log"] = engine.log_line
+    py["log_structured"] = engine.log_structured
     py["flua_log"] = engine.flua_log
     py["getenv"] = engine.env.get
     py["api_remote_mode"] = lambda: engine.hc3 is not None

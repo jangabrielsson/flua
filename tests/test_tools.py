@@ -26,6 +26,7 @@ def test_registry_discovers_all_tools() -> None:
         "newQA",
         "pack",
         "setup",
+        "ui",
         "unpack",
         "updateQA",
         "uploadFQA",

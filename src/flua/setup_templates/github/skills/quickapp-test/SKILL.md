@@ -26,6 +26,23 @@ echo $?                          # 3. exit code: 0 = pass, non-zero = fail
 
 ## Self-asserting QA pattern
 
+Built-in version — `require("flua-test")`, no boilerplate (the module is
+provided by flua itself; require'd code never travels in a packaged .fqa):
+
+```lua
+--%%name:my_qa_test
+local Test = require("flua-test")
+local t = Test.new()
+
+t:expect(cond, "msg")          -- PASS:/FAIL: line, counts failures
+t:assert_eq(got, want, "msg")  -- deep compare, tables included
+t:assert_json(text, "msg")     -- json.decode succeeds
+t:finish()                     -- "failures: N" + exit(failures > 0 and 1 or 0)
+```
+
+The hand-rolled equivalent (works on a real HC3 too, e.g. via
+`--%%file:$flua-test.lua,test` — the library is plain Lua):
+
 ```lua
 --%%name:my_qa_test
 local failures = 0
@@ -85,6 +102,34 @@ curl "http://127.0.0.1:8090/plugins/getView?id=5000"
 
 The QA's PASS/FAIL output goes to the flua process's stdout. Kill the
 background flua when done.
+
+UI events and the rendered view work from inside the QA too — no curl, no
+browser:
+
+```lua
+local data, status = _FLUA.uiEvent("onBtn", "onReleased")   -- like the HC3 UI
+local data, status = _FLUA.uiEvent("s1", "onChanged", "42") -- values are strings
+local view = self:getView()                                  -- current viewLayout
+                                                            -- (updateView changes included)
+```
+
+The callback fires asynchronously after the call returns — assert on the
+callback's effects. `flua --tool ui qa.lua` prints the whole UI as text
+(elements, callbacks, options) for a quick eyeball check.
+
+## Machine-readable logs
+
+Agents parsing flua's output should use JSON lines — one object per log
+line, exit code unchanged:
+
+```bash
+flua --api local --log json qa.lua       # {time, level, tag, qaid, msg} per line
+flua --api local --logfile run.log qa.lua   # log copy (ANSI stripped) appended
+```
+
+stdout stays pure JSON in `--log json` mode (flua's own notices and the
+final verdict — `flua: QA <name> (<id>) exited with code N` — go to
+stderr). The verdict line appears for every failing QA, in any log mode.
 
 ## Deterministic virtual time
 

@@ -897,10 +897,39 @@ agent) check the exit code:
 echo $?                                           # 0 = pass, non-zero = fail
 ```
 
+Instead of hand-rolling the assertions, `require("flua-test")` — a
+built-in assertions library (no files needed, nothing travels in the
+.fqa):
+
+```lua
+local Test = require("flua-test")
+local t = Test.new()
+t:expect(cond, "msg")          -- PASS:/FAIL: line, counts failures
+t:assert_eq(got, want, "msg")  -- deep compare, tables included
+t:assert_json(text, "msg")     -- json.decode succeeds
+t:finish()                     -- "failures: N" + exit(failures > 0 and 1 or 0)
+```
+
 The exit code is the contract: an uncaught Lua error exits 1, and `exit(N)`
 (`os.exit(N)`) exits N — the QA must end with an explicit exit, or the run
-never finishes. When the logic under test needs interactions, serve the sim
-API with `--ui PORT` and drive it over HTTP (`/plugins/callUIEvent`,
+never finishes. A failing QA in a multi-QA run fails the process (the last
+failing QA's code wins), and flua prints a verdict line on stderr —
+`flua: QA <name> (<id>) exited with code N` — so agents can attribute the
+exit code.
+
+For machine-readable runs (agents parsing the log), `--log json` emits one
+JSON object per line — `{time, level, tag, qaid, msg}` — with stdout kept
+pure JSON and flua's own notices on stderr; `--logfile FILE` writes a copy
+of the log (ANSI stripped, JSON lines with `--log json`).
+
+UI behavior folds into the same loop from Lua: `_FLUA.uiEvent(element,
+eventType[, value])` injects a UI event exactly as the HC3 UI would deliver
+it (values arrive as strings, like the real UI), and `self:getView()`
+returns the current rendered view — `updateView` changes included. A text
+rendering of the UI without a browser: `flua --tool ui script.lua`.
+
+When the logic under test needs external interactions, serve the sim API
+with `--ui PORT` and drive it over HTTP (`/plugins/callUIEvent`,
 `/devices/<id>/action/<name>`, `/devices/<id>` for state), and keep timer
 logic deterministic with `--start`, `--speed`, `--instant`, and `--seed`.
 The `quickapp-test` skill installed by `--tool setup` documents the whole
@@ -943,5 +972,10 @@ live on `_FLUA` so your code stays portable:
   lands in the sim feed (`api.get('/refreshStates')`) and reaches every
   `RefreshStateSubscriber`; a `DevicePropertyUpdatedEvent` also updates the
   shadowed device. `created`/`sourceType` are filled in when omitted.
+- `_FLUA.uiEvent(elementName, eventType[, value])` — inject a UI event
+  exactly as the HC3 UI delivers it (the same route the viewer uses),
+  returns `(data, status)`; the QA's callback fires async, values arrive
+  as strings. The verify loop's browser-free UI testing (with
+  `self:getView()` to read the rendered view).
 - `_FLUA.setTimeout(fn, ms, qaId)` — timer with explicit QA attribution
 - `if _FLUA then` — detect flua at runtime

@@ -40,6 +40,9 @@ MQTT_PUBLISH = (
 MQTT_DISCONNECT = "mqttDisconnect"  # {"qa": int?, "conn": int}
 CLEAR_TIMEOUT = "clearTimeout"  # {"id": int}
 LOG = "log"  # {"level": "info|warning|error", "text": str}
+LOG_STRUCTURED = (
+    "logStructured"  # {"level": str, "tag": str|None, "qaid": int|None, "text": str}
+)  # --log json: fields instead of a pre-formatted line
 EXIT = "exit"  # {"code": int}
 QA_LOADED = "qaLoaded"  # {"id": int}  a QA finished loading its code
 

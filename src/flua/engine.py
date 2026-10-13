@@ -78,6 +78,9 @@ def _print_stdout(text: str) -> None:
     print(text, flush=True)
 
 
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")  # logfile copies carry no colors
+
+
 # Libraries bundled with flua (--%%file:$name.lua loads from here). The
 # directory ships in the wheel (pyproject package-data: lua/lib/*.lua).
 BUNDLED_LIB_DIR = Path(__file__).parent / "lua" / "lib"
@@ -207,6 +210,8 @@ class LuaEngine:
         self.sync_sockets = SyncTCPSockets()
         self._running = False
         self._exit_code = 0
+        self._log_json = False  # --log json: QA log lines as JSON
+        self._logfile: Any = None  # --logfile FILE: log copy (ANSI stripped)
         self._pump_task: asyncio.Task[None] | None = None
         self.env = EnvChain()  # os.getenv chain: local .env > ~/.env > process env
         # HC3 REST API: the offline sim with api_mode="local" (the explicit
@@ -373,6 +378,38 @@ class LuaEngine:
         code, where the pump is frozen)."""
         self._handle_log({"type": messages.LOG, "level": level, "text": text})
 
+    def log_structured(self, level: str, tag: Any, qaid: Any, text: str) -> None:
+        """--log json: a QA log line as fields (level, tag, qa id, message)
+        instead of a pre-formatted line. Same sync/depth guarantees as
+        log_line."""
+        self._handle_log_structured(
+            {
+                "type": messages.LOG_STRUCTURED,
+                "level": str(level),
+                "tag": None if tag is None else str(tag),
+                "qaid": None if qaid is None else int(qaid),
+                "text": str(text),
+            }
+        )
+
+    def set_log_mode(self, fmt: str = "text", logfile: str | None = None) -> None:
+        """--log/--logfile: JSON-lines QA logs and/or a log copy in a file
+        (ANSI stripped). Must run before the QAs load (it flips the Lua-side
+        flag the log formatter consults)."""
+        self._log_json = fmt == "json"
+        self._lua.globals()["_FLUA"]["logJson"] = self._log_json
+        if logfile:
+            self._logfile = open(logfile, "a", encoding="utf-8")
+
+    def _logfile_write(self, line: str) -> None:
+        if self._logfile is None:
+            return
+        try:
+            self._logfile.write(line + "\n")
+            self._logfile.flush()
+        except OSError:
+            pass
+
     def flua_log(self, level: str, qa_id: int | None, message: str) -> None:
         """Flua's own log lines — visually distinct from QA logs: a [FLUA]
         level column plus the QA tag (name+id) the message belongs to, with
@@ -386,16 +423,20 @@ class LuaEngine:
                 tag = f"{info['name']}{qa_id}"
         text = str(message)
         logger.debug("Flua [%s]: %s", level, text)
+        if self._log_json:
+            # stdout stays pure JSON; flua's own notices go to stderr
+            print(f"{date}[FLUA   ][{tag}]: {text}", file=sys.stderr)
+            return
         if self.color_enabled():
             _print_stdout(f"\x1b[37m{date}\x1b[35m[FLUA   ]\x1b[37m[{tag}]: {text}\x1b[0m")
         else:
             _print_stdout(f"{date}[FLUA   ][{tag}]: {text}")
 
-    def render_html(self, text: str) -> str:
+    def render_html(self, text: str, plain: bool = False) -> str:
         """Render the HTML subset the HC3 console supports in QA log
         messages (see loghtml.py). Pure Python — safe at any Lua call depth
-        like log_line."""
-        return render_html_tags(str(text), self.color_enabled())
+        like log_line. ``plain`` strips the tags without colors (JSON logs)."""
+        return render_html_tags(str(text), False if plain else self.color_enabled())
 
     def fetch_url(self, url: str) -> tuple[int | None, str, dict[str, str]]:
         """Server-side fetch for GET /proxy?url=... (the HC3's UI helper):
@@ -1316,6 +1357,12 @@ class LuaEngine:
         self._timers.stop()
         self.sync_sockets.close_all()
         self.server_host.close_all()
+        if self._logfile is not None:
+            try:
+                self._logfile.close()
+            except OSError:
+                pass
+            self._logfile = None
         if self._pump_task is not None:
             self._pump_task.cancel()
             try:
@@ -1351,6 +1398,16 @@ class LuaEngine:
     def exit_code(self) -> int:
         """Exit code requested by Lua via the ``exit`` message (0 = none yet)."""
         return self._exit_code
+
+    def failed_qas(self) -> list[tuple[int, str, int]]:
+        """QAs that exited nonzero, as (id, name, code) — the CLI prints
+        these as a final verdict so agents can attribute the exit code."""
+        out: list[tuple[int, str, int]] = []
+        for qa_id, info in self._qas.items():
+            code = info.get("exited")
+            if code:
+                out.append((int(qa_id), str(info.get("name", "")), int(code)))
+        return sorted(out)
 
     def has_pending_work(self) -> bool:
         """True while timers, message queues, in-flight worker tasks, or a
@@ -1773,9 +1830,35 @@ class LuaEngine:
     def _handle_log(self, msg: dict[str, Any]) -> None:
         level = str(msg.get("level", "info")).upper()
         text = str(msg.get("text", ""))
+        if self._log_json:
+            # Python-originated lines (the greeting, notices) ride the same
+            # path — keep stdout pure JSON
+            self._handle_log_structured(
+                {
+                    "type": messages.LOG_STRUCTURED,
+                    "level": level,
+                    "tag": None,
+                    "qaid": None,
+                    "text": text,
+                }
+            )
+            return
         logger.debug("Lua [%s]: %s", level, text)
         # colors (if enabled) are embedded in the text by the Lua side
         _print_stdout(text)
+        self._logfile_write(_ANSI_RE.sub("", text))
+
+    def _handle_log_structured(self, msg: dict[str, Any]) -> None:
+        entry: dict[str, Any] = {
+            "time": datetime.fromtimestamp(self.clock.time).isoformat(timespec="seconds"),
+            "level": str(msg.get("level", "info")).upper(),
+            "tag": msg.get("tag"),
+            "qaid": msg.get("qaid"),
+            "msg": str(msg.get("text", "")),
+        }
+        line = json.dumps(entry, ensure_ascii=False)
+        _print_stdout(line)
+        self._logfile_write(line)
 
     def color_enabled(self) -> bool:
         """Whether QA log lines should carry ANSI colors.
