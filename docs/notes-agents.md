@@ -65,6 +65,17 @@ curl/browser for anything UI-related.
 8. **MCP server** exposing run/check/inspect as tools — the agent-ecosystem
    direction (Claude/Copilot hosts). Real project; not a quick win.
 
+   Benefit analysis (2026-10-13): skills = knowledge, `--tool`/CLI = the
+   engine's manual interface, MCP = a machine interface for hosts that
+   prefer one. Four deltas: (1) typed tool schemas instead of
+   arg-string/parse-text friction; (2) hosts with no/unreliable shell
+   (Claude Desktop etc.) get flua at all; (3) live stateful sessions — a
+   running engine across tool calls (inspect, inject events, poke) vs
+   one-shot runs; (4) one standard surface for every host. V1 scope
+   suggestion: stdio JSON-RPC, dependency-free, 4-6 tools (check, run with
+   instant/json, ui_text, inject_ui_event, devices) wrapping the existing
+   engine/tools.
+
 ## Known gaps (found while shipping)
 
 - A single `select`'s initial `value` is dropped from the legacy
