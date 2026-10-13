@@ -23,7 +23,10 @@ classifiers = [
     "Topic :: Software Development :: Interpreters",
 ]
 dependencies = [
-    "lupa>=2.4",            # 2.4+ bundles Lua 5.4 and supports Python 3.13
+    "lupa>=2.8",            # 2.7+ bundles Lua 5.5 (2.8 fixes the non-x86_64 sdist);
+    #                        flua develops/tests against Lua 5.5 — bump to 2.9
+    #                        when it ships (GH#294: Lua 5.5 GC fix for Python
+    #                        objects crossing into Lua)
 ]
 
 [project.urls]
