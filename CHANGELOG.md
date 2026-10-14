@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.35] - 2026-10-14
+
+### Fixed
+- ensure proper closure of HTTPError responses to prevent warnings at GC time
+
 ## [0.1.34] - 2026-10-14
 
 ### Added
