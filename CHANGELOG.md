@@ -4,6 +4,19 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.34] - 2026-10-14
+
+### Added
+- implement DeviceCreatedEvent and DeviceRemovedEvent handling in API and state management
+
+### Changed
+- Add serial execution option for pytest, improve sleep durations, and enhance test stability
+- add initial draft for distribution surfaces including package managers and VS Code extension
+- add benefit analysis for MCP server and tool schemas in notes-agents.md
+
+### Fixed
+- update logging messages and improve event handling in documentation and code
+
 ## [0.1.33] - 2026-10-13
 
 ### Added
