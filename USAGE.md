@@ -678,8 +678,9 @@ serves that the HC3 doesn't are failures; fields the sim doesn't model yet
 are reported as gaps.
 
 `RefreshStateSubscriber` (the refreshStates subscriber class) works in
-both modes: offline, sim state changes (property updates, actions) are
-emitted as real-shaped `DevicePropertyUpdatedEvent` /
+both modes: offline, sim state changes (device creation/removal, property
+updates, actions) are emitted as real-shaped `DeviceCreatedEvent` /
+`DeviceRemovedEvent` / `DevicePropertyUpdatedEvent` /
 `DeviceActionRanEvent` events — `updateProperty` only emits when the value
 actually changes — and online, the poller long-polls the real HC3's
 refreshStates and mirrors its events into the same feed. Both arrive at

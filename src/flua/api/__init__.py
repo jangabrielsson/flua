@@ -15,6 +15,7 @@ import json
 import logging
 import re
 import threading
+import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
@@ -78,8 +79,12 @@ class Api:
         name: str,
         device_type: str | None,
         properties: Any,
-    ) -> None:
-        self.state.register_qa(qa_id, name, device_type, properties)
+        proxy: bool = False,
+    ) -> dict[str, Any] | None:
+        """Register a running QA as a device; returns the recorded
+        DeviceCreatedEvent (None for proxy QAs — the real HC3 emits those)."""
+        now = self._engine.clock.time if self._engine is not None else time.time()
+        return self.state.register_qa(qa_id, name, device_type, properties, proxy=proxy, now=now)
 
     def _remote_hook(self, method: str, path: str, body: Any) -> tuple[Any, int]:
         """Forward a sim-handled call to the real HC3 (proxy mode): handlers

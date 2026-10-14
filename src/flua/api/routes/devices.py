@@ -105,7 +105,14 @@ def device_delete(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     dev = state.device(req.path_params["id"])
     if dev is None:
         return None, 404
-    del state.devices[int(req.path_params["id"])]
+    device_id = int(req.path_params["id"])
+    del state.devices[device_id]
+    if state.is_proxy(device_id):
+        # the HC3 owns the device; its own events come back via the poll
+        return None, 204
+    entry = state.record_device_removed(dev, _now(req))
+    if req.emit is not None:
+        req.emit(messages.refresh_state_event(entry))
     return None, 204
 
 

@@ -173,6 +173,7 @@ def child_device_create(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     if state.is_proxy(int(req.body["parentId"])):
         # the HC3 owns the parent: create the child there and shadow it
         # under the HC3-assigned id, so callbacks route to the right device
+        # (the HC3 emits the DeviceCreatedEvent; the poll mirrors it)
         if req.remote is None:
             return None, 404
         child, status = req.remote(req.method, req.path, req.body)
@@ -181,6 +182,9 @@ def child_device_create(state: SimState, req: ApiRequest) -> tuple[Any, int]:
         state.register_proxy_child(child)
         return public(child), 201
     dev = state.create_child_device(int(req.body["parentId"]), req.body)
+    entry = state.record_device_created(dev, _now(req))
+    if req.emit is not None:
+        req.emit(messages.refresh_state_event(entry))
     return dev, 201
 
 
@@ -205,7 +209,13 @@ def child_device_remove(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     state.proxy_ids.discard(child_id)
     state.plugin_variables.pop(child_id, None)
     if proxy:
+        # the HC3 owns the child: its DeviceRemovedEvent comes back through
+        # the refreshStates poll, so the sim must not emit a duplicate
         forward_to_proxy(req, True)
+        return None, 204
+    entry = state.record_device_removed(dev, _now(req))
+    if req.emit is not None:
+        req.emit(messages.refresh_state_event(entry))
     return None, 204
 
 

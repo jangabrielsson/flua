@@ -640,7 +640,12 @@ class LuaEngine:
         # plugin device exists before onInit executes, and onInit's own api
         # calls (internalStorage, updateProperty) must find it.
         self._restore_qa_state(name, qa_id, device_properties)
-        self.api.register_qa(qa_id, name, qa_config.get("type"), device_properties)
+        created = self.api.register_qa(
+            qa_id, name, qa_config.get("type"), device_properties, proxy=proxy_enabled
+        )
+        if created is not None:
+            # every RefreshStateSubscriber learns the new device appeared
+            self.enqueue_outbound(messages.refresh_state_event(created))
         self.mark_db_dirty()
         if proxy_enabled:
             # the sim only shadows the HC3's device from here on

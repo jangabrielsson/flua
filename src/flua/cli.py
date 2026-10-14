@@ -381,6 +381,7 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         parser.error(str(exc))
     await engine.start()
     ui_server: ApiServer | None = None
+    ui_viewer_msg: str | None = None
     if args.ui is not None:
         # the UI viewer's channel: serve the sim API over HTTP (viewer polls
         # /devices and fires /plugins/callUIEvent — the HC3's own contract).
@@ -390,11 +391,10 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             await ui_server.start()
         except (OSError, RuntimeError) as exc:
             parser.error(f"cannot serve the UI API on port {args.ui}: {exc}")
-        engine.post(
-            messages.log(
-                "info",
-                f"flua: UI viewer on http://127.0.0.1:{ui_server.port}/ — open it in a browser",
-            )
+        # logged after the greeting below, so the greeting always opens the
+        # startup output (the pump prints messages in post order)
+        ui_viewer_msg = (
+            f"flua: UI viewer on http://127.0.0.1:{ui_server.port}/ — open it in a browser"
         )
     if args.debugger is not None:
         _start_debugger(engine, args.debugger)
@@ -449,6 +449,8 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
                 f"Python {sys.version.split()[0]}), mode {mode}",
             )
         )
+    if ui_viewer_msg is not None:
+        engine.post(messages.log("info", ui_viewer_msg))
 
     if args.watch:
         args.run_for = 0  # stay alive until exit() or Ctrl-C

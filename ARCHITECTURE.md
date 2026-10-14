@@ -151,10 +151,10 @@ One dispatcher, three outcomes:
   calling QA's id travels with each request).
 - **`api.hc3.*`** forces the remote backend (bypasses hybrid routing;
   `fibaro.callhc3` uses it). Offline it stands in for the sim.
-- **Events.** State changes emit `DevicePropertyUpdatedEvent` /
-  `DeviceActionRanEvent` with the real HC3's envelope; `updateProperty`
-  emits only when the value actually changes. Configuration edits go to
-  the `changes` feed instead.
+- **Events.** State changes emit `DeviceCreatedEvent` / `DeviceRemovedEvent`
+  / `DevicePropertyUpdatedEvent` / `DeviceActionRanEvent` with the real
+  HC3's envelope; `updateProperty` emits only when the value actually
+  changes. Configuration edits go to the `changes` feed instead.
 - **`/flua/embeddedUI`** — a flua-only route (no HC3 counterpart, always
   local): the UI viewer's channel for the device type's default view. The
   tables live in `devices/uielements.py` and resolve watched device

@@ -313,6 +313,54 @@ class SimState:
         )
         return self.events[-1][1]
 
+    def record_device_created(self, device: dict[str, Any], now: float) -> dict[str, Any]:
+        """The DeviceCreatedEvent the real HC3 emits when a device appears
+        in the system (a plugin device, a QA, or a created child)."""
+        self._refresh_seq += 1
+        self.events.append(
+            (
+                self._refresh_seq,
+                self._envelope(
+                    "DeviceCreatedEvent",
+                    now,
+                    "system",
+                    int(device["id"]),
+                    {"id": int(device["id"])},
+                ),
+            )
+        )
+        return self.events[-1][1]
+
+    def record_device_removed(self, device: dict[str, Any], now: float) -> dict[str, Any]:
+        """The DeviceRemovedEvent the real HC3 emits when a device
+        disappears: the device's id/name/type plus its room and section,
+        resolved from the sim's rooms/sections (best-effort — a device
+        without a room reports an empty one)."""
+        room_id = int(device.get("roomID") or 0)
+        room = self.rooms.get(room_id)
+        section = self.sections.get(int(room.get("sectionID") or 219)) if room is not None else None
+        self._refresh_seq += 1
+        self.events.append(
+            (
+                self._refresh_seq,
+                self._envelope(
+                    "DeviceRemovedEvent",
+                    now,
+                    "system",
+                    int(device["id"]),
+                    {
+                        "id": int(device["id"]),
+                        "deviceName": device.get("name", ""),
+                        "type": device.get("type"),
+                        "roomId": room_id,
+                        "roomName": room.get("name", "") if room is not None else "",
+                        "sectionName": section.get("name", "") if section is not None else "",
+                    },
+                ),
+            )
+        )
+        return self.events[-1][1]
+
     def mirror_event(self, entry: dict[str, Any]) -> None:
         """An event polled from the real HC3 (online mode): same content,
         local sequence — so api.get('/refreshStates?last=N') serves the
@@ -379,8 +427,16 @@ class SimState:
         name: str,
         device_type: str | None,
         properties: Any,
-    ) -> None:
-        """Register a running QA as a device (mirrors init.lua's dev table)."""
+        proxy: bool = False,
+        now: float | None = None,
+    ) -> dict[str, Any] | None:
+        """Register a running QA as a device (mirrors init.lua's dev table).
+
+        Records the HC3's DeviceCreatedEvent in the feed (returned so the
+        engine can hand it to the pump). Proxy-mode QAs are owned by the
+        real HC3, which emits the event itself — the poll mirrors it, so no
+        local event.
+        """
         dev = _device_skeleton(qa_id, name, device_type)
         if isinstance(properties, dict):
             # QA config wins over the type skeleton's default properties.
@@ -389,6 +445,9 @@ class SimState:
             dev["properties"] = merged
         dev["modified"] = int(time.time())  # fibaro.get's second return value
         self.devices[qa_id] = dev
+        if proxy:
+            return None
+        return self.record_device_created(dev, now if now is not None else time.time())
 
     # -- proxy mode -------------------------------------------------------------
 

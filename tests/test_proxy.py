@@ -713,6 +713,11 @@ async def test_proxy_child_device_remove_deletes_on_hc3(
         assert _MockHc3.seen("DELETE", "/api/plugins/removeChildDevice/58")
         assert 58 not in engine.api.state.devices
         assert not engine.api.state.is_proxy(58)
+        # no local DeviceRemovedEvent: the HC3 emits its own, mirrored by the
+        # refreshStates poll (a local one would duplicate it)
+        assert not any(
+            entry.get("type") == "DeviceRemovedEvent" for _, entry in engine.api.state.events
+        )
     finally:
         await engine.stop()
 
@@ -870,6 +875,11 @@ async def test_proxy_create_child_device_uses_hc3_id(
         assert _MockHc3.seen("POST", "/api/plugins/createChildDevice")
         assert engine.api.state.devices[101]["parentId"] == 100
         assert engine.api.state.is_proxy(101)
+        # the HC3 created the device, so the sim emits no local
+        # DeviceCreatedEvent (the poll mirrors the HC3's own event)
+        assert not any(
+            entry.get("type") == "DeviceCreatedEvent" for _, entry in engine.api.state.events
+        )
     finally:
         await engine.stop()
 

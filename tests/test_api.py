@@ -792,7 +792,7 @@ def test_alarms_breached_from_seed() -> None:
 
 
 def test_refresh_states(api: Api) -> None:
-    api.register_qa(5000, "qa", None, {})
+    api.register_qa(5000, "qa", None, {})  # emits DeviceCreatedEvent (seq 1)
     assert api.dispatch(
         "POST",
         "/plugins/updateProperty",
@@ -800,45 +800,96 @@ def test_refresh_states(api: Api) -> None:
     ) == (None, 204)
     data, status = api.dispatch("GET", "/refreshStates")
     assert status == 200
-    assert data["last"] == 1
+    assert data["last"] == 2
     assert data["status"] == "IDLE"  # the real HC3's idle base shape
     assert isinstance(data["date"], str) and isinstance(data["timestamp"], int)
     assert isinstance(data["timestampMillis"], int)
     # state updates are EVENTS on the real HC3 (changes is UI noise)
     assert "changes" not in data
     events = data["events"]
-    assert len(events) == 1
-    assert events[0]["type"] == "DevicePropertyUpdatedEvent"
-    assert events[0]["sourceType"] == "system"
-    assert events[0]["objects"] == [{"objectType": "device", "objectId": 5000}]
-    assert events[0]["data"] == {
+    assert [e["type"] for e in events] == [
+        "DeviceCreatedEvent",
+        "DevicePropertyUpdatedEvent",
+    ]
+    assert events[0]["data"] == {"id": 5000}
+    assert events[1]["sourceType"] == "system"
+    assert events[1]["objects"] == [{"objectType": "device", "objectId": 5000}]
+    assert events[1]["data"] == {
         "id": 5000,
         "property": "value",
         "newValue": True,
         "oldValue": False,
     }
-    assert isinstance(events[0]["created"], int) and isinstance(events[0]["createdMillis"], int)
+    assert isinstance(events[1]["created"], int) and isinstance(events[1]["createdMillis"], int)
     # the same value again: no state change, no event (the user's rule)
     api.dispatch(
         "POST",
         "/plugins/updateProperty",
         {"deviceId": 5000, "propertyName": "value", "value": True},
     )
-    data, _ = api.dispatch("GET", "/refreshStates?last=1")
+    data, _ = api.dispatch("GET", "/refreshStates?last=2")
     assert "events" not in data
-    data, _ = api.dispatch("GET", "/refreshStates?last=1")
-    assert "changes" not in data and "events" not in data  # nothing new: absent
+    assert "changes" not in data  # nothing new: absent
     api.dispatch("POST", "/customEvents/x")
-    data, _ = api.dispatch("GET", "/refreshStates?last=1")
-    assert data["last"] == 2
+    data, _ = api.dispatch("GET", "/refreshStates?last=2")
+    assert data["last"] == 3
     assert data["events"] == [{"type": "CustomEvent", "data": {"name": "x"}}]
     assert api.dispatch("GET", "/refreshStates?last=abc") == (None, 400)
     # configuration updates (name etc.) are the "changes" feed
     api.dispatch("PUT", "/devices/5000", {"name": "renamed"})
-    data, _ = api.dispatch("GET", "/refreshStates?last=2")
+    data, _ = api.dispatch("GET", "/refreshStates?last=3")
     assert data["changes"] == [
         {"id": 5000, "name": "name", "newValue": "renamed", "oldValue": "qa"}
     ]
+
+
+def test_device_created_and_removed_events(api: Api) -> None:
+    # device creation/removal emits the HC3's DeviceCreatedEvent /
+    # DeviceRemovedEvent into the refreshStates feed and the pump
+    api.register_qa(5000, "qa", None, {})
+    child, status = api.dispatch(
+        "POST", "/plugins/createChildDevice", {"name": "light", "parentId": 5000}
+    )
+    assert status == 201
+    child_id = child["id"]
+    assert api.dispatch("DELETE", f"/devices/{child_id}") == (None, 204)
+    child2, _ = api.dispatch(
+        "POST", "/plugins/createChildDevice", {"name": "fan", "parentId": 5000}
+    )
+    assert api.dispatch("DELETE", f"/plugins/removeChildDevice/{child2['id']}") == (None, 204)
+    events = [entry for _, entry in api.state.events]
+    assert [e["type"] for e in events] == [
+        "DeviceCreatedEvent",  # the QA registered
+        "DeviceCreatedEvent",  # child 'light'
+        "DeviceRemovedEvent",  # DELETE /devices/{id}
+        "DeviceCreatedEvent",  # child 'fan'
+        "DeviceRemovedEvent",  # DELETE /plugins/removeChildDevice/{id}
+    ]
+    created_qa, created_light, removed_light, created_fan, removed_fan = events
+    assert created_qa["data"] == {"id": 5000}
+    assert created_light["data"] == {"id": child_id}
+    assert created_fan["data"] == {"id": child2["id"]}
+    # every event carries the sim's standard device-event envelope
+    for entry in events:
+        assert entry["sourceType"] == "system"
+        assert entry["objects"] == [{"objectType": "device", "objectId": entry["data"]["id"]}]
+        assert isinstance(entry["created"], int) and isinstance(entry["createdMillis"], int)
+    # removed events carry the device's identity and location (children land
+    # in the default room, like on the HC3)
+    assert removed_light["data"] == {
+        "id": child_id,
+        "deviceName": "light",
+        "type": "com.fibaro.binarySwitch",
+        "roomId": 219,
+        "roomName": "Default room",
+        "sectionName": "Default section",
+    }
+    assert removed_fan["data"]["deviceName"] == "fan"
+    assert removed_fan["data"]["id"] == child2["id"]
+    # the route-emitted events also reached the pump (subscriber delivery);
+    # the QA-registration event is handed to the pump by the engine instead
+    pump_types = [m["event"]["type"] for m in api.emitted if m["type"] == "refreshStateEvent"]
+    assert pump_types == [e["type"] for e in events[1:]]
 
 
 def test_profiles(api: Api) -> None:

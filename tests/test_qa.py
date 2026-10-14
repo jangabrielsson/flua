@@ -429,6 +429,40 @@ async def test_dynamic_load_from_file(tmp_path, capsys) -> None:
 
 
 @pytest.mark.asyncio
+async def test_device_created_and_removed_events_reach_subscribers(tmp_path, capsys) -> None:
+    # a RefreshStateSubscriber sees DeviceCreatedEvent when another QA is
+    # loaded and DeviceRemovedEvent when a device is deleted through the API
+    target = tmp_path / "loaded.lua"
+    target.write_text("--%%name:loaded-qa\nfunction QuickApp:onInit() end\n")
+    watcher = tmp_path / "watcher.lua"
+    watcher.write_text(
+        "local sub = RefreshStateSubscriber()\n"
+        "sub:subscribe(function(e)\n"
+        "  return e.type == 'DeviceCreatedEvent' or e.type == 'DeviceRemovedEvent'\n"
+        "end, function(e)\n"
+        "  print('EVENT', e.type, e.data.id)\n"
+        "end)\n"
+        "sub:run()\n"
+        "function QuickApp:onInit()\n"
+        "  local id = _FLUA.loadQAfromFile('" + str(target) + "')\n"
+        "  print('LOADED', id)\n"
+        "  api.delete('/devices/'..id)\n"
+        "end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(watcher), None, {}, str(watcher))
+        await wait_until(lambda: not engine.has_pending_work())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "LOADED 5001" in out
+    assert "EVENT DeviceCreatedEvent 5001" in out
+    assert "EVENT DeviceRemovedEvent 5001" in out
+
+
+@pytest.mark.asyncio
 async def test_dynamic_load_from_string(tmp_path, capsys) -> None:
     loader = tmp_path / "loader.lua"
     loader.write_text(
