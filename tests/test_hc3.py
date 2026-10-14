@@ -23,9 +23,32 @@ pytest.importorskip("lupa")
 
 from flua.engine import LuaEngine
 
+pytestmark = pytest.mark.slow  # real wall-clock waits (sleeps, settles, timeouts)
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 GOOD_CREDS = "Basic " + base64.b64encode(b"admin:secret").decode()
+
+
+async def _wait_until(predicate, timeout: float = 5.0) -> None:
+    deadline = time.monotonic() + timeout
+    while not predicate():
+        if time.monotonic() > deadline:
+            raise AssertionError("condition not met within timeout")
+        await asyncio.sleep(0.01)
+
+
+async def _wait_for_output(capsys, needle: str, timeout: float = 5.0) -> str:
+    """Poll capsys until needle appears; returns the accumulated output (the
+    accumulator owns capsys from here on — read it instead of capsys)."""
+    seen = ""
+    deadline = time.monotonic() + timeout
+    while needle not in seen:
+        if time.monotonic() > deadline:
+            raise AssertionError(f"{needle!r} not seen; output so far:\n{seen}")
+        await asyncio.sleep(0.01)
+        seen += capsys.readouterr().out
+    return seen
 
 
 class _MockHc3(BaseHTTPRequestHandler):
@@ -264,7 +287,11 @@ def mock_hc3() -> str:
     _MockHc3.file_updates = []
     _MockHc3.export_post_rejects = False
     server = ThreadingHTTPServer(("127.0.0.1", 0), _MockHc3)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
+    # Python 3.14's serve_forever polls for shutdown at 0.5s by default;
+    # the fixture teardown would otherwise cost half a second per test
+    threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
     yield f"http://127.0.0.1:{server.server_port}"
     server.shutdown()
 
@@ -309,10 +336,9 @@ async def test_hybrid_routing_local_sim_and_remote_hc3(
     await engine.start()
     try:
         engine.start_qa(str(script), None, {}, str(script))
-        await asyncio.sleep(0.5)
+        out = await _wait_for_output(capsys, "REMOTE 200 hc3-device")
     finally:
         await engine.stop()
-    out = capsys.readouterr().out
     assert "LOCAL 5000" in out  # served by the offline sim
     assert "REMOTE 200 hc3-device" in out  # served by the mock HC3
 
@@ -324,8 +350,10 @@ async def test_slow_remote_call_does_not_freeze_other_qas(
     # QA a makes a SLOW remote api.get; QA b's interval keeps ticking while
     # a waits. The calling QA is suspended (its own messages defer), but the
     # pump and every other QA keep running — with the old blocking dispatch
-    # b would tick zero times during a's ~0.8s call.
-    _MockHc3.device_delay = 0.8
+    # b would tick zero times during a's ~0.5s call. b must be fully booted
+    # first (its boot api calls queue behind a's in-flight dispatch lock), so
+    # a waits 200ms before its slow call.
+    _MockHc3.device_delay = 0.5
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.setenv("HC3_URL", mock_hc3)
     monkeypatch.setenv("HC3_USER", "admin")
@@ -334,9 +362,11 @@ async def test_slow_remote_call_does_not_freeze_other_qas(
     slow.write_text(
         "--%%name:slowpoke\n"
         "function QuickApp:onInit()\n"
-        "  local d, status = api.get('/devices/45')\n"
-        "  print('SLOW DONE', status, d.name)\n"
-        "  exit(0)\n"
+        "  setTimeout(function()\n"
+        "    local d, status = api.get('/devices/45')\n"
+        "    print('SLOW DONE', status, d.name)\n"
+        "    exit(0)\n"
+        "  end, 200)\n"
         "end\n"
     )
     tick = tmp_path / "tick.lua"
@@ -355,11 +385,9 @@ async def test_slow_remote_call_does_not_freeze_other_qas(
     try:
         engine.start_qa(str(slow), None, {}, str(slow))
         engine.start_qa(str(tick), None, {}, str(tick))
-        await asyncio.sleep(1.2)
+        out = await _wait_for_output(capsys, "SLOW DONE 200 hc3-device")
     finally:
         await engine.stop()
-    out = capsys.readouterr().out
-    assert "SLOW DONE 200 hc3-device" in out
     ticks = out.count("TICK ")
     assert ticks >= 3, f"other QA frozen during the remote call ({ticks} ticks): {out}"
 
@@ -395,11 +423,11 @@ async def test_remote_api_call_suspends_only_calling_qa(
     await engine.start()
     try:
         engine.start_qa(str(script), None, {}, str(script))
-        await asyncio.sleep(1.0)
+        out = await _wait_for_output(capsys, "ORDER api:200,timer")
     finally:
         await engine.stop()
-    out = capsys.readouterr().out
-    assert "ORDER api:200,timer" in out  # the call completed before the deferred timer
+    # the call completed before the deferred timer (its event list proves it)
+    assert "ORDER api:200,timer" in out
 
 
 @pytest.mark.asyncio
@@ -426,10 +454,9 @@ async def test_flua_mode_reports_effective_runtime_mode(
         # load_qa_file parses the --%% header (start_qa takes a raw config)
         assert engine.load_qa_file(str(online))[1] is None
         assert engine.load_qa_file(str(pinned))[1] is None
-        await asyncio.sleep(0.4)
+        out = await _wait_for_output(capsys, "PINNED offline")
     finally:
         await engine.stop()
-    out = capsys.readouterr().out
     assert "MODE online" in out
     assert "PINNED offline" in out
 
@@ -454,7 +481,8 @@ async def test_auth_failure_aborts_immediately(
     await engine.start()
     try:
         engine.start_qa(str(script), None, {}, str(script))
-        await asyncio.sleep(0.5)
+        # the auth guard aborts the engine and sets the exit code
+        await _wait_until(lambda: engine.exit_code == 1)
     finally:
         await engine.stop()
     captured = capsys.readouterr()
@@ -492,10 +520,9 @@ async def test_api_hc3_bypasses_the_hybrid_dispatch(
     await engine.start()
     try:
         engine.start_qa(str(script), None, {}, str(script))
-        await asyncio.sleep(0.5)
+        out = await _wait_for_output(capsys, "REMOTE 200 hc3-device")
     finally:
         await engine.stop()
-    out = capsys.readouterr().out
     assert "SIM bypass" in out  # the hybrid dispatch: local sim first
     assert "HC3 404" in out  # api.hc3 skipped the sim; the mock 404s on 5000
     assert "REMOTE 200 hc3-device" in out  # and reaches the mock's device 45
@@ -522,10 +549,9 @@ async def test_flua_namespace_ids_never_forward(tmp_path, capsys, mock_hc3, monk
     await engine.start()
     try:
         engine.start_qa(str(script), None, {}, str(script))
-        await asyncio.sleep(0.5)
+        out = await _wait_for_output(capsys, "HC3_NS 200 hc3-device")
     finally:
         await engine.stop()
-    out = capsys.readouterr().out
     assert "FLOA_NS 404" in out  # answered locally, no forwarding
     assert "HC3_NS 200 hc3-device" in out  # lower ids still reach the HC3
     forwarded = [r for r in _MockHc3.requests_seen if r.startswith("/api/devices/5001")]
@@ -547,10 +573,10 @@ async def test_api_hc3_falls_back_to_sim_offline(tmp_path, capsys, monkeypatch) 
     await engine.start()
     try:
         engine.start_qa(str(script), None, {}, str(script))
-        await asyncio.sleep(0.4)
+        out = await _wait_for_output(capsys, "FALLBACK 5000")
     finally:
         await engine.stop()
-    assert "FALLBACK 5000" in capsys.readouterr().out
+    assert "FALLBACK 5000" in out
 
 
 @pytest.mark.asyncio
@@ -566,16 +592,17 @@ async def test_refresh_state_subscriber_receives_sim_events(tmp_path, capsys, mo
         "    print('SUB', e.type, e.data.actionName)\n"
         "  end)\n"
         "  sub:run()\n"
+        "  print('SUB READY')\n"
         "end, 20)\n"
     )
     engine = LuaEngine()
     await engine.start()
     try:
         engine.start_qa(str(script), None, {}, str(script))
-        await asyncio.sleep(0.2)
+        await _wait_for_output(capsys, "SUB READY")
         engine.api.dispatch("POST", "/devices/5000/action/toggle", {"args": []})
-        await asyncio.sleep(0.3)
-        assert "SUB DeviceActionRanEvent toggle" in capsys.readouterr().out
+        out = await _wait_for_output(capsys, "SUB DeviceActionRanEvent toggle")
+        assert "SUB DeviceActionRanEvent toggle" in out
     finally:
         await engine.stop()
 
@@ -602,16 +629,14 @@ async def test_online_poller_mirrors_events_into_buffer(
         "setTimeout(function()\n"
         "  local data = api.get('/refreshStates?last=0')\n"
         "  for _, e in ipairs(data.events or {}) do print('BUFFER', e.type) end\n"
-        "end, 4000)\n"  # after the second poll mirrors the event
+        "end, 1500)\n"  # after the second poll (~1s) mirrors the event
     )
     engine = LuaEngine(api_mode="remote")
     await engine.start()
     try:
         engine.start_qa(str(script), None, {}, str(script))
-        await asyncio.sleep(4.5)  # past the 4000 ms BUFFER timer
-        out = capsys.readouterr().out
+        out = await _wait_for_output(capsys, "BUFFER DevicePropertyUpdatedEvent")
         assert "MIRROR DevicePropertyUpdatedEvent 45" in out
-        assert "BUFFER DevicePropertyUpdatedEvent" in out
     finally:
         await engine.stop()
 
@@ -634,10 +659,10 @@ async def test_keep_alive_directive_keeps_engine_pending(
     await engine.start()
     try:
         engine.start_qa(str(script), None, {}, str(script))
-        await asyncio.sleep(0.6)
-        out = capsys.readouterr().out
+        out = await _wait_for_output(capsys, "DONE")
         assert "DONE" in out
-        assert not engine.has_pending_work()  # idle run drains despite the poller
+        await _wait_until(lambda: not engine.has_pending_work())
+        # idle run drains despite the poller
     finally:
         await engine.stop()
 
@@ -646,8 +671,7 @@ async def test_keep_alive_directive_keeps_engine_pending(
     await engine.start()
     try:
         engine.load_qa_file(str(script))  # parses the --%% header like the CLI
-        await asyncio.sleep(0.6)
-        out = capsys.readouterr().out
+        out = await _wait_for_output(capsys, "KEEP")
         assert "KEEP" in out
         assert engine.has_pending_work()  # the keep-alive QA holds the engine open
     finally:
@@ -659,8 +683,8 @@ async def test_keep_alive_directive_keeps_engine_pending(
     await engine.start()
     try:
         engine.load_qa_file(str(script))
-        await asyncio.sleep(0.6)
-        assert not engine.has_pending_work()  # the exited QA no longer holds it
+        await _wait_until(lambda: not engine.has_pending_work())
+        # the exited QA no longer holds it
     finally:
         await engine.stop()
 
@@ -680,7 +704,9 @@ async def test_poller_auth_failure_stops_after_one_attempt(
     try:
         await engine.start()
         try:
-            await asyncio.sleep(1.5)  # several poll cycles would fit here
+            # the auth guard aborts the engine and sets the exit code; once
+            # that lands, no further poll can have been attempted
+            await _wait_until(lambda: engine.exit_code == 1)
         finally:
             await engine.stop()
     finally:
@@ -748,7 +774,13 @@ def test_ctrl_c_terminates_promptly_mid_long_poll(tmp_path, mock_hc3) -> None:
         stderr=subprocess.PIPE,
     )
     try:
-        time.sleep(1.0)  # the keep-alive long poll is in flight, held 20s
+        # the keep-alive long poll must be in flight (the handler holds it
+        # 20s) — the request record lands when the handler starts
+        deadline = time.monotonic() + 5.0
+        while "/api/refreshStates" not in _MockHc3.requests_seen:
+            if time.monotonic() > deadline:
+                raise AssertionError("long poll never reached the mock HC3")
+            time.sleep(0.02)
         started = time.monotonic()
         proc.send_signal(signal.SIGINT)
         _out, err = proc.communicate(timeout=10)
@@ -862,10 +894,9 @@ async def test_offline_directive_pins_secondary_qa_to_sim(
     try:
         engine.load_qa_file(str(a))
         engine.load_qa_file(str(b))
-        await asyncio.sleep(0.5)
+        out = await _wait_for_output(capsys, "B 404")
     finally:
         await engine.stop()
-    out = capsys.readouterr().out
     assert "A 200 hc3-device" in out  # the online QA reaches the mock HC3
     assert "B 404" in out  # the pinned QA stays in the sim
 
@@ -896,10 +927,9 @@ async def test_mode_directive_pins_secondary_qa_to_sim(
     try:
         engine.load_qa_file(str(a))
         engine.load_qa_file(str(b))
-        await asyncio.sleep(0.5)
+        out = await _wait_for_output(capsys, "B 404")
     finally:
         await engine.stop()
-    out = capsys.readouterr().out
     assert "A 200 hc3-device" in out  # the online QA reaches the mock HC3
     assert "B 404" in out  # the pinned QA stays in the sim
 
@@ -987,10 +1017,9 @@ async def test_devices_list_is_union_of_sim_and_hc3(
     try:
         engine.load_qa_file(str(a))
         engine.load_qa_file(str(b))
-        await asyncio.sleep(0.5)
+        out = await _wait_for_output(capsys, "B 3")
     finally:
         await engine.stop()
-    out = capsys.readouterr().out
     # QA a + QA b + the sim's device 1 (the HC3) + the two HC3 devices
     assert "A 5" in out
     assert "hc3-device" in out and "hc3-other" in out

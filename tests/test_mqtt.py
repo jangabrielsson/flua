@@ -7,6 +7,7 @@ import struct
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -167,7 +168,9 @@ def _encode_string_bytes(value: str) -> bytes:
     return struct.pack(">H", len(raw)) + raw
 
 
-async def _run_qa(script: str, sleep: float = 1.2, capsys=None) -> str:
+async def _run_qa(script: str, capsys, needle: str, timeout: float = 5.0) -> str:
+    """Run a QA and wait until needle appears in its output (the accumulated
+    output is returned — the caller owns capsys from here on)."""
     import tempfile
 
     with tempfile.TemporaryDirectory() as d:
@@ -178,10 +181,16 @@ async def _run_qa(script: str, sleep: float = 1.2, capsys=None) -> str:
         await engine.start()
         try:
             engine.start_qa(path, None, {}, path)
-            await asyncio.sleep(sleep)
+            seen = ""
+            deadline = time.monotonic() + timeout
+            while needle not in seen:
+                if time.monotonic() > deadline:
+                    raise AssertionError(f"{needle!r} not seen; output so far:\n{seen}")
+                await asyncio.sleep(0.01)
+                seen += capsys.readouterr().out
+            return seen
         finally:
             await engine.stop()
-    return capsys.readouterr().out
 
 
 @pytest.mark.asyncio
@@ -213,6 +222,7 @@ async def test_mqtt_connect_subscribe_publish_roundtrip(capsys) -> None:
         "  client:addEventListener('error', function(e) print('ERROR', e.code) end)\n"
         "end, 20)\n",
         capsys=capsys,
+        needle="MESSAGE flua/test hello 1 true",
     )
     assert "CONNECT CB 0" in out
     assert "CONNECTED false 0 true" in out
@@ -235,6 +245,7 @@ async def test_mqtt_connect_refused(capsys) -> None:
         "  client:addEventListener('error', function(e) print('ERR') end)\n"
         "end, 20)\n",
         capsys=capsys,
+        needle="CONNECT CB -1",
     )
     assert "CONNECT CB -1" in out
     assert "SHOULD_NOT_FIRE" not in out
@@ -258,6 +269,7 @@ async def test_mqtt_unsubscribe(capsys) -> None:
         "  client:addEventListener('error', function(e) print('ERROR', e.code) end)\n"
         "end, 20)\n",
         capsys=capsys,
+        needle="UNSUBSCRIBED true",
     )
     assert "UNSUBSCRIBED true" in out
     assert "ERROR" not in out

@@ -462,6 +462,22 @@ class LuaEngine:
         """Queue a Python -> Lua message for the pump to deliver."""
         self._outbound.put_nowait(msg)
 
+    def _post_from_worker(self, out: dict[str, Any], loop: Any) -> None:
+        """Hand a message from a worker thread to the pump loop. Drops it
+        when the loop is already closed (the engine was torn down while the
+        call was in flight — the QA is gone, the result means nothing)."""
+        try:
+            running = asyncio.get_running_loop()
+        except RuntimeError:
+            running = None
+        if loop is not None and running is not loop:
+            try:
+                loop.call_soon_threadsafe(self.enqueue_outbound, out)
+                return
+            except RuntimeError:
+                return  # loop closed — the run is over
+        self.enqueue_outbound(out)
+
     def lua_runtime(self) -> lupa.LuaRuntime:
         return self._lua
 
@@ -1552,15 +1568,7 @@ class LuaEngine:
             if info is not None and info.get("exited") is not None:
                 return  # the QA died while the call was in flight — drop it
             out = messages.api_result(qa, data, status)
-            loop = self._loop
-            try:
-                running = asyncio.get_running_loop()
-            except RuntimeError:
-                running = None
-            if loop is not None and running is not loop:
-                loop.call_soon_threadsafe(self.enqueue_outbound, out)
-            else:
-                self.enqueue_outbound(out)
+            self._post_from_worker(out, self._loop)
 
         threading.Thread(target=worker, name="flua-api", daemon=True).start()
 
@@ -1712,15 +1720,7 @@ class LuaEngine:
         if qa is None:
             return
         out = messages.ws_event(qa, conn, event, data, is_binary)
-        loop = self._loop
-        try:
-            running = asyncio.get_running_loop()
-        except RuntimeError:
-            running = None
-        if loop is not None and running is not loop:
-            loop.call_soon_threadsafe(self.enqueue_outbound, out)  # worker thread
-        else:
-            self.enqueue_outbound(out)
+        self._post_from_worker(out, self._loop)
 
     # -- mqtt.* client (MQTT 3.1.1 in worker threads) ---------------------------
 
@@ -1801,15 +1801,7 @@ class LuaEngine:
         if qa is None:
             return
         out = messages.mqtt_event(qa, conn, event, data)
-        loop = self._loop
-        try:
-            running = asyncio.get_running_loop()
-        except RuntimeError:
-            running = None
-        if loop is not None and running is not loop:
-            loop.call_soon_threadsafe(self.enqueue_outbound, out)  # worker thread
-        else:
-            self.enqueue_outbound(out)
+        self._post_from_worker(out, self._loop)
 
     async def _run_http_request(self, msg: dict[str, Any]) -> None:
         result: dict[str, Any]

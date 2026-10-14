@@ -41,6 +41,7 @@ flua = "flua.cli:main"
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23.0",
+    "pytest-xdist>=3.6",
     "ruff>=0.6.0",
 ]
 
@@ -80,6 +81,8 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+addopts = "-n auto"
 markers = [
     "hc3: live tests against a real HC3 (opt-in: set HC3_TEST=1 and configure HC3 credentials in the environment)",
+    "slow: tests that spend real wall-clock time (long polls, protocol settle, example fixtures) — skipped by the fast gate (-m 'not slow')",
 ]

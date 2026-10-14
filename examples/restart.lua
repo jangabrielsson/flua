@@ -10,7 +10,7 @@ function QuickApp:onInit()
   n = n + 1
   self:setVariable("boots", tostring(n))
   self:debug("Initializing QuickApp", n)
-  fibaro.sleep(2000)
+  fibaro.sleep(300)
   if n < 3 then
     plugin.restart(self.id)
   end

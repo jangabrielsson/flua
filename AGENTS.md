@@ -25,7 +25,9 @@ against a real HC3, or in proxy mode (a mirror QA on the HC3).
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"   # first time
-.venv/bin/pytest tests/ -q                  # full suite (live-HC3 tests skipped)
+.venv/bin/pytest tests/ -q                  # full suite (live-HC3 skipped)
+.venv/bin/pytest tests/ -q --serial         # one process (debugging; -n 0 also works)
+.venv/bin/pytest tests/ -q -m "not slow"    # fast gate: skips wall-clock-bound tests
 .venv/bin/pytest tests/test_qa.py -q        # one file
 .venv/bin/ruff check src/ tests/            # lint (must pass)
 .venv/bin/ruff format src/ tests/           # format (line length 100)
@@ -66,6 +68,11 @@ Python 3.11+. `lupa` is the only runtime dependency.
 - Almost everything runs **offline**: QAs against the simulated HC3, and
   online/proxy tests against **local mock HC3 servers** (threaded HTTP
   servers defined in the test files themselves). Never hit a real controller.
+- Tests run **in parallel by default** (`-n auto` in addopts; ~20s on 8
+  cores). `--serial` (or `-n 0`) runs one process for debugging;
+  `-m "not slow"` skips the tests that deliberately spend wall-clock time
+  (real sleeps, protocol settles, socket timeouts) — they carry the
+  `slow` marker.
 - `tests/test_hc3_live.py` / `tests/test_hc3_compat.py` are opt-in live-HC3
   suites (set `HC3_TEST=1` and configure credentials).
 - Many tests bind localhost sockets (mock servers, emulator callback

@@ -32,6 +32,8 @@ pytest.importorskip("lupa")
 from flua.engine import LuaEngine  # noqa: E402
 from flua.http_server import ApiServer  # noqa: E402
 
+pytestmark = pytest.mark.slow  # real wall-clock waits (sleeps, settles, timeouts)
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 

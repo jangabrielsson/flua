@@ -6,6 +6,8 @@ add_arguments() and run() — no other file changes.
 
 import argparse
 import json
+import os
+import shutil
 import subprocess
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -183,7 +185,9 @@ class _MockHc3(BaseHTTPRequestHandler):
 
 def _mock_hc3(tmp_path, monkeypatch) -> ThreadingHTTPServer:
     server = ThreadingHTTPServer(("127.0.0.1", 0), _MockHc3)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
+    threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.setenv("HC3_URL", f"http://127.0.0.1:{server.server_port}")
     monkeypatch.setenv("HC3_USER", "admin")
@@ -370,7 +374,9 @@ def test_upload_and_download_fqa_tools(tmp_path, monkeypatch, capsys) -> None:
     _MockHc3.fqas = {}
     _MockHc3.next_id = 100
     server = ThreadingHTTPServer(("127.0.0.1", 0), _MockHc3)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
+    threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
     try:
         monkeypatch.setenv("HOME", str(tmp_path / "home"))
         monkeypatch.setenv("HC3_URL", f"http://127.0.0.1:{server.server_port}")
@@ -418,7 +424,9 @@ def test_update_qa_syncs_files_name_properties_and_interfaces(
         }
     }
     server = ThreadingHTTPServer(("127.0.0.1", 0), _MockHc3)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
+    threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
     try:
         monkeypatch.setenv("HOME", str(tmp_path / "home"))
         monkeypatch.setenv("HC3_URL", f"http://127.0.0.1:{server.server_port}")
@@ -472,7 +480,9 @@ def test_update_qa_syncs_files_name_properties_and_interfaces(
 
 def test_create_db_tool(tmp_path, monkeypatch, capsys) -> None:
     server = ThreadingHTTPServer(("127.0.0.1", 0), _MockHc3)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
+    threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
     try:
         monkeypatch.setenv("HOME", str(tmp_path / "home"))
         monkeypatch.setenv("HC3_URL", f"http://127.0.0.1:{server.server_port}")
@@ -676,28 +686,32 @@ def test_packaged_instructions_match_the_repo() -> None:
             assert copy.read_bytes() == origin.read_bytes(), f"drifted: {copy}"
 
 
-def test_sync_skills_script_restores_drift() -> None:
+def test_sync_skills_script_restores_drift(tmp_path) -> None:
     # scripts/sync-skills.sh is the manual way back in sync: run it after a
-    # deliberate drift and the packaged copies match the repo again
+    # deliberate drift and the packaged copies match the repo again. The test
+    # runs against temp copies (SKILLS_SRC/SKILLS_DEST) so the repo tree is
+    # never rewritten mid-suite — other tests read it concurrently.
     repo = Path(__file__).resolve().parent.parent
-    packaged = repo / "src" / "flua" / "setup_templates" / "github" / "skills"
+    skills = tmp_path / "skills"
+    shutil.copytree(repo / ".github" / "skills", skills)
+    packaged = tmp_path / "packaged"
+    shutil.copytree(repo / "src" / "flua" / "setup_templates" / "github" / "skills", packaged)
     victim = packaged / "quickapp-types" / "SKILL.md"
-    original = victim.read_bytes()
-    victim.write_bytes(original + b"\n<!-- drift -->\n")
-    try:
-        result = subprocess.run(
-            [str(repo / "scripts" / "sync-skills.sh")],
-            cwd=repo,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        assert result.returncode == 0, result.stderr
-    finally:
-        if victim.read_bytes() != original:
-            victim.write_bytes(original)  # never leave the tree drifted
-    assert victim.read_bytes() == original
-    assert "synced .github/skills" in result.stdout
+    victim.write_bytes(victim.read_bytes() + b"\n<!-- drift -->\n")
+    env = {**os.environ, "SKILLS_SRC": str(skills), "SKILLS_DEST": str(packaged)}
+    result = subprocess.run(
+        [str(repo / "scripts" / "sync-skills.sh")],
+        cwd=repo,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "synced" in result.stdout
+    # the drift is gone: the packaged copy matches the skill dir again
+    assert victim.read_bytes() == (skills / "quickapp-types" / "SKILL.md").read_bytes()
+    assert "<!-- drift -->" not in victim.read_text(encoding="utf-8")
 
 
 def test_packaged_viewer_serves_from_the_package() -> None:

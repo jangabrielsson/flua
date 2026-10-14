@@ -12,6 +12,8 @@ pytest.importorskip("lupa")
 
 from flua.engine import LuaEngine  # noqa: E402
 
+pytestmark = pytest.mark.slow  # real wall-clock waits (sleeps, settles, timeouts)
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -343,8 +345,8 @@ def test_example_restart_restarts_with_variable() -> None:
 
 
 def test_example_sleep_keeps_deferred_timer() -> None:
-    # examples/sleep.lua sets a 2s timer and sleeps 3s: the timer is due
-    # during the sleep, so it must run after the sleeping callback resumed
+    # examples/sleep.lua sets a 400ms timer and sleeps 600ms: the timer is
+    # due during the sleep, so it must run after the sleeping callback resumed
     result = subprocess.run(
         [sys.executable, "-m", "flua", "--api", "local", "examples/sleep.lua"],
         cwd=REPO_ROOT,
@@ -353,7 +355,7 @@ def test_example_sleep_keeps_deferred_timer() -> None:
         timeout=90,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "Test 1 executed, 2s later" in result.stdout
-    assert "Slept for 3 seconds in onInit" in result.stdout
-    assert result.stdout.index("Slept for 3 seconds") < result.stdout.index("Test 1 executed")
+    assert "Test 1 executed, 400ms later" in result.stdout
+    assert "Slept for 600ms in onInit" in result.stdout
+    assert result.stdout.index("Slept for 600ms") < result.stdout.index("Test 1 executed")
     assert "stack traceback" not in result.stdout

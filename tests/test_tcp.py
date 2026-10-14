@@ -14,6 +14,8 @@ pytest.importorskip("lupa")
 
 from flua.engine import LuaEngine
 
+pytestmark = pytest.mark.slow  # real wall-clock waits (sleeps, settles, timeouts)
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 

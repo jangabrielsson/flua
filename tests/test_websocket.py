@@ -9,6 +9,7 @@ import struct
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -127,7 +128,9 @@ class EchoWsServer:
                     conn.sendall(_server_frame(opcode, payload))
 
 
-async def _run_qa(script: str, sleep: float = 1.0, capsys=None) -> str:
+async def _run_qa(script: str, capsys, needle: str, timeout: float = 5.0) -> str:
+    """Run a QA and wait until needle appears in its output (the accumulated
+    output is returned — the caller owns capsys from here on)."""
     import tempfile
 
     with tempfile.TemporaryDirectory() as d:
@@ -138,10 +141,16 @@ async def _run_qa(script: str, sleep: float = 1.0, capsys=None) -> str:
         await engine.start()
         try:
             engine.start_qa(path, None, {}, path)
-            await asyncio.sleep(sleep)
+            seen = ""
+            deadline = time.monotonic() + timeout
+            while needle not in seen:
+                if time.monotonic() > deadline:
+                    raise AssertionError(f"{needle!r} not seen; output so far:\n{seen}")
+                await asyncio.sleep(0.01)
+                seen += capsys.readouterr().out
+            return seen
         finally:
             await engine.stop()
-    return capsys.readouterr().out
 
 
 @pytest.mark.asyncio
@@ -165,6 +174,7 @@ async def test_websocket_binary_roundtrip(capsys) -> None:
         f"  ws:connect('ws://127.0.0.1:{server.port}/')\n"
         "end, 20)\n",
         capsys=capsys,
+        needle="BIN true",
     )
     assert "BIN true 4 16,22,0,255" in out
     assert "ERR" not in out
@@ -183,6 +193,7 @@ async def test_websocket_connect_headers(capsys) -> None:
         "{['Authorization'] = 'Basic abc123', ['X-Custom'] = 'yes'})\n"
         "end, 20)\n",
         capsys=capsys,
+        needle="CONNECTED",
     )
     assert "CONNECTED" in out
     assert "ERR" not in out
@@ -212,6 +223,7 @@ async def test_websocket_echo_roundtrip(capsys) -> None:
         f"  ws:connect('ws://127.0.0.1:{server.port}/echo')\n"
         "end, 20)\n",
         capsys=capsys,
+        needle="CLOSED false",
     )
     assert "CONNECTED true" in out
     assert "DATA ping from flua" in out
@@ -229,6 +241,7 @@ async def test_websocket_connect_refused(capsys) -> None:
         "  ws:connect('ws://127.0.0.1:1/')\n"
         "end, 20)\n",
         capsys=capsys,
+        needle="ERROR true",
     )
     assert "ERROR true" in out
     assert "SHOULD_NOT_FIRE" not in out

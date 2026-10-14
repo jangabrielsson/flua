@@ -18,11 +18,33 @@ pytest.importorskip("lupa")
 from flua.engine import LuaEngine
 from flua.http import http_call
 
+pytestmark = pytest.mark.slow  # real wall-clock waits (sleeps, settles, timeouts)
+
+
+async def _wait_for_output(capsys, needle: str, timeout: float = 5.0) -> str:
+    """Poll capsys until needle appears; returns the accumulated output."""
+    return await _wait_for_all(capsys, [needle], timeout)
+
+
+async def _wait_for_all(capsys, needles: list[str], timeout: float = 5.0) -> str:
+    """Poll capsys until every needle has appeared (order-independent —
+    HTTP callbacks may fire in any order). Returns the accumulated output."""
+    seen = ""
+    deadline = time.monotonic() + timeout
+    missing = set(needles)
+    while missing:
+        if time.monotonic() > deadline:
+            raise AssertionError(f"not seen: {sorted(missing)!r}; output so far:\n{seen}")
+        await asyncio.sleep(0.01)
+        seen += capsys.readouterr().out
+        missing = {n for n in missing if n not in seen}
+    return seen
+
 
 class _Handler(BaseHTTPRequestHandler):
     def _respond(self):
         if self.path.startswith("/slow"):
-            time.sleep(2.0)
+            time.sleep(1.0)  # slow enough that the 0.2s timeout test times out
         payload = json.dumps(
             {"method": self.command, "path": self.path, "body": self._body or None}
         ).encode()
@@ -49,7 +71,9 @@ class _Handler(BaseHTTPRequestHandler):
 @pytest.fixture(scope="module")
 def http_server() -> str:
     server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread = threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    )
     thread.start()
     yield f"http://127.0.0.1:{server.server_port}"
     server.shutdown()
@@ -96,7 +120,9 @@ def _https_server(cert_dir: str):
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.load_cert_chain(Path(cert_dir) / "cert.pem", Path(cert_dir) / "key.pem")
     httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)
-    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    threading.Thread(
+        target=httpd.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
     return httpd, f"https://127.0.0.1:{httpd.server_port}/"
 
 
@@ -126,10 +152,9 @@ async def test_http_check_certificate_option(tmp_path, capsys) -> None:
         await engine.start()
         try:
             engine.start_qa(str(script), None, {}, str(script))
-            await asyncio.sleep(1.0)
+            out = await _wait_for_all(capsys, ["OK 200", "ERR2"])
         finally:
             await engine.stop()
-        out = capsys.readouterr().out
         assert "OK 200" in out  # verification skipped
         assert "SHOULD_NOT_SUCCEED" not in out
         assert "ERR2" in out  # the default verifies, the self-signed cert fails
@@ -165,10 +190,9 @@ async def test_http_client_lua_roundtrip(tmp_path, capsys, http_server: str) -> 
     await engine.start()
     try:
         engine.start_qa(str(script), None, {}, str(script))
-        await asyncio.sleep(1.0)
+        out = await _wait_for_all(capsys, ["OK 200 true yes", "NOTFOUND 404", "TRANSPORT true"])
     finally:
         await engine.stop()
-    out = capsys.readouterr().out
     assert "OK 200 true yes" in out
     assert "NOTFOUND 404" in out
     assert "TRANSPORT true" in out

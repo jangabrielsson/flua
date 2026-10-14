@@ -26,6 +26,8 @@ pytest.importorskip("lupa")
 
 from flua.engine import LuaEngine  # noqa: E402
 
+pytestmark = pytest.mark.slow  # real wall-clock waits (sleeps, settles, timeouts)
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -249,7 +251,9 @@ class _MockHc3(BaseHTTPRequestHandler):
 def mock_hc3():
     _MockHc3.reset()
     server = ThreadingHTTPServer(("127.0.0.1", 0), _MockHc3)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread = threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    )
     thread.start()
     url = f"http://127.0.0.1:{server.server_address[1]}"
     yield url
