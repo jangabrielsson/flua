@@ -124,6 +124,7 @@ async def test_call_ui_event_over_http(server, tmp_path, capsys) -> None:
     with pytest.raises(urllib.error.HTTPError) as exc:
         await asyncio.to_thread(_http, f"{base}/plugins/callUIEvent?deviceID=5000")
     assert exc.value.code == 400
+    exc.value.close()  # release the error response while the socket is alive
 
 
 @pytest.mark.asyncio
@@ -229,6 +230,7 @@ async def test_bad_json_body_is_400(server) -> None:
     with pytest.raises(urllib.error.HTTPError) as exc:
         await asyncio.to_thread(_http_raw, f"{base}/plugins/updateView", "POST", b"{not json")
     assert exc.value.code == 400
+    exc.value.close()  # release the error response while the socket is alive
 
 
 @pytest.mark.asyncio

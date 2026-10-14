@@ -119,6 +119,11 @@ class Hc3Remote:
         except urllib.error.HTTPError as exc:
             status = exc.code
             raw = exc.read()
+            # close the error response while its socket is alive — an
+            # unclosed HTTPError finalized later (after the connection
+            # died) raises from close() and triggers the unraisable-
+            # exception warning at GC time
+            exc.close()
         except Exception as exc:
             logger.debug("hc3 request failed for %s %s: %s", method, path, exc)
             return None, 0  # transport failure: no HTTP status

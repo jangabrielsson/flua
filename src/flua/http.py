@@ -52,5 +52,8 @@ def http_call(
     except urllib.error.HTTPError as exc:
         status = exc.code
         body = exc.read()
+        # close while the socket is alive (see hc3.py): a late finalization
+        # of an unclosed error response raises from close() at GC time
+        exc.close()
         response_headers = dict(exc.headers.items()) if exc.headers else {}
     return status, body.decode("utf-8", errors="replace"), response_headers
