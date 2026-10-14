@@ -20,7 +20,7 @@ already logs with `print(...)` — and every line has a shape worth reading:
 - `SunsetLamp5000` — *which* QuickApp said it (name + id).
 - `Lamp on` — the message.
 
-There are five levels, in order of loudness:
+There are four levels, in order of loudness:
 
 ```text
 [TRACE  ]   quiet details, mostly for your future self
@@ -143,13 +143,24 @@ it smaller** until it works, then add pieces back.
 Programmers call this "the smallest case that fails" — and half the time,
 the act of shrinking finds the bug before the bug finds you.
 
-## Ask the forum
+## Ask for help
 
 When you've read the log, checked the file, and shrunk the problem — and
-it's still wrong — ask. The Fibaro forum has a flua thread, and the
-community of HC3 owners there has seen most of it before.
+it's still wrong — ask. Two places work well:
 
-A question that gets answered includes three things:
+- **An AI agent.** Paste the three things below into Claude Code, Copilot,
+  DeepSeek, ChatGPT — whatever you already have open. AI assistants are
+  surprisingly good at reading QuickApp code, and flua is built to be
+  agent-friendly: the log lines have one fixed shape, `flua --check` reports
+  problems with file and line, and the flua repository ships `AGENTS.md`
+  plus Copilot instructions — so an agent working *inside* the project
+  already knows the house rules. Let the agent run `flua --check` and the
+  QA itself: it can read the errors faster than you can copy them.
+- **The Fibaro forum.** flua has a thread there, and the community of HC3
+  owners has seen most of it before.
+
+A question that gets answered — by a human *or* an agent — includes three
+things:
 
 1. **What you expected** — "the lamp should turn on after 18:13".
 2. **What happened** — the exact log lines or error, copied as text.

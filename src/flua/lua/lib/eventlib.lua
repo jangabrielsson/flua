@@ -250,10 +250,12 @@ local function dateTest(dateStr0)
   end
 
   local function parseDateStr(dateStr) --,last)
+---@diagnostic disable-next-line: undefined-field
     local seq = string.split(dateStr," ")   -- min,hour,day,month,wday
     assert(seq,"Bad date string '%s'",dateStr)
     local lim = {{min=0,max=59},{min=0,max=23},{min=1,max=31},{min=1,max=12},{min=1,max=7},{min=2000,max=3000}}
     for i=1,6 do if seq[i]=='*' or seq[i]==nil then seq[i]=tostring(lim[i].min).."-"..lim[i].max end end
+---@diagnostic disable-next-line: undefined-field
     seq = map(function(w) return string.split(w,",") end, seq)   -- split sequences "3,4"
     local month0 = os.date("*t",os.time()).month
     seq = map(function(t) local m = table.remove(lim,1);
@@ -660,9 +662,9 @@ local handlerMT = {
   post = function(k,event,time)
     local timers = k._timers
     if not timers then timers = {}; k._timers=timers end
-    local ref
-    ref = post(event,time,nil,function(event) timers[ref]=nil end)
-    timers[ref] = true
+    local ref = nil
+    ref = post(event,time,nil,function(event) if ref then timers[ref]=nil end end)
+    if ref then timers[ref] = true end
   end,
   cancel = function(k,ref) 
     fibaro.cancel(ref) 
