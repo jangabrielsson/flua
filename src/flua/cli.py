@@ -20,12 +20,15 @@ import io
 import json
 import logging
 import os
+import shutil
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
 
 from . import __version__, messages
+from .api import Api
 from .clock import parse_start_time
 from .config import (
     expand_includes,
@@ -180,6 +183,34 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+# Temp dirs holding CLI-unpacked .fqa packages; registered with the engine
+# at startup (cleaned at stop). See _load_qas.
+_FQA_UNPACK_DIRS: list[str] = []
+
+
+def _unpack_fqa_script(parser: argparse.ArgumentParser, path: Path) -> str:
+    """Unpack a .fqa package into a temp dir; returns the generated main's
+    path. Uses the same machinery as the upload path (engine.fqa_to_files),
+    so the regenerated --%% header (name/type/properties/UI/--%%file) drives
+    the standard pipeline."""
+    try:
+        raw = path.read_text(encoding="utf-8")
+        body = json.loads(raw)
+    except (OSError, ValueError) as exc:
+        parser.error(f"cannot open {path}: {exc}")
+    fqa = Api._parse_fqa_body(body)
+    if fqa is None or not isinstance(fqa.get("files"), list):
+        parser.error(f"cannot open {path}: not a .fqa package (no files list)")
+    base = os.path.join(tempfile.gettempdir(), f"flua-qa-files-{os.getpid()}")
+    os.makedirs(base, exist_ok=True)
+    directory = tempfile.mkdtemp(prefix="cli-fqa-", dir=base)
+    main_path, err = LuaEngine.fqa_to_files(fqa, directory)
+    if err is not None or main_path is None:
+        parser.error(f"cannot open {path}: {err or 'package has no main file'}")
+    _FQA_UNPACK_DIRS.append(base)
+    return main_path
+
+
 def _load_qas(
     parser: argparse.ArgumentParser, args: argparse.Namespace
 ) -> tuple[dict[str, Any], list[tuple[str | None, str | None, dict[str, Any]]]]:
@@ -190,10 +221,13 @@ def _load_qas(
     CLI, -e code runs before any scripts — the VS Code mobdebug extension
     launches interpreters with -l package -e "<debugger bootstrap>" plus the
     script. Global params from every QA are copied up in file order — the
-    last file wins.
+    last file wins. A ``*.fqa`` script argument is unpacked first (a temp
+    dir, cleaned at engine stop) and its generated main runs like a normal
+    project — so downloaded/packed fqas are directly runnable.
     """
     global_config: dict[str, Any] = {}
     specs: list[tuple[str | None, str | None, dict[str, Any]]] = []
+    _FQA_UNPACK_DIRS.clear()
     if args.code is not None:
         global_params, local_params = split_annotations(parse_annotations(args.code))
         global_config.update(global_params)
@@ -202,6 +236,8 @@ def _load_qas(
         path = Path(script)
         if not path.exists():
             parser.error(f"cannot open {script}: no such file")
+        if path.suffix.lower() == ".fqa":
+            path = Path(_unpack_fqa_script(parser, path))
         source = path.read_text(encoding="utf-8")
         try:
             annotations = expand_includes(parse_annotations(source), path.parent)
@@ -377,6 +413,9 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             location=location,
         )
         engine.set_log_mode(args.log, args.logfile)
+        for directory in _FQA_UNPACK_DIRS:
+            # CLI-unpacked .fqa packages die with the engine
+            engine.track_temp_dir(directory)
     except (ValueError, OSError) as exc:
         parser.error(str(exc))
     await engine.start()
@@ -512,13 +551,21 @@ def _check_cli(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
     engine = LuaEngine()
     lua = engine.lua_runtime()
     findings: list[str] = []
+    unpack_dirs: list[str] = []
     if args.code is not None:
         findings += check_source(args.code, "<command line>", lua)
     for script in args.scripts:
         path = Path(script)
         if not path.exists():
             parser.error(f"cannot open {script}: no such file")
+        if path.suffix.lower() == ".fqa":
+            path = Path(_unpack_fqa_script(parser, path))
+            unpack_dirs = list(_FQA_UNPACK_DIRS)
         findings += check_file(str(path.resolve()), lua)
+    # check mode never starts the engine: clean the unpack dirs here
+    for directory in unpack_dirs:
+        with contextlib.suppress(OSError):
+            shutil.rmtree(directory, ignore_errors=True)
     if not findings:
         print("ok")
         return 0

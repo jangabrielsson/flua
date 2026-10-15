@@ -149,6 +149,51 @@ def test_export_and_unpack_roundtrip(tmp_path) -> None:
     assert "RUNS ok" in result.stdout
 
 
+def test_fqa_as_script_runs_the_packaged_qa(tmp_path) -> None:
+    # flua <file>.fqa: the CLI unpacks the package to a temp dir and runs
+    # its main — downloaded/packed fqas are directly runnable
+    main = tmp_path / "main.lua"
+    main.write_text(
+        "--%%name:fqarun\n"
+        "--%%file:lib.lua,lib\n"
+        "-- --------------- EOH ---------------\n"
+        "print('RUNS', LIB)\n"
+    )
+    (tmp_path / "lib.lua").write_text("LIB = 'ok'\n")
+    package = tmp_path / "runme.fqa"
+    result = _run("export", str(main), "-o", str(package))
+    assert result.returncode == 0, result.stdout + result.stderr
+    result = _run("--api", "local", str(package))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "RUNS ok" in result.stdout
+
+
+def test_fqa_as_script_check(tmp_path) -> None:
+    # flua --check <file>.fqa checks the unpacked package
+    main = tmp_path / "main.lua"
+    main.write_text("--%%name:checkme\nprint('x')\n")
+    package = tmp_path / "checkme.fqa"
+    result = _run("export", str(main), "-o", str(package))
+    assert result.returncode == 0, result.stdout + result.stderr
+    result = _run("--check", str(package))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "ok" in result.stdout
+
+
+def test_fqa_as_script_bad_package_errors(tmp_path) -> None:
+    # invalid JSON and shape-less JSON both fail with a clean message
+    garbage = tmp_path / "bad.fqa"
+    garbage.write_text("{not json")
+    result = _run("--api", "local", str(garbage))
+    assert result.returncode != 0
+    assert "cannot open" in result.stderr
+    wrong_shape = tmp_path / "wrong.fqa"
+    wrong_shape.write_text('{"name": "nofiles"}')
+    result = _run("--api", "local", str(wrong_shape))
+    assert result.returncode != 0
+    assert "not a .fqa package" in result.stderr
+
+
 # -- --watch ----------------------------------------------------------------------
 
 

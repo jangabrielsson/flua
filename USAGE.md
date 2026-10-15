@@ -801,6 +801,20 @@ Upload `myqa.fqa` through the HC3 web UI (Create QuickApp → import). The
 package follows the HC3's schema — only the properties the HC3 accepts
 travel; dynamic properties are left out.
 
+An `.fqa` file is also directly runnable — handy for testing a package you
+just downloaded from the HC3 (or built with `--tool pack`):
+
+```bash
+.venv/bin/flua --api local myqa.fqa     # unpack to a temp dir and run main
+.venv/bin/flua --check myqa.fqa         # static-check the packaged code
+```
+
+flua unpacks the package into a temp directory (cleaned up at exit) and
+runs the generated main through the normal pipeline — name, type,
+properties, UI rows, and `--%%file` extras all come back out of the
+package. The QA's own `--%%` header rides along too, so a downloaded QA's
+`--%%mode`/`--%%var` directives behave like they would unpacked.
+
 Or let flua talk to the HC3 directly with the `--tool` (alias `-t`)
 commands — they package/unpack for you, so you develop in the unpacked
 format (individual `.lua` files) and only the HC3 sees `.fqa`:

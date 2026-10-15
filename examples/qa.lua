@@ -1,5 +1,7 @@
 --%%name:Test
 --%%type:com.fibaro.binarySwitch
+--%%uid:836r26r827r67823
+--%%var:bar="Hello"
 
 function QuickApp:onInit()
     self:debug("QuickApp initialized")
@@ -7,13 +9,17 @@ function QuickApp:onInit()
     self:debug("Type", self.type)
     self:debug("ID", self.id)
 
+    self:debug("UID",self.properties.quickAppUuid)
+
     self:trace("TRACE")
     self:warning("WARNING")
     self:error("ERROR")
 
+    self:debug("Bar variable", self:getVariable("bar"))
+
     self:setVariable("foo", {1,2,3})
     local foo = self:getVariable("foo")
-    self:debug("QA variable variable", json.encode(foo))
+    self:debug("QA variable foo", json.encode(foo))
 
     self:internalStorageSet("foo", {1,2,3})
     local iv = self:internalStorageGet("foo")

@@ -998,6 +998,11 @@ class LuaEngine:
         self._qa_file_dirs.add(base)
         return directory
 
+    def track_temp_dir(self, directory: str) -> None:
+        """Register a directory for removal at stop — the CLI's .fqa script
+        imports unpack into one and the engine owns its cleanup."""
+        self._qa_file_dirs.add(directory)
+
     @staticmethod
     def _safe_file_name(name: str) -> str:
         safe = os.path.basename(str(name)).strip()
@@ -1231,8 +1236,8 @@ class LuaEngine:
             return "nil"
         return str(value)
 
+    @staticmethod
     def fqa_to_files(
-        self,
         fqa: dict[str, Any],
         directory: str,
         device_id: int | None = None,
@@ -1271,7 +1276,7 @@ class LuaEngine:
         if isinstance(initial, dict):
             for key, value in initial.items():
                 if isinstance(value, (str, int, float, bool)) or value is None:
-                    header.append(f"--%%property:{key}={self._lua_scalar(value)}")
+                    header.append(f"--%%property:{key}={LuaEngine._lua_scalar(value)}")
             variables = initial.get("quickAppVariables")
             if isinstance(variables, list):
                 for var in variables:
@@ -1290,7 +1295,7 @@ class LuaEngine:
             if entry is main:
                 continue
             try:
-                name = self._safe_file_name(str(entry.get("name") or ""))
+                name = LuaEngine._safe_file_name(str(entry.get("name") or ""))
             except ValueError as exc:
                 return None, str(exc)
             if device_id is not None:
@@ -1315,7 +1320,7 @@ class LuaEngine:
         header.append("-- --------------- EOH ---------------")
         content = str(main.get("content") or "")
         if strip_header:
-            content = self._strip_directive_header(content)
+            content = LuaEngine._strip_directive_header(content)
         if device_id is not None:
             main_name = f"{prefix}_main_{device_id}.lua"
         else:
