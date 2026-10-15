@@ -68,7 +68,10 @@ class EchoServer:
                     return
                 if not data:
                     return
-                conn.sendall(data)
+                try:
+                    conn.sendall(data)
+                except OSError:
+                    return  # peer closed mid-read (timeout tests) — no thread noise
         finally:
             conn.close()
 

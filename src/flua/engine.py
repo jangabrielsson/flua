@@ -1450,10 +1450,19 @@ class LuaEngine:
             self.clock.tick(time.monotonic())
             self._timers.fire_due()
             await self._drain_inbound()
+            # Poll the outbound queue without a cancellable get(): on
+            # Python <= 3.12, ``asyncio.wait_for(queue.get(), timeout)``
+            # could cancel the getter at the very moment an item arrived —
+            # the item was consumed but the TimeoutError discarded it, and
+            # the message (a timer, a restart, an api result) vanished. That
+            # raced the graceful-exit check into ending runs early on
+            # loaded machines (the CI failures on 3.11/3.12). get_nowait()
+            # can never lose an item.
             try:
-                batch = [await asyncio.wait_for(self._outbound.get(), timeout=_PUMP_POLL)]
-            except TimeoutError:
+                batch = [self._outbound.get_nowait()]
+            except asyncio.QueueEmpty:
                 self._flush_db()  # idle: persist any --%%db:+ changes
+                await asyncio.sleep(_PUMP_POLL)
                 continue
             while not self._outbound.empty():
                 batch.append(self._outbound.get_nowait())
