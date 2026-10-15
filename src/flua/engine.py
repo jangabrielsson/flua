@@ -271,6 +271,11 @@ class LuaEngine:
         # in-flight net.HTTPClient tasks: they count as pending work, so the
         # CLI keeps running until responses are delivered
         self._http_tasks: set[asyncio.Task[None]] = set()
+        # remote api.* calls in flight on flua-api worker threads (a
+        # suspended QA is waiting on each). Counted by has_pending_work so
+        # the graceful-exit check never ends a run mid-call; incremented
+        # before the thread starts, decremented in its finally (GIL-atomic).
+        self._api_calls_inflight = 0
         # net.TCPSocket ops run in worker threads over their own pool (the
         # debugger's sockets stay single-threaded on the main thread)
         self.qa_sockets = SyncTCPSockets()
@@ -1439,6 +1444,7 @@ class LuaEngine:
             or bool(self._inbound)
             or not self._outbound.empty()
             or bool(self._http_tasks)
+            or self._api_calls_inflight > 0
             or self.qa_websockets.active_count() > 0
             or self.qa_mqtt.active_count() > 0
         )
@@ -1555,29 +1561,33 @@ class LuaEngine:
         hc3_direct = bool(msg.get("hc3"))
         if debug_flag(self.config, "api"):
             self.debug_log(f"api {method} {url}")
+        self._api_calls_inflight += 1  # counted before start: no exit window
 
         def worker() -> None:
             try:
-                if hc3_direct:
-                    data, status = self.api.dispatch_hc3(method, url, body)
-                else:
-                    data, status = self.api.dispatch(method, url, body, qa_id=qa)
-            except Exception:
-                logger.exception("async api dispatch failed for %s %s", method, url)
-                data, status = None, 0
-            # --%%warn:true — error status codes are easy to miss (the HC3
-            # stays silent, the emulator can shout)
-            enabled = bool(self.config.get("warn"))
-            info = self._qas.get(qa)
-            if info is not None:
-                enabled = enabled or bool(info.get("config", {}).get("warn"))
-            if enabled and (status >= 300 or status <= 0):
-                self.flua_log("warning", qa, f"api {method} {url} -> {status}")
-            info = self._qas.get(qa)
-            if info is not None and info.get("exited") is not None:
-                return  # the QA died while the call was in flight — drop it
-            out = messages.api_result(qa, data, status)
-            self._post_from_worker(out, self._loop)
+                try:
+                    if hc3_direct:
+                        data, status = self.api.dispatch_hc3(method, url, body)
+                    else:
+                        data, status = self.api.dispatch(method, url, body, qa_id=qa)
+                except Exception:
+                    logger.exception("async api dispatch failed for %s %s", method, url)
+                    data, status = None, 0
+                # --%%warn:true — error status codes are easy to miss (the HC3
+                # stays silent, the emulator can shout)
+                enabled = bool(self.config.get("warn"))
+                info = self._qas.get(qa)
+                if info is not None:
+                    enabled = enabled or bool(info.get("config", {}).get("warn"))
+                if enabled and (status >= 300 or status <= 0):
+                    self.flua_log("warning", qa, f"api {method} {url} -> {status}")
+                info = self._qas.get(qa)
+                if info is not None and info.get("exited") is not None:
+                    return  # the QA died while the call was in flight — drop it
+                out = messages.api_result(qa, data, status)
+                self._post_from_worker(out, self._loop)
+            finally:
+                self._api_calls_inflight -= 1
 
         threading.Thread(target=worker, name="flua-api", daemon=True).start()
 

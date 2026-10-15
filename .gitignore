@@ -1,7 +1,8 @@
 .venv/
 .venv311/
 .venv312/
-.venv312/
+.venv315/
+.venv315/
 __pycache__/
 *.pyc
 .pytest_cache/
