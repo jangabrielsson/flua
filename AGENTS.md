@@ -13,6 +13,10 @@ against a real HC3, or in proxy mode (a mirror QA on the HC3).
 
 - **Runtime**: `src/flua/` — Python engine + the HC3 runtime in `src/flua/lua/`.
 - **Docs**: `USAGE.md` (user guide), `ARCHITECTURE.md` (internals),
+  `docs/concurrency.md` (threading/execution model, blocking rules,
+  graceful exit), `docs/walkthroughs.md` (guided traces of key flows),
+  `docs/invariants.md` (behavioral contracts with their pinning tests),
+  `docs/decisions/` (ADR-lite — update when a decision changes).
   `README.md` (overview).
 - **Examples**: `examples/` — runnable QuickApps; the test suite treats them
   as living fixtures, so keep them terminating unless their purpose is to run
@@ -119,8 +123,10 @@ Python 3.11+. `lupa` is the only runtime dependency.
 - Keep `_PY` (the Lua↔Python bridge surface) minimal; convenience lives in Lua.
 - `dev/` is scratch. Do not commit probes.
 - Docs: behavior changes belong in `USAGE.md` (user-facing) and/or
-  `ARCHITECTURE.md` (internals); directive changes belong in the directive
-  table.
+  `ARCHITECTURE.md` (internals); new contracts, event shapes, or identity
+  rules belong in `docs/invariants.md` with a pinning test; concurrency
+  changes belong in `docs/concurrency.md`. Directive changes belong in the
+  directive table.
 
 ## Workflow for AI agents
 
@@ -144,8 +150,9 @@ Code, Cursor, or another tool):
 
 - The project owner is the author and main developer; changes are reviewed
   commit-by-commit. Prefer small, focused, verifiable changes.
-- When a behavior is intentional-but-surprising (e.g. online being the
-  default mode), document it rather than silently changing it.
+- When a behavior is intentional-but-surprising (e.g. a proxy QA sharing
+  its HC3 device id with the sim shadow), document it rather than silently
+  changing it.
 - Do not touch the live HC3 from tests or scripts unless explicitly asked.
 
 ## Repo-specific agent files

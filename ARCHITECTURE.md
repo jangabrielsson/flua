@@ -4,6 +4,19 @@ This file explains how flua works under the hood. The user guide is
 [USAGE.md](USAGE.md); this is the machinery. Diagrams are ASCII so they
 render everywhere (GitHub, VS Code, terminal).
 
+Deeper dives, kept out of this file on purpose:
+
+- **[concurrency.md](docs/concurrency.md)** — the execution model: the pump,
+  the bridge queues, per-QA coroutines, worker threads, blocking rules,
+  graceful exit, and the two race lessons.
+- **[walkthroughs.md](docs/walkthroughs.md)** — guided traces through the
+  key flows (QA boot, sleep, remote API suspension, event delivery, proxy
+  shadowing).
+- **[invariants.md](docs/invariants.md)** — the behavioral contracts, each with
+  the test that pins it (the traceability companion to §13 below).
+- **[decisions/](docs/decisions/)** — ADR-lite: the *why* behind deliberate
+  choices.
+
 ## 1. Overview
 
 flua runs real Fibaro QuickApps offline. One Python process hosts a lupa
@@ -168,6 +181,10 @@ One dispatcher, three outcomes:
 
 ## 7. Worker threads
 
+The full threading model — who may block what, what counts as pending work,
+and the races that bit us — lives in
+[concurrency.md](docs/concurrency.md). This section is the tour version.
+
 All blocking network I/O runs in worker threads; the pump never blocks:
 
 ```
@@ -286,3 +303,6 @@ class of drift.
 8. `updateProperty` emits an event only when the value changes.
 9. The debugger's sockets block the main thread on purpose.
 10. Tests never touch a production HC3 unless `HC3_TEST=1`.
+
+Each of these (plus the identity/routing/event/exit contracts around them)
+is expanded with its pinning test in [invariants.md](docs/invariants.md).

@@ -3,6 +3,20 @@
 Thanks for your interest! flua is an open project — pull requests are
 welcome.
 
+Before diving in, read the orientation pair:
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — components and layers.
+- **[docs/concurrency.md](docs/concurrency.md)** — the execution model
+  (pump, bridge queues, per-QA coroutines, worker threads, blocking rules,
+  graceful exit).
+- **[docs/walkthroughs.md](docs/walkthroughs.md)** — guided traces through
+  the key flows, when you want to *see* a mechanism run.
+- **[docs/invariants.md](docs/invariants.md)** — the behavioral contracts,
+  each with the test that pins it: when a change touches a contract, the
+  pin is the test to run (and update deliberately).
+- **[docs/decisions/](docs/decisions/)** — the why behind deliberate
+  choices; update these when a decision changes.
+
 ## Setup
 
 ```bash

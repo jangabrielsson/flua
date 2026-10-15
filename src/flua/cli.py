@@ -347,8 +347,8 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         # The engine mode follows the MAIN QA's directives (its header over
         # any --%%include'd defaults) — --%%mode:offline selects the sim,
         # --%%mode:online|proxy the HC3. An explicit --api flag always
-        # wins, and the default (no directive anywhere) is ONLINE — offline
-        # is opt-in.
+        # wins, and the default (no directive anywhere) is OFFLINE — online
+        # is opt-in (docs/decisions/0001).
         api_mode = args.api
         if api_mode is None and qa_specs:
             # the FIRST spec may be an injected -e bootstrap (the mobdebug
