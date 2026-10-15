@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.38] - 2026-10-15
+
+### Fixed
+- track in-flight API calls to ensure graceful exit during remote operations
+
 ## [0.1.37] - 2026-10-15
 
 ### Fixed
