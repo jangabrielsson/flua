@@ -4,6 +4,20 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.39] - 2026-10-17
+
+### Added
+- enhance logging capabilities with structured JSON output and add support for Python 3.14
+- add support for .fqa files as scripts and enhance logging over REST
+- add support for running and checking .fqa packages directly from CLI
+
+### Changed
+- Implement HC3 REST API parity for debug messages and system logs
+- Implement ADRs for id namespaces, proxy device behavior, and device lifecycle events
+
+### Fixed
+- enhance project validation and include checks in the --check command
+
 ## [0.1.38] - 2026-10-15
 
 ### Fixed
