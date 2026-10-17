@@ -16,13 +16,19 @@ import pytest
 pytest.importorskip("lupa")
 
 from flua.mcp import jsonrpc as core  # noqa: E402
-from flua.mcp.server import METHODS, PROTOCOL_VERSION  # noqa: E402
+from flua.mcp.server import (  # noqa: E402
+    LEGACY_PROTOCOL_VERSION,
+    METHODS,
+    SUPPORTED_VERSIONS,
+    _check_protocol_version,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def _dispatch(line: str) -> dict | None:
-    return core.handle_message(line, METHODS)
+    # the same precheck run_stdio installs: per-request protocol version
+    return core.handle_message(line, METHODS, precheck=_check_protocol_version)
 
 
 def _call(name: str, args: dict) -> dict:
@@ -74,14 +80,63 @@ def test_notifications_get_no_response() -> None:
 
 
 def test_initialize_handshake() -> None:
-    result = _call("initialize", {"protocolVersion": PROTOCOL_VERSION})
-    assert result["protocolVersion"] == PROTOCOL_VERSION
+    # the legacy (initialize-era) handshake: still served for older clients
+    result = _call("initialize", {"protocolVersion": LEGACY_PROTOCOL_VERSION})
+    assert result["protocolVersion"] == LEGACY_PROTOCOL_VERSION
     assert result["capabilities"] == {"tools": {}}
     assert result["serverInfo"]["name"] == "flua-mcp"
 
 
+def test_discover_lists_supported_versions() -> None:
+    # server/discover (2026-07-28, required): versions, capabilities, identity
+    result = _call("server/discover", {})
+    assert result["resultType"] == "complete"
+    assert result["supportedVersions"] == SUPPORTED_VERSIONS
+    assert "2026-07-28" in result["supportedVersions"]
+    assert result["capabilities"] == {"tools": {}}
+    assert result["_meta"]["io.modelcontextprotocol/serverInfo"]["name"] == "flua-mcp"
+    assert result["instructions"]
+
+
+def test_modern_per_request_version_check() -> None:
+    # 2026-07-28: the version rides params._meta per request; a supported
+    # version is served, an unknown one answers -32022 with the list
+    response = _dispatch(
+        json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "ping",
+                "params": {
+                    "_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28"}
+                },
+            }
+        )
+    )
+    assert response is not None and response["result"] == {}
+    response = _dispatch(
+        json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "ping",
+                "params": {
+                    "_meta": {"io.modelcontextprotocol/protocolVersion": "1900-01-01"}
+                },
+            }
+        )
+    )
+    assert response is not None
+    assert response["error"]["code"] == -32022
+    assert response["error"]["data"] == {
+        "supported": SUPPORTED_VERSIONS,
+        "requested": "1900-01-01",
+    }
+
+
 def test_tools_list_shape() -> None:
     result = _call("tools/list", {})
+    assert result["resultType"] == "complete"
     names = [t["name"] for t in result["tools"]]
     assert names == ["qa_check", "qa_run"]
     for tool in result["tools"]:
@@ -180,16 +235,21 @@ def test_stdio_transport_end_to_end(tmp_path) -> None:
     script = tmp_path / "e2e.lua"
     script.write_text("print('E2E')\nexit(0)\n")
     messages = [
-        {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+        {"jsonrpc": "2.0", "id": 1, "method": "server/discover", "params": {}},
+        {"jsonrpc": "2.0", "id": 2, "method": "initialize", "params": {}},
         {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
-        {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+        {"jsonrpc": "2.0", "id": 3, "method": "tools/list", "params": {}},
         {
             "jsonrpc": "2.0",
-            "id": 3,
+            "id": 4,
             "method": "tools/call",
-            "params": {"name": "qa_run", "arguments": {"files": [str(script)]}},
+            "params": {
+                "_meta": {"io.modelcontextprotocol/protocolVersion": "2026-07-28"},
+                "name": "qa_run",
+                "arguments": {"files": [str(script)]},
+            },
         },
-        {"jsonrpc": "2.0", "id": 4, "method": "ping", "params": {}},
+        {"jsonrpc": "2.0", "id": 5, "method": "ping", "params": {}},
     ]
     process = subprocess.run(
         [sys.executable, "-m", "flua.mcp.server"],
@@ -203,9 +263,10 @@ def test_stdio_transport_end_to_end(tmp_path) -> None:
     assert process.returncode == 0, process.stderr
     responses = [json.loads(line) for line in process.stdout.splitlines() if line.strip()]
     # one response per request; the notification is silent
-    assert [r["id"] for r in responses] == [1, 2, 3, 4]
-    assert responses[0]["result"]["protocolVersion"] == PROTOCOL_VERSION
-    assert [t["name"] for t in responses[1]["result"]["tools"]] == ["qa_check", "qa_run"]
-    run_result = json.loads(responses[2]["result"]["content"][0]["text"])
+    assert [r["id"] for r in responses] == [1, 2, 3, 4, 5]
+    assert "2026-07-28" in responses[0]["result"]["supportedVersions"]
+    assert responses[1]["result"]["protocolVersion"] == LEGACY_PROTOCOL_VERSION
+    assert [t["name"] for t in responses[2]["result"]["tools"]] == ["qa_check", "qa_run"]
+    run_result = json.loads(responses[3]["result"]["content"][0]["text"])
     assert run_result["exitCode"] == 0
-    assert responses[3]["result"] == {}
+    assert responses[4]["result"] == {}

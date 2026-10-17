@@ -7,19 +7,23 @@ with flua (design: `docs/notes/notes-mcp.md`, packaging: ADR 0010).
 ## Protocol surface (current)
 
 - **Transport**: stdio — newline-delimited JSON-RPC 2.0 on stdin/stdout.
-- **Protocol version**: `2025-06-18` (the stateless-session spec). Sessions
-  are not used yet; every request is self-contained.
+- **Spec revision**: dual-era. The **modern** surface (2026-07-28) needs no
+  handshake — every request carries its protocol version in `params._meta`
+  and `server/discover` (required) lists `supportedVersions`. The **legacy**
+  `initialize` handshake (2025-06-18) is still served for older clients.
+  Unsupported versions answer error `-32022` with `{supported, requested}`.
 - **stdout is pure JSON-RPC** — one response line per request; server
   diagnostics go to stderr. Agents can parse stdout unconditionally.
 - **Capabilities**: `tools` only. Resources and prompts come later.
 
-| Method | Purpose |
-|---|---|
-| `initialize` | handshake → `{protocolVersion, capabilities, serverInfo}` |
-| `ping` | liveness → `{}` |
-| `tools/list` | the tools with their JSON-Schema inputs |
-| `tools/call` | run one tool → `{content: [{type: "text", text: <json>}], isError}` |
-| `notifications/initialized`, `notifications/cancelled` | accepted, never answered |
+| Method | Era | Purpose |
+|---|---|---|
+| `server/discover` | modern | `{resultType, supportedVersions, capabilities, _meta.serverInfo, instructions}` |
+| `initialize` | legacy | handshake → `{protocolVersion, capabilities, serverInfo}` |
+| `ping` | both | liveness → `{}` |
+| `tools/list` | both | the tools with their JSON-Schema inputs (`resultType: "complete"`) |
+| `tools/call` | both | run one tool → `{resultType, content, isError}` |
+| `notifications/initialized`, `notifications/cancelled` | legacy | accepted, never answered |
 
 Error semantics: invalid JSON/requests and unknown methods answer with the
 standard JSON-RPC error codes (`-32700`/`-32600`/`-32601`); bad *tool
@@ -64,7 +68,7 @@ json` lines, `verdict` the stderr notices (exit attribution). A nonzero
 
 ```bash
 flua-mcp                 # stdio JSON-RPC server (reads stdin, answers stdout)
-flua-mcp --version       # flua-mcp 0.1.40 (protocol 2025-06-18)
+flua-mcp --version       # flua-mcp 0.1.40 (protocols 2026-07-28, 2025-06-18)
 ```
 
 Register it as a stdio MCP server in the host's config — no extra install,

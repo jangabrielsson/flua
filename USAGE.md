@@ -980,7 +980,7 @@ The same surface is available as an MCP server for hosts that prefer one
 (Claude Desktop, Copilot, …). It ships with flua:
 
 ```bash
-flua-mcp                  # stdio JSON-RPC (protocol 2025-06-18)
+flua-mcp                  # stdio JSON-RPC (dual-era: 2026-07-28 modern, 2025-06-18 legacy)
 flua-mcp --version
 ```
 

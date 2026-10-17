@@ -16,23 +16,64 @@ from .. import __version__
 from .jsonrpc import INVALID_PARAMS, METHOD_NOT_FOUND, JsonRpcError, run_stdio
 from .tools import TOOLS
 
-PROTOCOL_VERSION = "2025-06-18"
+# The 2026-07-28 revision dropped the initialize handshake: every request
+# carries its protocol version in params._meta and servers MUST implement
+# server/discover (the "modern" era). Older clients still send initialize
+# (the "legacy" era, 2025-11-25 and earlier) — flua-mcp serves both.
+SUPPORTED_VERSIONS = ["2026-07-28", "2025-06-18"]
+LEGACY_PROTOCOL_VERSION = "2025-06-18"  # advertised to initialize-era clients
+UNSUPPORTED_PROTOCOL_VERSION = -32022
+
+SERVER_INSTRUCTIONS = (
+    "flua-mcp runs Fibaro QuickApps in the flua emulator. Use qa_check to "
+    "static-check QA files and qa_run to run them to completion; runs are "
+    "offline by default and never touch a controller unless mode=remote."
+)
+
+
+def _check_protocol_version(msg: dict[str, Any]) -> None:
+    """Modern per-request version negotiation: params._meta carries the
+    client's protocol version; unsupported versions answer -32022.
+    Requests without the field are legacy (the initialize era)."""
+    meta = (msg.get("params") or {}).get("_meta") or {}
+    version = meta.get("io.modelcontextprotocol/protocolVersion")
+    if version is not None and version not in SUPPORTED_VERSIONS:
+        raise JsonRpcError(
+            UNSUPPORTED_PROTOCOL_VERSION,
+            "Unsupported protocol version",
+            {"supported": SUPPORTED_VERSIONS, "requested": version},
+        )
 
 
 def _initialize(_params: dict[str, Any]) -> dict[str, Any]:
     return {
-        "protocolVersion": PROTOCOL_VERSION,
+        "protocolVersion": LEGACY_PROTOCOL_VERSION,
         "capabilities": {"tools": {}},
         "serverInfo": {"name": "flua-mcp", "version": __version__},
     }
 
 
+def _discover(_params: dict[str, Any]) -> dict[str, Any]:
+    """server/discover (2026-07-28, required): supported versions,
+    capabilities, and identity in one request."""
+    return {
+        "resultType": "complete",
+        "supportedVersions": SUPPORTED_VERSIONS,
+        "capabilities": {"tools": {}},
+        "instructions": SERVER_INSTRUCTIONS,
+        "_meta": {
+            "io.modelcontextprotocol/serverInfo": {"name": "flua-mcp", "version": __version__}
+        },
+    }
+
+
 def _tools_list(_params: dict[str, Any]) -> dict[str, Any]:
     return {
+        "resultType": "complete",
         "tools": [
             {"name": name, "description": spec["description"], "inputSchema": spec["inputSchema"]}
             for name, spec in TOOLS.items()
-        ]
+        ],
     }
 
 
@@ -47,6 +88,7 @@ def _tools_call(params: dict[str, Any]) -> dict[str, Any]:
     try:
         result = spec["handler"](arguments)
         return {
+            "resultType": "complete",
             "content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}],
             "isError": False,
         }
@@ -62,6 +104,7 @@ def _dumps(value: Any) -> str:
 
 
 METHODS: dict[str, Any] = {
+    "server/discover": _discover,
     "initialize": _initialize,
     "ping": lambda _params: {},
     "tools/list": _tools_list,
@@ -76,9 +119,10 @@ def main(argv: list[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
     if "--version" in argv:
-        print(f"flua-mcp {__version__} (protocol {PROTOCOL_VERSION})")
+        supported = ", ".join(SUPPORTED_VERSIONS)
+        print(f"flua-mcp {__version__} (protocols {supported})")
         return 0
-    return run_stdio(METHODS)
+    return run_stdio(METHODS, precheck=_check_protocol_version)
 
 
 if __name__ == "__main__":

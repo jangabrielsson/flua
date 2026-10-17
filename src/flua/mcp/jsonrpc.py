@@ -43,11 +43,15 @@ def _error(response_id: Any, code: int, message: str, data: Any = None) -> dict[
 
 
 def handle_message(
-    line: str, methods: dict[str, Callable[[dict[str, Any]], Any]]
+    line: str,
+    methods: dict[str, Callable[[dict[str, Any]], Any]],
+    precheck: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any] | None:
     """One newline-delimited JSON-RPC message -> the response to print, or
     None for notifications (no id) and for parse-level failures with no id
-    to echo (per spec those answer with id null)."""
+    to echo (per spec those answer with id null). ``precheck`` runs after
+    JSON-RPC validation and may raise JsonRpcError (e.g. the MCP protocol
+    version check) — the error becomes the response."""
     try:
         msg = json.loads(line)
     except ValueError:
@@ -60,6 +64,13 @@ def handle_message(
         )
     method = msg.get("method")
     is_notification = "id" not in msg
+    if precheck is not None:
+        try:
+            precheck(msg)
+        except JsonRpcError as exc:
+            if is_notification:
+                return None
+            return _error(msg["id"], exc.code, exc.message, exc.data)
     handler = methods.get(method) if isinstance(method, str) else None
     if handler is None:
         if is_notification:
@@ -81,14 +92,17 @@ def handle_message(
     return _result(msg["id"], result)
 
 
-def run_stdio(methods: dict[str, Callable[[dict[str, Any]], Any]]) -> int:
+def run_stdio(
+    methods: dict[str, Callable[[dict[str, Any]], Any]],
+    precheck: Callable[[dict[str, Any]], None] | None = None,
+) -> int:
     """The server loop: read JSON-RPC lines from stdin until EOF, write one
     response line per request. Returns the process exit code."""
     for line in sys.stdin:
         line = line.strip()
         if not line:
             continue
-        response = handle_message(line, methods)
+        response = handle_message(line, methods, precheck)
         if response is not None:
             print(json.dumps(response, ensure_ascii=False), flush=True)
     return 0
