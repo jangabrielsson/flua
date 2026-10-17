@@ -36,6 +36,7 @@ Issues = "https://github.com/jangabrielsson/flua/issues"
 
 [project.scripts]
 flua = "flua.cli:main"
+flua-mcp = "flua.mcp.server:main"
 
 [project.optional-dependencies]
 dev = [

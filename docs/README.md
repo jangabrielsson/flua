@@ -28,6 +28,8 @@ notes at a glance.
   `--%%` reference, all runtime features.
 - **[rest-endpoints.md](rest-endpoints.md)** — which REST endpoints are
   real vs shape-only stubs, and the rule for promoting one.
+- **[mcp.md](mcp.md)** — the `flua-mcp` server: protocol surface, tools,
+  host registration, and what agents can rely on.
 - **[../AGENTS.md](../AGENTS.md)** — working rules for AI agents (any
   framework).
 - **[../CHANGELOG.md](../CHANGELOG.md)** — release notes.

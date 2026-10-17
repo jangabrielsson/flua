@@ -974,6 +974,22 @@ appends every structured system/crash event as one JSON line — the
 complete history, where `GET /flua/systemLog` is the bounded in-memory
 buffer.
 
+### MCP server (`flua-mcp`)
+
+The same surface is available as an MCP server for hosts that prefer one
+(Claude Desktop, Copilot, …). It ships with flua:
+
+```bash
+flua-mcp                  # stdio JSON-RPC (protocol 2025-06-18)
+flua-mcp --version
+```
+
+V1 tools: `qa_check` (static checks, `{ok, findings}`) and `qa_run`
+(one-shot run, `{exitCode, logs, verdict}`). Host registration: add
+`flua-mcp` as a stdio server in your host's MCP config — no extra install,
+no extra dependencies. The full reference (protocol surface, tool schemas,
+error semantics, examples): `docs/mcp.md`.
+
 UI behavior folds into the same loop from Lua: `_FLUA.uiEvent(element,
 eventType[, value])` injects a UI event exactly as the HC3 UI would deliver
 it (values arrive as strings, like the real UI), and `self:getView()`

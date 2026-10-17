@@ -17,6 +17,7 @@ against a real HC3, or in proxy mode (a mirror QA on the HC3).
   graceful exit), `docs/walkthroughs.md` (guided traces of key flows),
   `docs/invariants.md` (behavioral contracts with their pinning tests),
   `docs/rest-endpoints.md` (real vs shape-only-stub REST routes),
+  `docs/mcp.md` (the flua-mcp server: protocol, tools, host setup),
   `docs/decisions/` (ADR-lite — update when a decision changes).
   `README.md` (overview).
 - **Examples**: `examples/` — runnable QuickApps; the test suite treats them
@@ -46,6 +47,7 @@ Python 3.11+. `lupa` is the only runtime dependency.
 | Area | Purpose | Typical changes |
 |---|---|---|
 | `src/flua/engine.py` | Lua VM, queues, and message pump | Engine and scheduling behavior |
+| `src/flua/mcp/` | The MCP server (`flua-mcp`): stdio JSON-RPC core + tool registry | New tools, protocol surface |
 | `src/flua/api/` | Simulated and hybrid HC3 REST API | API routes and simulated state |
 | `src/flua/api/routes/` | Pure REST route handlers | New or changed endpoints |
 | `src/flua/lua/` | HC3-compatible Lua runtime | QuickApp, fibaro, timer, and network behavior |

@@ -1,7 +1,9 @@
 # Note: flua as an MCP server
 
-Status: draft design (2026-10-16) — continuing the tier 3 discussion in
-notes-agents.md. Not implemented.
+Status: V1 implemented (2026-10-17) — stdio transport, JSON-RPC core,
+`qa_check` + `qa_run` tools, shipped as `flua-mcp` in the fibaro-flua wheel
+(ADR 0010). Sessions, resources/prompts, and Streamable HTTP are still
+open.
 
 ## Context
 
