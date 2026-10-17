@@ -9,10 +9,12 @@ content blocks.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import subprocess
 import sys
+import time
 from typing import Any
 
 from ..check import check_file
@@ -94,7 +96,7 @@ def _parse_start(raw: Any) -> float | None:
 
 def _qa_probe(args: dict[str, Any]) -> dict[str, Any]:
     """Probe a session: devices, QA status, and the new debugMessages /
-    systemEvents since the last probe (cursor-based deltas)."""
+    systemEvents / refreshStates since the last probe (cursor deltas)."""
     session = _session_for(args)
     return _SESSIONS.probe(session)
 
@@ -120,6 +122,58 @@ def _qa_stop(args: dict[str, Any]) -> dict[str, Any]:
 
 def _qa_sessions(args: dict[str, Any]) -> dict[str, Any]:
     return {"sessions": _SESSIONS.list()}
+
+
+def _devices(args: dict[str, Any]) -> dict[str, Any]:
+    """Run QA files to completion (one-shot, like qa_run) and return the
+    final device list from the REST feeds — the simulated house after the
+    run — plus the aggregated exit code."""
+    mode = args.get("mode")
+    if mode not in (None, "local", "remote"):
+        raise JsonRpcError(INVALID_PARAMS, "mode must be 'local' or 'remote'")
+    timeout = args.get("timeout")
+    if timeout is not None and (not isinstance(timeout, (int, float)) or timeout <= 0):
+        raise JsonRpcError(INVALID_PARAMS, "timeout must be a positive number of seconds")
+    loop = asyncio.new_event_loop()
+    try:
+        engine = LuaEngine(
+            api_mode="local" if mode is None else mode,
+            speed=float("inf")
+            if args.get("instant")
+            else (args.get("speed") if args.get("speed") is not None else 1.0),
+            start=_parse_start(args.get("start")),
+        )
+        exit_code = loop.run_until_complete(
+            _drain_engine(
+                engine, _file_list(args), float(timeout if timeout is not None else 120.0)
+            )
+        )
+        devices, status = engine.api.dispatch("GET", "/devices")
+        return {"exitCode": exit_code, "devices": devices if status == 200 else None}
+    except ValueError as exc:
+        raise JsonRpcError(INVALID_PARAMS, str(exc)) from None
+    finally:
+        loop.close()
+
+
+async def _drain_engine(engine: LuaEngine, files: list[str], timeout: float) -> int:
+    """Start the QAs and pump until nothing is pending (or the wall-clock
+    timeout); returns the aggregated exit code."""
+    await engine.start()
+    try:
+        for path in files:
+            qa_id, error = engine.load_qa_file(path)  # CLI-parity: --%% directives
+            if error is not None:
+                raise JsonRpcError(INVALID_PARAMS, f"{path}: {error}")
+            assert qa_id is not None
+        deadline = time.monotonic() + timeout
+        while engine.has_pending_work() and time.monotonic() < deadline:
+            await asyncio.sleep(0.05)
+        if engine.has_pending_work():
+            raise JsonRpcError(INTERNAL_ERROR, f"run timed out after {timeout}s")
+        return engine.exit_code
+    finally:
+        await engine.stop()
 
 
 def _session_for(args: dict[str, Any]) -> Any:
@@ -347,6 +401,36 @@ TOOLS: dict[str, Tool] = {
         },
         "handler": _qa_ui,
     },
+    "devices": {
+        "description": (
+            "Run QA files to completion (one-shot, like qa_run) and return the "
+            "final device list from the REST feeds — [{id, name, type, "
+            "properties, ...}] — the simulated house after the run, plus the "
+            "aggregated exitCode. Offline by default; instant=true collapses "
+            "virtual time."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "files": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 1,
+                    "description": "QA files to run",
+                },
+                "mode": {"type": "string", "enum": ["local", "remote"]},
+                "instant": {"type": "boolean"},
+                "speed": {"type": "number"},
+                "start": {"type": "string", "description": "virtual start time"},
+                "timeout": {
+                    "type": "number",
+                    "description": "wall seconds (default 120)",
+                },
+            },
+            "required": ["files"],
+        },
+        "handler": _devices,
+    },
     "qa_start": {
         "description": (
             "Start a session: a running flua engine with the given QAs, kept "
@@ -378,9 +462,11 @@ TOOLS: dict[str, Tool] = {
     },
     "qa_probe": {
         "description": (
-            "Probe a session: {devices, qas, debugMessages, systemEvents} — the "
-            "two log feeds are deltas since the previous probe (cursor-based), so "
-            "repeated probes only show what is new."
+            "Probe a session: {devices, qas, debugMessages, systemEvents, "
+            "refreshStates} — the three feeds are deltas since the previous "
+            "probe (cursor-based), so repeated probes only show what is new. "
+            "refreshStates carries the HC3 polling shape "
+            "{status, last, changes, events}."
         ),
         "inputSchema": {
             "type": "object",

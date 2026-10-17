@@ -39,6 +39,7 @@ class _Session:
         self.last_used = time.monotonic()
         self.debug_last = 0  # /debugMessages cursor for probe deltas
         self.sys_last = 0  # /flua/systemLog cursor for probe deltas
+        self.refresh_last = 0  # /refreshStates cursor for probe deltas
 
 
 class SessionManager:
@@ -99,7 +100,16 @@ class SessionManager:
     async def _bootstrap(self, session: _Session, files: list[str], ready: dict[str, Any]) -> None:
         try:
             await session.engine.start()
-            qa_ids = [session.engine.start_qa(path, None, {}, path) for path in files]
+            qa_ids: list[int] = []
+            for path in files:
+                # load_qa_file = CLI parity: the file's --%% directives reach
+                # the engine (names, properties, per-QA clock settings)
+                qa_id, error = session.engine.load_qa_file(path)
+                if error is not None:
+                    ready["error"] = f"{path}: {error}"
+                    return
+                assert qa_id is not None
+                qa_ids.append(qa_id)
             ready.update(ok=True, qa_ids=qa_ids)
         except Exception as exc:
             ready["error"] = str(exc)
@@ -188,11 +198,17 @@ class SessionManager:
         )
         system, _ = session.engine.api.dispatch("GET", f"/flua/systemLog?last={session.sys_last}")
         session.sys_last = system.get("nextLast") if isinstance(system, dict) else session.sys_last
+        refresh, _ = session.engine.api.dispatch(
+            "GET", f"/refreshStates?last={session.refresh_last}"
+        )
+        if isinstance(refresh, dict):
+            session.refresh_last = refresh.get("last", session.refresh_last)
         return {
             "devices": devices if status == 200 else None,
             "qas": qas,
             "debugMessages": debug.get("messages") if isinstance(debug, dict) else [],
             "systemEvents": system.get("entries") if isinstance(system, dict) else [],
+            "refreshStates": refresh if isinstance(refresh, dict) else None,
         }
 
     def action(self, session: _Session, qa_id: int, action: str, args: list[Any]) -> dict[str, Any]:

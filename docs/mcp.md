@@ -87,6 +87,22 @@ options, so an agent can read a QA's controls without parsing prose.
 {"name": "qa_ui", "arguments": {"files": ["main.lua"]}}
 ```
 
+#### `devices`
+
+Runs QA files to completion (same semantics as `qa_run`, in-process) and
+returns the **final device list from the REST feeds** — the simulated
+house after the run — plus the aggregated `exitCode`.
+
+```json
+{"name": "devices", "arguments": {"files": ["main.lua"], "instant": true}}
+```
+
+Arguments: `files` (required), `mode`, `instant`, `speed`, `start`,
+`timeout`. Result: `{"exitCode", "devices": [{id, name, type, properties,
+...}]}` — `/devices` verbatim (the HC3 pseudo-device id 1 is included).
+`--%%` directives reach the engine exactly as the CLI parses them, so the
+device names and properties are the run's real ones.
+
 ### Sessions (live probing)
 
 A session is a running flua engine an agent can probe across tool calls.
@@ -97,8 +113,10 @@ argument, never connection state.
   `{sessionId, qaIds}`. Idle sessions are reaped after `ttl` seconds
   (default 600).
 - **`qa_probe`** — `{sessionId}` → `{devices, qas, debugMessages,
-  systemEvents}`. The two log feeds are **deltas since the previous probe**
-  (cursor-based) — repeated probes only show what is new.
+  systemEvents, refreshStates}`. The three feeds are **deltas since the
+  previous probe** (cursor-based) — repeated probes only show what is
+  new. `refreshStates` carries the HC3 polling shape
+  `{status, last, changes, events}`.
 - **`qa_action`** — `{sessionId, qaId, action, args?}` → `{status}`;
   dispatches `POST /devices/{id}/action/{action}` into the running engine
   (reaches the QA's `callAction`).
@@ -220,9 +238,12 @@ no extra dependencies:
 
 ## Status & next
 
-- Done: stdio core, one-shot tools (`qa_check`, `qa_run`, `qa_ui`), the
-  session tier (`qa_start`/`qa_probe`/`qa_action`/`qa_sessions`/`qa_stop`),
-  the resource tier (`flua://docs/*`), the prompt tier
-  (`qa_debug`/`qa_skeleton`), the Streamable HTTP transport (stateless),
-  packaging, tests (`tests/test_mcp.py`, `tests/test_mcp_http.py`).
-- Planned: more one-shot tools (`devices` from the REST feeds).
+- Done: stdio core, one-shot tools (`qa_check`, `qa_run`, `qa_ui`,
+  `devices`), the session tier (`qa_start`/`qa_probe`/`qa_action`/
+  `qa_sessions`/`qa_stop`), the resource tier (`flua://docs/*`), the
+  prompt tier (`qa_debug`/`qa_skeleton`), the Streamable HTTP transport
+  (stateless), packaging, tests (`tests/test_mcp.py`,
+  `tests/test_mcp_http.py`).
+- Planned: nothing concrete — candidates: more REST parity tools
+  (rooms/sections/scenes), HTTP session mode (deliberately out of scope
+  so far, ADR 0011).

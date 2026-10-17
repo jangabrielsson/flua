@@ -1,12 +1,15 @@
 # Note: flua as an MCP server
 
-Status: V1 + sessions + resources + prompts + HTTP implemented
-(2026-10-17) — stdio transport, JSON-RPC core, `qa_check`/`qa_run`/`qa_ui`
-one-shot tools, the session tier (`qa_start`/`qa_probe`/`qa_action`/
-`qa_sessions`/`qa_stop` on in-process engines), dual-era protocol
-(2026-07-28 modern + 2025-06-18 legacy), the resource tier (`flua://docs/*`
-from the packaged docs), the prompt tier (`qa_debug`/`qa_skeleton`), and
-the Streamable HTTP transport (stateless, opt-in `flua-mcp --http`).
+Status: V1 + sessions + resources + prompts + HTTP + devices implemented
+(2026-10-17) — stdio transport, JSON-RPC core, one-shot tools
+(`qa_check`/`qa_run`/`qa_ui`/`devices` — the last runs to completion and
+returns the final device list), the session tier (`qa_start`/`qa_probe`/
+`qa_action`/`qa_sessions`/`qa_stop` on in-process engines, `qa_probe`
+carries the refreshStates feed as a cursor delta), dual-era protocol
+(2026-07-28 modern + 2025-06-18 legacy), the resource tier
+(`flua://docs/*` from the packaged docs), the prompt tier
+(`qa_debug`/`qa_skeleton`), and the Streamable HTTP transport (stateless,
+opt-in `flua-mcp --http`).
 
 ## Context
 
@@ -113,8 +116,9 @@ Yes — that is exactly the V1, and it stays valid for V2:
 |---|---|---|
 | `qa_check` | files → `{ok, findings[]}` | one-shot (subprocess) |
 | `qa_run` | files, directives(mode/instant/speed/vars) → `{exit_code, logs[], verdict}` | one-shot (subprocess) |
+| `devices` | files, directives → `{exit_code, devices[]}` (run to completion, then the final device list) | one-shot (in-process engine) |
 | `qa_start` | files, directives → `{session_id, qa_ids[]}` | in-process engine |
-| `qa_probe` | session_id → `{devices[], qas[], logs[]}` | in-process engine |
+| `qa_probe` | session_id → `{devices[], qas[], logs[], refreshStates}` | in-process engine |
 | `qa_action` | session_id, qa_id, action, args → result | in-process engine |
 | `qa_ui_text` | file → text rendering | one-shot (`--tool ui`) |
 | `qa_stop` / `qa_sessions` | session control | server state |
@@ -151,6 +155,7 @@ e.g. `flua://docs/USAGE.md`, `flua://docs/walkthroughs.md`,
    fine. Should the server cap them?
 4. Do we pin the MCP spec version in the server's manifest and reject
    old-protocol clients explicitly?
-5. Should `qa_probe` include the refreshStates feed (subscribers' view),
-   or is devices + logs enough for V1?
+5. ~~Should `qa_probe` include the refreshStates feed?~~ Yes — implemented:
+   the feed rides the same cursor-delta machinery as the logs (HC3 polling
+   shape `{status, last, changes, events}`).
 6. Naming: `qa_*` prefix everywhere, or drop it (`run`, `check`, `probe`)?

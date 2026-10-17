@@ -985,11 +985,12 @@ flua-mcp --version
 ```
 
 Tools: one-shot `qa_check` (static checks, `{ok, findings}`), `qa_run`
-(one-shot run, `{exitCode, logs, verdict}`), and `qa_ui` (structured UI
-dump) — plus the session tier for live probing: `qa_start` keeps a running
-engine, `qa_probe` reads devices + new log lines (cursor-based deltas),
-`qa_action` dispatches device actions into it, `qa_stop`/`qa_sessions`
-manage it. Resources: the docs ship in the wheel and are served as
+(one-shot run, `{exitCode, logs, verdict}`), `qa_ui` (structured UI
+dump), and `devices` (run to completion, then the final device list from
+the REST feeds) — plus the session tier for live probing: `qa_start`
+keeps a running engine, `qa_probe` reads devices + new log/refreshState
+lines (cursor-based deltas), `qa_action` dispatches device actions into
+it, `qa_stop`/`qa_sessions` manage it. Resources: the docs ship in the wheel and are served as
 `flua://docs/*` (e.g. `flua://docs/USAGE.md`, `flua://docs/tutorial/…`) via
 `resources/list`/`resources/read` — an agent host can read the flua docs
 without a repo checkout. Prompts: `qa_debug` (seeded debugging guidance)

@@ -152,6 +152,7 @@ def test_tools_list_shape() -> None:
         "qa_check",
         "qa_run",
         "qa_ui",
+        "devices",
         "qa_start",
         "qa_probe",
         "qa_action",
@@ -424,6 +425,48 @@ def test_qa_run_bad_filter_regex() -> None:
     assert result["isError"] is True
 
 
+# -- devices ----------------------------------------------------------------------
+
+
+def test_devices_returns_the_final_house_state(tmp_path) -> None:
+    script = tmp_path / "dev.lua"
+    script.write_text(
+        "--%%name:dev_probe\n"
+        "function QuickApp:onInit()\n"
+        "  self:updateProperty('value', 42)\n"
+        "  exit(0)\n"
+        "end\n"
+    )
+    result = _tool("devices", {"files": [str(script)], "instant": True})
+    assert result["exitCode"] == 0
+    # the list holds the HC3 pseudo-device (id 1) and the QA itself
+    qa = next(d for d in result["devices"] if d["id"] == 5000)
+    assert qa["name"] == "dev_probe"
+    assert qa["properties"]["value"] == 42
+
+
+def test_devices_reports_the_exit_code(tmp_path) -> None:
+    script = tmp_path / "dev_fail.lua"
+    script.write_text("print('nope')\nexit(3)\n")
+    result = _tool("devices", {"files": [str(script)], "instant": True})
+    assert result["exitCode"] == 3
+    assert result["devices"]  # the exited QA is still listed
+
+
+def test_devices_rejects_bad_mode() -> None:
+    result = _tool("devices", {"files": ["x.lua"], "mode": "cloud"})
+    assert result["isError"] is True
+    assert "mode" in result["message"]
+
+
+def test_devices_times_out_on_a_qa_that_never_drains(tmp_path) -> None:
+    script = tmp_path / "dev_forever.lua"
+    script.write_text("setTimeout(function() print('late') end, 3600000)\n")
+    result = _tool("devices", {"files": [str(script)], "timeout": 0.5})
+    assert result["isError"] is True
+    assert "timed out" in result["message"]
+
+
 # -- qa_ui -----------------------------------------------------------------------
 
 
@@ -480,6 +523,35 @@ def test_session_start_probe_action_stop(tmp_path) -> None:
     assert any(s["sessionId"] == session_id for s in listed["sessions"])
     assert _tool("qa_stop", {"sessionId": session_id}) == {"stopped": True}
     assert _tool("qa_sessions", {})["sessions"] == []
+
+
+def test_session_probe_includes_the_refreshstates_feed(tmp_path) -> None:
+    script = tmp_path / "tick_prop.lua"
+    script.write_text(
+        "--%%name:tick_prop\n"
+        "function QuickApp:onInit()\n"
+        "  setTimeout(function()\n"
+        "    self:updateProperty('value', 7)\n"
+        "  end, 100)\n"
+        "end\n"
+    )
+    started = _tool("qa_start", {"files": [str(script)]})
+    session_id = started["sessionId"]
+    try:
+        import time as _time
+
+        _time.sleep(0.4)  # let the 100ms timer fire
+        probe = _tool("qa_probe", {"sessionId": session_id})
+        feed = probe["refreshStates"]
+        assert feed["last"] > 0
+        assert any(e["type"] == "DevicePropertyUpdatedEvent" for e in feed.get("events", []))
+        _time.sleep(0.2)
+        probe2 = _tool("qa_probe", {"sessionId": session_id})
+        # cursor delta: the second probe sees nothing new
+        assert probe2["refreshStates"]["last"] >= feed["last"]
+        assert not probe2["refreshStates"].get("events")
+    finally:
+        _tool("qa_stop", {"sessionId": session_id})
 
 
 def test_session_action_reaches_callaction(tmp_path) -> None:
