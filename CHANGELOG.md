@@ -4,6 +4,14 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.44] - 2026-10-17
+
+### Added
+- implement reusable prompts for debugging and QA templates
+
+### Changed
+- Add multi-file QuickApps tutorial and debugging guide
+
 ## [0.1.43] - 2026-10-17
 
 ### Added
