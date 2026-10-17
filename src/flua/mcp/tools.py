@@ -16,9 +16,13 @@ from typing import Any
 
 from ..check import check_file
 from ..engine import LuaEngine
+from ..tools.ui import ui_dump
 from .jsonrpc import INTERNAL_ERROR, INVALID_PARAMS, JsonRpcError
+from .sessions import DEFAULT_TTL, SessionManager
 
 Tool = dict[str, Any]
+
+_SESSIONS = SessionManager()
 
 
 def _file_list(args: dict[str, Any]) -> list[str]:
@@ -40,6 +44,91 @@ def _qa_check(args: dict[str, Any]) -> dict[str, Any]:
             severity, _, message = rest.partition(": ")
             findings.append({"file": file, "severity": severity, "message": message})
     return {"ok": not any(f["severity"] == "error" for f in findings), "findings": findings}
+
+
+def _qa_ui(args: dict[str, Any]) -> dict[str, Any]:
+    """The structured UI of one QA (the --tool ui --json payload)."""
+    files = _file_list(args)
+    if len(files) != 1:
+        raise JsonRpcError(INVALID_PARAMS, "qa_ui takes exactly one file")
+    try:
+        return ui_dump(files[0])
+    except (FileNotFoundError, ValueError) as exc:
+        raise JsonRpcError(INVALID_PARAMS, str(exc)) from None
+
+
+def _qa_start(args: dict[str, Any]) -> dict[str, Any]:
+    """Start a session: a running engine with the given QAs. Returns
+    {sessionId, qaIds}; the id is an explicit argument on every later
+    session tool (the transport itself stays stateless)."""
+    mode = args.get("mode")
+    if mode not in (None, "local", "remote"):
+        raise JsonRpcError(INVALID_PARAMS, "mode must be 'local' or 'remote'")
+    ttl = args.get("ttl", DEFAULT_TTL)
+    if not isinstance(ttl, (int, float)) or ttl <= 0:
+        raise JsonRpcError(INVALID_PARAMS, "ttl must be a positive number of seconds")
+    try:
+        return _SESSIONS.start(
+            _file_list(args),
+            mode,
+            bool(args.get("instant")),
+            args.get("speed"),
+            _parse_start(args.get("start")),
+            float(ttl),
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise JsonRpcError(INTERNAL_ERROR, str(exc)) from None
+
+
+def _parse_start(raw: Any) -> float | None:
+    if raw is None:
+        return None
+    from ..clock import parse_start_time
+
+    try:
+        return parse_start_time(str(raw))
+    except ValueError as exc:
+        raise JsonRpcError(INVALID_PARAMS, str(exc)) from None
+
+
+def _qa_probe(args: dict[str, Any]) -> dict[str, Any]:
+    """Probe a session: devices, QA status, and the new debugMessages /
+    systemEvents since the last probe (cursor-based deltas)."""
+    session = _session_for(args)
+    return _SESSIONS.probe(session)
+
+
+def _qa_action(args: dict[str, Any]) -> dict[str, Any]:
+    """Dispatch a device action into a running session's QA (callAction)."""
+    session = _session_for(args)
+    qa_id = args.get("qaId")
+    action = args.get("action")
+    if not isinstance(qa_id, int) or not isinstance(action, str) or not action:
+        raise JsonRpcError(INVALID_PARAMS, "qaId (int) and action (string) are required")
+    args_list = args.get("args")
+    if args_list is None:
+        args_list = []
+    if not isinstance(args_list, list):
+        raise JsonRpcError(INVALID_PARAMS, "args must be a list")
+    return _SESSIONS.action(session, qa_id, action, args_list)
+
+
+def _qa_stop(args: dict[str, Any]) -> dict[str, Any]:
+    return {"stopped": _SESSIONS.stop(str(args.get("sessionId") or ""))}
+
+
+def _qa_sessions(args: dict[str, Any]) -> dict[str, Any]:
+    return {"sessions": _SESSIONS.list()}
+
+
+def _session_for(args: dict[str, Any]) -> Any:
+    session_id = args.get("sessionId")
+    if not isinstance(session_id, str) or not session_id:
+        raise JsonRpcError(INVALID_PARAMS, "sessionId (string) is required")
+    try:
+        return _SESSIONS.get(session_id)
+    except KeyError:
+        raise JsonRpcError(INVALID_PARAMS, f"unknown session: {session_id}") from None
 
 
 def _qa_run(args: dict[str, Any]) -> dict[str, Any]:
@@ -149,5 +238,102 @@ TOOLS: dict[str, Tool] = {
             "required": ["files"],
         },
         "handler": _qa_run,
+    },
+    "qa_ui": {
+        "description": (
+            "The structured UI of one QA: {name, type, useUiView, elements, "
+            "callbacks} — elements carry their name/text/value/options, the same "
+            "payload as `flua --tool ui --json`."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "files": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 1,
+                    "maxItems": 1,
+                    "description": "the QA file (exactly one)",
+                },
+            },
+            "required": ["files"],
+        },
+        "handler": _qa_ui,
+    },
+    "qa_start": {
+        "description": (
+            "Start a session: a running flua engine with the given QAs, kept "
+            "alive for probing. Returns {sessionId, qaIds} — the sessionId is an "
+            "explicit argument on every session tool. Sessions idle out after "
+            "`ttl` seconds (default 600)."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "files": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": 1,
+                    "description": "QA files to load into the session",
+                },
+                "mode": {"type": "string", "enum": ["local", "remote"]},
+                "instant": {"type": "boolean"},
+                "speed": {"type": "number"},
+                "start": {"type": "string", "description": "virtual start time"},
+                "ttl": {
+                    "type": "number",
+                    "description": "idle seconds before auto-stop (default 600)",
+                },
+            },
+            "required": ["files"],
+        },
+        "handler": _qa_start,
+    },
+    "qa_probe": {
+        "description": (
+            "Probe a session: {devices, qas, debugMessages, systemEvents} — the "
+            "two log feeds are deltas since the previous probe (cursor-based), so "
+            "repeated probes only show what is new."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "sessionId": {"type": "string", "description": "from qa_start"},
+            },
+            "required": ["sessionId"],
+        },
+        "handler": _qa_probe,
+    },
+    "qa_action": {
+        "description": (
+            "Dispatch a device action into a running session's QA (the HC3's "
+            "POST /devices/{id}/action/{action} — reaches the QA's callAction). "
+            "Returns {status}."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "sessionId": {"type": "string"},
+                "qaId": {"type": "integer"},
+                "action": {"type": "string"},
+                "args": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["sessionId", "qaId", "action"],
+        },
+        "handler": _qa_action,
+    },
+    "qa_stop": {
+        "description": "Stop a session (tears the engine down). Returns {stopped}.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"sessionId": {"type": "string"}},
+            "required": ["sessionId"],
+        },
+        "handler": _qa_stop,
+    },
+    "qa_sessions": {
+        "description": "List the live sessions: [{sessionId, qaIds, ageSeconds}].",
+        "inputSchema": {"type": "object", "properties": {}},
+        "handler": _qa_sessions,
     },
 }

@@ -1,9 +1,10 @@
 # Note: flua as an MCP server
 
-Status: V1 implemented (2026-10-17) — stdio transport, JSON-RPC core,
-`qa_check` + `qa_run` tools, shipped as `flua-mcp` in the fibaro-flua wheel
-(ADR 0010). Sessions, resources/prompts, and Streamable HTTP are still
-open.
+Status: V1 + sessions implemented (2026-10-17) — stdio transport, JSON-RPC
+core, `qa_check`/`qa_run`/`qa_ui` one-shot tools, the session tier
+(`qa_start`/`qa_probe`/`qa_action`/`qa_sessions`/`qa_stop` on in-process
+engines), dual-era protocol (2026-07-28 modern + 2025-06-18 legacy).
+Resources/prompts and Streamable HTTP are still open.
 
 ## Context
 

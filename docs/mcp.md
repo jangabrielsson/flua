@@ -31,9 +31,11 @@ arguments* and tool failures travel in the result as `isError: true` —
 never as a JSON-RPC error. Unknown tool names are JSON-RPC errors
 (`-32601`), per the spec.
 
-## Tools (V1)
+## Tools
 
-### `qa_check`
+### One-shot
+
+#### `qa_check`
 
 Static checks — same layers as `flua --check`: Lua syntax, unknown `--%%`
 directives, deprecated HC3 APIs, and every `--%%file` include. Does not run
@@ -46,11 +48,10 @@ the QA.
 Result: `{"ok": bool, "findings": [{"file", "severity", "message"}]}` —
 `ok` is false when any finding is `error`-severity.
 
-### `qa_run`
+#### `qa_run`
 
 Runs QA files to completion in the emulator and returns the outcome.
-One-shot: the run ends when the QAs drain (interactive probing is a later
-session tool).
+One-shot: the run ends when the QAs drain.
 
 ```json
 {"name": "qa_run", "arguments": {"files": ["main.lua"], "instant": true}}
@@ -63,6 +64,39 @@ Arguments: `files` (required), `mode` (`local`|`remote`), `instant`,
 Result: `{"exitCode", "logs", "verdict"}` — `logs` are the QA's `--log
 json` lines, `verdict` the stderr notices (exit attribution). A nonzero
 `exitCode` is a failed run.
+
+#### `qa_ui`
+
+The structured UI of one QA: `{name, type, useUiView, elements, callbacks}`
+(the `flua --tool ui --json` payload) — elements carry name/text/value/
+options, so an agent can read a QA's controls without parsing prose.
+
+```json
+{"name": "qa_ui", "arguments": {"files": ["main.lua"]}}
+```
+
+### Sessions (live probing)
+
+A session is a running flua engine an agent can probe across tool calls.
+The MCP transport itself stays stateless: the `sessionId` is an explicit
+argument, never connection state.
+
+- **`qa_start`** — `{files, mode?, instant?, speed?, start?, ttl?}` →
+  `{sessionId, qaIds}`. Idle sessions are reaped after `ttl` seconds
+  (default 600).
+- **`qa_probe`** — `{sessionId}` → `{devices, qas, debugMessages,
+  systemEvents}`. The two log feeds are **deltas since the previous probe**
+  (cursor-based) — repeated probes only show what is new.
+- **`qa_action`** — `{sessionId, qaId, action, args?}` → `{status}`;
+  dispatches `POST /devices/{id}/action/{action}` into the running engine
+  (reaches the QA's `callAction`).
+- **`qa_sessions`** — `{}` → `{sessions: [{sessionId, qaIds, ageSeconds}]}`.
+- **`qa_stop`** — `{sessionId}` → `{stopped}`. Unknown session ids are
+  `isError` tool results.
+
+Sessions run in-process (each engine owns its asyncio loop on a daemon
+thread, like the test suite drives them) and are always torn down when the
+stdio pipe closes — an agent cannot leak engines.
 
 ## Running it
 
@@ -102,9 +136,8 @@ no extra dependencies:
 
 ## Status & next
 
-- Done: stdio core, `qa_check`, `qa_run`, packaging, tests
-  (`tests/test_mcp.py` — core, transport, tools, end-to-end).
-- Planned: session tools (`qa_start`/`qa_probe`/`qa_action` on the
-  in-process engine), more one-shot tools (`qa_ui` from `--tool ui --json`,
-  `devices` from the REST feeds), resources/prompts (`flua://docs/*`), and
-  the Streamable HTTP transport.
+- Done: stdio core, one-shot tools (`qa_check`, `qa_run`, `qa_ui`), the
+  session tier (`qa_start`/`qa_probe`/`qa_action`/`qa_sessions`/`qa_stop`),
+  packaging, tests (`tests/test_mcp.py`).
+- Planned: resources/prompts (`flua://docs/*`), more one-shot tools
+  (`devices` from the REST feeds), and the Streamable HTTP transport.

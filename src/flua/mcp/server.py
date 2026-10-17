@@ -14,7 +14,7 @@ from typing import Any
 
 from .. import __version__
 from .jsonrpc import INVALID_PARAMS, METHOD_NOT_FOUND, JsonRpcError, run_stdio
-from .tools import TOOLS
+from .tools import _SESSIONS, TOOLS
 
 # The 2026-07-28 revision dropped the initialize handshake: every request
 # carries its protocol version in params._meta and servers MUST implement
@@ -122,7 +122,10 @@ def main(argv: list[str] | None = None) -> int:
         supported = ", ".join(SUPPORTED_VERSIONS)
         print(f"flua-mcp {__version__} (protocols {supported})")
         return 0
-    return run_stdio(METHODS, precheck=_check_protocol_version)
+    try:
+        return run_stdio(METHODS, precheck=_check_protocol_version)
+    finally:
+        _SESSIONS.shutdown()  # never leak engines when the stdio pipe closes
 
 
 if __name__ == "__main__":

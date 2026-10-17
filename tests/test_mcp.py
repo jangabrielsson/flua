@@ -26,6 +26,16 @@ from flua.mcp.server import (  # noqa: E402
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
+@pytest.fixture(autouse=True)
+def _clean_sessions():
+    # the session manager is a module singleton: never leak an engine into
+    # the next test, even when a test fails mid-way
+    yield
+    from flua.mcp.tools import _SESSIONS
+
+    _SESSIONS.shutdown()
+
+
 def _dispatch(line: str) -> dict | None:
     # the same precheck run_stdio installs: per-request protocol version
     return core.handle_message(line, METHODS, precheck=_check_protocol_version)
@@ -138,11 +148,19 @@ def test_tools_list_shape() -> None:
     result = _call("tools/list", {})
     assert result["resultType"] == "complete"
     names = [t["name"] for t in result["tools"]]
-    assert names == ["qa_check", "qa_run"]
+    assert names == [
+        "qa_check",
+        "qa_run",
+        "qa_ui",
+        "qa_start",
+        "qa_probe",
+        "qa_action",
+        "qa_stop",
+        "qa_sessions",
+    ]
     for tool in result["tools"]:
         assert tool["description"]
         assert tool["inputSchema"]["type"] == "object"
-        assert tool["inputSchema"]["required"] == ["files"]
 
 
 def test_unknown_tool_is_an_rpc_error() -> None:
@@ -228,6 +246,100 @@ def test_qa_run_bad_mode() -> None:
     assert result["isError"] is True
 
 
+# -- qa_ui -----------------------------------------------------------------------
+
+
+def test_qa_ui_dumps_elements_and_callbacks(tmp_path) -> None:
+    script = tmp_path / "ui.lua"
+    script.write_text(
+        "--%%name:uitool\n"
+        '--%%u:{button="B1",text="Press me",onReleased="go"}\n'
+        '--%%u:{select="sel1",text="Pick",value="11",options={{type="option",text="One",value="11"}}}\n'
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:go() end\n"
+    )
+    result = _tool("qa_ui", {"files": [str(script)]})
+    assert result["name"] == "uitool"
+    kinds = {e.get("name"): e for e in result["elements"]}
+    assert kinds["B1"]["type"] == "button"
+    assert kinds["sel1"]["values"] == ["11"]
+    assert {"callback": "go", "eventType": "onReleased", "name": "B1"} in result["callbacks"]
+
+
+# -- sessions ---------------------------------------------------------------------
+
+
+def _ticking_qa(tmp_path, name: str = "tick") -> str:
+    script = tmp_path / f"{name}.lua"
+    script.write_text(
+        f"--%%name:{name}\n"
+        "setInterval(function() print('TICK') end, 50)\n"
+    )
+    return str(script)
+
+
+def test_session_start_probe_action_stop(tmp_path) -> None:
+    started = _tool("qa_start", {"files": [_ticking_qa(tmp_path)]})
+    session_id = started["sessionId"]
+    assert started["qaIds"] == [5000]
+    # the interval prints land in the probe's debugMessages delta
+    import time as _time
+
+    _time.sleep(0.3)
+    probe = _tool("qa_probe", {"sessionId": session_id})
+    assert probe["qas"][0]["name"] == "tick"
+    assert any(d["tag"] == "tick5000" for d in probe["debugMessages"])
+    assert probe["devices"]
+    # the second probe is a delta: only messages newer than the cursor
+    import time as _time
+
+    _time.sleep(0.2)
+    probe2 = _tool("qa_probe", {"sessionId": session_id})
+    assert probe2["debugMessages"]
+    assert probe2["debugMessages"][0]["id"] > probe["debugMessages"][-1]["id"]
+    # sessions list + stop
+    listed = _tool("qa_sessions", {})
+    assert any(s["sessionId"] == session_id for s in listed["sessions"])
+    assert _tool("qa_stop", {"sessionId": session_id}) == {"stopped": True}
+    assert _tool("qa_sessions", {})["sessions"] == []
+
+
+def test_session_action_reaches_callaction(tmp_path) -> None:
+    script = tmp_path / "act.lua"
+    script.write_text(
+        "--%%name:act\n"
+        "function QuickApp:toggle() print('TOGGLED') end\n"
+    )
+    started = _tool("qa_start", {"files": [str(script)]})
+    session_id = started["sessionId"]
+    try:
+        result = _tool("qa_action", {"sessionId": session_id, "qaId": 5000, "action": "toggle"})
+        assert result["status"] == 202
+        import time as _time
+
+        _time.sleep(0.2)
+        probe = _tool("qa_probe", {"sessionId": session_id})
+        assert any("TOGGLED" in (d.get("message") or "") for d in probe["debugMessages"])
+    finally:
+        _tool("qa_stop", {"sessionId": session_id})
+
+
+def test_session_ttl_reaps_idle_sessions(tmp_path) -> None:
+    started = _tool("qa_start", {"files": [_ticking_qa(tmp_path)], "ttl": 0.3})
+    assert started["sessionId"]
+    import time as _time
+
+    _time.sleep(0.6)
+    # the reap runs lazily on the next session operation
+    assert _tool("qa_sessions", {})["sessions"] == []
+
+
+def test_session_unknown_id_errors() -> None:
+    result = _tool("qa_probe", {"sessionId": "nope"})
+    assert result["isError"] is True
+    assert "unknown session" in result["message"]
+
+
 # -- end-to-end over stdio ---------------------------------------------------------
 
 
@@ -266,7 +378,7 @@ def test_stdio_transport_end_to_end(tmp_path) -> None:
     assert [r["id"] for r in responses] == [1, 2, 3, 4, 5]
     assert "2026-07-28" in responses[0]["result"]["supportedVersions"]
     assert responses[1]["result"]["protocolVersion"] == LEGACY_PROTOCOL_VERSION
-    assert [t["name"] for t in responses[2]["result"]["tools"]] == ["qa_check", "qa_run"]
+    assert [t["name"] for t in responses[2]["result"]["tools"]][:2] == ["qa_check", "qa_run"]
     run_result = json.loads(responses[3]["result"]["content"][0]["text"])
     assert run_result["exitCode"] == 0
     assert responses[4]["result"] == {}

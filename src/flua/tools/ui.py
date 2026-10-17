@@ -156,6 +156,20 @@ def _render_ui_view(rows: Any, cbs: dict[str, dict[str, str]]) -> list[str]:
     return lines
 
 
+def ui_dump(script: str) -> dict[str, Any]:
+    """The structured UI dump: {name, type, useUiView, elements, callbacks}.
+    Shared by the --tool ui --json output and the MCP qa_ui tool."""
+    fqa, _ = build_fqa(script)
+    initial = fqa.get("initialProperties") or {}
+    return {
+        "name": fqa.get("name"),
+        "type": fqa.get("type"),
+        "useUiView": bool(initial.get("useUiView")),
+        "elements": _components(initial),
+        "callbacks": initial.get("uiCallbacks") or [],
+    }
+
+
 def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     try:
         fqa, _ = build_fqa(args.script)
@@ -166,14 +180,7 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     if args.json:
         # structured dump: agents read elements/callbacks/values without
         # parsing prose — the same components the text renderer walks
-        payload = {
-            "name": fqa.get("name"),
-            "type": fqa.get("type"),
-            "useUiView": bool(initial.get("useUiView")),
-            "elements": _components(initial),
-            "callbacks": initial.get("uiCallbacks") or [],
-        }
-        print(json.dumps(payload))
+        print(json.dumps(ui_dump(args.script)))
         return 0
     print(f'QA "{fqa.get("name")}" ({fqa.get("type", "?")})')
     if initial.get("useUiView"):
