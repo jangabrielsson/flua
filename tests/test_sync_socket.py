@@ -78,14 +78,18 @@ def test_timeout_returns_partial_data(echo_server) -> None:
     sc.close(conn_id)
 
 
-def test_eof_returns_closed(echo_server) -> None:
+def test_eof_returns_closed(tcp_listener) -> None:
+    # the peer sends FIN: the reader must report "closed", not hang or
+    # time out. Own the peer socket directly (accept + close) — the echo
+    # fixture's stop() races its accept loop, so it cannot guarantee the
+    # FIN (accept may complete before the conn lands in _clients).
     sc = SyncTCPSockets()
-    _, conn_id = sc.connect("127.0.0.1", echo_server.port)
-    # closing the peer: send FIN and make the echo thread drop the connection
-    echo_server.stop()
-    time.sleep(0.3)
+    port = tcp_listener.getsockname()[1]
+    _, conn_id = sc.connect("127.0.0.1", port)
+    peer, _ = tcp_listener.accept()
+    peer.close()
     ok, err, partial = sc.read(conn_id, "*l")
-    assert not ok and err == "closed"
+    assert not ok and err == "closed" and partial is None
     sc.close(conn_id)
 
 
