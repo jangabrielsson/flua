@@ -1,6 +1,11 @@
 --%%name:Test
 --%%type:com.fibaro.binarySwitch
 --%%uid:836r26r827r67823
+--%%description:my little QA
+--%%model:model-x
+--%%build:7
+--%%manufacturer:fibaro
+--%%property:value=true
 --%%var:bar="Hello"
 
 function QuickApp:onInit()
@@ -10,6 +15,11 @@ function QuickApp:onInit()
     self:debug("ID", self.id)
 
     self:debug("UID",self.properties.quickAppUuid)
+    self:debug("Description", self.properties.userDescription)
+    self:debug("Model", self.properties.model)
+    self:debug("Build", self.properties.buildNumber)
+    self:debug("Manufacturer", self.properties.manufacturer)
+    self:debug("Value property", self.properties.value)
 
     self:trace("TRACE")
     self:warning("WARNING")

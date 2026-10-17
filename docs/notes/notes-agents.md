@@ -60,10 +60,11 @@ curl/browser for anything UI-related.
 6. Per-run log file — `--logfile FILE`.
 7. Final verdict line — stderr, every failing QA, any log mode.
 
-### Tier 3 — the long game — DEFERRED
+### Tier 3 — the long game — DRAFTED
 
 8. **MCP server** exposing run/check/inspect as tools — the agent-ecosystem
-   direction (Claude/Copilot hosts). Real project; not a quick win.
+   direction (Claude/Copilot hosts). Real project; not a quick win. First
+   design draft: `docs/notes/notes-mcp.md`.
 
    Benefit analysis (2026-10-13): skills = knowledge, `--tool`/CLI = the
    engine's manual interface, MCP = a machine interface for hosts that

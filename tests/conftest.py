@@ -57,7 +57,10 @@ class EchoServer:
 
     @staticmethod
     def _echo_loop(conn: socket.socket) -> None:
-        conn.settimeout(0.2)
+        try:
+            conn.settimeout(0.2)
+        except OSError:
+            return  # teardown closed the socket before the thread ran
         try:
             while True:
                 try:

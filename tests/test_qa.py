@@ -463,6 +463,90 @@ async def test_device_created_and_removed_events_reach_subscribers(tmp_path, cap
 
 
 @pytest.mark.asyncio
+async def test_debug_messages_record_qa_logs(tmp_path) -> None:
+    # QA console lines land in GET /debugMessages with their tag and level
+    # (print → debug, fibaro.warning → warning), and DELETE clears them
+    script = tmp_path / "dbg.lua"
+    script.write_text(
+        "--%%name:dbg\n"
+        "print('hello')\n"
+        "fibaro.warning(__TAG, 'careful')\n"  # HC3 signature: fibaro.warning(tag, msg)
+        "exit(0)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await wait_until(lambda: not engine.has_pending_work())
+        data, status = engine.api.dispatch("GET", "/debugMessages")
+        assert status == 200
+        mine = [m for m in data["messages"] if m.get("tag") == "dbg5000"]
+        assert [(m["type"], m["message"]) for m in mine] == [
+            ("debug", "hello"),
+            ("warning", "careful"),
+        ]
+        assert data["nextLast"] == data["messages"][-1]["id"]
+        # the QA's tag shows up in the tags endpoint
+        tags, status = engine.api.dispatch("GET", "/debugMessages/tags")
+        assert status == 200 and "dbg5000" in tags
+        # DELETE clears the buffer
+        assert engine.api.dispatch("DELETE", "/debugMessages") == (None, 204)
+        data, _ = engine.api.dispatch("GET", "/debugMessages")
+        assert data["messages"] == []
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_system_log_records_lifecycle_and_crashes(tmp_path) -> None:
+    # /flua/systemLog carries run_start/qa_load/run_stop for a clean run,
+    # and crash entries with the QA tag for a failing callback
+    script = tmp_path / "boom.lua"
+    script.write_text(
+        "--%%name:boom\n"
+        "setTimeout(function() error('kaboom') end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await wait_until(lambda: not engine.has_pending_work())
+        data, status = engine.api.dispatch("GET", "/flua/systemLog")
+        assert status == 200
+        events = [e["event"] for e in data["entries"]]
+        assert "run_start" in events and "run_stop" not in events  # still running
+        assert "qa_load" in events
+        crashes = [e for e in data["entries"] if e["event"] == "crash"]
+        assert crashes and crashes[0]["qa"] == 5000
+        assert crashes[0]["tag"] == "boom5000"
+        assert "kaboom" in crashes[0]["detail"]
+        assert data["nextLast"] == data["entries"][-1]["id"]
+    finally:
+        await engine.stop()
+        data, _ = engine.api.dispatch("GET", "/flua/systemLog")
+        assert [e["event"] for e in data["entries"]][-1] == "run_stop"
+
+
+@pytest.mark.asyncio
+async def test_system_log_records_boot_failures(tmp_path) -> None:
+    # a QA that cannot load (syntax error) records a qa_error entry
+    script = tmp_path / "broken.lua"
+    script.write_text("--%%name:broken\nthis is not lua\n")
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await wait_until(lambda: not engine.has_pending_work())
+        data, _ = engine.api.dispatch("GET", "/flua/systemLog")
+        errors = [e for e in data["entries"] if e["event"] == "qa_error"]
+        assert errors and errors[0]["qa"] == 5000
+        assert errors[0]["tag"] == "broken5000"
+        assert "boot failed" in errors[0]["detail"]
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
 async def test_dynamic_load_from_string(tmp_path, capsys) -> None:
     loader = tmp_path / "loader.lua"
     loader.write_text(

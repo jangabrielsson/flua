@@ -170,8 +170,87 @@ def home_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     ), 200
 
 
+def _int_param(query: dict[str, str], name: str) -> int | None:
+    """Parse an optional integer query param; raises ValueError on bad
+    values (callers turn that into a 400)."""
+    raw = query.get(name)
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        raise ValueError(name) from None
+
+
 def debug_messages_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    return public({"messages": [], "nextLast": 0}), 200
+    """GET /debugMessages — the QA console buffer, in the real HC3's
+    DebugMessagesDto shape. Query params match the HC3's debugMessages API:
+    ``last`` (only messages with id > last), ``offset`` (return the newest N;
+    -1 = all), ``filter`` (comma list of tags), ``types`` (comma list of
+    message types), ``from``/``to`` (timestamp bounds)."""
+    query = req.query
+    try:
+        last = _int_param(query, "last") or 0
+        offset_raw = _int_param(query, "offset")
+        from_ts = _int_param(query, "from")
+        to_ts = _int_param(query, "to")
+    except ValueError:
+        return None, 400
+    offset = -1 if offset_raw is None else offset_raw
+    tags = [t for t in (query.get("filter") or "").split(",") if t]
+    types = [t for t in (query.get("types") or "").split(",") if t]
+    messages = [m for m in state.debug_messages if m["id"] > last]
+    if tags:
+        messages = [m for m in messages if m.get("tag") in tags]
+    if types:
+        messages = [m for m in messages if m["type"] in types]
+    if from_ts is not None:
+        messages = [m for m in messages if m["timestamp"] >= from_ts]
+    if to_ts is not None:
+        messages = [m for m in messages if m["timestamp"] <= to_ts]
+    if offset >= 0:
+        messages = [] if offset == 0 else messages[-offset:]
+    next_last = messages[-1]["id"] if messages else 0
+    return public({"nextLast": next_last, "messages": messages}), 200
+
+
+def debug_messages_delete(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    """DELETE /debugMessages — clear the console buffer."""
+    state.clear_debug_messages()
+    return None, 204
+
+
+def debug_messages_tags(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    """GET /debugMessages/tags — the distinct QA tags seen so far."""
+    tags = sorted({m["tag"] for m in state.debug_messages if m.get("tag")})
+    return public(tags), 200
+
+
+def flua_system_log(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    """GET /flua/systemLog — flua's structured lifecycle/crash feed (the
+    machine-readable system log the real HC3 lacks). Same polling pattern
+    as /debugMessages: ``last`` (only entries with id > last), ``offset``
+    (the newest N; -1 = all). Entries: {id, time, event, qa, tag, code,
+    detail} — events: run_start/run_stop, qa_load/qa_restart/qa_exit,
+    qa_error, crash, error."""
+    query = req.query
+    try:
+        last = _int_param(query, "last") or 0
+        offset_raw = _int_param(query, "offset")
+    except ValueError:
+        return None, 400
+    offset = -1 if offset_raw is None else offset_raw
+    entries = [e for e in state.system_events if e["id"] > last]
+    if offset >= 0:
+        entries = [] if offset == 0 else entries[-offset:]
+    next_last = entries[-1]["id"] if entries else 0
+    return public({"nextLast": next_last, "entries": entries}), 200
+
+
+def flua_system_log_delete(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    """DELETE /flua/systemLog — clear the lifecycle buffer."""
+    state.clear_system_events()
+    return None, 204
 
 
 def weather_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:

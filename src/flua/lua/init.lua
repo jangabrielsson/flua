@@ -309,6 +309,9 @@ end
 resumeQa = function(qaId, co, ...)
   local ok, res = coroutine.resume(co, ...)
   if not ok then
+    -- a callback crash: record it in the system log (flua's structured
+    -- crash feed) in addition to the console traceback
+    _PY.system_event("crash", qaId, tostring(res))
     postLog("error", tostring(res))
     postLog("error", debug.traceback(co, nil, 2))
     if qaRunners[qaId] == co then qaRunners[qaId] = nil end
@@ -561,6 +564,10 @@ local function formatLogLine(tag, level, msg, qaid)
   -- text (no colors) and the structured fields go to Python, which emits
   -- the JSON line — nothing to format here.
   msg = _PY.render_html(sanitizeMsg(tostring(msg)), _FLUA.logJson == true)
+  -- every QA console line also lands in the sim's /debugMessages buffer
+  -- (the HC3's console log, served over REST) — structured fields, both
+  -- log modes. Untagged runtime lines are recorded Python-side.
+  _PY.debug_message(level, tag, qaid, msg)
   if _FLUA.logJson then
     _PY.log_structured(level, tag, qaid, msg)
     return nil
@@ -888,6 +895,7 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
   local chunk, err = loader()
   if not chunk then
     print("Error loading " .. tostring(sourceName) .. ": " .. tostring(err))
+    _PY.system_event("qa_error", qaId, "boot failed: " .. tostring(err))
     _FLUA.exit(1)
     return
   end
@@ -895,6 +903,7 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
   if not ok then
     print("Error:", err2)
     print(debug.traceback(nil, 2))
+    _PY.system_event("qa_error", qaId, "boot failed: " .. tostring(err2))
     _FLUA.exit(1)
     return
   end
@@ -903,6 +912,7 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
   if not bok then
     print("Error in bootstrap:", berr)
     print(debug.traceback(nil, 2))
+    _PY.system_event("qa_error", qaId, "bootstrap failed: " .. tostring(berr))
     _FLUA.exit(1)
     return
   end

@@ -122,6 +122,20 @@ def install_bindings(engine: "LuaEngine") -> None:
     py["note_debugger_pause"] = engine.note_debugger_pause
     py["log"] = engine.log_line
     py["log_structured"] = engine.log_structured
+
+    def debug_message(level: object, tag: object, qaid: object, msg: object) -> None:
+        # QA console lines (lua formatLogLine): qaid is implied by the tag
+        engine._debug_message(str(level), None if tag is None else str(tag), str(msg))
+
+    py["debug_message"] = debug_message
+
+    def system_event(event: object, qa: object, detail: object) -> None:
+        # QA crashes and boot errors (lua side): qa may be nil
+        engine._system_event(
+            str(event), None if qa is None else int(qa), str(detail or "")
+        )
+
+    py["system_event"] = system_event
     py["flua_log"] = engine.flua_log
     py["getenv"] = engine.env.get
     py["api_remote_mode"] = lambda: engine.hc3 is not None

@@ -41,12 +41,16 @@ notes at a glance.
 
 ## Scratch notes (not canonical)
 
-These capture in-progress thinking. Treat them as dated working notes, not
-reference — promote anything that becomes a rule into the reference docs
-above.
+These live in [notes/](notes/) and capture in-progress thinking. Treat them
+as dated working notes, not reference — promote anything that becomes a
+rule into the reference docs above.
 
 - `notes-agents.md` — agent-facing DX ideas (now partly realized: flua-test,
   `--log json`, AGENTS.md).
+- `notes-mcp.md` — flua as an MCP server (draft design: tool surface,
+  sessions, stateless transport).
+- `notes-rest-parity.md` — HC3 REST parity strategy; real `/debugMessages`
+  implemented, system/crash log drafted.
 - `notes-distribution.md` — packaging/distribution surfaces.
 - `notes-mqtt-broker.md` — MQTT broker explorations.
 - `notes-select-value.md` — select-value UI semantics.

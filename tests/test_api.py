@@ -894,6 +894,86 @@ def test_device_created_and_removed_events(api: Api) -> None:
     assert pump_types == [e["type"] for e in events[1:]]
 
 
+def test_debug_messages(api: Api) -> None:
+    # GET /debugMessages serves the console buffer in the HC3's
+    # DebugMessagesDto shape with the HC3's query params
+    data, status = api.dispatch("GET", "/debugMessages")
+    assert status == 200 and data == {"nextLast": 0, "messages": []}
+    now = 1000
+    api.state.record_debug_message("warning", "tag0", "msg0", now)
+    api.state.record_debug_message("debug", "tag1", "msg1", now + 1)
+    api.state.record_debug_message("warning", "tag0", "msg2", now + 2)
+    data, _ = api.dispatch("GET", "/debugMessages")
+    assert data["nextLast"] == 3
+    assert [m["id"] for m in data["messages"]] == [1, 2, 3]
+    assert data["messages"][0] == {
+        "id": 1,
+        "timestamp": 1000,
+        "type": "warning",
+        "tag": "tag0",
+        "message": "msg0",
+    }
+    # last: only newer messages (the HC3's poll pattern last=nextLast)
+    data, _ = api.dispatch("GET", "/debugMessages?last=1")
+    assert [m["id"] for m in data["messages"]] == [2, 3]
+    # offset: the newest N; 0 means none; -1 (default) means all
+    data, _ = api.dispatch("GET", "/debugMessages?offset=2")
+    assert [m["id"] for m in data["messages"]] == [2, 3]
+    data, _ = api.dispatch("GET", "/debugMessages?offset=0")
+    assert data["messages"] == []
+    # types: comma-separated, like the HC3's explode=false arrays
+    data, _ = api.dispatch("GET", "/debugMessages?types=warning")
+    assert [m["id"] for m in data["messages"]] == [1, 3]
+    # filter: tags
+    data, _ = api.dispatch("GET", "/debugMessages?filter=tag1")
+    assert [m["id"] for m in data["messages"]] == [2]
+    # from/to: timestamp bounds (inclusive)
+    data, _ = api.dispatch("GET", "/debugMessages?from=1001&to=1002")
+    assert [m["id"] for m in data["messages"]] == [2, 3]
+    # bad numeric params are 400s
+    assert api.dispatch("GET", "/debugMessages?last=abc") == (None, 400)
+    # tags: the distinct QA tags seen so far
+    tags, _ = api.dispatch("GET", "/debugMessages/tags")
+    assert tags == ["tag0", "tag1"]
+    # DELETE clears the buffer; ids keep growing so polling never replays
+    assert api.dispatch("DELETE", "/debugMessages") == (None, 204)
+    data, _ = api.dispatch("GET", "/debugMessages")
+    assert data == {"nextLast": 0, "messages": []}
+    api.state.record_debug_message("debug", "tag1", "msg3", now + 3)
+    data, _ = api.dispatch("GET", "/debugMessages")
+    assert data["messages"][0]["id"] == 4
+
+
+def test_flua_system_log(api: Api) -> None:
+    # GET /flua/systemLog: the structured lifecycle/crash feed (flua-only,
+    # the machine-readable system log the HC3 lacks) — same poll pattern
+    # as /debugMessages
+    data, status = api.dispatch("GET", "/flua/systemLog")
+    assert status == 200 and data == {"nextLast": 0, "entries": []}
+    api.state.record_system_event("run_start", None, None, "", 1000)
+    api.state.record_system_event("qa_load", 5000, "qa5000", "", 1001)
+    api.state.record_system_event("qa_exit", 5000, "qa5000", "exit(1)", 1002, code=1)
+    data, _ = api.dispatch("GET", "/flua/systemLog")
+    assert data["nextLast"] == 3
+    assert [e["event"] for e in data["entries"]] == ["run_start", "qa_load", "qa_exit"]
+    first = data["entries"][0]
+    assert first["id"] == 1 and isinstance(first["time"], str)
+    assert first["qa"] is None and first["tag"] is None and first["code"] == 0
+    assert first["detail"] == ""
+    last = data["entries"][2]
+    assert last["qa"] == 5000 and last["tag"] == "qa5000" and last["code"] == 1
+    assert last["detail"] == "exit(1)"
+    # last / offset polling, bad params, DELETE — same contract as debugMessages
+    data, _ = api.dispatch("GET", "/flua/systemLog?last=1")
+    assert [e["id"] for e in data["entries"]] == [2, 3]
+    data, _ = api.dispatch("GET", "/flua/systemLog?offset=1")
+    assert [e["id"] for e in data["entries"]] == [3]
+    assert api.dispatch("GET", "/flua/systemLog?last=abc") == (None, 400)
+    assert api.dispatch("DELETE", "/flua/systemLog") == (None, 204)
+    data, _ = api.dispatch("GET", "/flua/systemLog")
+    assert data == {"nextLast": 0, "entries": []}
+
+
 def test_profiles(api: Api) -> None:
     data, status = api.dispatch("GET", "/profiles")
     assert status == 200 and data[0]["id"] == 1 and data[0]["active"] is True

@@ -12,12 +12,20 @@ from __future__ import annotations
 
 import copy
 import time
+from collections import deque
+from datetime import datetime
 from typing import Any
 
 from ..devices import skeleton_for
 from ..suncalc import sunrise_sunset
 
 FIRST_RUNTIME_ID = 900000
+
+# How many /debugMessages entries the sim keeps (the HC3's buffer is bounded
+# too; the oldest lines fall off).
+_DEBUG_MESSAGES_MAX = 10000
+# How many /flua/systemLog entries the sim keeps.
+_SYSTEM_EVENTS_MAX = 2000
 
 DEFAULT_DEVICE_TYPE = "com.fibaro.binarySwitch"
 
@@ -63,6 +71,16 @@ class SimState:
         self.changes: list[tuple[int, dict[str, Any]]] = []
         self.events: list[tuple[int, dict[str, Any]]] = []
         self._refresh_seq = 0
+        # debugMessages: the QA console buffer (GET /debugMessages), like the
+        # HC3's — {id, timestamp, type, tag, message}, newest last, bounded.
+        # Appended from the pump and worker threads (deque.append is atomic).
+        self.debug_messages: deque[dict[str, Any]] = deque(maxlen=_DEBUG_MESSAGES_MAX)
+        self._debug_seq = 0
+        # systemLog (flua-only, GET /flua/systemLog): structured engine
+        # lifecycle + crash events — the machine-readable log the real HC3
+        # lacks. {id, time, event, qa, tag, code, detail}, newest last.
+        self.system_events: deque[dict[str, Any]] = deque(maxlen=_SYSTEM_EVENTS_MAX)
+        self._sys_seq = 0
         self.custom_events: list[dict[str, Any]] = []  # POST /customEvents history
         self._next_id = FIRST_RUNTIME_ID
         # Proxy mode (--%%proxy:true): ids of devices the real HC3 owns and
@@ -376,6 +394,67 @@ class SimState:
         self._refresh_seq += 1
         self.events.append((self._refresh_seq, {"type": "CustomEvent", "data": {"name": name}}))
         self.custom_events.append({"name": name})
+
+    # -- debugMessages ------------------------------------------------------------
+
+    def record_debug_message(
+        self, type_: str, tag: str | None, message: str, timestamp: float
+    ) -> None:
+        """Append one console line to the /debugMessages buffer (the HC3's
+        DebugMessageDto shape: id, timestamp, type, tag, message). Called
+        from the pump and worker threads — pure deque append, never Lua."""
+        self._debug_seq += 1
+        self.debug_messages.append(
+            {
+                "id": self._debug_seq,
+                "timestamp": int(timestamp),
+                "type": type_,
+                "tag": tag,
+                "message": message,
+            }
+        )
+
+    def clear_debug_messages(self) -> None:
+        """DELETE /debugMessages: empty the console buffer (ids keep growing,
+        so polling with last=nextLast never replays cleared lines)."""
+        self.debug_messages.clear()
+
+    def record_system_event(
+        self,
+        event: str,
+        qa: int | None,
+        tag: str | None,
+        detail: str,
+        timestamp: float,
+        code: int = 0,
+    ) -> None:
+        """Append one structured lifecycle/crash entry to /flua/systemLog.
+        Called from the pump and worker threads — pure deque append, never
+        Lua. Event names: run_start, run_stop, qa_load, qa_restart, qa_exit,
+        qa_error, crash, error."""
+        self._sys_seq += 1
+        try:
+            when = datetime.fromtimestamp(timestamp).isoformat(timespec="seconds")
+        except (OSError, OverflowError, ValueError):
+            # exotic --start values: the virtual clock can leave the range
+            # datetime handles — fall back to the raw epoch seconds
+            when = str(int(timestamp))
+        self.system_events.append(
+            {
+                "id": self._sys_seq,
+                "time": when,
+                "event": event,
+                "qa": qa,
+                "tag": tag,
+                "code": code,
+                "detail": detail,
+            }
+        )
+
+    def clear_system_events(self) -> None:
+        """DELETE /flua/systemLog: empty the lifecycle buffer (ids keep
+        growing, like debugMessages)."""
+        self.system_events.clear()
 
     # -- global variables --------------------------------------------------------
 

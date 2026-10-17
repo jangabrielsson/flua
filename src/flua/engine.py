@@ -377,6 +377,26 @@ class LuaEngine:
         """Append a Lua -> Python message. Never blocks, never calls Lua."""
         self._inbound.append(msg)
 
+    def _debug_message(self, level: str, tag: str | None, text: str) -> None:
+        """Record one QA console line in the sim's /debugMessages buffer
+        (same sync/depth guarantees as log_line: pure state append, never
+        Lua, so it is safe inside debugger-stepped code)."""
+        self.api.state.record_debug_message(
+            str(level).lower(), tag, text, self.clock.time
+        )
+
+    def _system_event(self, event: str, qa: int | None, detail: str, code: int = 0) -> None:
+        """Record one structured lifecycle/crash entry in /flua/systemLog
+        (pure state append — safe at any call depth, any thread)."""
+        tag = None
+        if qa is not None:
+            info = self.qa_info(int(qa))
+            if info is not None:
+                tag = f"{info['name']}{qa}"
+        self.api.state.record_system_event(
+            event, None if qa is None else int(qa), tag, detail, self.clock.time, code=code
+        )
+
     def log_line(self, level: str, text: str) -> None:
         """Print a QA log line directly (safe at any call depth: only stdout
         and logging, never Lua state — so it works inside debugger-stepped
@@ -428,6 +448,7 @@ class LuaEngine:
                 tag = f"{info['name']}{qa_id}"
         text = str(message)
         logger.debug("Flua [%s]: %s", level, text)
+        self.api.state.record_debug_message(str(level).lower(), tag, text, self.clock.time)
         if self._log_json:
             # stdout stays pure JSON; flua's own notices go to stderr
             print(f"{date}[FLUA   ][{tag}]: {text}", file=sys.stderr)
@@ -990,6 +1011,7 @@ class LuaEngine:
                 int(qa_id), info["path"] or "", info["config"], info["path"] or ""
             )
         )
+        self._system_event("qa_restart", qa_id, "")
 
     def _qa_file_dir(self, qa_id: int) -> str:
         base = os.path.join(tempfile.gettempdir(), f"flua-qa-files-{os.getpid()}")
@@ -1377,6 +1399,7 @@ class LuaEngine:
         if self._running:
             return
         self._running = True
+        self._system_event("run_start", None, "")
         self._pump_task = asyncio.create_task(self._pump(), name="flua-pump")
         if self.hc3 is not None:
             # online mode: mirror the real HC3's refreshStates feed
@@ -1384,6 +1407,8 @@ class LuaEngine:
             self._poller_task = asyncio.create_task(self._hc3_poll(), name="flua-hc3-poll")
 
     async def stop(self) -> None:
+        if self._running:
+            self._system_event("run_stop", None, "")
         self._running = False
         self._timers.stop()
         self.sync_sockets.close_all()
@@ -1492,6 +1517,7 @@ class LuaEngine:
                     await result
             except Exception:
                 logger.exception("handler %r failed for message %r", msg.get("type"), msg)
+                self._system_event("error", None, f"handler {msg.get('type')} failed")
 
     def _deliver_to_lua(self, batch: list[dict[str, Any]]) -> None:
         """The single Python -> Lua entry point."""
@@ -1500,6 +1526,7 @@ class LuaEngine:
             self._lua.globals()["_FLUA"]["dispatch"](lua_batch)
         except Exception:
             logger.exception("lua dispatch failed for batch %r", batch)
+            self._system_event("error", None, "lua dispatch failed")
 
     # -- handlers (Lua -> Python message types) -----------------------------------
 
@@ -1877,6 +1904,10 @@ class LuaEngine:
             "qaid": msg.get("qaid"),
             "msg": str(msg.get("text", "")),
         }
+        if entry["tag"] is None:
+            # untagged lines (runtime print, notices): QA lines reach the
+            # buffer through _PY.debug_message instead (no double record)
+            self._debug_message(entry["level"], None, entry["msg"])
         line = json.dumps(entry, ensure_ascii=False)
         _print_stdout(line)
         self._logfile_write(line)
@@ -1907,6 +1938,7 @@ class LuaEngine:
             if info is not None:
                 info["exited"] = code
                 logger.debug("QA %d (%s) exited with code %d", qa_id, info["name"], code)
+            self._system_event("qa_exit", qa_id, f"exit({code})", code=code)
             if code != 0:
                 self._exit_code = code  # last failing QA wins
             return
@@ -1919,6 +1951,7 @@ class LuaEngine:
         if info is not None:
             info["loaded"] = True
             logger.debug("QA %d (%s) loaded", qa_id, info["name"])
+            self._system_event("qa_load", qa_id, "")
             if info.get("path") in self._temp_qa_paths:
                 # the temp file backing loadQAfromString was consumed
                 self._cleanup_temp_qa(info["path"])

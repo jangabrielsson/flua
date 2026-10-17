@@ -963,6 +963,12 @@ logic deterministic with `--start`, `--speed`, `--instant`, and `--seed`.
 The `quickapp-test` skill installed by `--tool setup` documents the whole
 loop for coding agents.
 
+Every QA console line also lands in the sim's `GET /debugMessages` buffer
+(the HC3's console log, served over REST): `last`/`offset`/`filter`/`types`
+query params, `DELETE /debugMessages` clears it, `GET /debugMessages/tags`
+lists the QA tags seen — a machine-readable log feed with the same surface
+the real HC3 offers.
+
 ## The HC3 REST API reference
 
 `docs/specs/hc3-api.json` is the checked-in structural reference of the HC3
