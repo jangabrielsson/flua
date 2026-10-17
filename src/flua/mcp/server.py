@@ -1,9 +1,9 @@
 """flua-mcp: the MCP server (stdio transport).
 
 Model Context Protocol over newline-delimited JSON-RPC on stdin/stdout.
-Stdout is pure JSON-RPC; server diagnostics go to stderr. The protocol
-version follows the 2025-06-18 MCP spec (stateless sessions allowed);
-only the initialize/tools surface is implemented so far.
+Stdout is pure JSON-RPC; server diagnostics go to stderr. Serves both the
+2026-07-28 protocol era (per-request version in params._meta + server/discover)
+and the legacy initialize era; implements tools and resources.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from typing import Any
 
 from .. import __version__
 from .jsonrpc import INVALID_PARAMS, METHOD_NOT_FOUND, JsonRpcError, run_stdio
+from .resources import list_resources, read_resource
 from .tools import _SESSIONS, TOOLS
 
 # The 2026-07-28 revision dropped the initialize handshake: every request
@@ -27,7 +28,10 @@ UNSUPPORTED_PROTOCOL_VERSION = -32022
 SERVER_INSTRUCTIONS = (
     "flua-mcp runs Fibaro QuickApps in the flua emulator. Use qa_check to "
     "static-check QA files and qa_run to run them to completion; runs are "
-    "offline by default and never touch a controller unless mode=remote."
+    "offline by default and never touch a controller unless mode=remote. "
+    "In terminals prefer the `flua` command over `python -m flua` — tool "
+    "subprocesses use this server's interpreter, which may differ from the "
+    "shell's default python."
 )
 
 
@@ -48,7 +52,7 @@ def _check_protocol_version(msg: dict[str, Any]) -> None:
 def _initialize(_params: dict[str, Any]) -> dict[str, Any]:
     return {
         "protocolVersion": LEGACY_PROTOCOL_VERSION,
-        "capabilities": {"tools": {}},
+        "capabilities": {"tools": {}, "resources": {}},
         "serverInfo": {"name": "flua-mcp", "version": __version__},
     }
 
@@ -59,7 +63,7 @@ def _discover(_params: dict[str, Any]) -> dict[str, Any]:
     return {
         "resultType": "complete",
         "supportedVersions": SUPPORTED_VERSIONS,
-        "capabilities": {"tools": {}},
+        "capabilities": {"tools": {}, "resources": {}},
         "instructions": SERVER_INSTRUCTIONS,
         "_meta": {
             "io.modelcontextprotocol/serverInfo": {"name": "flua-mcp", "version": __version__}
@@ -109,6 +113,8 @@ METHODS: dict[str, Any] = {
     "ping": lambda _params: {},
     "tools/list": _tools_list,
     "tools/call": _tools_call,
+    "resources/list": list_resources,
+    "resources/read": read_resource,
     # client notifications: handled, never answered (the core drops the id)
     "notifications/initialized": lambda _params: None,
     "notifications/cancelled": lambda _params: None,

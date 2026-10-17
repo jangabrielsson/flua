@@ -1,10 +1,11 @@
 # Note: flua as an MCP server
 
-Status: V1 + sessions implemented (2026-10-17) — stdio transport, JSON-RPC
-core, `qa_check`/`qa_run`/`qa_ui` one-shot tools, the session tier
-(`qa_start`/`qa_probe`/`qa_action`/`qa_sessions`/`qa_stop` on in-process
-engines), dual-era protocol (2026-07-28 modern + 2025-06-18 legacy).
-Resources/prompts and Streamable HTTP are still open.
+Status: V1 + sessions + resources implemented (2026-10-17) — stdio
+transport, JSON-RPC core, `qa_check`/`qa_run`/`qa_ui` one-shot tools, the
+session tier (`qa_start`/`qa_probe`/`qa_action`/`qa_sessions`/`qa_stop` on
+in-process engines), dual-era protocol (2026-07-28 modern + 2025-06-18
+legacy), and the resource tier (`flua://docs/*` from the packaged docs).
+Prompts and Streamable HTTP are still open.
 
 ## Context
 
@@ -74,10 +75,13 @@ No new engine work needed — the tool layer just passes lists through.
 Knowledge is **resources and prompts**, not tools — tools stay imperative
 and typed:
 
-- **Resources** (`flua://...`): USAGE.md, ARCHITECTURE.md, the walkthroughs,
-  the tutorial chapters, `docs/specs/hc3-api.json` (the endpoint reference),
-  and the `quickapp-*` skill bodies. Served from the installed package
-  (`--examples`/wheel data), so the MCP works from pip alone.
+- **Resources** (`flua://docs/…`): USAGE.md, ARCHITECTURE.md, the
+  walkthroughs, the tutorial chapters, `docs/specs/hc3-api.json` (the
+  endpoint reference), and `docs/mcp.md`. Served from the installed
+  package (`setup_templates/docs`, synced by `scripts/sync-skills.sh`), so
+  the MCP works from pip alone. Text only, paths canonicalized, traversal
+  rejected. (Skills are not resources — the `.github/skills` bodies stay a
+  repo-level mechanism; the docs overlap covers the same knowledge.)
 - **Prompts**: `qa_debug` (paste an error + file → structured next-step
   guidance: read the log shape, `--check`, shrink-the-problem),
   `qa_skeleton` (emit a QA template with flua-test assertions and the
@@ -114,9 +118,10 @@ Yes — that is exactly the V1, and it stays valid for V2:
 | `qa_ui_text` | file → text rendering | one-shot (`--tool ui`) |
 | `qa_stop` / `qa_sessions` | session control | server state |
 
-Resources: `flua://docs/usage`, `flua://docs/walkthroughs`, `flua://docs/
-tutorial/{chapter}`, `flua://specs/hc3-api`, `flua://skills/{name}`.
-Prompts: `qa_debug`, `qa_skeleton`.
+Resources (implemented): `flua://docs/<file>` — the packaged docs tree,
+e.g. `flua://docs/USAGE.md`, `flua://docs/walkthroughs.md`,
+`flua://docs/tutorial/{chapter}.md`, `flua://docs/specs/hc3-api.json`,
+`flua://docs/mcp.md`. Prompts: `qa_debug`, `qa_skeleton` (planned).
 
 ## Transport notes (stateless spec)
 

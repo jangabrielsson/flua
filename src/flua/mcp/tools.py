@@ -10,6 +10,7 @@ content blocks.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from typing import Any
@@ -170,11 +171,73 @@ def _qa_run(args: dict[str, Any]) -> dict[str, Any]:
             logs.append(json.loads(line))
         except ValueError:
             logs.append(line)  # never drop a line over a formatting surprise
+    summary = _summarize(logs)
+    filt = args.get("filter")
+    if filt is not None:
+        logs = _filter_logs(logs, filt)
     return {
         "exitCode": result.returncode,
         "logs": logs,
         "verdict": [line for line in result.stderr.splitlines() if line.strip()],
+        "summary": summary,
     }
+
+
+def _summarize(logs: list[Any]) -> dict[str, Any]:
+    """The answer the agent wants without shelling out to jq: level counts,
+    flua-test PASS/FAIL tallies, and the failures:N total."""
+    levels: dict[str, int] = {}
+    passed = failed = failures_total = 0
+    for entry in logs:
+        if not isinstance(entry, dict):
+            continue
+        level = str(entry.get("level") or "").upper()
+        if level:
+            levels[level] = levels.get(level, 0) + 1
+        msg = str(entry.get("msg") or "")
+        if msg.startswith("PASS:"):
+            passed += 1
+        elif msg.startswith("FAIL:"):
+            failed += 1
+        elif msg.startswith("failures: "):
+            try:
+                failures_total = max(failures_total, int(msg.split(":", 1)[1].strip()))
+            except ValueError:
+                pass
+    return {"levels": levels, "pass": passed, "fail": failed, "failures": failures_total}
+
+
+def _filter_logs(logs: list[Any], filt: dict[str, Any]) -> list[Any]:
+    """Server-side log narrowing ({levels?, match?}) — the agent asks the
+    server for 'just the failures' instead of shelling out to jq."""
+    if not isinstance(filt, dict):
+        raise JsonRpcError(INVALID_PARAMS, "filter must be an object {levels?, match?}")
+    levels = filt.get("levels")
+    if levels is not None:
+        if not isinstance(levels, list) or not all(isinstance(name, str) for name in levels):
+            raise JsonRpcError(INVALID_PARAMS, "filter.levels must be a list of level names")
+        wanted = {name.upper() for name in levels}
+        logs = [
+            entry
+            for entry in logs
+            if isinstance(entry, dict) and str(entry.get("level") or "").upper() in wanted
+        ]
+    match = filt.get("match")
+    if match is not None:
+        if not isinstance(match, str):
+            raise JsonRpcError(INVALID_PARAMS, "filter.match must be a string (regex)")
+        try:
+            pattern = re.compile(match)
+        except re.error as exc:
+            raise JsonRpcError(
+                INVALID_PARAMS, f"filter.match is not a valid regex: {exc}"
+            ) from None
+        logs = [
+            entry
+            for entry in logs
+            if pattern.search(entry.get("msg", "") if isinstance(entry, dict) else str(entry))
+        ]
+    return logs
 
 
 TOOLS: dict[str, Tool] = {
@@ -203,9 +266,11 @@ TOOLS: dict[str, Tool] = {
         "description": (
             "Run QA files to completion in the emulator (offline sim by default; "
             "mode 'remote' uses the real HC3 via the environment's credentials). "
-            "Returns {exitCode, logs, verdict}: logs are the QA's --log json lines, "
-            "verdict the stderr notices. One-shot — the run ends when the QAs drain; "
-            "interactive probing is a later session tool."
+            "Returns {exitCode, logs, verdict, summary}: logs are the QA's "
+            "--log json lines, verdict the stderr notices, summary the "
+            "level counts and flua-test PASS/FAIL tallies (no jq needed). "
+            "`filter` narrows the returned logs server-side. One-shot — the run "
+            "ends when the QAs drain; interactive probing is the session tools."
         ),
         "inputSchema": {
             "type": "object",
@@ -233,6 +298,28 @@ TOOLS: dict[str, Tool] = {
                 "timeout": {
                     "type": "number",
                     "description": "wall-clock seconds before the run is killed (default 120)",
+                },
+                "filter": {
+                    "type": "object",
+                    "properties": {
+                        "levels": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": (
+                                "keep only these log levels (e.g. [\"ERROR\", \"WARNING\"])"
+                            ),
+                        },
+                        "match": {
+                            "type": "string",
+                            "description": (
+                                "regex matched against the log message (e.g. \"FAIL|Schedule:\")"
+                            ),
+                        },
+                    },
+                    "description": (
+                        "narrow the returned logs server-side; the summary always "
+                        "describes the whole run"
+                    ),
                 },
             },
             "required": ["files"],

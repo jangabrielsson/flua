@@ -673,6 +673,24 @@ def test_packaged_skills_match_the_repo() -> None:
             assert copy.read_bytes() == origin.read_bytes(), f"drifted: {copy}"
 
 
+def test_packaged_docs_match_the_repo() -> None:
+    # the flua-mcp resource tier serves the packaged docs from pip installs;
+    # keep the copies honest like the skills (sync: scripts/sync-skills.sh)
+    repo = Path(__file__).resolve().parent.parent
+    packaged = repo / "src" / "flua" / "setup_templates" / "docs"
+    for origin in (repo / "docs").rglob("*"):
+        if origin.is_file():
+            copy = packaged / origin.relative_to(repo / "docs")
+            assert copy.exists(), f"missing packaged doc: {copy}"
+            assert copy.read_bytes() == origin.read_bytes(), f"drifted: {copy}"
+    for name in ("USAGE.md", "ARCHITECTURE.md", "CONTRIBUTING.md"):
+        assert (packaged / name).read_bytes() == (repo / name).read_bytes(), f"drifted: {name}"
+    # root README.md is deliberately not copied: docs/README.md (the docs
+    # index) owns that name in the packaged tree, so flua://docs/README.md
+    # is unambiguous — and the loop above already pinned it to docs/README.md
+    assert (packaged / "README.md").read_bytes() == (repo / "docs" / "README.md").read_bytes()
+
+
 def test_packaged_instructions_match_the_repo() -> None:
     # quickapp-dev.instructions.md lives in the repo (.github/instructions,
     # auto-applied to all *.lua work) and ships in the wheel — keep the
@@ -698,7 +716,20 @@ def test_sync_skills_script_restores_drift(tmp_path) -> None:
     shutil.copytree(repo / "src" / "flua" / "setup_templates" / "github" / "skills", packaged)
     victim = packaged / "quickapp-types" / "SKILL.md"
     victim.write_bytes(victim.read_bytes() + b"\n<!-- drift -->\n")
-    env = {**os.environ, "SKILLS_SRC": str(skills), "SKILLS_DEST": str(packaged)}
+    # the docs half of the sync gets temp targets too — never the repo tree
+    docs = tmp_path / "docs-src"
+    shutil.copytree(repo / "docs", docs)
+    packaged_docs = tmp_path / "docs-packaged"
+    packaged_docs.mkdir()
+    doc_victim = packaged_docs / "walkthroughs.md"
+    doc_victim.write_bytes(b"drifted\n")
+    env = {
+        **os.environ,
+        "SKILLS_SRC": str(skills),
+        "SKILLS_DEST": str(packaged),
+        "DOCS_SRC": str(docs),
+        "DOCS_DEST": str(packaged_docs),
+    }
     result = subprocess.run(
         [str(repo / "scripts" / "sync-skills.sh")],
         cwd=repo,
@@ -712,6 +743,9 @@ def test_sync_skills_script_restores_drift(tmp_path) -> None:
     # the drift is gone: the packaged copy matches the skill dir again
     assert victim.read_bytes() == (skills / "quickapp-types" / "SKILL.md").read_bytes()
     assert "<!-- drift -->" not in victim.read_text(encoding="utf-8")
+    # ...and the docs copy matches the docs tree (plus the root READMEs)
+    assert doc_victim.read_bytes() == (docs / "walkthroughs.md").read_bytes()
+    assert (packaged_docs / "USAGE.md").read_bytes() == (repo / "USAGE.md").read_bytes()
 
 
 def test_packaged_viewer_serves_from_the_package() -> None:

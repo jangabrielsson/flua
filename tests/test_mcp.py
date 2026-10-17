@@ -93,7 +93,7 @@ def test_initialize_handshake() -> None:
     # the legacy (initialize-era) handshake: still served for older clients
     result = _call("initialize", {"protocolVersion": LEGACY_PROTOCOL_VERSION})
     assert result["protocolVersion"] == LEGACY_PROTOCOL_VERSION
-    assert result["capabilities"] == {"tools": {}}
+    assert result["capabilities"] == {"tools": {}, "resources": {}}
     assert result["serverInfo"]["name"] == "flua-mcp"
 
 
@@ -103,7 +103,7 @@ def test_discover_lists_supported_versions() -> None:
     assert result["resultType"] == "complete"
     assert result["supportedVersions"] == SUPPORTED_VERSIONS
     assert "2026-07-28" in result["supportedVersions"]
-    assert result["capabilities"] == {"tools": {}}
+    assert result["capabilities"] == {"tools": {}, "resources": {}}
     assert result["_meta"]["io.modelcontextprotocol/serverInfo"]["name"] == "flua-mcp"
     assert result["instructions"]
 
@@ -180,6 +180,67 @@ def test_unknown_tool_is_an_rpc_error() -> None:
     assert "unknown tool" in response["error"]["message"]
 
 
+# -- resources ------------------------------------------------------------------
+
+
+def test_resources_list_serves_the_packaged_docs() -> None:
+    result = _call("resources/list", {})
+    assert result["resultType"] == "complete"
+    uris = [r["uri"] for r in result["resources"]]
+    assert "flua://docs/USAGE.md" in uris
+    assert "flua://docs/mcp.md" in uris
+    assert "flua://docs/tutorial/01-install.md" in uris
+    usage = next(r for r in result["resources"] if r["uri"] == "flua://docs/USAGE.md")
+    assert usage["mimeType"] == "text/markdown"
+    assert usage["description"]
+    # binary files (the tutorial PDF) stay out of the resource list
+    assert not any(r["uri"].endswith(".pdf") for r in result["resources"])
+
+
+def test_resources_read_returns_doc_content() -> None:
+    result = _call("resources/read", {"uri": "flua://docs/USAGE.md"})
+    assert result["resultType"] == "complete"
+    assert result["contents"][0]["uri"] == "flua://docs/USAGE.md"
+    assert result["contents"][0]["mimeType"] == "text/markdown"
+    packaged = REPO_ROOT / "src" / "flua" / "setup_templates" / "docs" / "USAGE.md"
+    assert result["contents"][0]["text"] == packaged.read_text(encoding="utf-8")
+
+
+def test_resources_reject_traversal_and_unknown() -> None:
+    # .. must not escape the docs tree, encoded or not
+    for uri in (
+        "flua://docs/../pyproject.toml",
+        "flua://docs/%2e%2e/pyproject.toml",
+        "flua://docs/..%2fpyproject.toml",
+    ):
+        response = _dispatch(
+            json.dumps(
+                {"jsonrpc": "2.0", "id": 1, "method": "resources/read", "params": {"uri": uri}}
+            )
+        )
+        assert response is not None
+        assert response["error"]["code"] == core.INVALID_PARAMS, uri
+    # unknown files and non-text targets are clean errors, not crashes
+    for uri in ("flua://docs/nope.md", "flua://docs/tutorial/flua-tutorial.pdf"):
+        response = _dispatch(
+            json.dumps(
+                {"jsonrpc": "2.0", "id": 1, "method": "resources/read", "params": {"uri": uri}}
+            )
+        )
+        assert response is not None
+        assert response["error"]["code"] == core.INVALID_PARAMS, uri
+
+
+def test_resources_read_rejects_non_docs_uri() -> None:
+    response = _dispatch(
+        json.dumps(
+            {"jsonrpc": "2.0", "id": 1, "method": "resources/read", "params": {"uri": "file:///etc/passwd"}}
+        )
+    )
+    assert response is not None
+    assert response["error"]["code"] == core.INVALID_PARAMS
+
+
 # -- qa_check --------------------------------------------------------------------
 
 
@@ -243,6 +304,54 @@ def test_qa_run_instant(tmp_path) -> None:
 
 def test_qa_run_bad_mode() -> None:
     result = _tool("qa_run", {"files": ["x.lua"], "mode": "banana"})
+    assert result["isError"] is True
+
+
+def test_qa_run_summary_counts_assertions_and_levels(tmp_path) -> None:
+    # the summary answers "how did it go" without shelling out to jq:
+    # level counts, flua-test PASS/FAIL tallies, and the failures total
+    script = tmp_path / "sum.lua"
+    script.write_text(
+        "local Test = require('flua-test')\n"
+        "local t = Test.new()\n"
+        "t:expect(true, 'one is one')\n"
+        "t:expect(true, 'two is two')\n"
+        "t:expect(false, 'nope')\n"
+        "fibaro.warning(__TAG, 'watch out')\n"
+        "t:finish()\n"
+    )
+    result = _tool("qa_run", {"files": [str(script)]})
+    assert result["summary"]["pass"] == 2
+    assert result["summary"]["fail"] == 1
+    assert result["summary"]["failures"] == 1
+    assert result["summary"]["levels"].get("WARNING", 0) >= 1
+    assert result["exitCode"] == 1
+
+
+def test_qa_run_filter_narrows_logs_server_side(tmp_path) -> None:
+    script = tmp_path / "flt.lua"
+    script.write_text(
+        "print('TICK one')\n"
+        "print('TICK two')\n"
+        "fibaro.error(__TAG, 'boom')\n"
+        "exit(0)\n"
+    )
+    result = _tool("qa_run", {"files": [str(script)], "filter": {"levels": ["ERROR"]}})
+    assert any("boom" in (e.get("msg") or "") for e in result["logs"] if isinstance(e, dict))
+    assert all(
+        (e.get("level") or "").upper() == "ERROR" for e in result["logs"] if isinstance(e, dict)
+    )
+    # the summary still describes the whole run, not the filtered view
+    assert result["summary"]["levels"].get("DEBUG", 0) >= 2
+    result = _tool("qa_run", {"files": [str(script)], "filter": {"match": "TICK two"}})
+    assert any("TICK two" in (e.get("msg") or "") for e in result["logs"] if isinstance(e, dict))
+    assert not any(
+        "TICK one" in (e.get("msg") or "") for e in result["logs"] if isinstance(e, dict)
+    )
+
+
+def test_qa_run_bad_filter_regex() -> None:
+    result = _tool("qa_run", {"files": ["x.lua"], "filter": {"match": "("}})
     assert result["isError"] is True
 
 
@@ -361,7 +470,13 @@ def test_stdio_transport_end_to_end(tmp_path) -> None:
                 "arguments": {"files": [str(script)]},
             },
         },
-        {"jsonrpc": "2.0", "id": 5, "method": "ping", "params": {}},
+        {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "method": "resources/read",
+            "params": {"uri": "flua://docs/rest-endpoints.md"},
+        },
+        {"jsonrpc": "2.0", "id": 6, "method": "ping", "params": {}},
     ]
     process = subprocess.run(
         [sys.executable, "-m", "flua.mcp.server"],
@@ -375,10 +490,12 @@ def test_stdio_transport_end_to_end(tmp_path) -> None:
     assert process.returncode == 0, process.stderr
     responses = [json.loads(line) for line in process.stdout.splitlines() if line.strip()]
     # one response per request; the notification is silent
-    assert [r["id"] for r in responses] == [1, 2, 3, 4, 5]
+    assert [r["id"] for r in responses] == [1, 2, 3, 4, 5, 6]
     assert "2026-07-28" in responses[0]["result"]["supportedVersions"]
     assert responses[1]["result"]["protocolVersion"] == LEGACY_PROTOCOL_VERSION
     assert [t["name"] for t in responses[2]["result"]["tools"]][:2] == ["qa_check", "qa_run"]
     run_result = json.loads(responses[3]["result"]["content"][0]["text"])
     assert run_result["exitCode"] == 0
-    assert responses[4]["result"] == {}
+    assert responses[4]["result"]["contents"][0]["uri"] == "flua://docs/rest-endpoints.md"
+    assert responses[4]["result"]["contents"][0]["text"]
+    assert responses[5]["result"] == {}

@@ -14,7 +14,8 @@ with flua (design: `docs/notes/notes-mcp.md`, packaging: ADR 0010).
   Unsupported versions answer error `-32022` with `{supported, requested}`.
 - **stdout is pure JSON-RPC** — one response line per request; server
   diagnostics go to stderr. Agents can parse stdout unconditionally.
-- **Capabilities**: `tools` only. Resources and prompts come later.
+- **Capabilities**: `tools` and `resources` (the packaged docs as
+  `flua://docs/*`). Prompts come later.
 
 | Method | Era | Purpose |
 |---|---|---|
@@ -23,6 +24,8 @@ with flua (design: `docs/notes/notes-mcp.md`, packaging: ADR 0010).
 | `ping` | both | liveness → `{}` |
 | `tools/list` | both | the tools with their JSON-Schema inputs (`resultType: "complete"`) |
 | `tools/call` | both | run one tool → `{resultType, content, isError}` |
+| `resources/list` | both | every doc resource → `{resultType, resources: [{uri, name, title, description, mimeType}]}` |
+| `resources/read` | both | one resource's text → `{resultType, contents: [{uri, mimeType, text}]}` |
 | `notifications/initialized`, `notifications/cancelled` | legacy | accepted, never answered |
 
 Error semantics: invalid JSON/requests and unknown methods answer with the
@@ -59,11 +62,14 @@ One-shot: the run ends when the QAs drain.
 
 Arguments: `files` (required), `mode` (`local`|`remote`), `instant`,
 `speed`, `start` (virtual start time, e.g. `"2027/10/6 18:30:00"`),
-`timeout` (wall seconds, default 120).
+`timeout` (wall seconds, default 120), `filter` (`{levels?, match?}` —
+server-side log narrowing; the agent asks for "just the failures" instead
+of shelling out).
 
-Result: `{"exitCode", "logs", "verdict"}` — `logs` are the QA's `--log
-json` lines, `verdict` the stderr notices (exit attribution). A nonzero
-`exitCode` is a failed run.
+Result: `{"exitCode", "logs", "verdict", "summary"}` — `logs` are the QA's
+`--log json` lines, `verdict` the stderr notices, and `summary` the answer
+without jq: level counts and flua-test `pass`/`fail`/`failures` tallies. A
+nonzero `exitCode` is a failed run.
 
 #### `qa_ui`
 
@@ -98,6 +104,25 @@ Sessions run in-process (each engine owns its asyncio loop on a daemon
 thread, like the test suite drives them) and are always torn down when the
 stdio pipe closes — an agent cannot leak engines.
 
+## Resources
+
+The docs ship in the wheel (`src/flua/setup_templates/docs`, synced from the
+repo by `scripts/sync-skills.sh`) and are served as MCP resources under the
+`flua://docs/` scheme — so a host without a repo checkout can still read the
+same knowledge a local agent reads from the checkout. Text files only (the
+tutorial PDF is not served).
+
+```json
+{"method": "resources/read", "params": {"uri": "flua://docs/USAGE.md"}}
+```
+
+Examples: `flua://docs/USAGE.md`, `flua://docs/ARCHITECTURE.md`,
+`flua://docs/tutorial/01-install.md`, `flua://docs/decisions/0010-mcp-ships-in-the-wheel.md`,
+`flua://docs/specs/hc3-api.json`, `flua://docs/mcp.md` (this page).
+`resources/list` enumerates them with mime types and curated descriptions;
+paths are canonicalized and traversal (`..`) is rejected with a JSON-RPC
+error, never a filesystem escape.
+
 ## Running it
 
 ```bash
@@ -123,7 +148,8 @@ no extra dependencies:
 ## What agents can rely on
 
 - `initialize` and `tools/list` are the discovery surface — schemas are
-  complete and typed; never parse `tools/list` prose.
+  complete and typed; never parse `tools/list` prose. `resources/list` is
+  the same for docs: read `resources/read`, don't guess file locations.
 - Tool results are JSON inside the MCP `text` content block (single block).
 - `qa_run` never talks to a controller unless `mode: "remote"` is explicit;
   the default is the offline sim.
@@ -138,6 +164,6 @@ no extra dependencies:
 
 - Done: stdio core, one-shot tools (`qa_check`, `qa_run`, `qa_ui`), the
   session tier (`qa_start`/`qa_probe`/`qa_action`/`qa_sessions`/`qa_stop`),
-  packaging, tests (`tests/test_mcp.py`).
-- Planned: resources/prompts (`flua://docs/*`), more one-shot tools
+  the resource tier (`flua://docs/*`), packaging, tests (`tests/test_mcp.py`).
+- Planned: prompts (`prompts/list`/`prompts/get`), more one-shot tools
   (`devices` from the REST feeds), and the Streamable HTTP transport.

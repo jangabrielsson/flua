@@ -989,10 +989,13 @@ Tools: one-shot `qa_check` (static checks, `{ok, findings}`), `qa_run`
 dump) — plus the session tier for live probing: `qa_start` keeps a running
 engine, `qa_probe` reads devices + new log lines (cursor-based deltas),
 `qa_action` dispatches device actions into it, `qa_stop`/`qa_sessions`
-manage it. Host registration: add `flua-mcp` as a stdio server in your
-host's MCP config — no extra install, no extra dependencies. The full
-reference (protocol surface, tool schemas, error semantics, examples):
-`docs/mcp.md`.
+manage it. Resources: the docs ship in the wheel and are served as
+`flua://docs/*` (e.g. `flua://docs/USAGE.md`, `flua://docs/tutorial/…`) via
+`resources/list`/`resources/read` — an agent host can read the flua docs
+without a repo checkout. Host registration: add `flua-mcp` as a stdio
+server in your host's MCP config — no extra install, no extra
+dependencies. The full reference (protocol surface, tool schemas, error
+semantics, examples): `docs/mcp.md`.
 
 UI behavior folds into the same loop from Lua: `_FLUA.uiEvent(element,
 eventType[, value])` injects a UI event exactly as the HC3 UI would deliver

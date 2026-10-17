@@ -1,0 +1,9663 @@
+{
+ "$comment": "Structural reference of the HC3 REST API, distilled from the official swagger. Facts only: paths, methods, parameter names/types, request-body schemas, response status codes, and schema field names/types. Regenerate with scripts/extract_hc3_api.py.",
+ "generator": "scripts/extract_hc3_api.py",
+ "endpoints": [
+  {
+   "method": "GET",
+   "path": "/RGBPrograms",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<ProgramDto>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/RGBPrograms",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "CreateProgramRequest"
+   },
+   "responses": {
+    "201": "ProgramDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/RGBPrograms/{programID}",
+   "parameters": [
+    {
+     "name": "programID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/RGBPrograms/{programID}",
+   "parameters": [
+    {
+     "name": "programID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "ProgramDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/RGBPrograms/{programID}",
+   "parameters": [
+    {
+     "name": "programID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "ProgramDto"
+   },
+   "responses": {
+    "200": "ProgramDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/additionalInterfaces",
+   "parameters": [
+    {
+     "name": "deviceId",
+     "in": "query",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<string>",
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/additionalInterfaces/{interfaceName}",
+   "parameters": [
+    {
+     "name": "interfaceName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "DevicesDto",
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/alarms/v1/devices/",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<AlarmDeviceEntryDto>"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/alarms/v1/history/",
+   "parameters": [
+    {
+     "name": "from",
+     "in": "query",
+     "required": false,
+     "type": "number"
+    },
+    {
+     "name": "to",
+     "in": "query",
+     "required": false,
+     "type": "number"
+    },
+    {
+     "name": "pageSize",
+     "in": "query",
+     "required": false,
+     "type": "number"
+    },
+    {
+     "name": "page",
+     "in": "query",
+     "required": false,
+     "type": "number"
+    },
+    {
+     "name": "order",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "name": "type",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<AlarmHistoryEntryDto>"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/alarms/v1/partitions",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<AlarmPartitionDto>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/alarms/v1/partitions",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "NewPartitionDto"
+   },
+   "responses": {
+    "201": "inline_response_201",
+    "403": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/alarms/v1/partitions/actions/arm",
+   "parameters": [
+    {
+     "name": "Fibaro-User-PIN",
+     "in": "header",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "403": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/alarms/v1/partitions/actions/arm",
+   "parameters": [
+    {
+     "name": "Fibaro-User-PIN",
+     "in": "header",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "403": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/alarms/v1/partitions/actions/tryArm",
+   "parameters": [
+    {
+     "name": "Fibaro-User-PIN",
+     "in": "header",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<PartitionArmTryResult>",
+    "403": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/alarms/v1/partitions/breached",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<integer>"
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/alarms/v1/partitions/{partitionID}",
+   "parameters": [
+    {
+     "name": "partitionID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/alarms/v1/partitions/{partitionID}",
+   "parameters": [
+    {
+     "name": "partitionID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "AlarmPartitionDto",
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/alarms/v1/partitions/{partitionID}",
+   "parameters": [
+    {
+     "name": "partitionID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "NewPartitionDto"
+   },
+   "responses": {
+    "204": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/alarms/v1/partitions/{partitionID}/actions/arm",
+   "parameters": [
+    {
+     "name": "partitionID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "Fibaro-User-PIN",
+     "in": "header",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/alarms/v1/partitions/{partitionID}/actions/arm",
+   "parameters": [
+    {
+     "name": "partitionID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "Fibaro-User-PIN",
+     "in": "header",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/alarms/v1/partitions/{partitionID}/actions/tryArm",
+   "parameters": [
+    {
+     "name": "partitionID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "Fibaro-User-PIN",
+     "in": "header",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "PartitionArmTryResult",
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/apps/com.fibaro.zwave/diagnostics/transmissions",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "DiagnosticTransmissions"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/apps/com.fibaro.zwave/nodes/{nodeId}/actions",
+   "parameters": [
+    {
+     "name": "nodeId",
+     "in": "path",
+     "required": true,
+     "type": "NodeId"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<ActionStatusResponse>",
+    "400": "Error",
+    "404": "Error"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/apps/com.fibaro.zwave/nodes/{nodeId}/actions",
+   "parameters": [
+    {
+     "name": "nodeId",
+     "in": "path",
+     "required": true,
+     "type": "NodeId"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": null
+   },
+   "responses": {
+    "202": "CreateActionResponse",
+    "400": "Error",
+    "404": "Error"
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/apps/com.fibaro.zwave/nodes/{nodeId}/actions/{actionId}",
+   "parameters": [
+    {
+     "name": "nodeId",
+     "in": "path",
+     "required": true,
+     "type": "NodeId"
+    },
+    {
+     "name": "actionId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "400": "Error",
+    "403": "Error",
+    "404": "Error"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/apps/com.fibaro.zwave/nodes/{nodeId}/actions/{actionId}",
+   "parameters": [
+    {
+     "name": "nodeId",
+     "in": "path",
+     "required": true,
+     "type": "NodeId"
+    },
+    {
+     "name": "actionId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "ActionStatusResponse",
+    "400": "Error",
+    "404": "Error"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/apps/com.fibaro.zwave/nodes/{nodeId}/associationGroupInfo",
+   "parameters": [
+    {
+     "name": "nodeId",
+     "in": "path",
+     "required": true,
+     "type": "NodeId"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<EndpointAssociationGroupInfo>",
+    "400": "Error",
+    "404": "Error"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/apps/com.fibaro.zwave/nodes/{nodeId}/associations",
+   "parameters": [
+    {
+     "name": "nodeId",
+     "in": "path",
+     "required": true,
+     "type": "NodeId"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<EndpointAssociationGroups>",
+    "400": "Error",
+    "404": "Error"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/apps/com.fibaro.zwave/nodes/{nodeId}/endpoints/{endpointId}/associationGroupInfo",
+   "parameters": [
+    {
+     "name": "nodeId",
+     "in": "path",
+     "required": true,
+     "type": "NodeId"
+    },
+    {
+     "name": "endpointId",
+     "in": "path",
+     "required": true,
+     "type": "EndpointId"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<AssociationGroupInfo>",
+    "400": "Error",
+    "404": "Error"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/apps/com.fibaro.zwave/nodes/{nodeId}/endpoints/{endpointId}/associations",
+   "parameters": [
+    {
+     "name": "nodeId",
+     "in": "path",
+     "required": true,
+     "type": "NodeId"
+    },
+    {
+     "name": "endpointId",
+     "in": "path",
+     "required": true,
+     "type": "EndpointId"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<AssociationGroup>",
+    "400": "Error",
+    "404": "Error"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/categories",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<CategoryDto>"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/coPlot?id={id}&from={timestampFrom}&to={timestampTo}",
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "timestampFrom",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "timestampTo",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "CoFromToArray"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/customEvents",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<CustomEventDto>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/customEvents",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "CustomEventDto"
+   },
+   "responses": {
+    "200": "CustomEventDto",
+    "400": null,
+    "409": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/customEvents/{customEventName}",
+   "parameters": [
+    {
+     "name": "customEventName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/customEvents/{customEventName}",
+   "parameters": [
+    {
+     "name": "customEventName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "CustomEventDto",
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/customEvents/{customEventName}",
+   "parameters": [
+    {
+     "name": "customEventName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/customEvents/{customEventName}",
+   "parameters": [
+    {
+     "name": "customEventName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "CustomEventDto"
+   },
+   "responses": {
+    "200": "CustomEventDto",
+    "400": null,
+    "404": null,
+    "409": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/customEvents/{customEventName}/publish",
+   "parameters": [
+    {
+     "name": "customEventName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "404": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/debugMessages",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "400": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/debugMessages",
+   "parameters": [
+    {
+     "name": "filter",
+     "in": "query",
+     "required": false,
+     "type": "array<string>"
+    },
+    {
+     "name": "types",
+     "in": "query",
+     "required": false,
+     "type": "array<string>"
+    },
+    {
+     "name": "from",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "name": "to",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "name": "last",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "name": "offset",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "DebugMessagesDto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/debugMessages/tags",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<string>"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/deviceNotifications/v1",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<DeviceNotificationsSettings>"
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/deviceNotifications/v1/{deviceID}",
+   "parameters": [
+    {
+     "name": "deviceID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/deviceNotifications/v1/{deviceID}",
+   "parameters": [
+    {
+     "name": "deviceID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<NotificationsSettings>",
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/deviceNotifications/v1/{deviceID}",
+   "parameters": [
+    {
+     "name": "deviceID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "array<NotificationsSettings>"
+   },
+   "responses": {
+    "204": null,
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/devices",
+   "parameters": [
+    {
+     "name": "roomID",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "name": "interface",
+     "in": "query",
+     "required": false,
+     "type": "array<string>"
+    },
+    {
+     "name": "type",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "name": "viewVersion",
+     "in": "query",
+     "required": false,
+     "type": "ViewVersionEnum"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<DeviceDto>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/devices",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "PluginCreateDto"
+   },
+   "responses": {
+    "200": "DeviceDto",
+    "400": null,
+    "403": null,
+    "404": null,
+    "409": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/devices/action/{timestamp}/{id}",
+   "parameters": [
+    {
+     "name": "timestamp",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/devices/addInterface",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "DevicesInterfacesDto"
+   },
+   "responses": {
+    "204": null,
+    "400": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/devices/deleteInterface",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "DevicesInterfacesDto"
+   },
+   "responses": {
+    "204": null,
+    "400": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/devices/filter",
+   "parameters": [
+    {
+     "name": "viewVersion",
+     "in": "query",
+     "required": false,
+     "type": "ViewVersionEnum"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "DeviceListFiltersDto"
+   },
+   "responses": {
+    "200": "array<DeviceDto>",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/devices/groupAction/{actionName}",
+   "parameters": [
+    {
+     "name": "actionName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "GroupActionArguments"
+   },
+   "responses": {
+    "200": null,
+    "400": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/devices/hierarchy",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "DeviceTypeHierarchy"
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/devices/{deviceID}",
+   "parameters": [
+    {
+     "name": "deviceID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "400": null,
+    "403": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/devices/{deviceID}",
+   "parameters": [
+    {
+     "name": "deviceID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "viewVersion",
+     "in": "query",
+     "required": false,
+     "type": "ViewVersionEnum"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "DeviceDto",
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/devices/{deviceID}",
+   "parameters": [
+    {
+     "name": "deviceID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "DeviceDto"
+   },
+   "responses": {
+    "200": "DeviceDto",
+    "400": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/devices/{deviceID}/action/{actionName}",
+   "parameters": [
+    {
+     "name": "deviceID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "actionName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "DeviceActionArgumentsDto"
+   },
+   "responses": {
+    "202": null,
+    "400": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/devices?property=[lastLoggedUser,{userId}]",
+   "parameters": [
+    {
+     "name": "userId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<DeviceDto>"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/diagnostics",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "Diagnostic"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/energy/billing/periods",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<EnergyBillingPeriodDto>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/energy/billing/periods",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "EnergyBillingPeriodDto"
+   },
+   "responses": {
+    "204": null,
+    "400": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/energy/billing/summary",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "EnergyBillingSummaryTypesDto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/energy/billing/tariff",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "EnergyTariffDto"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/energy/billing/tariff",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "EnergyTariffDto"
+   },
+   "responses": {
+    "204": null,
+    "400": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/energy/consumption",
+   "parameters": [
+    {
+     "name": "deviceIds",
+     "in": "query",
+     "required": false,
+     "type": "array<integer>"
+    },
+    {
+     "name": "startPeriod",
+     "in": "query",
+     "required": false,
+     "type": "DateTimeUnitDto"
+    },
+    {
+     "name": "endPeriod",
+     "in": "query",
+     "required": false,
+     "type": "DateTimeUnitDto"
+    },
+    {
+     "name": "subtractWholeHouseEnergy",
+     "in": "query",
+     "required": false,
+     "type": "boolean"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/energy/consumption/detail",
+   "parameters": [
+    {
+     "name": "period",
+     "in": "query",
+     "required": true,
+     "type": "array<DateTimeUnitDto>"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "EnergyDetailDto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/energy/consumption/device/{deviceId}/detail",
+   "parameters": [
+    {
+     "name": "periods",
+     "in": "query",
+     "required": true,
+     "type": "array<DateTimeUnitDto>"
+    },
+    {
+     "name": "deviceId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "EnergyDeviceDetailDto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/energy/consumption/metrics",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "EnergyMetricsDto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/energy/consumption/room/{roomId}/detail",
+   "parameters": [
+    {
+     "name": "period",
+     "in": "query",
+     "required": true,
+     "type": "array<DateTimeUnitDto>"
+    },
+    {
+     "name": "roomId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "EnergyRoomDetailDto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/energy/consumption/summary",
+   "parameters": [
+    {
+     "name": "period",
+     "in": "query",
+     "required": true,
+     "type": "DateTimeUnitDto"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "EnergySummaryDto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/energy/devices",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<EnergyDeviceInfo>"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/energy/ecology/detail",
+   "parameters": [
+    {
+     "name": "startDate",
+     "in": "query",
+     "required": true,
+     "type": "DateTimeUnitDto"
+    },
+    {
+     "name": "endDate",
+     "in": "query",
+     "required": true,
+     "type": "DateTimeUnitDto"
+    },
+    {
+     "name": "intervalType",
+     "in": "query",
+     "required": false,
+     "type": "TimeIntervalEnum"
+    },
+    {
+     "name": "interval",
+     "in": "query",
+     "required": false,
+     "type": "number"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<EcologyDetailsDto>"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/energy/ecology/summary",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "EcologySummaryDto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/energy/installationCost",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<InstallationCostDto>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/energy/installationCost",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "InstallationCostDto"
+   },
+   "responses": {
+    "201": "InstallationCostDto"
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/energy/installationCost/{id}",
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/energy/installationCost/{id}",
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "InstallationCostDto"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/energy/installationCost/{id}",
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "InstallationCostDto"
+   },
+   "responses": {
+    "200": "InstallationCostDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/energy/savings/detail",
+   "parameters": [
+    {
+     "name": "startDate",
+     "in": "query",
+     "required": true,
+     "type": "DateTimeUnitDto"
+    },
+    {
+     "name": "endDate",
+     "in": "query",
+     "required": true,
+     "type": "DateTimeUnitDto"
+    },
+    {
+     "name": "intervalType",
+     "in": "query",
+     "required": false,
+     "type": "TimeIntervalEnum"
+    },
+    {
+     "name": "interval",
+     "in": "query",
+     "required": false,
+     "type": "number"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<SavingsDetailsDto>"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/energy/savings/installation",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<SavingsInstallationDto>"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/energy/savings/summary",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "SavingsSummaryDto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/energy/settings",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "EnergySettingsDto"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/energy/settings",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "EnergySettingsDto"
+   },
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/energy/{timestampFrom}/{timestampTo}/{dataSet}/{type}/{unit}/{id}",
+   "parameters": [
+    {
+     "name": "timestampFrom",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "timestampTo",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "dataSet",
+     "in": "path",
+     "required": true,
+     "type": "DataTypeSummaryOrCompare"
+    },
+    {
+     "name": "type",
+     "in": "path",
+     "required": true,
+     "type": "DataTypeRoomsOrDevices"
+    },
+    {
+     "name": "unit",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "EnergyFromTo"
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/events/history",
+   "parameters": [
+    {
+     "name": "eventType",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "name": "timestamp",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "name": "shrink",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "name": "objectType",
+     "in": "query",
+     "required": false,
+     "type": "SourceType"
+    },
+    {
+     "name": "objectId",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "400": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/events/history",
+   "parameters": [
+    {
+     "name": "eventType",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "name": "from",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "name": "to",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "name": "sourceType",
+     "in": "query",
+     "required": false,
+     "type": "SourceType"
+    },
+    {
+     "name": "sourceId",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "name": "objectType",
+     "in": "query",
+     "required": false,
+     "type": "SourceType"
+    },
+    {
+     "name": "objectId",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "name": "lastId",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "name": "numberOfRecords",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "name": "roomId",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "name": "sectionId",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "name": "category",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<EventDto>",
+    "400": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/events/publishEvent/GeofenceEvent",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "body"
+   },
+   "responses": {
+    "200": null,
+    "400": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/events/publishEvent/{eventName}",
+   "parameters": [
+    {
+     "name": "eventName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "object"
+   },
+   "responses": {
+    "200": null,
+    "400": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/factoryReset",
+   "parameters": [],
+   "requestBody": {
+    "required": false,
+    "schema": "FactoryResetRequestBody"
+   },
+   "responses": {
+    "202": null,
+    "400": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/fti/v2",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "FTIDto"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/fti/v2/changeStep/{step}",
+   "parameters": [
+    {
+     "name": "step",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/fti/v2/finish",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/fti/v2/reset",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/globalVariables",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<GlobalVariableDto>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/globalVariables",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "GlobalVariableDto"
+   },
+   "responses": {
+    "200": "GlobalVariableDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/globalVariables/{globalVariableName}",
+   "parameters": [
+    {
+     "name": "globalVariableName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/globalVariables/{globalVariableName}",
+   "parameters": [
+    {
+     "name": "globalVariableName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "GlobalVariableDto",
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/globalVariables/{globalVariableName}",
+   "parameters": [
+    {
+     "name": "globalVariableName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "GlobalVariableDto"
+   },
+   "responses": {
+    "200": "GlobalVariableDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/home",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "HomeDto"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/home",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "HomeDto"
+   },
+   "responses": {
+    "200": null,
+    "400": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/icons",
+   "parameters": [
+    {
+     "name": "id",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "name": "name",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "name": "type",
+     "in": "query",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "fileExtension",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/icons",
+   "parameters": [
+    {
+     "name": "X-Fibaro-Version",
+     "in": "header",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "deviceType",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/icons",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": null
+   },
+   "responses": {
+    "201": "CreatedIconDto",
+    "400": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/installer",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/installer",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "Installer"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/installer",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "InstallerCreateRequest"
+   },
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/installer",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "InstallerPutRequest"
+   },
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/installer/mobileDevicesToNotify",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "MobileDevicesToNotify"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/installer/mobileDevicesToNotify",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "MobileDevicesToNotify"
+   },
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/installer/mobileDevicesToNotify/{deviceId}",
+   "parameters": [
+    {
+     "name": "deviceId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/installer/mobileDevicesToNotify/{deviceId}",
+   "parameters": [
+    {
+     "name": "deviceId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/installer/monitoringRequest",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "InstallerMonitoringRequest"
+   },
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/installer/remoteAccessRequest",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/iosDevices",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<iOSDev>"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/json/{parametersTemplate}.json",
+   "parameters": [
+    {
+     "name": "parametersTemplate",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "DeviceParametersDto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/limits",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "Limits"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/linkedDevices/v1/devices",
+   "parameters": [
+    {
+     "name": "type",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<LinkedDeviceDto>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/linkedDevices/v1/devices",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "NewLinkedDeviceDto"
+   },
+   "responses": {
+    "201": "LinkedDeviceCreatedDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/linkedDevices/v1/devices/{deviceID}",
+   "parameters": [
+    {
+     "name": "deviceID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/linkedDevices/v1/devices/{deviceID}",
+   "parameters": [
+    {
+     "name": "deviceID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "LinkedDeviceDto",
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/linkedDevices/v1/devices/{deviceID}",
+   "parameters": [
+    {
+     "name": "deviceID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "UpdateLinkedDeviceDto"
+   },
+   "responses": {
+    "204": null,
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/linkedDevices/v1/inputDevices",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<LinkedDeviceInputDeviceDto>"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/linkedDevices/v1/providers",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<LinkedDeviceProviderDto>"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/loginStatus",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "LoginStatus"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/loginStatus",
+   "parameters": [
+    {
+     "name": "action",
+     "in": "query",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "tosAccepted",
+     "in": "query",
+     "required": false,
+     "type": "boolean"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "LoginStatus",
+    "400": null,
+    "403": "LogoutStatus",
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/mobile/push",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "CreatePushRequest"
+   },
+   "responses": {
+    "200": null,
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/mobile/push/{id}",
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/mobile/push/{id}",
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/networkDiscovery/arp",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "NetworkDiscoveryDto"
+   },
+   "responses": {
+    "200": "array<DeviceNetworkDataDto>"
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/notificationCenter",
+   "parameters": [
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<number>"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/notificationCenter",
+   "parameters": [
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": "pageNumber",
+     "in": "query",
+     "required": false,
+     "type": "number"
+    },
+    {
+     "name": "pageSize",
+     "in": "query",
+     "required": false,
+     "type": "number"
+    },
+    {
+     "name": "order",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<NotificationCenterDto>",
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/notificationCenter",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "NotificationCenterRequestDto"
+   },
+   "responses": {
+    "200": "NotificationCenterDto",
+    "400": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/notificationCenter/markAsRead",
+   "parameters": [
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "400": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/notificationCenter/markAsUnread",
+   "parameters": [
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    },
+    {
+     "name": null,
+     "in": null,
+     "required": false,
+     "type": null
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "400": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/notificationCenter/{notificationId}",
+   "parameters": [
+    {
+     "name": "notificationId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/notificationCenter/{notificationId}",
+   "parameters": [
+    {
+     "name": "notificationId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "NotificationCenterDto",
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/notificationCenter/{notificationId}",
+   "parameters": [
+    {
+     "name": "notificationId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "NotificationCenterRequestDto"
+   },
+   "responses": {
+    "200": "NotificationCenterDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/panelService/1/action/abortUpgrade",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "AbortUpgrade"
+   },
+   "responses": {
+    "200": "AbortUpgradeDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/panelService/1/action/changelog",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "GetChangelog"
+   },
+   "responses": {
+    "200": "GetChangelogDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/panelService/1/action/checkUpgradeAvailability",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "CheckUpgradeAvailability"
+   },
+   "responses": {
+    "200": "CheckUpgradeAvailabilityDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/panelService/1/action/startUpgrade",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "StartUpgrade"
+   },
+   "responses": {
+    "200": "StartUpgradeDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/panels/climate",
+   "parameters": [
+    {
+     "name": "detailed",
+     "in": "query",
+     "required": false,
+     "type": "boolean"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<BasicClimateZone>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/panels/climate",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "AdvancedClimateZone"
+   },
+   "responses": {
+    "201": "AdvancedClimateZone",
+    "400": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/panels/climate/action/createDefaultZones",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<BasicClimateZone>",
+    "409": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/panels/climate/availableDevices",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<integer>"
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/panels/climate/{climateID}",
+   "parameters": [
+    {
+     "name": "climateID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/panels/climate/{climateID}",
+   "parameters": [
+    {
+     "name": "climateID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "AdvancedClimateZone",
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/panels/climate/{climateID}",
+   "parameters": [
+    {
+     "name": "climateID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "AdvancedClimateZone"
+   },
+   "responses": {
+    "200": "AdvancedClimateZone",
+    "400": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/panels/energy?id={id}",
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<Energy>"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/panels/family",
+   "parameters": [
+    {
+     "name": "userID",
+     "in": "query",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "from",
+     "in": "query",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "to",
+     "in": "query",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<FamilyLocation>"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/panels/favoriteColors",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<FavoriteColor>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/panels/favoriteColors",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "NewFavoriteColor"
+   },
+   "responses": {
+    "201": "FavoriteColor",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/panels/favoriteColors/v2",
+   "parameters": [
+    {
+     "name": "colorComponents",
+     "in": "query",
+     "required": false,
+     "type": "array<string>"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<FavoriteColorV2>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/panels/favoriteColors/v2",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "NewFavoriteColorV2"
+   },
+   "responses": {
+    "201": "FavoriteColorV2",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/panels/favoriteColors/v2/{favoriteColorID}",
+   "parameters": [
+    {
+     "name": "favoriteColorID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "FavoriteColorV2"
+   },
+   "responses": {
+    "200": "FavoriteColorV2",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/panels/favoriteColors/{favoriteColorID}",
+   "parameters": [
+    {
+     "name": "favoriteColorID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/panels/favoriteColors/{favoriteColorID}",
+   "parameters": [
+    {
+     "name": "favoriteColorID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "FavoriteColor"
+   },
+   "responses": {
+    "200": "FavoriteColor",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/panels/humidity",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<HumidityZone>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/panels/humidity",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "inline_object"
+   },
+   "responses": {
+    "201": null,
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/panels/humidity/{humidityID}",
+   "parameters": [
+    {
+     "name": "humidityID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/panels/humidity/{humidityID}",
+   "parameters": [
+    {
+     "name": "humidityID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "HumidityZone"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/panels/humidity/{humidityID}",
+   "parameters": [
+    {
+     "name": "humidityID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "HumidityZone"
+   },
+   "responses": {
+    "200": "HumidityZone",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/panels/location",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<Location>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/panels/location",
+   "parameters": [],
+   "requestBody": {
+    "required": false,
+    "schema": "LocationRequest"
+   },
+   "responses": {
+    "201": "Location",
+    "400": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/panels/location/{locationID}",
+   "parameters": [
+    {
+     "name": "locationID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "400": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/panels/location/{locationID}",
+   "parameters": [
+    {
+     "name": "locationID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "Location",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/panels/location/{locationID}",
+   "parameters": [
+    {
+     "name": "locationID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "LocationRequest"
+   },
+   "responses": {
+    "200": "array<Location>",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/panels/notifications",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "Notifications"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/panels/notifications",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "inline_object"
+   },
+   "responses": {
+    "201": "Notification",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/panels/notifications/{notificationID}",
+   "parameters": [
+    {
+     "name": "notificationID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/panels/notifications/{notificationID}",
+   "parameters": [
+    {
+     "name": "notificationID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "Notification",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/panels/notifications/{notificationID}",
+   "parameters": [
+    {
+     "name": "notificationID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "string"
+   },
+   "responses": {
+    "200": null,
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/panels/sprinklers",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<SprinklerSchedule>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/panels/sprinklers",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "SprinklerScheduleCreateRequest"
+   },
+   "responses": {
+    "201": "SprinklerSchedule"
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/panels/sprinklers/{scheduleId}",
+   "parameters": [
+    {
+     "name": "scheduleId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/panels/sprinklers/{scheduleId}",
+   "parameters": [
+    {
+     "name": "scheduleId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "SprinklerSchedule",
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/panels/sprinklers/{scheduleId}",
+   "parameters": [
+    {
+     "name": "scheduleId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "SprinklerScheduleRequest"
+   },
+   "responses": {
+    "200": "array<SprinklerSchedule>",
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/panels/sprinklers/{scheduleId}/sequences",
+   "parameters": [
+    {
+     "name": "scheduleId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "SprinklerSequenceRequest"
+   },
+   "responses": {
+    "201": "array<SprinklerSequence>"
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/panels/sprinklers/{scheduleId}/sequences/{sequenceId}",
+   "parameters": [
+    {
+     "name": "scheduleId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "sequenceId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/panels/sprinklers/{scheduleId}/sequences/{sequenceId}",
+   "parameters": [
+    {
+     "name": "scheduleId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "sequenceId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "SprinklerSequenceRequest"
+   },
+   "responses": {
+    "200": "array<SprinklerSequence>",
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/panels/sprinklers/{scheduleId}/sequences/{sequenceId}/startWatering",
+   "parameters": [
+    {
+     "name": "scheduleId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "sequenceId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "wateringTime",
+     "in": "query",
+     "required": false,
+     "type": "number"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/panels/sprinklers/{scheduleId}/sequences/{sequenceId}/stopWatering",
+   "parameters": [
+    {
+     "name": "scheduleId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "sequenceId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/passwordForgotten",
+   "parameters": [
+    {
+     "name": "login",
+     "in": "query",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "lang",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "Status"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/plugins",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "PluginsDto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/plugins/callUIEvent",
+   "parameters": [
+    {
+     "name": "deviceID",
+     "in": "query",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "elementName",
+     "in": "query",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "eventType",
+     "in": "query",
+     "required": true,
+     "type": "UiEventType"
+    },
+    {
+     "name": "value",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/plugins/createChildDevice",
+   "parameters": [],
+   "requestBody": {
+    "required": false,
+    "schema": "CreateChildDeviceDto"
+   },
+   "responses": {
+    "200": null,
+    "400": null,
+    "500": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/plugins/getView",
+   "parameters": [
+    {
+     "name": "id",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "name": "name",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "name": "type",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "name": "version",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "name": "Accept-Language",
+     "in": "header",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "name": "Accept",
+     "in": "header",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "PluginViewDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/plugins/installed",
+   "parameters": [
+    {
+     "name": "type",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "InstalledPluginsDto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/plugins/installed",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "InstalledPluginsDto"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/plugins/installed",
+   "parameters": [
+    {
+     "name": "type",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "InstalledPluginsDto"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/plugins/interfaces",
+   "parameters": [],
+   "requestBody": {
+    "required": false,
+    "schema": "PluginsInterfaceParamDto"
+   },
+   "responses": {
+    "200": null,
+    "400": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/plugins/ipCameras",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<IPCameraDto>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/plugins/publishEvent",
+   "parameters": [],
+   "requestBody": {
+    "required": false,
+    "schema": null
+   },
+   "responses": {
+    "200": null,
+    "400": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/plugins/restart",
+   "parameters": [],
+   "requestBody": {
+    "required": false,
+    "schema": "RestartPluginRequestDto"
+   },
+   "responses": {
+    "200": "RestartPluginResponseDto",
+    "500": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/plugins/types",
+   "parameters": [
+    {
+     "name": "Accept-Language",
+     "in": "header",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "PluginsTypesDto"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/plugins/updateProperty",
+   "parameters": [],
+   "requestBody": {
+    "required": false,
+    "schema": "UpdatePropertyDto"
+   },
+   "responses": {
+    "200": null,
+    "400": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/plugins/updateView",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "PluginUpdateDto"
+   },
+   "responses": {
+    "200": "object",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/plugins/v2",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "PluginsV2Dto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/profiles",
+   "parameters": [
+    {
+     "name": "showHidden",
+     "in": "query",
+     "required": false,
+     "type": "boolean"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "ProfileServiceDto"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/profiles",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "ProfileCreateDto"
+   },
+   "responses": {
+    "200": "ProfileDto",
+    "403": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/profiles",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "ProfileServiceDto"
+   },
+   "responses": {
+    "200": "ProfileServiceDto"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/profiles/activeProfile/{profileId}",
+   "parameters": [
+    {
+     "name": "profileId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/profiles/reset",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "403": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/profiles/{profileId}",
+   "parameters": [
+    {
+     "name": "profileId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "400": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/profiles/{profileId}",
+   "parameters": [
+    {
+     "name": "profileId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "showHidden",
+     "in": "query",
+     "required": false,
+     "type": "boolean"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "ProfileDto",
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/profiles/{profileId}",
+   "parameters": [
+    {
+     "name": "profileId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "ProfileDto"
+   },
+   "responses": {
+    "200": "ProfileDto",
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/profiles/{profileId}/climateZones/{zoneId}",
+   "parameters": [
+    {
+     "name": "profileId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "zoneId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "ClimateZoneActionUpdateDto"
+   },
+   "responses": {
+    "200": "ProfileDto"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/profiles/{profileId}/partitions/{partitionId}",
+   "parameters": [
+    {
+     "name": "profileId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "partitionId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "PartitionActionUpdateDto"
+   },
+   "responses": {
+    "200": "ProfileDto"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/profiles/{profileId}/scenes/{sceneId}",
+   "parameters": [
+    {
+     "name": "profileId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "sceneId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "SceneActorUpdateDto"
+   },
+   "responses": {
+    "200": "ProfileDto"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/quickApp",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "CreateQuickAppRequest"
+   },
+   "responses": {
+    "200": "DeviceDto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/quickApp/availableTypes",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<QuickAvailableTypeDto>"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/quickApp/export/{deviceId}",
+   "parameters": [
+    {
+     "name": "deviceId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "object"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/quickApp/export/{deviceId}",
+   "parameters": [
+    {
+     "name": "deviceId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": false,
+    "schema": "QuickAppExportRequest"
+   },
+   "responses": {
+    "200": null,
+    "400": "HCErrorDto",
+    "409": "HCErrorDto"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/quickApp/import",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": null
+   },
+   "responses": {
+    "200": "DeviceDto",
+    "400": "HCErrorDto",
+    "403": "HCErrorDto",
+    "409": "HCErrorDto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/quickApp/{deviceId}/files",
+   "parameters": [
+    {
+     "name": "deviceId",
+     "in": "path",
+     "required": true,
+     "type": "number"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<QuickAppFile>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/quickApp/{deviceId}/files",
+   "parameters": [
+    {
+     "name": "deviceId",
+     "in": "path",
+     "required": true,
+     "type": "number"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "QuickAppFile"
+   },
+   "responses": {
+    "200": "QuickAppFile"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/quickApp/{deviceId}/files",
+   "parameters": [
+    {
+     "name": "deviceId",
+     "in": "path",
+     "required": true,
+     "type": "number"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "array<QuickAppFileDetails>"
+   },
+   "responses": {
+    "200": "array<QuickAppFile>"
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/quickApp/{deviceId}/files/{fileName}",
+   "parameters": [
+    {
+     "name": "deviceId",
+     "in": "path",
+     "required": true,
+     "type": "number"
+    },
+    {
+     "name": "fileName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/quickApp/{deviceId}/files/{fileName}",
+   "parameters": [
+    {
+     "name": "deviceId",
+     "in": "path",
+     "required": true,
+     "type": "number"
+    },
+    {
+     "name": "fileName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "QuickAppFileDetails"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/quickApp/{deviceId}/files/{fileName}",
+   "parameters": [
+    {
+     "name": "deviceId",
+     "in": "path",
+     "required": true,
+     "type": "number"
+    },
+    {
+     "name": "fileName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "QuickAppFileDetails"
+   },
+   "responses": {
+    "200": "QuickAppFileDetails"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/refreshStates",
+   "parameters": [
+    {
+     "name": "last",
+     "in": "query",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "lang",
+     "in": "query",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "rand",
+     "in": "query",
+     "required": true,
+     "type": "number"
+    },
+    {
+     "name": "logs",
+     "in": "query",
+     "required": false,
+     "type": "boolean"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "RefreshStateDto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/remoteGateway/verifyGateway",
+   "parameters": [
+    {
+     "name": "ip",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "name": "serial",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "409": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/resetZigbee",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "202": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/rooms",
+   "parameters": [
+    {
+     "name": "visible",
+     "in": "query",
+     "required": false,
+     "type": "boolean"
+    },
+    {
+     "name": "empty",
+     "in": "query",
+     "required": false,
+     "type": "boolean"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<RoomDto>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/rooms",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "RoomCreateRequest"
+   },
+   "responses": {
+    "201": "RoomDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/rooms/{roomID}",
+   "parameters": [
+    {
+     "name": "roomID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/rooms/{roomID}",
+   "parameters": [
+    {
+     "name": "roomID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "RoomDto"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/rooms/{roomID}",
+   "parameters": [
+    {
+     "name": "roomID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "RoomUpdateRequest"
+   },
+   "responses": {
+    "200": "RoomDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/rooms/{roomID}/action/setAsDefault",
+   "parameters": [
+    {
+     "name": "roomID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/rooms/{roomID}/groupAssignment",
+   "parameters": [
+    {
+     "name": "roomID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "RoomGroupAssignment"
+   },
+   "responses": {
+    "200": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/scenes",
+   "parameters": [
+    {
+     "name": "alexaProhibited",
+     "in": "query",
+     "required": false,
+     "type": "boolean"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<SceneDto>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/scenes",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "CreateSceneRequest"
+   },
+   "responses": {
+    "201": "CreateSceneResponse",
+    "400": null,
+    "403": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/scenes/hasTriggers",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "FilterSceneRequest"
+   },
+   "responses": {
+    "200": "array<SceneDto>"
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/scenes/{sceneID}",
+   "parameters": [
+    {
+     "name": "sceneID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/scenes/{sceneID}",
+   "parameters": [
+    {
+     "name": "sceneID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "alexaProhibited",
+     "in": "query",
+     "required": false,
+     "type": "boolean"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "SceneDto",
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/scenes/{sceneID}",
+   "parameters": [
+    {
+     "name": "sceneID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "UpdateSceneRequest"
+   },
+   "responses": {
+    "204": null,
+    "400": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/scenes/{sceneID}/convert",
+   "parameters": [
+    {
+     "name": "sceneID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "SceneDto",
+    "400": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/scenes/{sceneID}/copy",
+   "parameters": [
+    {
+     "name": "sceneID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "SceneDto",
+    "400": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/scenes/{sceneID}/copyAndConvert",
+   "parameters": [
+    {
+     "name": "sceneID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "SceneDto",
+    "400": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/scenes/{sceneID}/execute",
+   "parameters": [
+    {
+     "name": "sceneID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "pin",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "400": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/scenes/{sceneID}/execute",
+   "parameters": [
+    {
+     "name": "sceneID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "Fibaro-User-PIN",
+     "in": "header",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "ExecuteSceneRequest"
+   },
+   "responses": {
+    "204": null,
+    "400": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/scenes/{sceneID}/executeSync",
+   "parameters": [
+    {
+     "name": "sceneID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "pin",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "400": null,
+    "403": null,
+    "404": null,
+    "405": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/scenes/{sceneID}/executeSync",
+   "parameters": [
+    {
+     "name": "sceneID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "Fibaro-User-PIN",
+     "in": "header",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "ExecuteSceneRequest"
+   },
+   "responses": {
+    "204": null,
+    "400": null,
+    "403": null,
+    "404": null,
+    "405": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/scenes/{sceneID}/kill",
+   "parameters": [
+    {
+     "name": "sceneID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "pin",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/scenes/{sceneID}/kill",
+   "parameters": [
+    {
+     "name": "sceneID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "Fibaro-User-PIN",
+     "in": "header",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/sections",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<SectionDto>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/sections",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "SectionCreateRequest"
+   },
+   "responses": {
+    "201": "SectionDto",
+    "400": null,
+    "404": null,
+    "500": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/sections/{sectionID}",
+   "parameters": [
+    {
+     "name": "sectionID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/sections/{sectionID}",
+   "parameters": [
+    {
+     "name": "sectionID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "SectionDto"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/sections/{sectionID}",
+   "parameters": [
+    {
+     "name": "sectionID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "SectionUpdateRequest"
+   },
+   "responses": {
+    "200": "SectionDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/service/actions",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<ActionDto>"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/service/actions/{id}",
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "ActionResponseDto",
+    "404": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/service/backups",
+   "parameters": [
+    {
+     "name": "id",
+     "in": "query",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "type",
+     "in": "query",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/service/backups",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "AllBackups"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/service/backups",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "CreateBackupDto"
+   },
+   "responses": {
+    "200": null,
+    "202": null,
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/service/backups/{id}",
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "type",
+     "in": "query",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/service/canCreateBackups",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "BackupsPossible"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/service/capabilities",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "CapabilitiesDto"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/service/checkUpdate",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "202": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/service/discovery/resolve/{type}/{value}",
+   "parameters": [
+    {
+     "name": "type",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "value",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "options",
+     "in": "query",
+     "required": false,
+     "type": "array<string>"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "GatewayFilterMapResult",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/service/discovery/search",
+   "parameters": [
+    {
+     "name": "filterMap",
+     "in": "query",
+     "required": false,
+     "type": "array<string>"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<GatewayFilterMapResult>",
+    "400": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/service/gateway/role",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "GatewayRole"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/service/gateway/role",
+   "parameters": [],
+   "requestBody": {
+    "required": false,
+    "schema": "GatewayRequiredVersion"
+   },
+   "responses": {
+    "204": null,
+    "409": "Response409"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/service/getLocalBackupsStatus",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "BackupsStatus"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/service/getRemoteBackupsStatus",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "BackupsStatus"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/service/getZwaveEngine",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "GetZwaveEngineDto"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/service/reboot",
+   "parameters": [],
+   "requestBody": {
+    "required": false,
+    "schema": "ResetRequestDto"
+   },
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/service/resolve/{type}/{value}",
+   "parameters": [
+    {
+     "name": "type",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "value",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "GatewayFilterMapResult"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/service/restartServices",
+   "parameters": [
+    {
+     "name": "lang",
+     "in": "query",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": null
+   },
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/service/setZwaveEngine",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "SetZwaveEngineDto"
+   },
+   "responses": {
+    "202": null,
+    "400": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/service/slaves",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<GatewaySlave>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/service/slaves",
+   "parameters": [],
+   "requestBody": {
+    "required": false,
+    "schema": "GatewayNewSlave"
+   },
+   "responses": {
+    "200": "GatewaySlaveId",
+    "400": null,
+    "404": null,
+    "409": "Response409"
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/service/slaves/{id}",
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/service/slaves/{id}",
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": {
+    "required": false,
+    "schema": "GatewayNewSlave"
+   },
+   "responses": {
+    "204": null,
+    "404": null,
+    "409": "Response409"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/service/slaves/{id}/password",
+   "parameters": [
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "GatewaySlavePassword",
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/service/slaves/{serialOrId}/ip",
+   "parameters": [
+    {
+     "name": "serialOrId",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "rediscover",
+     "in": "query",
+     "required": false,
+     "type": "boolean"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "GatewayDiscoveredIP",
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/service/systemStatus",
+   "parameters": [
+    {
+     "name": "lang",
+     "in": "query",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "_",
+     "in": "query",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "SystemStatusDto"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/service/systemStatus",
+   "parameters": [
+    {
+     "name": "lang",
+     "in": "query",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "object"
+   },
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/service/update",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "202": null,
+    "500": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/service/update",
+   "parameters": [],
+   "requestBody": {
+    "required": false,
+    "schema": null
+   },
+   "responses": {
+    "201": "ActionIdDto",
+    "204": null,
+    "400": null,
+    "409": null,
+    "429": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/settings/certificates/ca",
+   "parameters": [
+    {
+     "name": "Accept",
+     "in": "header",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/settings/info",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "Info"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/settings/info",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "Settings"
+   },
+   "responses": {
+    "200": "Info",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/settings/led",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "LedDto"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/settings/led",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "LedDto"
+   },
+   "responses": {
+    "202": null,
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/settings/location",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "LocationSettings"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/settings/location",
+   "parameters": [
+    {
+     "name": "reboot",
+     "in": "query",
+     "required": false,
+     "type": "boolean"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "LocationSettings"
+   },
+   "responses": {
+    "200": null,
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/settings/network",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "networkConfiguration",
+    "500": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/settings/network/AccessPointMode",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "accessPointMode",
+    "500": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/settings/network/AccessPointMode",
+   "parameters": [],
+   "requestBody": {
+    "required": false,
+    "schema": "accessPointMode"
+   },
+   "responses": {
+    "200": null,
+    "500": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/settings/network/connections",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "connections",
+    "500": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/settings/network/connections",
+   "parameters": [],
+   "requestBody": {
+    "required": false,
+    "schema": "connection"
+   },
+   "responses": {
+    "200": "connection",
+    "409": null,
+    "500": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/settings/network/connections/{connectionUuid}",
+   "parameters": [
+    {
+     "name": "connectionUuid",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/settings/network/connections/{connectionUuid}",
+   "parameters": [
+    {
+     "name": "connectionUuid",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "connection",
+    "500": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/settings/network/connections/{connectionUuid}",
+   "parameters": [
+    {
+     "name": "connectionUuid",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": {
+    "required": false,
+    "schema": "connection"
+   },
+   "responses": {
+    "200": "connection",
+    "409": null,
+    "500": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/settings/network/connections/{connectionUuid}/check",
+   "parameters": [
+    {
+     "name": "connectionUuid",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "connection",
+    "427": null,
+    "473": null,
+    "480": null,
+    "500": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/settings/network/connections/{connectionUuid}/connect",
+   "parameters": [
+    {
+     "name": "connectionUuid",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "427": null,
+    "473": null,
+    "480": null,
+    "500": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/settings/network/connections/{connectionUuid}/disconnect",
+   "parameters": [
+    {
+     "name": "connectionUuid",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "500": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/settings/network/connectivity",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "internetConnectivity",
+    "500": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/settings/network/enabledProtocols",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "protocols",
+    "500": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/settings/network/enabledProtocols",
+   "parameters": [],
+   "requestBody": {
+    "required": false,
+    "schema": "protocols"
+   },
+   "responses": {
+    "200": null,
+    "500": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/settings/network/interfaces",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "interfaces",
+    "500": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/settings/network/interfaces/{interfaceName}",
+   "parameters": [
+    {
+     "name": "interfaceName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "configN",
+    "400": null,
+    "500": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/settings/network/interfaces/{interfaceName}",
+   "parameters": [
+    {
+     "name": "interfaceName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": {
+    "required": false,
+    "schema": "interfaceConfiguration"
+   },
+   "responses": {
+    "200": null,
+    "400": null,
+    "427": null,
+    "473": null,
+    "500": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/settings/network/interfaces/{interfaceName}/apInfo",
+   "parameters": [
+    {
+     "name": "interfaceName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "apListInfo",
+    "400": null,
+    "500": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/settings/network/interfaces/{interfaceName}/apList",
+   "parameters": [
+    {
+     "name": "interfaceName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "apList",
+    "400": null,
+    "500": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/settings/network/radio",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "radioListConfiguration",
+    "500": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/settings/network/radio",
+   "parameters": [],
+   "requestBody": {
+    "required": false,
+    "schema": "radioListConfiguration"
+   },
+   "responses": {
+    "200": null,
+    "400": null,
+    "500": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/settings/network/radio/{radioType}",
+   "parameters": [
+    {
+     "name": "radioType",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "radioConfiguration",
+    "404": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/settings/network/radio/{radioType}",
+   "parameters": [
+    {
+     "name": "radioType",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": {
+    "required": false,
+    "schema": "radioConfiguration"
+   },
+   "responses": {
+    "200": null,
+    "400": null,
+    "500": null
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/settings/network/resetInterfaces",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "400": null,
+    "500": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/settings/remoteAccess/status",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "remoteAccessStatus"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/settings/remoteAccess/status/{typeName}",
+   "parameters": [
+    {
+     "name": "typeName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "remoteAccessState"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/settings/remoteAccess/status/{typeName}",
+   "parameters": [
+    {
+     "name": "typeName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": {
+    "required": false,
+    "schema": "remoteAccessState"
+   },
+   "responses": {
+    "200": null,
+    "400": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/slave/{uuid}/api/apps/com.fibaro.zwave/nodes/{nodeId}/actions",
+   "parameters": [
+    {
+     "name": "uuid",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "nodeId",
+     "in": "path",
+     "required": true,
+     "type": "NodeId"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<ActionStatusResponse>",
+    "400": "Error",
+    "404": "Error"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/slave/{uuid}/api/apps/com.fibaro.zwave/nodes/{nodeId}/actions",
+   "parameters": [
+    {
+     "name": "uuid",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "nodeId",
+     "in": "path",
+     "required": true,
+     "type": "NodeId"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": null
+   },
+   "responses": {
+    "202": "CreateActionResponse",
+    "400": "Error",
+    "404": "Error"
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/slave/{uuid}/api/apps/com.fibaro.zwave/nodes/{nodeId}/actions/{actionId}",
+   "parameters": [
+    {
+     "name": "uuid",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "nodeId",
+     "in": "path",
+     "required": true,
+     "type": "NodeId"
+    },
+    {
+     "name": "actionId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "204": null,
+    "400": "Error",
+    "403": "Error",
+    "404": "Error"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/slave/{uuid}/api/apps/com.fibaro.zwave/nodes/{nodeId}/actions/{actionId}",
+   "parameters": [
+    {
+     "name": "uuid",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "nodeId",
+     "in": "path",
+     "required": true,
+     "type": "NodeId"
+    },
+    {
+     "name": "actionId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "ActionStatusResponse",
+    "400": "Error",
+    "404": "Error"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/slave/{uuid}/api/apps/com.fibaro.zwave/nodes/{nodeId}/associationGroupInfo",
+   "parameters": [
+    {
+     "name": "uuid",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "nodeId",
+     "in": "path",
+     "required": true,
+     "type": "NodeId"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<EndpointAssociationGroupInfo>",
+    "400": "Error",
+    "404": "Error"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/slave/{uuid}/api/apps/com.fibaro.zwave/nodes/{nodeId}/associations",
+   "parameters": [
+    {
+     "name": "uuid",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "nodeId",
+     "in": "path",
+     "required": true,
+     "type": "NodeId"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<EndpointAssociationGroups>",
+    "400": "Error",
+    "404": "Error"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/slave/{uuid}/api/apps/com.fibaro.zwave/nodes/{nodeId}/endpoints/{endpointId}/associationGroupInfo",
+   "parameters": [
+    {
+     "name": "uuid",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "nodeId",
+     "in": "path",
+     "required": true,
+     "type": "NodeId"
+    },
+    {
+     "name": "endpointId",
+     "in": "path",
+     "required": true,
+     "type": "EndpointId"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<AssociationGroupInfo>",
+    "400": "Error",
+    "404": "Error"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/slave/{uuid}/api/apps/com.fibaro.zwave/nodes/{nodeId}/endpoints/{endpointId}/associations",
+   "parameters": [
+    {
+     "name": "uuid",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "nodeId",
+     "in": "path",
+     "required": true,
+     "type": "NodeId"
+    },
+    {
+     "name": "endpointId",
+     "in": "path",
+     "required": true,
+     "type": "EndpointId"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<AssociationGroup>",
+    "400": "Error",
+    "404": "Error"
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/slave/{uuid}/api/devices/{deviceID}",
+   "parameters": [
+    {
+     "name": "uuid",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "deviceID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "403": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/slave/{uuid}/api/devices/{deviceID}/action/{actionName}",
+   "parameters": [
+    {
+     "name": "uuid",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "name": "deviceID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "actionName",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "DeviceActionArgumentsDto"
+   },
+   "responses": {
+    "202": null,
+    "400": null,
+    "403": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/slave/{uuid}/api/zwaveSettings",
+   "parameters": [
+    {
+     "name": "uuid",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "ZwaveSettingsDto"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/slave/{uuid}/api/zwaveSettings",
+   "parameters": [
+    {
+     "name": "uuid",
+     "in": "path",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "ZwaveSettingsRequest"
+   },
+   "responses": {
+    "200": null,
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/smokeTemperature/{timestampFrom}/{timestampTo}/{dataSet}/{type}/smoke/{id}",
+   "parameters": [
+    {
+     "name": "timestampFrom",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "timestampTo",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "dataSet",
+     "in": "path",
+     "required": true,
+     "type": "DataTypeSummaryOrCompare"
+    },
+    {
+     "name": "type",
+     "in": "path",
+     "required": true,
+     "type": "DataTypeRoomsOrDevices"
+    },
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "SmokeFromTo"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/sortOrder",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "SortOrderRequest"
+   },
+   "responses": {
+    "200": null,
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/temperature/{timestampFrom}/{timestampTo}/{dataSet}/{type}/temperature/{id}",
+   "parameters": [
+    {
+     "name": "timestampFrom",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "timestampTo",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "dataSet",
+     "in": "path",
+     "required": true,
+     "type": "DataTypeSummaryOrCompare"
+    },
+    {
+     "name": "type",
+     "in": "path",
+     "required": true,
+     "type": "DataTypeRoomsOrDevices"
+    },
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "TemperatureFromTo"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/testSatelConnection",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "TestSatelConnectionRequestDto"
+   },
+   "responses": {
+    "200": "TestSatelConnectionDto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/thermostatTemperature/{timestampFrom}/{timestampTo}/{dataSet}/{type}/thermostat/{id}",
+   "parameters": [
+    {
+     "name": "timestampFrom",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "timestampTo",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "dataSet",
+     "in": "path",
+     "required": true,
+     "type": "DataTypeSummaryOrCompare"
+    },
+    {
+     "name": "type",
+     "in": "path",
+     "required": true,
+     "type": "DataTypeRoomsOrDevices"
+    },
+    {
+     "name": "id",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "ThermostatFromTo"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/tos",
+   "parameters": [
+    {
+     "name": "lang",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "TermsOfServiceDto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/uiDeviceInfo",
+   "parameters": [
+    {
+     "name": "roomId",
+     "in": "query",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "name": "type",
+     "in": "query",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "name": "selectors",
+     "in": "query",
+     "required": false,
+     "type": "array<string>"
+    },
+    {
+     "name": "source",
+     "in": "query",
+     "required": false,
+     "type": "array<string>"
+    },
+    {
+     "name": "visible",
+     "in": "query",
+     "required": false,
+     "type": "boolean"
+    },
+    {
+     "name": "classification",
+     "in": "query",
+     "required": false,
+     "type": "array<DeviceClassificationDto>"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<DeviceInfoDto>"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/update",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "UpdatesDto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/userActivity",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "array<UserActivityDto>"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/users",
+   "parameters": [
+    {
+     "name": "hasDeviceRights",
+     "in": "query",
+     "required": false,
+     "type": "array<number>"
+    },
+    {
+     "name": "hasSceneRights",
+     "in": "query",
+     "required": false,
+     "type": "array<number>"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "array<UserDto>"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/users",
+   "parameters": [
+    {
+     "name": "isOffline",
+     "in": "query",
+     "required": false,
+     "type": "boolean"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "UserCreateRequest"
+   },
+   "responses": {
+    "201": "UserDto",
+    "400": null,
+    "409": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/users/action/cancelAdminTransfer",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "400": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/users/action/changeAdmin/{newAdminId}",
+   "parameters": [
+    {
+     "name": "newAdminId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "400": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/users/action/confirmAdminTransfer",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "400": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/users/action/synchronize",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/users/{userID}",
+   "parameters": [
+    {
+     "name": "userID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "name": "keepLocalUser",
+     "in": "query",
+     "required": false,
+     "type": "boolean"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "UserDto"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/users/{userID}",
+   "parameters": [
+    {
+     "name": "userID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "UserDto"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/users/{userID}",
+   "parameters": [
+    {
+     "name": "userID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "UserDto"
+   },
+   "responses": {
+    "200": "UserDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/users/{userID}/raInvite",
+   "parameters": [
+    {
+     "name": "userID",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/voip",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "Voip"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/weather",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "Weather"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/zwaveReconfigurationTasks",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "ZwaveConfigurationTaskDto"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/zwaveReconfigurationTasks",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "ZwaveDeviceConfigurationRequest"
+   },
+   "responses": {
+    "201": "ZwaveConfigurationTaskDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/zwaveReconfigurationTasks/reconfigureAll",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "ZwaveNetworkConfigurationRequest"
+   },
+   "responses": {
+    "201": "ZwaveConfigurationTaskDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "DELETE",
+   "path": "/zwaveReconfigurationTasks/{taskId}",
+   "parameters": [
+    {
+     "name": "taskId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/zwaveReconfigurationTasks/{taskId}",
+   "parameters": [
+    {
+     "name": "taskId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": null,
+   "responses": {
+    "200": "ZwaveConfigurationTaskDto"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/zwaveReconfigurationTasks/{taskId}",
+   "parameters": [
+    {
+     "name": "taskId",
+     "in": "path",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "requestBody": {
+    "required": true,
+    "schema": "ZwaveConfigurationTaskRequest"
+   },
+   "responses": {
+    "200": "ZwaveConfigurationTaskDto",
+    "400": null,
+    "404": null
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/zwaveSettings",
+   "parameters": [],
+   "requestBody": null,
+   "responses": {
+    "200": "ZwaveSettingsDto"
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/zwaveSettings",
+   "parameters": [],
+   "requestBody": {
+    "required": true,
+    "schema": "ZwaveSettingsRequest"
+   },
+   "responses": {
+    "200": null,
+    "400": null,
+    "404": null
+   }
+  }
+ ],
+ "schemas": {
+  "ColorDto": {
+   "type": "object",
+   "properties": {
+    "b": "integer",
+    "g": "integer",
+    "r": "integer",
+    "w": "integer"
+   }
+  },
+  "StepDto": {
+   "type": "object",
+   "properties": {
+    "color": "ColorDto",
+    "duration": "integer",
+    "transitionTime": "integer"
+   }
+  },
+  "ProgramDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string",
+    "totalDurationTime": "number",
+    "steps": "array<StepDto>"
+   }
+  },
+  "CreateProgramRequest": {
+   "type": "object",
+   "properties": {
+    "created": "integer",
+    "id": "integer",
+    "modified": "integer",
+    "name": "string",
+    "steps": "array<StepDto>",
+    "totalDurationTime": "integer"
+   }
+  },
+  "AlarmDeviceEntryDto": {
+   "type": "object",
+   "properties": {
+    "id": "number",
+    "name": "string"
+   }
+  },
+  "AlarmHistoryEntryDto": {
+   "type": "object",
+   "properties": {
+    "type": "string",
+    "partitionId": "number",
+    "userId": "number",
+    "deviceId": "number",
+    "timestamp": "number"
+   }
+  },
+  "NewPartitionDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "armDelay": "integer",
+    "breachDelay": "integer",
+    "devices": "array<integer>"
+   }
+  },
+  "AlarmPartitionDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string",
+    "armed": "boolean",
+    "breached": "boolean",
+    "armDelay": "number",
+    "breachDelay": "number",
+    "devices": "array<integer>",
+    "secondsToArm": "integer",
+    "lastActionAt": "integer"
+   }
+  },
+  "PartitionArmTryResult": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "result": "PartitionArmState",
+    "armTime": "integer",
+    "breachedDevices": "array<integer>"
+   }
+  },
+  "inline_response_201": {
+   "type": "object",
+   "properties": {
+    "id": "integer"
+   }
+  },
+  "Error": {
+   "type": "object",
+   "properties": {
+    "message": "string"
+   }
+  },
+  "CreateActionResponse": {
+   "type": "object",
+   "properties": {
+    "actionId": "integer",
+    "status": "ActionStatus"
+   }
+  },
+  "ActionStatusResponse": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "status": "ActionStatus",
+    "request": "object"
+   }
+  },
+  "Command": {
+   "type": "object",
+   "properties": {
+    "command": "string",
+    "commandClass": "string"
+   }
+  },
+  "AssociationGroupInfo": {
+   "type": "object",
+   "properties": {
+    "groupId": "GroupId",
+    "name": "string",
+    "profile": "string",
+    "multichannel": "boolean",
+    "maxTargets": "integer",
+    "commands": "array<Command>"
+   }
+  },
+  "EndpointAssociationGroupInfo": {
+   "type": "object",
+   "properties": {
+    "endpointId": "EndpointId",
+    "groups": "array<AssociationGroupInfo>"
+   }
+  },
+  "AssociationGroup": {
+   "type": "object",
+   "properties": {
+    "groupId": "GroupId",
+    "targets": "array<object>"
+   }
+  },
+  "EndpointAssociationGroups": {
+   "type": "object",
+   "properties": {
+    "endpointId": "EndpointId",
+    "groups": "array<AssociationGroup>"
+   }
+  },
+  "AssociationSetAction": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "groupId": "GroupId",
+    "endpointId": "EndpointId",
+    "targets": "array<object>"
+   }
+  },
+  "AssociationSetAllAction": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "endpoints": "array<EndpointAssociationGroups>"
+   }
+  },
+  "AssociationClearAllAction": {
+   "type": "object",
+   "properties": {
+    "name": "string"
+   }
+  },
+  "AssociationClearAction": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "groupId": "GroupId",
+    "endpointId": "EndpointId"
+   }
+  },
+  "AssociationAddAction": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "groupId": "GroupId",
+    "endpointId": "EndpointId",
+    "target": null
+   }
+  },
+  "AssociationRemoveAction": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "groupId": "GroupId",
+    "endpointId": "EndpointId",
+    "target": null
+   }
+  },
+  "CapabilitiesDto": {
+   "type": "object",
+   "properties": {
+    "version": "string",
+    "capabilities": "array<object>"
+   }
+  },
+  "CategoryDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string"
+   }
+  },
+  "Energy": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "totalEnergy": "number",
+    "current": "EnergyData",
+    "total": "EnergyData"
+   }
+  },
+  "EnergyData": {
+   "type": "object",
+   "properties": {
+    "H": "number",
+    "D": "number",
+    "W": "number",
+    "M": "number",
+    "Y": "number",
+    "costH": "number",
+    "costD": "number",
+    "costW": "number",
+    "costM": "number",
+    "costY": "number"
+   }
+  },
+  "Temperature": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "temperatureD": "number",
+    "temperatureH": "number",
+    "temperatureM": "number",
+    "temperatureW": "number"
+   }
+  },
+  "CoFromTo": {
+   "type": "object",
+   "properties": {
+    "timestamp": "number",
+    "value": "object",
+    "id": "number"
+   }
+  },
+  "SmokeFromTo": {
+   "type": "object",
+   "properties": {
+    "smoke": "array<array<number>>",
+    "temperature": "array<array<number>>",
+    "max": "number"
+   }
+  },
+  "ThermostatFromTo": {
+   "type": "object",
+   "properties": {
+    "targetLevel": "array<array<number>>",
+    "temperature": "array<array<number>>",
+    "thermostatMode": "array<array<object>>",
+    "min": "number",
+    "max": "number"
+   }
+  },
+  "DebugMessagesDto": {
+   "type": "object",
+   "properties": {
+    "nextLast": "number",
+    "messages": "array<DebugMessageDto>"
+   }
+  },
+  "DebugMessageDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "timestamp": "integer",
+    "type": "string",
+    "tag": "string",
+    "message": "string"
+   }
+  },
+  "NotificationsSettings": {
+   "type": "object",
+   "properties": {
+    "type": "NotificationType",
+    "active": "boolean",
+    "label": "string",
+    "interval": "object",
+    "channels": "array<ChannelType>",
+    "supportedChannels": "array<ChannelType>",
+    "users": "array<integer>",
+    "supportedInterval": "array<IntervalType>",
+    "category": "string"
+   }
+  },
+  "DeviceNotificationsSettings": {
+   "type": "object",
+   "properties": {
+    "deviceId": "integer",
+    "notifications": "array<NotificationsSettings>"
+   }
+  },
+  "Icon": {
+   "type": "object",
+   "properties": {
+    "path": "string",
+    "source": "string",
+    "overlay": "string"
+   }
+  },
+  "BlackBoxDto": {
+   "type": "object",
+   "properties": {
+    "fileName": "string",
+    "state": "string",
+    "timestamp": "number"
+   }
+  },
+  "DeviceListFiltersDto": {
+   "type": "object",
+   "properties": {
+    "filters": "array<DeviceListFilterDto>",
+    "attributes": "object"
+   }
+  },
+  "DeviceListFilterDto": {
+   "type": "object",
+   "properties": {
+    "filter": "string",
+    "value": "array<object>"
+   }
+  },
+  "DevicesInterfacesDto": {
+   "type": "object",
+   "properties": {
+    "devicesId": "array<integer>",
+    "interfaces": "array<string>"
+   }
+  },
+  "DeviceAvailableSceneDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "sceneId": "number"
+   }
+  },
+  "DevicePropertiesDto": {
+   "type": "object",
+   "properties": {
+    "alarmLevel": "integer",
+    "alarmType": "integer",
+    "armed": "boolean",
+    "autoOffChannel1": "number",
+    "autoOffChannel2": "number",
+    "zwaveResources": "array<ResourceTypeDto>",
+    "associationMode": "integer",
+    "availableDoorLockModes": "array<DoorLockMode>",
+    "availablePositions": "array<AvailablePosition>",
+    "availableScenes": "array<DeviceAvailableSceneDto>",
+    "batteryLevel": "integer",
+    "batteryLowNotification": "boolean",
+    "blackBox": "BlackBoxDto",
+    "buttonHold": "integer",
+    "buttonsType": "ButtonType",
+    "currentHumidity": "integer",
+    "showFreezeAlarm": "boolean",
+    "showFireAlarm": "boolean",
+    "buttonType": null,
+    "configurationSourceDeviceId": "number",
+    "motorInversion": "boolean",
+    "restoreStateAfterPowerShortage": "boolean",
+    "voltageMeasurementReport": "integer",
+    "steeringInversion": "boolean",
+    "movingUpTime": "integer",
+    "movingDownTime": "integer",
+    "slatsRotationTime": "integer",
+    "virtualBottomLimit": "integer",
+    "cameraType": "integer",
+    "categories": "array<string>",
+    "calibrationVariants": "array<string>",
+    "calibrated": "boolean",
+    "centralSceneSupport": "array<CentralScene>",
+    "channel1": "string",
+    "channel2": "string",
+    "channel3": "string",
+    "channel4": "string",
+    "climateZoneHash": "string",
+    "climateZoneId": "integer",
+    "configured": "boolean",
+    "dead": "boolean",
+    "position": "string",
+    "port": "number",
+    "strategy": "string",
+    "deadReason": "string",
+    "defInterval": "integer",
+    "defaultPartyTime": "integer",
+    "defaultTone": "integer",
+    "defaultWateringTime": "integer",
+    "deviceControlType": "integer",
+    "deviceRole": "DeviceRole",
+    "deviceState": "string",
+    "supportedDeviceRoles": "array<DeviceRole>",
+    "deviceGroup": "array<integer>",
+    "raStatus": "string",
+    "deviceGroupMaster": "integer",
+    "deviceIcon": "integer",
+    "devices": "array<integer>",
+    "devicesInitializationProcess": "string",
+    "DeviceUID": "string",
+    "displayOnMainPage": "integer",
+    "doorLockMode": "DoorLockMode",
+    "emailNotificationID": "integer",
+    "emailNotificationType": "integer",
+    "endPointId": "integer",
+    "externalSensorConnected": "boolean",
+    "favoritePositionsNativeSupport": "boolean",
+    "favoritePositions": "array<FavoritePositions>",
+    "fgrgbwMode": "string",
+    "fidUuid": "string",
+    "fidLastSynchronizationTimestamp": "integer",
+    "fidRole": "string",
+    "firmwareUpdate": "DeviceFirmwareUpdateDto",
+    "gatewayId": "string",
+    "humidityThreshold": "integer",
+    "httpsEnabled": "boolean",
+    "icon": "Icon",
+    "includeInEnergyPanel": "boolean",
+    "inputToChannelMap": "DeviceInputToChannelMapDto",
+    "ip": "string",
+    "isLight": "boolean",
+    "jpgPath": "string",
+    "lastBreached": "number",
+    "lastHealthy": "number",
+    "lastLoggedUser": "number",
+    "lastModerate": "number",
+    "liliOffCommand": "string",
+    "liliOnCommand": "string",
+    "linkedDeviceType": "string",
+    "localProtectionEnabledChannel1": "boolean",
+    "localProtectionEnabledChannel2": "boolean",
+    "localProtectionState": "integer",
+    "localProtectionSupport": "integer",
+    "log": "string",
+    "logTemp": "string",
+    "manufacturer": "string",
+    "markAsDead": "boolean",
+    "maxInterval": "integer",
+    "maxUsers": "integer",
+    "maxValue": "integer",
+    "maxVoltage": "integer",
+    "minInterval": "integer",
+    "minValue": "integer",
+    "minVoltage": "integer",
+    "mjpgPath": "string",
+    "mode": "number",
+    "model": "string",
+    "moveDownPath": "string",
+    "moveLeftPath": "string",
+    "moveRightPath": "string",
+    "moveStopPath": "string",
+    "moveUpPath": "string",
+    "networkStatus": "string",
+    "niceId": "integer",
+    "niceProtocol": "string",
+    "nodeId": "integer",
+    "numberOfSupportedButtons": "integer",
+    "offset": "string",
+    "overridesSchedule": "boolean",
+    "output1Id": "number",
+    "output2Id": "number",
+    "outputsChannelsConnected": "boolean",
+    "panicMode": "boolean",
+    "parameters": "array<DevicePropertiesDto_parameters>",
+    "parametersTemplate": "number",
+    "password": "string",
+    "pendingActions": "boolean",
+    "pollingDeadDevice": "boolean",
+    "pollingInterval": "number",
+    "pollingTimeSec": "string",
+    "power": "number",
+    "productInfo": "string",
+    "protectionExclusiveControl": "number",
+    "protectionExclusiveControlSupport": "number",
+    "protectionState": "number",
+    "protectionTimeout": "number",
+    "protectionTimeoutSupport": "boolean",
+    "pushNotificationID": "integer",
+    "pushNotificationType": "number",
+    "rateType": "RateType",
+    "refreshTime": "integer",
+    "remoteId": "integer",
+    "remoteGatewayId": "integer",
+    "RFProtectionEnabledChannel1": "boolean",
+    "RFProtectionEnabledChannel2": "boolean",
+    "RFProtectionState": "integer",
+    "RFProtectionSupport": "integer",
+    "rtspPath": "string",
+    "rtspPort": "integer",
+    "saveLogs": "boolean",
+    "slatsRange": "integer",
+    "slatsRangeMin": "integer",
+    "slatsRangeMax": "integer",
+    "storeEnergyData": "boolean",
+    "saveToEnergyPanel": "boolean",
+    "schedules": "array<object>",
+    "securityLevel": "string",
+    "securitySchemes": "array<string>",
+    "sendStopAfterMove": "boolean",
+    "serialNumber": "string",
+    "showEnergy": "boolean",
+    "state": null,
+    "energy": "number",
+    "sipUserPassword": "string",
+    "sipDisplayName": "string",
+    "sipUserID": "string",
+    "sipUserEnabled": "boolean",
+    "smsNotificationID": "integer",
+    "smsNotificationType": "number",
+    "softwareVersion": "string",
+    "stepInterval": "number",
+    "supportedThermostatFanModes": "array<string>",
+    "supportedThermostatModes": "array<string>",
+    "supportedTones": "array<object>",
+    "tamperMode": "string",
+    "targetLevel": "number",
+    "targetLevelDry": "number",
+    "targetLevelHumidify": "number",
+    "targetLevelMax": "number",
+    "targetLevelMin": "number",
+    "targetLevelStep": "number",
+    "targetLevelTimestamp": "number",
+    "thermostatFanMode": "string",
+    "thermostatFanOff": "boolean",
+    "thermostatFanState": "string",
+    "thermostatMode": "string",
+    "thermostatModeFuture": "string",
+    "thermostatOperatingState": "string",
+    "thermostatModeManufacturerData": "array<integer>",
+    "thermostatState": "string",
+    "powerConsumption": "number",
+    "timestamp": "integer",
+    "tone": "integer",
+    "unit": "string",
+    "updateVersion": "string",
+    "useTemplate": "boolean",
+    "userCodes": "array<UserCodeDto>",
+    "userDescription": "string",
+    "username": "string",
+    "wakeUpTime": "number",
+    "zwaveCompany": "string",
+    "zwaveInfo": "string",
+    "zwaveScheduleClimatePanelCompatibileBlocks": "array<object>",
+    "zwaveVersion": "string",
+    "value": null,
+    "viewLayout": "object",
+    "volume": "integer",
+    "mainFunction": "string",
+    "uiCallbacks": "array<object>",
+    "quickAppVariables": "array<object>",
+    "colorComponents": "object",
+    "walliOperatingMode": "string",
+    "ringUpperColor": "string",
+    "ringBottomColor": "string",
+    "ringBrightness": "number",
+    "ringLightMode": "string",
+    "ringConfirmingTime": "number",
+    "encrypted": "boolean",
+    "useUiView": "boolean",
+    "uiView": "object",
+    "Humidity": "number",
+    "Pressure": "number",
+    "Temperature": "number",
+    "Wind": "number",
+    "ConditionCode": "number",
+    "WeatherCondition": "string"
+   }
+  },
+  "DeviceActionArgumentsDto": {
+   "type": "object",
+   "properties": {
+    "args": "array<object>",
+    "delay": "number",
+    "integrationPin": "string"
+   }
+  },
+  "ResourceTypeDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "type": "number",
+    "scales": "array<number>",
+    "rateType": "number"
+   }
+  },
+  "DeviceInputToChannelMapDto": {
+   "type": "object",
+   "properties": {
+    "close": "array<number>",
+    "open": "array<number>",
+    "partialOpen1": "array<number>",
+    "step": "array<number>",
+    "stop": "array<number>",
+    "toggleCh1": "array<number>",
+    "toggleCh2": "array<number>",
+    "turnOffCh1": "array<number>",
+    "turnOffCh2": "array<number>",
+    "turnOnCh1": "array<number>",
+    "turnOnCh2": "array<number>",
+    "unsupported": "array<number>"
+   }
+  },
+  "PluginCreateDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "type": "string",
+    "roomID": "integer",
+    "properties": "DevicePropertiesDto"
+   }
+  },
+  "DeviceDto": {
+   "type": "object",
+   "properties": {
+    "actions": "object",
+    "baseType": "string",
+    "configXml": "boolean",
+    "created": "integer",
+    "enabled": "boolean",
+    "hasUIView": "boolean",
+    "id": "integer",
+    "interfaces": "array<string>",
+    "isPlugin": "boolean",
+    "modified": "integer",
+    "name": "string",
+    "parentId": "number",
+    "properties": "DevicePropertiesDto",
+    "roomID": "integer",
+    "sortOrder": "integer",
+    "type": "string",
+    "viewXml": "boolean",
+    "view": "array<ViewConfig>",
+    "visible": "boolean"
+   }
+  },
+  "DeviceInfoDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string",
+    "classification": "DeviceClassificationDto",
+    "roomId": "integer",
+    "type": "string",
+    "properties": "array<DeviceInfoPropertyDto>",
+    "role": "string",
+    "actions": "array<DeviceInfoPropertyDto>",
+    "events": "array<object>"
+   }
+  },
+  "DeviceInfoPropertyDto": {
+   "type": "object",
+   "properties": {
+    "name": null,
+    "type": "string",
+    "conditionType": "array<object>",
+    "operator": "string",
+    "picker": "string",
+    "label": "string",
+    "unitPath": "string",
+    "unit": "string",
+    "min": "number",
+    "max": "number",
+    "step": "number",
+    "args": "array<DeviceInfoPropertyDto>",
+    "enumValues": "DeviceInfoPropertyEnumValuesDto",
+    "valueMapping": "array<ValueMappingDto>",
+    "isUIAction": "boolean",
+    "definedValues": "array<DeviceInfoPropertyDefinedValue>",
+    "description": "string",
+    "colorComponents": "DeviceInfoPropertyColorComponents"
+   }
+  },
+  "DeviceInfoPropertyEnumValuesDto": {
+   "type": "object",
+   "properties": {
+    "items": "array<object>",
+    "type": "string",
+    "key": "string"
+   }
+  },
+  "ValueMappingDto": {
+   "type": "object",
+   "properties": {
+    "value": "boolean",
+    "label": "string"
+   }
+  },
+  "DeviceFirmwareUpdateDto": {
+   "type": "object",
+   "properties": {
+    "info": "string",
+    "progress": "integer",
+    "status": "string",
+    "updateVersion": "string"
+   }
+  },
+  "GroupActionArguments": {
+   "type": "object",
+   "properties": {
+    "args": "array<object>",
+    "filters": "array<object>",
+    "integrationPin": "string"
+   }
+  },
+  "CentralScene": {
+   "type": "object",
+   "properties": {
+    "keyAttributes": "array<KeyAttribute>",
+    "keyId": "number"
+   }
+  },
+  "NewDevice": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "properties": "DevicePropertiesDto",
+    "type": "string"
+   }
+  },
+  "DevicePropertiesDto_parameters": {
+   "type": "object",
+   "properties": {
+    "lastReportedValue": "number",
+    "size": "number",
+    "lastSetValue": "number",
+    "id": "number",
+    "value": "number",
+    "readyOnly": "boolean",
+    "setDefault": "boolean"
+   }
+  },
+  "UserCodeDto": {
+   "type": "object",
+   "properties": {
+    "id": "number",
+    "name": "string",
+    "status": "string",
+    "update": "string"
+   }
+  },
+  "ViewConfig": {
+   "type": "object",
+   "properties": {
+    "type": "string",
+    "assetsPath": "string",
+    "translatesPath": "string",
+    "name": "string"
+   }
+  },
+  "FavoritePositions": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "label": "string",
+    "value": "number",
+    "slatsAngle": "number"
+   }
+  },
+  "AvailablePosition": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "label": "string"
+   }
+  },
+  "DeviceTypeHierarchy": {
+   "type": "object",
+   "properties": {
+    "type": "string",
+    "children": "array<object>"
+   }
+  },
+  "DeviceInfoPropertyDefinedValue": {
+   "type": "object",
+   "properties": {
+    "unit": "string",
+    "values": "array<object>"
+   }
+  },
+  "DeviceInfoPropertyDefinedColorComponent": {
+   "type": "object",
+   "properties": {
+    "brightness": "number",
+    "color": "string",
+    "colorComponents": "object",
+    "label": "string"
+   }
+  },
+  "DeviceInfoPropertyColorComponents": {
+   "type": "object",
+   "properties": {
+    "blue": "DeviceInfoPropertyColorComponentsComponent",
+    "green": "DeviceInfoPropertyColorComponentsComponent",
+    "red": "DeviceInfoPropertyColorComponentsComponent",
+    "warmWhite": "DeviceInfoPropertyColorComponentsComponent",
+    "coldWhite": "DeviceInfoPropertyColorComponentsComponent",
+    "amber": "DeviceInfoPropertyColorComponentsComponent",
+    "cyan": "DeviceInfoPropertyColorComponentsComponent",
+    "purple": "DeviceInfoPropertyColorComponentsComponent"
+   }
+  },
+  "DeviceInfoPropertyColorComponentsComponent": {
+   "type": "object",
+   "properties": {
+    "label": "string",
+    "min": "number",
+    "max": "number"
+   }
+  },
+  "CpuLoad": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "idle": "number",
+    "nice": "number",
+    "system": "number",
+    "user": "number"
+   }
+  },
+  "Memory": {
+   "type": "object",
+   "properties": {
+    "buffers": "integer",
+    "cache": "integer",
+    "free": "integer",
+    "used": "integer"
+   }
+  },
+  "Storage": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "used": "integer"
+   }
+  },
+  "Diagnostic": {
+   "type": "object",
+   "properties": {
+    "cpuLoad": "array<CpuLoad>",
+    "memory": "Memory",
+    "storage": "Diagnostic_storage"
+   }
+  },
+  "Diagnostic_storage": {
+   "type": "object",
+   "properties": {
+    "internal": "array<Storage>"
+   }
+  },
+  "DiagnosticTransmissions": {
+   "type": "object",
+   "properties": {
+    "items": "array<DiagnosticTransmissionsItem>",
+    "since": "number",
+    "until": "number"
+   }
+  },
+  "DiagnosticTransmissionsItem": {
+   "type": "object",
+   "properties": {
+    "incomingFailedCrc": "number",
+    "incomingFailedDecryption": "number",
+    "incomingNonceGet": "number",
+    "incomingNonceReport": "number",
+    "incomingTimedOutNonce": "number",
+    "incomingTotal": "number",
+    "nodeId": "number",
+    "outgoingFailed": "number",
+    "outgoingNonceGet": "number",
+    "outgoingTotal": "number"
+   }
+  },
+  "EnergyDeviceInfo": {
+   "type": "object",
+   "properties": {
+    "id": "number",
+    "deleted": "boolean",
+    "roomId": "number",
+    "mainEnergyMeter": "boolean"
+   }
+  },
+  "EnergyBillingPeriodDto": {
+   "type": "object",
+   "properties": {
+    "duration": "BillingDurationEnum",
+    "startDate": "string",
+    "endDate": "string",
+    "fixedCost": "number"
+   }
+  },
+  "EnergyDeviceEntryDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string",
+    "roomId": "integer",
+    "consumption": "EnergyValueDto",
+    "production": "EnergyValueDto",
+    "consumptionCost": "EnergyCostDto",
+    "productionCost": "EnergyCostDto"
+   }
+  },
+  "EnergyRoomEntryDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "production": "EnergyValueDto",
+    "consumption": "EnergyValueDto",
+    "productionCost": "EnergyCostDto",
+    "consumptionCost": "EnergyCostDto"
+   }
+  },
+  "EnergyCategoryEntryDto": {
+   "type": "object",
+   "properties": {
+    "category": "string",
+    "production": "EnergyValueDto",
+    "consumption": "EnergyValueDto",
+    "productionCost": "EnergyCostDto",
+    "consumptionCost": "EnergyCostDto"
+   }
+  },
+  "EnergySummaryDto": {
+   "type": "object",
+   "properties": {
+    "production": "EnergyValueDto",
+    "consumption": "EnergyValueDto",
+    "productionCost": "EnergyCostDto",
+    "consumptionCost": "EnergyCostDto",
+    "topConsumingDevices": "array<EnergyDeviceEntryDto>"
+   }
+  },
+  "EnergyMetricsDto": {
+   "type": "object",
+   "properties": {
+    "productionPower": "PowerValueDto",
+    "consumptionPower": "PowerValueDto"
+   }
+  },
+  "EnergyDetailDto": {
+   "type": "object",
+   "properties": {
+    "energy": "array<object>"
+   }
+  },
+  "EnergyRoomDetailDto": {
+   "type": "object",
+   "properties": {
+    "energy": "array<object>"
+   }
+  },
+  "EnergyDeviceDetailDto": {
+   "type": "object",
+   "properties": {
+    "energy": "array<object>"
+   }
+  },
+  "EnergyBillingSummaryTypesDto": {
+   "type": "object",
+   "properties": {
+    "currentBillingPeriod": "EnergyBillingSummaryDto",
+    "previousBillingPeriod": "EnergyBillingSummaryDto"
+   }
+  },
+  "EnergyBillingSummaryDto": {
+   "type": "object",
+   "properties": {
+    "startDate": "DateTimeUnitDto",
+    "endDate": "DateTimeUnitDto",
+    "productionCost": "number",
+    "consumptionCost": "number",
+    "production": "EnergyValueDto",
+    "consumption": "EnergyValueDto"
+   }
+  },
+  "InstallationCostDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "date": "string",
+    "cost": "number",
+    "name": "string"
+   }
+  },
+  "EnergyAdditionalTariffDto": {
+   "type": "object",
+   "properties": {
+    "rate": "number",
+    "name": "string",
+    "startTime": "string",
+    "endTime": "string",
+    "days": "array<DayEnum>"
+   }
+  },
+  "EnergyTariffDto": {
+   "type": "object",
+   "properties": {
+    "rate": "number",
+    "name": "string",
+    "returnRate": "number",
+    "additionalTariffs": "array<EnergyAdditionalTariffDto>"
+   }
+  },
+  "SavingsDetailsDto": {
+   "type": "object",
+   "properties": {
+    "periodStart": "DateTimeUnitDto",
+    "periodEnd": "DateTimeUnitDto",
+    "production": "EnergyValueDto",
+    "consumption": "EnergyValueDto",
+    "productionCost": "EnergyCostDto",
+    "consumptionCost": "EnergyCostDto",
+    "devices": "array<EnergyDeviceEntryDto>"
+   }
+  },
+  "SavingsSummaryDto": {
+   "type": "object",
+   "properties": {
+    "hasProduction": "boolean",
+    "installationCost": "number",
+    "averageReturn": "number",
+    "averageReturnPeriod": "BillingDurationEnum",
+    "alreadyReturned": "number",
+    "currentPeriodCost": "number",
+    "averageCost": "number",
+    "averageCostPeriod": "BillingDurationEnum",
+    "currentYearCost": "number"
+   }
+  },
+  "SavingsInstallationDto": {
+   "type": "object",
+   "properties": {
+    "period": "DateTimeUnitDto",
+    "production": "EnergyValueDto",
+    "productionCost": "EnergyCostDto"
+   }
+  },
+  "EcologySummaryDto": {
+   "type": "object",
+   "properties": {
+    "productionStart": "string",
+    "selfSufficiency": "number",
+    "treesPlanted": "number",
+    "reductionCO2": "number"
+   }
+  },
+  "EcologyDetailsDto": {
+   "type": "object",
+   "properties": {
+    "periodStart": "DateTimeUnitDto",
+    "periodEnd": "DateTimeUnitDto",
+    "treesPlanted": "number",
+    "reductionCO2": "number"
+   }
+  },
+  "EnergySettingsDto": {
+   "type": "object",
+   "properties": {
+    "consumptionMeasurement": "ConsumptionMeasurementEnum",
+    "energyConsumptionMeters": "array<number>",
+    "energyProductionMeters": "array<number>",
+    "powerConsumptionMeters": "array<number>",
+    "powerProductionMeters": "array<number>",
+    "gridConsumptionMeters": "array<number>",
+    "gridProductionMeters": "array<number>",
+    "gridPowerConsumptionMeters": "array<number>",
+    "gridPowerProductionMeters": "array<number>"
+   }
+  },
+  "EventDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "sourceType": "SourceType",
+    "sourceId": "integer",
+    "timestamp": "integer",
+    "type": "string",
+    "data": "object",
+    "objects": "array<object>"
+   }
+  },
+  "body": {
+   "type": "object",
+   "properties": {
+    "deviceId": "integer",
+    "userId": "integer",
+    "locationId": "integer",
+    "geofenceAction": "string",
+    "timestamp": "integer"
+   }
+  },
+  "FavoriteColor": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "r": "integer",
+    "g": "integer",
+    "b": "integer",
+    "w": "integer",
+    "brightness": "integer",
+    "created": "integer",
+    "modified": "integer"
+   }
+  },
+  "NewFavoriteColor": {
+   "type": "object",
+   "properties": {
+    "r": "integer",
+    "g": "integer",
+    "b": "integer",
+    "w": "integer",
+    "brightness": "integer"
+   }
+  },
+  "FavoriteColorV2": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "colorComponents": "object",
+    "brightness": "integer",
+    "created": "integer",
+    "modified": "integer"
+   }
+  },
+  "NewFavoriteColorV2": {
+   "type": "object",
+   "properties": {
+    "colorComponents": "object",
+    "brightness": "integer"
+   }
+  },
+  "DeviceParametersDto": {
+   "type": "object",
+   "properties": {
+    "description": "string",
+    "id": "integer",
+    "parameters": "array<object>"
+   }
+  },
+  "FTIDto": {
+   "type": "object",
+   "properties": {
+    "currentStep": "FTIStepEnum",
+    "availableSteps": "array<FTIStepDto>",
+    "finished": "boolean"
+   }
+  },
+  "FTIStepDto": {
+   "type": "object",
+   "properties": {
+    "name": "FTIStepEnum"
+   }
+  },
+  "GatewayDiscoveredData": {
+   "type": "object",
+   "properties": {
+    "serial": "string",
+    "ip": "string"
+   }
+  },
+  "GatewayDiscoveredIP": {
+   "type": "object",
+   "properties": {
+    "ip": "string"
+   }
+  },
+  "GatewayFilterMapResult": {
+   "type": "object",
+   "properties": {
+    "ip": "string",
+    "mac": "string",
+    "serialNumber": "string",
+    "version": "string",
+    "slaveReady": "boolean",
+    "zwaveEngineVersion": "ZwaveEngineVersion"
+   }
+  },
+  "GatewaySlave": {
+   "type": "object",
+   "properties": {
+    "serial": "string",
+    "id": "string",
+    "mac": "string",
+    "ip": "string",
+    "version": "string",
+    "zwaveEngineVersion": "ZwaveEngineVersion",
+    "online": "boolean"
+   }
+  },
+  "GatewayNewSlave": {
+   "type": "object",
+   "properties": {
+    "serial": "string",
+    "login": "string",
+    "password": "string",
+    "ip": "string"
+   }
+  },
+  "GatewayRole": {
+   "type": "object",
+   "properties": {
+    "role": "string"
+   }
+  },
+  "GatewayRequiredVersion": {
+   "type": "object",
+   "properties": {
+    "requiredVersion": "string"
+   }
+  },
+  "GatewaySlavePassword": {
+   "type": "object",
+   "properties": {
+    "password": "string",
+    "login": "string"
+   }
+  },
+  "GatewaySlaveId": {
+   "type": "object",
+   "properties": {
+    "password": "string"
+   }
+  },
+  "Response409": {
+   "type": "object",
+   "properties": {
+    "message": "string",
+    "code": "string"
+   }
+  },
+  "GetZwaveEngineDto": {
+   "type": "object",
+   "properties": {
+    "version": "ZwaveEngineVersion",
+    "status": "string"
+   }
+  },
+  "HomeDto": {
+   "type": "object",
+   "properties": {
+    "timestamp": "number",
+    "defaultSensors": "HomeDto_defaultSensors",
+    "meters": "HomeDto_meters",
+    "notificationClient": "HomeDto_notificationClient",
+    "hcName": "string",
+    "weatherProvider": "number",
+    "currency": "string",
+    "fireAlarmTemperature": "number",
+    "freezeAlarmTemperature": "number",
+    "timeFormat": "number",
+    "dateFormat": "string",
+    "firstRunAfterUpdate": "boolean"
+   }
+  },
+  "HomeDto_defaultSensors": {
+   "type": "object",
+   "properties": {
+    "light": "number",
+    "temperature": "number",
+    "humidity": "number"
+   }
+  },
+  "HomeDto_meters": {
+   "type": "object",
+   "properties": {
+    "energy": "array<number>"
+   }
+  },
+  "HomeDto_notificationClient": {
+   "type": "object",
+   "properties": {
+    "marketingNotificationAllowed": "boolean"
+   }
+  },
+  "DeviceIconDto": {
+   "type": "object",
+   "properties": {
+    "deviceType": "string",
+    "iconSetName": "string",
+    "id": "integer",
+    "fileExtension": "string"
+   }
+  },
+  "RoomIconDto": {
+   "type": "object",
+   "properties": {
+    "iconName": "string",
+    "id": "integer",
+    "fileExtension": "string"
+   }
+  },
+  "SceneIconDto": {
+   "type": "object",
+   "properties": {
+    "iconName": "string",
+    "id": "integer",
+    "fileExtension": "string"
+   }
+  },
+  "CreatedIconDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "iconSetName": "string"
+   }
+  },
+  "IconListDto": {
+   "type": "object",
+   "properties": {
+    "device": "array<DeviceIconDto>",
+    "room": "array<RoomIconDto>",
+    "scene": "array<SceneIconDto>"
+   }
+  },
+  "Installer": {
+   "type": "object",
+   "properties": {
+    "email": "string",
+    "firstName": "string",
+    "lastName": "string",
+    "isCertified": "boolean",
+    "isSynchronized": "boolean",
+    "remoteAccess": "boolean",
+    "monitoring": "boolean",
+    "remainingTime": "integer"
+   }
+  },
+  "InstallerCreateRequest": {
+   "type": "object",
+   "properties": {
+    "email": "string",
+    "remoteAccess": "boolean"
+   }
+  },
+  "InstallerPutRequest": {
+   "type": "object",
+   "properties": {
+    "remoteAccess": "boolean",
+    "monitoring": "boolean"
+   }
+  },
+  "InstallerMonitoringRequest": {
+   "type": "object",
+   "properties": {
+    "email": "string",
+    "firstName": "string",
+    "lastName": "string"
+   }
+  },
+  "MobileDevicesToNotify": {
+   "type": "object",
+   "properties": {
+    "mobileDevicesToNotify": "array<integer>"
+   }
+  },
+  "iOSDev": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string",
+    "push": "boolean",
+    "udid": "string"
+   }
+  },
+  "Limits": {
+   "type": "object",
+   "properties": {
+    "scenesLimit": "integer",
+    "scenesUsed": "integer",
+    "pluginsLimit": "integer",
+    "pluginsUsed": "integer",
+    "quickAppsLimit": "integer",
+    "quickAppsUsed": "integer",
+    "zwaveDevicesLimit": "integer",
+    "zwaveDevicesUsed": "integer",
+    "niceDevicesLimit": "integer",
+    "niceDevicesUsed": "integer",
+    "ipCamerasLimit": "integer",
+    "ipCamerasUsed": "integer"
+   }
+  },
+  "LinkedDeviceProviderDtoSupportedLinksInputDevices": {
+   "type": "object",
+   "properties": {
+    "role": "string",
+    "minCount": "integer",
+    "maxCount": "integer",
+    "availableDevices": "array<integer>"
+   }
+  },
+  "LinkedDeviceDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "provider": "string",
+    "type": "string",
+    "devicesVisibility": "boolean",
+    "devices": "array<object>"
+   }
+  },
+  "NewLinkedDeviceDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "provider": "string",
+    "type": "string",
+    "roomId": "integer",
+    "devicesVisibility": "boolean",
+    "devices": "array<object>",
+    "deviceType": "string",
+    "properties": "object"
+   }
+  },
+  "UpdateLinkedDeviceDto": {
+   "type": "object",
+   "properties": {
+    "devicesVisibility": "boolean",
+    "devices": "array<object>"
+   }
+  },
+  "LinkedDeviceProviderDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "supportedLinks": "array<object>"
+   }
+  },
+  "LinkedDeviceCreatedDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer"
+   }
+  },
+  "LinkedDeviceInputDeviceDto": {
+   "type": "object",
+   "properties": {
+    "deviceId": "integer",
+    "linkedDevicesId": "array<integer>"
+   }
+  },
+  "LoginStatus": {
+   "type": "object",
+   "properties": {
+    "status": "boolean",
+    "type": "string",
+    "userID": "integer",
+    "username": "string",
+    "role": "string",
+    "analyticsUserIdHash": "string",
+    "skin": "string",
+    "skinSetting": "string",
+    "isAddTileVisible": "boolean",
+    "buiSettings": "object",
+    "rights": "UserDtoRights"
+   }
+  },
+  "LogoutStatus": {
+   "type": "object",
+   "properties": {
+    "status": "boolean",
+    "retryNumber": "integer",
+    "limit": "integer",
+    "timeLeft": "integer"
+   }
+  },
+  "CreatePushRequest": {
+   "type": "object",
+   "properties": {
+    "mobileDevices": "array<integer>",
+    "title": "string",
+    "message": "string",
+    "category": "string",
+    "service": "string",
+    "action": "string",
+    "data": null
+   }
+  },
+  "DeviceNetworkDataDto": {
+   "type": "object",
+   "properties": {
+    "ip": "string",
+    "mac": "string",
+    "vendor": "string"
+   }
+  },
+  "NetworkDiscoveryDto": {
+   "type": "object",
+   "properties": {
+    "mac": "array<string>"
+   }
+  },
+  "NotificationCenterDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "priority": "string",
+    "wasRead": "boolean",
+    "canBeDeleted": "boolean",
+    "type": "string",
+    "created": "integer",
+    "data": "NotificationCenterDataDto"
+   }
+  },
+  "NotificationCenterRequestDto": {
+   "type": "object",
+   "properties": {
+    "priority": "string",
+    "wasRead": "boolean",
+    "canBeDeleted": "boolean",
+    "type": "string",
+    "data": "NotificationCenterDataDto"
+   }
+  },
+  "NotificationCenterDataDto": {
+   "type": "object",
+   "properties": {
+    "deviceId": "integer",
+    "sceneId": "integer",
+    "taskId": "integer",
+    "title": "string",
+    "text": "string",
+    "name": "string",
+    "subType": "string",
+    "status": "string",
+    "url": "string",
+    "urlText": "string",
+    "info": "string",
+    "progress": "integer",
+    "icon": "NotificationCenterDataIconDto"
+   }
+  },
+  "NotificationCenterDataIconDto": {
+   "type": "object",
+   "properties": {
+    "path": "string",
+    "source": "string"
+   }
+  },
+  "StartUpgradeDto": {
+   "type": "object",
+   "properties": {
+    "status": "string"
+   }
+  },
+  "AbortUpgradeDto": {
+   "type": "object",
+   "properties": {
+    "status": "string"
+   }
+  },
+  "CheckUpgradeAvailabilityDto": {
+   "type": "object",
+   "properties": {
+    "status": "string"
+   }
+  },
+  "GetChangelogDto": {
+   "type": "object",
+   "properties": {
+    "changelog": "array<string>",
+    "devId": "number",
+    "status": "string",
+    "warnings": "array<string>"
+   }
+  },
+  "StartUpgrade": {
+   "type": "object",
+   "properties": {
+    "args": "array<number>"
+   }
+  },
+  "AbortUpgrade": {
+   "type": "object",
+   "properties": {
+    "args": "array<number>"
+   }
+  },
+  "CheckUpgradeAvailability": {
+   "type": "object",
+   "properties": {
+    "args": "array<number>"
+   }
+  },
+  "GetChangelog": {
+   "type": "object",
+   "properties": {
+    "args": "array<number>"
+   }
+  },
+  "ClimateSetpoint": {
+   "type": "object",
+   "properties": {
+    "hour": "integer",
+    "minute": "integer",
+    "temperatureHeating": "number",
+    "temperatureCooling": "number"
+   }
+  },
+  "ClimateScheduleDay": {
+   "type": "object",
+   "properties": {
+    "morning": "ClimateSetpoint",
+    "day": "ClimateSetpoint",
+    "evening": "ClimateSetpoint",
+    "night": "ClimateSetpoint"
+   }
+  },
+  "BasicProperties": {
+   "type": "object",
+   "properties": {
+    "mode": "Mode",
+    "handSetPointHeating": "number",
+    "handSetPointCooling": "number",
+    "handTimestamp": "integer",
+    "handMode": "Mode",
+    "vacationSetPointHeating": "number",
+    "vacationSetPointCooling": "number",
+    "vacationMode": "Mode",
+    "vacationStartTime": "number",
+    "vacationEndTime": "number",
+    "currentTemperature": "number",
+    "currentTemperatureHeating": "number",
+    "currentTemperatureCooling": "number",
+    "currentSetpointTimeStartHour": "number",
+    "currentSetpointTimeStartMinute": "number",
+    "currentSetpointTimeEndHour": "number",
+    "currentSetpointTimeEndMinute": "number"
+   }
+  },
+  "AdvancedProperties": {
+   "type": "object",
+   "properties": {
+    "mode": "Mode",
+    "monday": "ClimateScheduleDay",
+    "tuesday": "ClimateScheduleDay",
+    "wednesday": "ClimateScheduleDay",
+    "thursday": "ClimateScheduleDay",
+    "friday": "ClimateScheduleDay",
+    "saturday": "ClimateScheduleDay",
+    "sunday": "ClimateScheduleDay",
+    "handSetPointHeating": "number",
+    "handSetPointCooling": "number",
+    "handTimestamp": "integer",
+    "handMode": "Mode",
+    "vacationSetPointHeating": "number",
+    "vacationSetPointCooling": "number",
+    "vacationMode": "Mode",
+    "vacationStartTime": "number",
+    "vacationEndTime": "number",
+    "currentTemperatureHeating": "number",
+    "currentTemperatureCooling": "number",
+    "currentSetpointTimeStartHour": "number",
+    "currentSetpointTimeStartMinute": "number",
+    "currentSetpointTimeEndHour": "number",
+    "currentSetpointTimeEndMinute": "number",
+    "devices": "array<integer>",
+    "incompatibleDevices": "array<integer>",
+    "temperatureSensors": "array<integer>",
+    "calculationStrategy": "CalculationStrategy",
+    "currentTemperature": "number"
+   }
+  },
+  "BasicClimateZone": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string",
+    "active": "boolean",
+    "mode": "PanelMode",
+    "properties": "BasicProperties"
+   }
+  },
+  "AdvancedClimateZone": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string",
+    "active": "boolean",
+    "mode": "PanelMode",
+    "created": "integer",
+    "modified": "integer",
+    "properties": "AdvancedProperties"
+   }
+  },
+  "CustomEventDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "userDescription": "string"
+   }
+  },
+  "FamilyLocation": {
+   "type": "object",
+   "properties": {
+    "timestamp": "integer",
+    "latitude": "number",
+    "longitude": "number"
+   }
+  },
+  "GlobalVariableDto": {
+   "type": "object",
+   "properties": {
+    "enumValues": "array<string>",
+    "isEnum": "boolean",
+    "name": "string",
+    "readOnly": "boolean",
+    "value": "string"
+   }
+  },
+  "HumiditySetpoint": {
+   "type": "object",
+   "properties": {
+    "hour": "integer",
+    "minute": "integer",
+    "humidity": "number"
+   }
+  },
+  "HumidityScheduleDay": {
+   "type": "object",
+   "properties": {
+    "day": "HumiditySetpoint",
+    "evening": "HumiditySetpoint",
+    "morning": "HumiditySetpoint",
+    "night": "HumiditySetpoint"
+   }
+  },
+  "HumidityScheduleWeek": {
+   "type": "object",
+   "properties": {
+    "currentHumidity": "number",
+    "handHumidity": "number",
+    "handTimestamp": "integer",
+    "vacationHumidity": "number",
+    "rooms": "array<integer>",
+    "monday": "HumidityScheduleDay",
+    "tuesday": "HumidityScheduleDay",
+    "wednesday": "HumidityScheduleDay",
+    "thursday": "HumidityScheduleDay",
+    "friday": "HumidityScheduleDay",
+    "saturday": "HumidityScheduleDay",
+    "sunday": "HumidityScheduleDay"
+   }
+  },
+  "HumidityZone": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string",
+    "created": "integer",
+    "modified": "integer",
+    "properties": "HumidityScheduleWeek"
+   }
+  },
+  "inline_object": {
+   "type": "object",
+   "properties": {
+    "name": "string"
+   }
+  },
+  "Location": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string",
+    "address": "string",
+    "longitude": "number",
+    "latitude": "number",
+    "radius": "integer",
+    "home": "boolean",
+    "created": "integer",
+    "modified": "integer"
+   }
+  },
+  "LocationRequest": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "address": "string",
+    "longitude": "number",
+    "latitude": "number",
+    "radius": "integer"
+   }
+  },
+  "Notification": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string",
+    "sms": "string",
+    "email": "string",
+    "push": "string",
+    "created": "integer",
+    "modified": "integer"
+   }
+  },
+  "SprinklerZone": {
+   "type": "object",
+   "properties": {
+    "deviceId": "integer",
+    "duration": "integer"
+   }
+  },
+  "SprinklerSequenceRequest": {
+   "type": "object",
+   "properties": {
+    "startTime": "integer",
+    "sprinklers": "array<SprinklerZone>"
+   }
+  },
+  "SprinklerSequence": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "isRunning": "boolean",
+    "startTime": "integer",
+    "sprinklers": "array<SprinklerZone>"
+   }
+  },
+  "SprinklerSequenceStartWateringRequest": {
+   "type": "object",
+   "properties": {
+    "wateringTime": "integer"
+   }
+  },
+  "SprinklerSchedule": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string",
+    "isActive": "boolean",
+    "days": "Day",
+    "sequences": "array<SprinklerSequence>"
+   }
+  },
+  "SprinklerScheduleCreateRequest": {
+   "type": "object",
+   "properties": {
+    "name": "string"
+   }
+  },
+  "SprinklerScheduleRequest": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "days": "Day",
+    "sequences": "array<SprinklerSequenceRequest>",
+    "isActive": "boolean"
+   }
+  },
+  "Status": {
+   "type": "object",
+   "properties": {
+    "status": "string"
+   }
+  },
+  "PluginViewDto": {
+   "type": "object",
+   "properties": {
+    "$jason": "object"
+   }
+  },
+  "PluginBodyDto": {
+   "type": "object",
+   "properties": {
+    "sections": "PluginSectionsDto",
+    "header": "PluginHeaderDto"
+   }
+  },
+  "PluginHeaderDto": {
+   "type": "object",
+   "properties": {
+    "title": "string",
+    "style": "object"
+   }
+  },
+  "PluginSectionsDto": {
+   "type": "object",
+   "properties": {
+    "items": "array<object>"
+   }
+  },
+  "PluginButtonDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "text": "string",
+    "visible": "boolean",
+    "type": "string",
+    "style": "object",
+    "image": "string",
+    "classes": "array<string>",
+    "eventBinding": "object"
+   }
+  },
+  "PluginHorizontalLayoutDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "type": "string",
+    "components": "array<object>",
+    "style": "object"
+   }
+  },
+  "PluginImageDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "type": "string",
+    "url": "string",
+    "style": "object"
+   }
+  },
+  "PluginLabelDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "type": "string",
+    "text": "string",
+    "style": "object"
+   }
+  },
+  "PluginMultiSelectDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "type": "string",
+    "text": "string",
+    "selectionType": "string",
+    "style": "object",
+    "options": "array<PluginOptionDto>",
+    "values": "array<string>"
+   }
+  },
+  "PluginOptionDto": {
+   "type": "object",
+   "properties": {
+    "value": "string",
+    "type": "string",
+    "text": "string"
+   }
+  },
+  "PluginSingleSelectDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "type": "string",
+    "text": "string",
+    "selectionType": "string",
+    "style": "object",
+    "options": "array<PluginOptionDto>",
+    "values": "array<string>"
+   }
+  },
+  "PluginSliderDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "type": "string",
+    "max": "string",
+    "min": "string",
+    "step": "string",
+    "value": "string",
+    "style": "object"
+   }
+  },
+  "PluginSpaceDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "type": "string",
+    "style": "object"
+   }
+  },
+  "PluginSwitchDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "type": "string",
+    "value": "string",
+    "style": "object"
+   }
+  },
+  "PluginVerticalLayoutDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "type": "string",
+    "components": "array<object>",
+    "style": "object"
+   }
+  },
+  "PluginsTypesDto": {
+   "type": "object",
+   "properties": {
+    "installed": "InstalledPluginsDto",
+    "all": "object",
+    "promo": "array<object>"
+   }
+  },
+  "PluginUpdateDto": {
+   "type": "object",
+   "properties": {
+    "deviceId": "integer",
+    "componentName": "string",
+    "propertyName": "string",
+    "newValue": null
+   }
+  },
+  "PluginV2ElementDto": {
+   "type": "object",
+   "properties": {
+    "compatibility": "array<string>",
+    "defaultMainDeviceName": "string",
+    "description": "string",
+    "type": "string",
+    "url": "string",
+    "author": "string",
+    "version": "string",
+    "name": "string",
+    "manufacturer": "string",
+    "model": "string",
+    "category": "string",
+    "icon": "IconDto"
+   }
+  },
+  "IconDto": {
+   "type": "object",
+   "properties": {
+    "path": "string"
+   }
+  },
+  "PluginsDto": {
+   "type": "object",
+   "properties": {
+    "installed": "array<InstalledPluginElementDto>",
+    "all": "AllPluginsDto",
+    "promo": "array<PluginsPromoElementDto>"
+   }
+  },
+  "IPCameraDto": {
+   "type": "object",
+   "properties": {
+    "id": "string",
+    "manufacturer": "string",
+    "model": "string"
+   }
+  },
+  "InstalledPluginElementDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "predefined": "boolean"
+   }
+  },
+  "AllPluginsDto": {
+   "type": "object",
+   "properties": {
+    "types": "array<PluginByCategoryDto>"
+   }
+  },
+  "PluginByCategoryDto": {
+   "type": "object",
+   "properties": {
+    "category": "number",
+    "plugins": "array<PluginDto>",
+    "installed": "number"
+   }
+  },
+  "PluginDto": {
+   "type": "object",
+   "properties": {
+    "type": "string",
+    "name": "string",
+    "defaultMainDeviceName": "string",
+    "description": "string",
+    "user": "string",
+    "compatibility": "array<string>",
+    "predefined": "boolean",
+    "version": "string",
+    "url": "string",
+    "installed": "boolean"
+   }
+  },
+  "PluginsPromoElementDto": {
+   "type": "object",
+   "properties": {
+    "image": "PluginsPromoElementImageDto",
+    "predefined": "string"
+   }
+  },
+  "PluginsPromoElementImageDto": {
+   "type": "object",
+   "properties": {
+    "big": "string",
+    "small": "string"
+   }
+  },
+  "CreateChildDeviceDto": {
+   "type": "object",
+   "properties": {
+    "parentId": "integer",
+    "type": "string",
+    "name": "string",
+    "initialProperties": "object",
+    "initialInterfaces": "array<string>"
+   }
+  },
+  "UpdatePropertyDto": {
+   "type": "object",
+   "properties": {
+    "deviceId": "integer",
+    "propertyName": "string",
+    "value": null
+   }
+  },
+  "ZwaveNodeRemovedEventDto": {
+   "type": "object",
+   "properties": {
+    "type": "string",
+    "data": "object"
+   }
+  },
+  "CentralSceneEventDto": {
+   "type": "object",
+   "properties": {
+    "type": "string",
+    "source": "integer",
+    "data": "object"
+   }
+  },
+  "DeviceFirmwareUpdateEventDto": {
+   "type": "object",
+   "properties": {
+    "type": "string",
+    "source": "integer",
+    "data": "object"
+   }
+  },
+  "SceneActivationEventDto": {
+   "type": "object",
+   "properties": {
+    "type": "string",
+    "source": "integer",
+    "data": "object"
+   }
+  },
+  "ZwaveNetworkResetEventDto": {
+   "type": "object",
+   "properties": {
+    "type": "string"
+   }
+  },
+  "AccessControlEventDto": {
+   "type": "object",
+   "properties": {
+    "type": "string",
+    "source": "integer",
+    "data": "object"
+   }
+  },
+  "VideoGateIncomingCallEventDto": {
+   "type": "object",
+   "properties": {
+    "type": "string",
+    "data": "object"
+   }
+  },
+  "ZwaveDeviceParametersChangedEventDto": {
+   "type": "object",
+   "properties": {
+    "type": "string",
+    "source": "integer"
+   }
+  },
+  "GeofenceEventDto": {
+   "type": "object",
+   "properties": {
+    "type": "string",
+    "userId": "integer",
+    "deviceId": "integer",
+    "locationId": "integer",
+    "geofenceAction": "string",
+    "timestamp": "integer"
+   }
+  },
+  "PluginsInterfaceParamDto": {
+   "type": "object",
+   "properties": {
+    "action": "string",
+    "deviceId": "integer",
+    "interfaces": "array<string>"
+   }
+  },
+  "RestartPluginRequestDto": {
+   "type": "object",
+   "properties": {
+    "deviceId": "integer"
+   }
+  },
+  "RestartPluginResponseDto": {
+   "type": "object",
+   "properties": {
+    "status": "boolean"
+   }
+  },
+  "ProfileCreateDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "iconId": "integer",
+    "sourceId": "integer"
+   }
+  },
+  "ProfileServiceDto": {
+   "type": "object",
+   "properties": {
+    "activeProfile": "integer",
+    "profiles": "array<ProfileDto>"
+   }
+  },
+  "ProfileDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string",
+    "iconId": "integer",
+    "devices": "array<DeviceActorDto>",
+    "scenes": "array<SceneActorDto>",
+    "partitions": "array<PartitionActionDto>",
+    "climateZones": "array<ClimateZonesActionDto>"
+   }
+  },
+  "DeviceActorDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "action": "DeviceActionDto"
+   }
+  },
+  "SceneActorDto": {
+   "type": "object",
+   "properties": {
+    "sceneId": "integer",
+    "actions": "array<action>"
+   }
+  },
+  "PartitionActionDto": {
+   "type": "object",
+   "properties": {
+    "partitionId": "integer",
+    "action": "string"
+   }
+  },
+  "ClimateZonesActionDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "mode": "ClimateZonesActionMode",
+    "properties": "ClimateZonesActionProperties"
+   }
+  },
+  "ClimateZonesActionProperties": {
+   "type": "object",
+   "properties": {
+    "handSetPointHeating": "number",
+    "handSetPointCooling": "number",
+    "handMode": "ClimateZonesActionHandMode"
+   }
+  },
+  "PartitionActionUpdateDto": {
+   "type": "object",
+   "properties": {
+    "action": "string"
+   }
+  },
+  "ClimateZoneActionUpdateDto": {
+   "type": "object",
+   "properties": {
+    "mode": "ClimateZonesActionMode",
+    "properties": "ClimateZonesActionProperties"
+   }
+  },
+  "SceneActorUpdateDto": {
+   "type": "object",
+   "properties": {
+    "actions": "array<action>"
+   }
+  },
+  "DeviceActionDto": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "isUIAction": "boolean",
+    "args": "array<object>"
+   }
+  },
+  "CreateQuickAppRequest": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "type": "string",
+    "roomId": "number",
+    "initialProperties": "object",
+    "initialInterfaces": "array<string>",
+    "initialView": "object"
+   }
+  },
+  "QuickAvailableTypeDto": {
+   "type": "object",
+   "properties": {
+    "type": "string",
+    "label": "string"
+   }
+  },
+  "QuickAppFile": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "type": "string",
+    "isOpen": "boolean",
+    "isMain": "boolean"
+   }
+  },
+  "QuickAppFileDetails": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "type": "string",
+    "isOpen": "boolean",
+    "isMain": "boolean",
+    "content": "string"
+   }
+  },
+  "QuickAppExportRequest": {
+   "type": "object",
+   "properties": {
+    "encrypted": "boolean",
+    "serialNumbers": "array<string>"
+   }
+  },
+  "HCErrorDto": {
+   "type": "object",
+   "properties": {
+    "type": "string",
+    "reason": "string",
+    "message": "string"
+   }
+  },
+  "ResetRequestDto": {
+   "type": "object",
+   "properties": {
+    "recovery": "boolean"
+   }
+  },
+  "RefreshStateDto": {
+   "type": "object",
+   "properties": {
+    "status": "string",
+    "last": "integer",
+    "date": "string",
+    "timestamp": "integer",
+    "logs": "array<DebugMessageDto>",
+    "events": "array<object>",
+    "changes": "array<object>",
+    "alarmChanges": "array<object>"
+   }
+  },
+  "DefaultSensors": {
+   "type": "object",
+   "properties": {
+    "temperature": "integer",
+    "humidity": "integer",
+    "light": "integer"
+   }
+  },
+  "RoomCreateRequest": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "sectionID": "integer",
+    "category": "string",
+    "icon": "string",
+    "iconExtension": "string",
+    "iconColor": "IconColor",
+    "visible": "boolean"
+   }
+  },
+  "RoomUpdateRequest": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string",
+    "sectionID": "integer",
+    "icon": "string",
+    "iconExtension": "string",
+    "iconColor": "IconColor",
+    "defaultSensors": "DefaultSensors",
+    "defaultThermostat": "integer",
+    "sortOrder": "integer",
+    "category": "string",
+    "visible": "boolean"
+   }
+  },
+  "RoomDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string",
+    "sectionID": "integer",
+    "isDefault": "boolean",
+    "visible": "boolean",
+    "icon": "string",
+    "iconExtension": "string",
+    "iconColor": "IconColor",
+    "defaultSensors": "DefaultSensors",
+    "defaultThermostat": "integer",
+    "sortOrder": "integer",
+    "category": "string"
+   }
+  },
+  "RoomGroupAssignment": {
+   "type": "object",
+   "properties": {
+    "deviceIds": "array<integer>"
+   }
+  },
+  "CreateSceneRequest": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "description": "string",
+    "type": "string",
+    "mode": "string",
+    "icon": "string",
+    "content": "string",
+    "maxRunningInstances": "integer",
+    "hidden": "boolean",
+    "protectedByPin": "boolean",
+    "stopOnAlarm": "boolean",
+    "enabled": "boolean",
+    "restart": "boolean",
+    "categories": "array<integer>",
+    "scenarioData": "ScenarioContent",
+    "roomId": "integer"
+   }
+  },
+  "ExecuteSceneRequest": {
+   "type": "object",
+   "properties": {
+    "alexaProhibited": "boolean",
+    "args": "object"
+   }
+  },
+  "CreateSceneResponse": {
+   "type": "object",
+   "properties": {
+    "id": "integer"
+   }
+  },
+  "SceneDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string",
+    "description": "string",
+    "type": "string",
+    "mode": "string",
+    "icon": "string",
+    "iconExtension": "string",
+    "content": "string",
+    "maxRunningInstances": "integer",
+    "hidden": "boolean",
+    "protectedByPin": "boolean",
+    "scenarioData": "ScenarioContent",
+    "stopOnAlarm": "boolean",
+    "enabled": "boolean",
+    "restart": "boolean",
+    "categories": "array<integer>",
+    "created": "integer",
+    "updated": "integer",
+    "isRunning": "boolean",
+    "isScenarioDataCorrect": "boolean",
+    "started": "integer",
+    "roomId": "integer",
+    "sortOrder": "integer"
+   }
+  },
+  "UpdateSceneRequest": {
+   "type": "object",
+   "properties": {
+    "name": "string",
+    "description": "string",
+    "mode": "string",
+    "maxRunningInstances": "integer",
+    "icon": "string",
+    "content": "string",
+    "hidden": "boolean",
+    "protectedByPin": "boolean",
+    "stopOnAlarm": "boolean",
+    "enabled": "boolean",
+    "restart": "boolean",
+    "categories": "array<integer>",
+    "scenarioData": "ScenarioContent",
+    "roomId": "integer"
+   }
+  },
+  "ScenarioContent": {
+   "type": "object",
+   "properties": {
+    "type": "string",
+    "version": "integer",
+    "when": "ScenarioContentWhen",
+    "where": "ScenarioContentWhere",
+    "what": "ScenarioContentWhat",
+    "trigger": "ScenarioContentWhere",
+    "turnOffDelay": "integer",
+    "actions": "array<object>",
+    "triggers": "triggers",
+    "conditions": "conditions"
+   }
+  },
+  "ScenarioContentWhen": {
+   "type": "object",
+   "properties": {
+    "daysOfWeek": "array<string>",
+    "exactTime": "string",
+    "afterTime": "string",
+    "timeOffset": "integer",
+    "notEarlierThan": "string",
+    "notLaterThan": "string"
+   }
+  },
+  "ScenarioContentWhere": {
+   "type": "object",
+   "properties": {
+    "wholeHouse": "boolean",
+    "sections": "array<integer>",
+    "rooms": "array<integer>",
+    "devices": "array<integer>"
+   }
+  },
+  "ScenarioContentWhat": {
+   "type": "object",
+   "properties": {
+    "action": "object"
+   }
+  },
+  "complexConditions": {
+   "type": "object",
+   "properties": {
+    "group": "string",
+    "type": "string",
+    "conditions": "conditions",
+    "operator": "string"
+   }
+  },
+  "deviceTriggerOrCondition": {
+   "type": "object",
+   "properties": {
+    "group": "string",
+    "type": "string",
+    "id": "number",
+    "property": "string",
+    "operator": "string",
+    "value": null,
+    "duration": "number"
+   }
+  },
+  "profileTriggerOrCondition": {
+   "type": "object",
+   "properties": {
+    "group": "string",
+    "type": "string",
+    "value": "number",
+    "property": "string",
+    "operator": "string",
+    "duration": "number"
+   }
+  },
+  "cronTriggerOrCondition": {
+   "type": "object",
+   "properties": {
+    "group": "string",
+    "type": "string",
+    "property": "string",
+    "operator": "string",
+    "value": null
+   }
+  },
+  "interval": {
+   "type": "object",
+   "properties": {
+    "date": "cron",
+    "interval": "number"
+   }
+  },
+  "weatherBasicCondition": {
+   "type": "object",
+   "properties": {
+    "group": "string",
+    "type": "string",
+    "value": "number",
+    "property": "string",
+    "operator": "string",
+    "duration": "number"
+   }
+  },
+  "weatherConditionsCondition": {
+   "type": "object",
+   "properties": {
+    "group": "string",
+    "type": "string",
+    "value": "string",
+    "property": "string",
+    "operator": "string",
+    "duration": "number"
+   }
+  },
+  "isDayOrNightCondition": {
+   "type": "object",
+   "properties": {
+    "group": "string",
+    "type": "string",
+    "operator": "string",
+    "value": "boolean",
+    "property": "string"
+   }
+  },
+  "sunEventTrigger": {
+   "type": "object",
+   "properties": {
+    "group": "string",
+    "type": "string",
+    "property": "string",
+    "value": "number",
+    "operator": "string"
+   }
+  },
+  "deviceAction": {
+   "type": "object",
+   "properties": {
+    "group": "string",
+    "id": "array<number>",
+    "action": "string",
+    "args": "array<object>",
+    "delay": "number"
+   }
+  },
+  "profileAction": {
+   "type": "object",
+   "properties": {
+    "group": "string",
+    "id": "number",
+    "action": "string",
+    "delay": "number"
+   }
+  },
+  "remoteControllerTrigger": {
+   "type": "object",
+   "properties": {
+    "group": "string",
+    "type": "string",
+    "id": "number",
+    "property": "string",
+    "value": "object",
+    "operator": "string"
+   }
+  },
+  "SectionCreateRequest": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string"
+   }
+  },
+  "SectionUpdateRequest": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string",
+    "created": "integer",
+    "modified": "integer",
+    "sortOrder": "integer"
+   }
+  },
+  "SectionDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string",
+    "created": "integer",
+    "modified": "integer",
+    "sortOrder": "integer"
+   }
+  },
+  "ActionDto": {
+   "type": "object",
+   "properties": {
+    "id": "string",
+    "name": "string",
+    "status": "string",
+    "request": "object"
+   }
+  },
+  "ActionStageDto": {
+   "type": "object",
+   "properties": {
+    "type": "string",
+    "name": "string",
+    "id": "string",
+    "status": "string"
+   }
+  },
+  "ActionResponseDto": {
+   "type": "object",
+   "properties": {
+    "action": "ActionDto",
+    "stages": "array<ActionStageDto>"
+   }
+  },
+  "BackupsPossible": {
+   "type": "object",
+   "properties": {
+    "canCreateCloudBackup": "boolean",
+    "canCreateLocalBackup": "boolean"
+   }
+  },
+  "BackupsStatus": {
+   "type": "object",
+   "properties": {
+    "canCreateAutoBackup": "boolean",
+    "canCreateManualBackup": "boolean",
+    "canRestoreBackup": "boolean"
+   }
+  },
+  "Backup": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "timestamp": "integer",
+    "compatible": "boolean",
+    "automatic": "boolean",
+    "devices": "integer",
+    "rooms": "integer",
+    "scenes": "integer",
+    "description": "string",
+    "softVersion": "string",
+    "size": "string",
+    "filename": "string",
+    "slavesBackups": "array<string>",
+    "zwaveEngineVersion": "ZwaveEngineVersion"
+   }
+  },
+  "LocalBackups": {
+   "type": "object",
+   "properties": {
+    "type": "string",
+    "localBackupPath": "string",
+    "automaticCount": "integer",
+    "automaticLimit": "integer",
+    "manualCount": "integer",
+    "manualLimit": "integer",
+    "uploadedBackup": "array<Backup>"
+   }
+  },
+  "RemoteBackups": {
+   "type": "object",
+   "properties": {
+    "type": "string",
+    "totalSpace": "string",
+    "usedSpace": "string",
+    "usedSpacePercentage": "string",
+    "automaticCount": "integer",
+    "automaticLimit": "integer",
+    "manualCount": "integer",
+    "manualLimit": "integer",
+    "backups": "array<Backup>"
+   }
+  },
+  "ServiceBackupsParams": {
+   "type": "object",
+   "properties": {
+    "description": "string",
+    "id": "string",
+    "type": "string",
+    "version": "string"
+   }
+  },
+  "CreateBackupDto": {
+   "type": "object",
+   "properties": {
+    "action": "string",
+    "params": "ServiceBackupsParams"
+   }
+  },
+  "FactoryResetRequestBody": {
+   "type": "object",
+   "properties": {
+    "ticket": "string",
+    "deleteBackups": "boolean",
+    "detachFibaroId": "boolean"
+   }
+  },
+  "ActionIdDto": {
+   "type": "object",
+   "properties": {
+    "actionId": "string"
+   }
+  },
+  "UpdatesDto": {
+   "type": "object",
+   "properties": {
+    "updates": "object",
+    "conditions": "object",
+    "localUpdate": "object",
+    "updateStableAvailable": "boolean",
+    "updateBetaAvailable": "boolean",
+    "newestStableVersion": "Version",
+    "newestBetaVersion": "Version",
+    "allConditionsMet": "boolean"
+   }
+  },
+  "DownloadDto": {
+   "type": "object",
+   "properties": {
+    "action": "string",
+    "params": "object"
+   }
+  },
+  "InstallDto": {
+   "type": "object",
+   "properties": {
+    "action": "string",
+    "params": "object"
+   }
+  },
+  "AutoDto": {
+   "type": "object",
+   "properties": {
+    "action": "string",
+    "params": "object"
+   }
+  },
+  "CancelDownloadDto": {
+   "type": "object",
+   "properties": {
+    "action": "string"
+   }
+  },
+  "SetZwaveEngineDto": {
+   "type": "object",
+   "properties": {
+    "version": "ZwaveEngineVersion",
+    "reboot": "boolean"
+   }
+  },
+  "CurrentVersion": {
+   "type": "object",
+   "properties": {
+    "version": "string",
+    "type": "string"
+   }
+  },
+  "InstallVersion": {
+   "type": "object",
+   "properties": {
+    "version": "string",
+    "type": "string",
+    "status": "string",
+    "progress": "integer"
+   }
+  },
+  "Info": {
+   "type": "object",
+   "properties": {
+    "serialNumber": "string",
+    "platform": "string",
+    "zwaveEngineVersion": "ZwaveEngineVersion",
+    "zigbeeStatus": "boolean",
+    "hcName": "string",
+    "mac": "string",
+    "zwaveVersion": "string",
+    "timeFormat": "integer",
+    "dateFormat": "string",
+    "timezoneOffset": "integer",
+    "decimalMark": "string",
+    "zwaveRegion": "ZwaveRegion",
+    "serverStatus": "integer",
+    "defaultLanguage": "string",
+    "defaultRoomId": "integer",
+    "sunsetHour": "string",
+    "sunriseHour": "string",
+    "hotelMode": "boolean",
+    "temperatureUnit": "string",
+    "batteryLowNotification": "boolean",
+    "date": "string",
+    "currency": "string",
+    "softVersion": "string",
+    "beta": "boolean",
+    "currentVersion": "CurrentVersion",
+    "installVersion": "InstallVersion",
+    "timestamp": "integer",
+    "online": "boolean",
+    "updateStableAvailable": "boolean",
+    "updateBetaAvailable": "boolean",
+    "newestStableVersion": "string",
+    "newestBetaVersion": "string",
+    "isFTIConfigured": "boolean",
+    "skin": "string",
+    "skinSetting": "string",
+    "isSlave": "boolean",
+    "oemId": "OemId"
+   }
+  },
+  "LedDto": {
+   "type": "object",
+   "properties": {
+    "brightness": "integer"
+   }
+  },
+  "LocationSettingsDate": {
+   "type": "object",
+   "properties": {
+    "day": "integer",
+    "month": "integer",
+    "year": "integer"
+   }
+  },
+  "LocationSettingsTime": {
+   "type": "object",
+   "properties": {
+    "hour": "integer",
+    "minute": "integer"
+   }
+  },
+  "LocationSettings": {
+   "type": "object",
+   "properties": {
+    "houseNumber": "integer",
+    "timezone": "string",
+    "timezoneOffset": "integer",
+    "ntp": "boolean",
+    "ntpServer": "string",
+    "date": "LocationSettingsDate",
+    "time": "LocationSettingsTime",
+    "longitude": "number",
+    "latitude": "number",
+    "city": "string",
+    "temperatureUnit": "string",
+    "windUnit": "string",
+    "timeFormat": "integer",
+    "dateFormat": "string",
+    "decimalMark": "string"
+   }
+  },
+  "interfaces": {
+   "type": "object",
+   "properties": {
+    "interfaces": "array<string>"
+   }
+  },
+  "ipConfig": {
+   "type": "object",
+   "properties": {
+    "ipMode": "string",
+    "ip": "string",
+    "mask": "string",
+    "gateway": "string",
+    "dns1": "string",
+    "dns2": "string",
+    "macAddress": "string"
+   }
+  },
+  "apConfig": {
+   "type": "object",
+   "properties": {
+    "ssid": "string",
+    "security": "string",
+    "password": "string",
+    "fallback": "boolean",
+    "hidden": "boolean",
+    "signal": "integer",
+    "bssid": "string",
+    "frequency": "integer"
+   }
+  },
+  "interfaceConfiguration": {
+   "type": "object",
+   "properties": {
+    "enabled": "boolean",
+    "ipConfig": "ipConfig",
+    "apConfig": "apConfig"
+   }
+  },
+  "networkConfiguration": {
+   "type": "object",
+   "properties": {
+    "networkConfig": "configN"
+   }
+  },
+  "ap": {
+   "type": "object",
+   "properties": {
+    "ssid": "string",
+    "signal": "integer",
+    "security": "array<string>"
+   }
+  },
+  "apInfo": {
+   "type": "object",
+   "properties": {
+    "ssid": "string",
+    "bssid": "string",
+    "frequency": "integer",
+    "signal": "integer",
+    "apMode": "string",
+    "security": "array<string>"
+   }
+  },
+  "apList": {
+   "type": "object",
+   "properties": {
+    "apList": "array<ap>"
+   }
+  },
+  "apListInfo": {
+   "type": "object",
+   "properties": {
+    "apListInfo": "array<apInfo>"
+   }
+  },
+  "accessPointMode": {
+   "type": "object",
+   "properties": {
+    "accessPointEnabled": "boolean"
+   }
+  },
+  "protocols": {
+   "type": "object",
+   "properties": {
+    "http": "boolean",
+    "https": "boolean"
+   }
+  },
+  "internetConnectivity": {
+   "type": "object",
+   "properties": {
+    "internetConnectivity": "boolean"
+   }
+  },
+  "connection": {
+   "type": "object",
+   "properties": {
+    "uuid": "string",
+    "name": "string",
+    "enabled": "boolean",
+    "status": "string",
+    "apConfig": "apConfig",
+    "ipConfig": "ipConfig"
+   }
+  },
+  "statusResponse": {
+   "type": "object",
+   "properties": {
+    "code": "integer",
+    "message": "string"
+   }
+  },
+  "radioConfiguration": {
+   "type": "object",
+   "properties": {
+    "enabled": "boolean"
+   }
+  },
+  "remoteAccessState": {
+   "type": "object",
+   "properties": {
+    "active": "boolean",
+    "deadline": "integer",
+    "supportUser": "boolean"
+   }
+  },
+  "remoteAccessStatus": {
+   "type": "object",
+   "properties": {
+    "user": "remoteAccessState",
+    "support": "remoteAccessState"
+   }
+  },
+  "SortOrderRequest": {
+   "type": "object",
+   "properties": {
+    "from": "integer",
+    "to": "integer",
+    "fromSection": "integer",
+    "toSection": "integer",
+    "fromRoom": "integer",
+    "toRoom": "integer",
+    "fromType": "string",
+    "toType": "string",
+    "action": "string"
+   }
+  },
+  "SystemStatusDto": {
+   "type": "object",
+   "properties": {
+    "description": "string",
+    "os": "string",
+    "stage": "SystemStatusStageDto",
+    "current": "integer",
+    "done": "boolean",
+    "max": "integer",
+    "status": "string",
+    "title": "string",
+    "update": "SystemStatusUpdateDto",
+    "platform": "string",
+    "oemId": "string"
+   }
+  },
+  "SystemStatusStageDto": {
+   "type": "object",
+   "properties": {
+    "description": "string",
+    "current": "integer",
+    "done": "boolean",
+    "max": "integer"
+   }
+  },
+  "SystemStatusUpdateDto": {
+   "type": "object",
+   "properties": {
+    "type": "string",
+    "version": "string"
+   }
+  },
+  "TermsOfServiceDto": {
+   "type": "object",
+   "properties": {
+    "accepted": "boolean",
+    "text": "string"
+   }
+  },
+  "TestSatelConnectionRequestDto": {
+   "type": "object",
+   "properties": {
+    "ipAddress": "string",
+    "portNumber": "integer"
+   }
+  },
+  "TestSatelConnectionDto": {
+   "type": "object",
+   "properties": {
+    "status": "string"
+   }
+  },
+  "UserActivityDto": {
+   "type": "object",
+   "properties": {
+    "email": "string",
+    "lastActivity": "integer",
+    "type": "string",
+    "user": "string",
+    "userId": "integer"
+   }
+  },
+  "UserCreateRequest": {
+   "type": "object",
+   "properties": {
+    "email": "string",
+    "name": "string",
+    "type": "string"
+   }
+  },
+  "UserDto": {
+   "type": "object",
+   "properties": {
+    "id": "integer",
+    "name": "string",
+    "password": "string",
+    "pin": "string",
+    "passwordConfirm": "string",
+    "type": "string",
+    "email": "string",
+    "alarmRights": "array<integer>",
+    "climateZoneRights": "array<integer>",
+    "profileRights": "array<integer>",
+    "raStatus": "string",
+    "isAdminTransferPossible": "boolean",
+    "rights": "UserDtoRights",
+    "hotelRoom": "integer",
+    "sendNotifications": "boolean",
+    "tracking": "integer",
+    "useOptionalArmPin": "boolean",
+    "useIntegrationPin": "boolean",
+    "integrationPin": "string",
+    "initialWizard": "boolean",
+    "pendingAdminRoleTransfer": "boolean",
+    "fidUuid": "string",
+    "fidLastSynchronizationTimestamp": "integer",
+    "fidRole": "string",
+    "skin": "string",
+    "skinSetting": "string",
+    "isAddTileVisible": "boolean",
+    "buiSettings": "object"
+   }
+  },
+  "UserDtoRights": {
+   "type": "object",
+   "properties": {
+    "advanced": "object",
+    "devices": "object",
+    "scenes": "object",
+    "alarmPartitions": "object",
+    "profiles": "object",
+    "climateZones": "object"
+   }
+  },
+  "Voip": {
+   "type": "object",
+   "properties": {
+    "voipDevices": "array<VoipDev>"
+   }
+  },
+  "VoipDev": {
+   "type": "object",
+   "properties": {
+    "deviceIcon": "string",
+    "id": "integer",
+    "sipDisplayName": "string",
+    "sipUserID": "string"
+   }
+  },
+  "Weather": {
+   "type": "object",
+   "properties": {
+    "ConditionCode": "integer",
+    "Humidity": "number",
+    "Temperature": "number",
+    "TemperatureUnit": "string",
+    "WeatherCondition": "string",
+    "WeatherConditionConverted": "string",
+    "Wind": "number",
+    "WindUnit": "string"
+   }
+  },
+  "ZwaveSettingsDto": {
+   "type": "object",
+   "properties": {
+    "globalPollingEnabled": "boolean",
+    "globalPollingInterval": "number",
+    "minDevicePollingInterval": "number",
+    "minGlobalPollingInterval": "number"
+   }
+  },
+  "ZwaveSettingsRequest": {
+   "type": "object",
+   "properties": {
+    "globalPollingEnabled": "boolean",
+    "globalPollingInterval": "number",
+    "minDevicePollingInterval": "number",
+    "minGlobalPollingInterval": "number"
+   }
+  },
+  "ZwaveConfigurationTaskDto": {
+   "type": "object",
+   "properties": {
+    "id": "number",
+    "status": "string",
+    "deviceId": "number",
+    "nodeId": "number",
+    "name": "string",
+    "notificationId": "number",
+    "softReconfiguration": "boolean",
+    "battery": "boolean",
+    "childDevices": "array<object>"
+   }
+  },
+  "ZwaveConfigurationTaskRequest": {
+   "type": "object",
+   "properties": {
+    "status": "string"
+   }
+  },
+  "ZwaveDeviceConfigurationRequest": {
+   "type": "object",
+   "properties": {
+    "deviceId": "number",
+    "softReconfiguration": "boolean",
+    "name": "string"
+   }
+  },
+  "ZwaveNetworkConfigurationRequest": {
+   "type": "object",
+   "properties": {
+    "softReconfiguration": "boolean"
+   }
+  }
+ }
+}

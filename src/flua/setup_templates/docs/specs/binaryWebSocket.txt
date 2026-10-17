@@ -1,0 +1,48 @@
+Posted August 24
+Hi, 
+ 
+We're adding support for sending non-UTF-8 payloads over the WebSocket. It will look something like this: 
+ 
+-- connect example 
+sock:connect("wss://broker.example.com/mqtt", {
+  ["Sec-WebSocket-Protocol"] = "mqtt",
+})
+
+-- listener with additional flag to detect biarny content 
+sock:addEventListener("dataReceived", function(payload, isBinary) ... end)
+
+-- sample sendBinary 
+local packet = string.char(0x10, 0x16, 0x00, 0x04, 0x4D, 0x51, 0x54, 0x54, 0x04, 0x02, 0x00, 0x3C, 0x00, 0x0A, 0x68, 0x63, 0x33, 0x2D, 0x63, 0x6C, 0x69, 0x65, 0x6E, 0x74)
+sock:sendBinary(packet)
+ 
+We've tested it with the HiveMQ public broker. @ChristianSogaard If you want to test this with your broker, I can upload a modified Lua environment via support access. Also, I can share an example of MQTT over WSS that we used to test out this new feature.  
+ 
+Unfortunately, we can't add this change to the next beta release (5.212), and probably not to the next stable version (5.220). This change should end up in the 5.221 beta version.  
+
+---------------------
+
+Posted August 25
+Hi Fibaro Support,
+Thank you for the information about the new sendBinary() support in net.WebSocketClientTls.
+I have now tested it on the special patched HC3 firmware 5.210.14 , against a real MQTT-over-WSS broker used by Navimow, and it works.
+Test evidence:
+net.WebSocketClientTls exists
+sendBinary available: true
+WSS connected; sending MQTT CONNECT
+TX CONNECT via sendBinary
+RX type=2 binary=true bytes=4 hex=20 02 00 00
+Direct MQTT CONNACK OK
+TX SUBSCRIBE 4 topics via sendBinary
+RX type=9 binary=true bytes=8 hex=90 06 00 02 00 00 00 00
+Direct MQTT SUBACK
+PUBLISH /downlink/vehicle/.../realtimeDate/location payloadBytes=110
+TX PINGREQ via sendBinary bytes=2 hex=C0 00
+RX type=13 binary=true bytes=2 hex=D0 00
+PINGRESP
+This confirms that:
+Sec-WebSocket-Protocol: mqtt is handled correctly.
+MQTT control packets can be sent as binary frames using sendBinary().
+Binary MQTT frames are received correctly through dataReceived(data, isBinary) with isBinary=true.
+MQTT CONNACK, SUBACK, live PUBLISH, and PINGRESP all work.
+I also implemented receive buffering as recommended, so the client does not assume that one WebSocket frame always equals one MQTT packet.
+From my side, the new WebSocket binary support appears to solve this use case. Thank you for the help. 
