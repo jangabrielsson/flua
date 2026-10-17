@@ -899,7 +899,10 @@ and one file per QA file, ready for editing and debugging.
 ```
 
 Checks syntax, unknown `--%%` directives (typos), and deprecated API calls.
-Warnings don't fail the run; syntax errors exit 1. Good in CI.
+Warnings don't fail the run; syntax errors exit 1. Good in CI. It checks the
+**whole project**: the main file plus every `--%%file` include (a missing
+include is an error, and `$name` entries resolve to flua's bundled
+libraries).
 
 ### Self-testing a QA (no repo needed)
 

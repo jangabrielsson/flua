@@ -19,5 +19,8 @@ function QuickApp:onInit()
   setInterval(function() 
     self:updateProperty("value",os.time())
   end, 1000)
+
+  -- export .fqa from the QuickApp 
+  local fqa = api.post("/quickApp/export/" .. self.id)
 end
 

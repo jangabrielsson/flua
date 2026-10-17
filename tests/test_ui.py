@@ -197,7 +197,13 @@ def test_select_with_options() -> None:
     legacy = ui["viewLayout"]["$jason"]["body"]["sections"]["items"][0]["components"][0]
     assert legacy["selectionType"] == "single"
     assert legacy["options"][0]["type"] == "option"
+    # ...and carries the initial selection: single select's el['value'] maps
+    # to the legacy values array (the viewer/HC3 upload renders it selected)
+    assert legacy["values"] == ["2"]
     assert ui["uiCallbacks"] == [{"callback": "setMode", "eventType": "onToggled", "name": "mode"}]
+    # the round trip keeps the selection: legacy viewLayout -> --%%u rows
+    back = ui_to_u_rows(view_layout=ui["viewLayout"], ui_callbacks=ui["uiCallbacks"])
+    assert "value='2'" in back[0]
 
 
 def test_multi_select_becomes_select_with_multi_selection() -> None:

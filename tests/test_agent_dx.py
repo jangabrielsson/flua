@@ -232,7 +232,7 @@ def test_tool_ui_renders_elements(tmp_path) -> None:
     assert 'label l1 "Status"' in result.stdout
     assert 'button B1 "Press me" -> onReleased=fopp' in result.stdout
     assert 'slider s1 "Level" [0..100] = 50 -> onChanged=slide' in result.stdout
-    assert 'select sel1 "Pick" [One=11] -> onToggled' in result.stdout
+    assert 'select sel1 "Pick" = {11} [One=11] -> onToggled' in result.stdout
 
 
 def test_multi_qa_exit_aggregation(tmp_path) -> None:

@@ -1,6 +1,11 @@
 # Note: single-select initial `value` dropped from legacy viewLayout
 
-Status: known gap, not scheduled. Found 2026-10-13 while shipping `--tool ui`.
+Status: fixed (2026-10-17). The compiler maps `el['value']` into the
+legacy `values` array, and the inverse (`ui_to_u_rows`/`_element`) reads
+the selection back — the `--%%u` round trip now preserves it.
+Pinned by `tests/test_ui.py::test_select_with_options` (legacy values +
+round trip) and `tests/test_agent_dx.py::test_tool_ui_renders_elements`
+(`--tool ui` shows the selection).
 
 ## Symptom
 

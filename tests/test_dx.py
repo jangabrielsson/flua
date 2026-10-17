@@ -87,6 +87,32 @@ def test_check_flags_deprecated_api() -> None:
         assert "deprecated API: GET /quickApp/export/5000" in result.stdout
 
 
+def test_check_follows_file_includes() -> None:
+    # --check validates the whole project: the main file plus every
+    # --%%file include, each with its own file context
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        main = Path(d) / "main.lua"
+        lib = Path(d) / "lib.lua"
+        main.write_text("--%%name:proj\n--%%file:lib.lua,lib\nprint(LIB)\n")
+        lib.write_text("LIB = 'ok'\n")
+        result = _run("--check", str(main))
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "ok" in result.stdout
+        # a syntax error in the include is caught and named
+        lib.write_text("LIB = )\n")
+        result = _run("--check", str(main))
+        assert result.returncode == 1
+        assert str(lib) in result.stdout
+        assert "error: syntax" in result.stdout
+        # a missing include is an error, like the runtime's load
+        lib.unlink()
+        result = _run("--check", str(main))
+        assert result.returncode == 1
+        assert "no such file" in result.stdout
+
+
 def test_check_syntax_error_exits_1() -> None:
     import tempfile
 

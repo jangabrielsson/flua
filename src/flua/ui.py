@@ -130,6 +130,13 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
             "type": "button",
         }
     if typ in ("select", "multi"):
+        # legacy format: the selection lives in "values" (an array), even
+        # for single select — its declared initial value is el["value"]
+        # (the multi-select convention uses el["values"])
+        if typ == "select" and el.get("value") is not None:
+            values = [el["value"]]
+        else:
+            values = list(el.get("values") or [])
         return {
             "name": name,
             "style": {"weight": style_weight},
@@ -138,7 +145,7 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
             "visible": True,
             "selectionType": "single" if typ == "select" else "multi",
             "options": _options(el),
-            "values": list(el.get("values") or []),
+            "values": values,
         }
     if typ == "switch":
         return {
@@ -345,6 +352,16 @@ def _element(component: dict[str, Any], callbacks: dict[str, dict[str, str]]) ->
             element["values"] = [str(value) for value in (component.get("values") or [])]
         elif component.get("value"):
             element["value"] = str(component["value"])
+        element = {key: name, "text": text, "options": options}
+        # the selection comes back too: legacy format carries it in
+        # "values" (single select's first entry), uiView in "value"
+        if multi:
+            if isinstance(component.get("values"), list):
+                element["values"] = list(component["values"])
+        elif component.get("value") is not None:
+            element["value"] = component["value"]
+        elif isinstance(component.get("values"), list) and component["values"]:
+            element["value"] = component["values"][0]
         if events.get("onToggled"):
             element["onToggled"] = events["onToggled"]
     else:

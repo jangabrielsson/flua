@@ -54,5 +54,46 @@ def check_source(source: str, name: str, lua: Any, base_dir: str | Path = ".") -
 
 
 def check_file(path: str, lua: Any) -> list[str]:
+    """Findings for one QA project: the main file plus every ``--%%file``
+    include, each with its own file context. A missing include is an error
+    (like the runtime's load); ``$name`` entries resolve to flua's bundled
+    libraries (src/flua/lua/lib)."""
     source = Path(path).read_text(encoding="utf-8")
-    return check_source(source, path, lua, Path(path).parent)
+    base = Path(path).parent
+    findings = check_source(source, path, lua, base)
+    try:
+        annotations = expand_includes(parse_annotations(source, warn_unknown=False), base)
+    except ValueError:
+        return findings  # the include failure is already reported by check_source
+    files = annotations.get("file")
+    if not isinstance(files, list):
+        return findings
+    seen = {Path(path).resolve()}
+    bundled = Path(__file__).resolve().parent / "lua" / "lib"
+    for entry in files:
+        # entries are raw "path,name" strings (config's parse_scalar)
+        if not isinstance(entry, str):
+            continue
+        raw, _, name = entry.partition(",")
+        raw = raw.strip()
+        name = name.strip() or raw
+        if not raw:
+            continue
+        if raw.startswith("$"):
+            lib_name = raw[1:].lstrip("/")
+            if Path(lib_name).name != lib_name or lib_name in ("", ".", ".."):
+                findings.append(f"{path}: error: --%%file:{raw},{name}: bad library name")
+                continue
+            target = bundled / lib_name
+        else:
+            target = base / raw
+        if not target.is_file():
+            findings.append(f"{path}: error: --%%file:{raw},{name}: no such file: {target}")
+            continue
+        resolved = target.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        include_source = target.read_text(encoding="utf-8")
+        findings += check_source(include_source, str(target), lua, target.parent)
+    return findings
