@@ -995,8 +995,11 @@ manage it. Resources: the docs ship in the wheel and are served as
 without a repo checkout. Prompts: `qa_debug` (seeded debugging guidance)
 and `qa_skeleton` (a runnable self-testing QA template). Host
 registration: add `flua-mcp` as a stdio server in your host's MCP config —
-no extra install, no extra dependencies. The full reference (protocol
-surface, tool schemas, error semantics, examples): `docs/mcp.md`.
+no extra install, no extra dependencies. Remote or browser hosts:
+`flua-mcp --http` serves the same surface as Streamable HTTP (stateless
+mode, loopback by default; `FLUA_MCP_TOKEN` is required for non-loopback
+binds). The full reference (protocol surface, tool schemas, error
+semantics, examples): `docs/mcp.md`.
 
 UI behavior folds into the same loop from Lua: `_FLUA.uiEvent(element,
 eventType[, value])` injects a UI event exactly as the HC3 UI would deliver

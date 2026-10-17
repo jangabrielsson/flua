@@ -1,12 +1,12 @@
 # Note: flua as an MCP server
 
-Status: V1 + sessions + resources + prompts implemented (2026-10-17) —
-stdio transport, JSON-RPC core, `qa_check`/`qa_run`/`qa_ui` one-shot
-tools, the session tier (`qa_start`/`qa_probe`/`qa_action`/`qa_sessions`/
-`qa_stop` on in-process engines), dual-era protocol (2026-07-28 modern +
-2025-06-18 legacy), the resource tier (`flua://docs/*` from the packaged
-docs), and the prompt tier (`qa_debug`/`qa_skeleton`). Streamable HTTP is
-still open.
+Status: V1 + sessions + resources + prompts + HTTP implemented
+(2026-10-17) — stdio transport, JSON-RPC core, `qa_check`/`qa_run`/`qa_ui`
+one-shot tools, the session tier (`qa_start`/`qa_probe`/`qa_action`/
+`qa_sessions`/`qa_stop` on in-process engines), dual-era protocol
+(2026-07-28 modern + 2025-06-18 legacy), the resource tier (`flua://docs/*`
+from the packaged docs), the prompt tier (`qa_debug`/`qa_skeleton`), and
+the Streamable HTTP transport (stateless, opt-in `flua-mcp --http`).
 
 ## Context
 
@@ -126,11 +126,12 @@ e.g. `flua://docs/USAGE.md`, `flua://docs/walkthroughs.md`,
 
 ## Transport notes (stateless spec)
 
-- One JSON-RPC implementation, two transports: **stdio** (local hosts,
-  ship first) and **Streamable HTTP** (single `/mcp` endpoint, stateless
-  mode — no session id, no SSE for V1). Dependency-free is realistic: the
-  stateless mode is plain HTTP POST + JSON-RPC; the SDK is only worth it
-  once sessions/resources push complexity up.
+- One JSON-RPC implementation, two transports, both shipped: **stdio**
+  (local hosts, the default) and **Streamable HTTP** (stateless mode —
+  `POST /mcp`, no session id, no SSE; `flua-mcp --http`, loopback by
+  default, `FLUA_MCP_TOKEN` required beyond loopback). Remote and browser
+  hosts use HTTP; local hosts keep stdio. Dependency-free holds: stdlib
+  `http.server` (ADR 0011).
 - Secrets: HC3 credentials come from the server's environment (`.env`
   chain), never from tool arguments — online/proxy runs reuse flua's own
   env resolution.
@@ -140,9 +141,8 @@ e.g. `flua://docs/USAGE.md`, `flua://docs/walkthroughs.md`,
 
 ## Open questions
 
-1. V1 transport order — stdio first, or Streamable HTTP first? (Depends on
-   which host we want to work with first: Claude Desktop needs HTTP/stdio
-   via config; Copilot needs registration via its MCP registry.)
+1. ~~V1 transport order — stdio first, or Streamable HTTP first?~~ Both
+   shipped: stdio default, `--http` opt-in (ADR 0011).
 2. In-process sessions: one shared event loop per server, or one thread +
    loop per session? (One loop is simpler; per-session is better
    isolation. flua's engine is designed for one engine per loop — a

@@ -6,7 +6,11 @@ with flua (design: `docs/notes/notes-mcp.md`, packaging: ADR 0010).
 
 ## Protocol surface (current)
 
-- **Transport**: stdio — newline-delimited JSON-RPC 2.0 on stdin/stdout.
+- **Transport**: stdio (default) — newline-delimited JSON-RPC 2.0 on
+  stdin/stdout. **Streamable HTTP** (opt-in) — `flua-mcp --http`, one
+  `POST /mcp` endpoint in stateless mode (ADR 0011): no SSE, no
+  `Mcp-Session-Id` (sessions are explicit tool arguments), same dispatch
+  core as stdio.
 - **Spec revision**: dual-era. The **modern** surface (2026-07-28) needs no
   handshake — every request carries its protocol version in `params._meta`
   and `server/discover` (required) lists `supportedVersions`. The **legacy**
@@ -146,7 +150,34 @@ Two reusable guidance prompts:
 Missing required arguments and unknown prompt names are JSON-RPC errors
 (`-32602`/`-32601`), like the tools.
 
-## Running it
+## Streamable HTTP transport (opt-in)
+
+```bash
+flua-mcp --http                # 127.0.0.1:8091, no auth (loopback only)
+flua-mcp --http 0.0.0.0:8091   # LAN-reachable — requires FLUA_MCP_TOKEN
+```
+
+One endpoint, stateless mode per the 2026-07-28 spec: `POST /mcp` carries
+a JSON-RPC request and returns the response; notifications answer `202`
+with no body; `GET`/`DELETE` answer `405` (no SSE); a request carrying
+`Mcp-Session-Id` answers `404` — transport sessions do not exist here.
+CORS is permissive so browser hosts work. The server **refuses to bind a
+non-loopback address without `FLUA_MCP_TOKEN`**, and every request must
+carry `Authorization: Bearer <token>` when one is set. Bodies over 10 MiB
+are rejected with `413`.
+
+```bash
+curl http://127.0.0.1:8091/mcp -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{}}'
+```
+
+Register the HTTP server in a host the same way as stdio, with the URL:
+
+```json
+{"mcpServers": {"flua": {"url": "http://127.0.0.1:8091/mcp"}}}
+```
+
+## Running it (stdio)
 
 ```bash
 flua-mcp                 # stdio JSON-RPC server (reads stdin, answers stdout)
@@ -170,6 +201,9 @@ no extra dependencies:
 
 ## What agents can rely on
 
+- The same methods and semantics hold over stdio and HTTP — one dispatch
+  core, two transports. Remote agents reach flua-mcp over HTTP through a
+  tunnel or a token-guarded LAN port; local hosts keep stdio.
 - `initialize` and `tools/list` are the discovery surface — schemas are
   complete and typed; never parse `tools/list` prose. `resources/list` is
   the same for docs: read `resources/read`, don't guess file locations.
@@ -189,6 +223,6 @@ no extra dependencies:
 - Done: stdio core, one-shot tools (`qa_check`, `qa_run`, `qa_ui`), the
   session tier (`qa_start`/`qa_probe`/`qa_action`/`qa_sessions`/`qa_stop`),
   the resource tier (`flua://docs/*`), the prompt tier
-  (`qa_debug`/`qa_skeleton`), packaging, tests (`tests/test_mcp.py`).
-- Planned: more one-shot tools (`devices` from the REST feeds), and the
-  Streamable HTTP transport.
+  (`qa_debug`/`qa_skeleton`), the Streamable HTTP transport (stateless),
+  packaging, tests (`tests/test_mcp.py`, `tests/test_mcp_http.py`).
+- Planned: more one-shot tools (`devices` from the REST feeds).

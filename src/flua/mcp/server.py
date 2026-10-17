@@ -8,11 +8,14 @@ and the legacy initialize era; implements tools and resources.
 
 from __future__ import annotations
 
+import argparse
 import json
+import os
 import sys
 from typing import Any
 
 from .. import __version__
+from .http import serve_http
 from .jsonrpc import INVALID_PARAMS, METHOD_NOT_FOUND, JsonRpcError, run_stdio
 from .prompts import get_prompt, list_prompts
 from .resources import list_resources, read_resource
@@ -127,10 +130,35 @@ METHODS: dict[str, Any] = {
 def main(argv: list[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv[1:]
-    if "--version" in argv:
+    parser = argparse.ArgumentParser(
+        prog="flua-mcp", description="flua's MCP server (stdio JSON-RPC, or Streamable HTTP)."
+    )
+    parser.add_argument("--version", action="store_true", help="print version and exit")
+    parser.add_argument(
+        "--http",
+        nargs="?",
+        const="127.0.0.1:8091",
+        metavar="HOST:PORT",
+        help="serve Streamable HTTP instead of stdio (default 127.0.0.1:8091; "
+        "set FLUA_MCP_TOKEN for anything but loopback)",
+    )
+    args = parser.parse_args(argv)
+    if args.version:
         supported = ", ".join(SUPPORTED_VERSIONS)
         print(f"flua-mcp {__version__} (protocols {supported})")
         return 0
+    if args.http:
+        host, _, port = args.http.rpartition(":")
+        try:
+            bind_port = int(port)
+        except ValueError:
+            print(f"flua-mcp: bad --http bind address: {args.http}", file=sys.stderr)
+            return 1
+        token = os.environ.get("FLUA_MCP_TOKEN") or None
+        try:
+            return serve_http(host, bind_port, METHODS, _check_protocol_version, token=token)
+        finally:
+            _SESSIONS.shutdown()  # never leak engines when the server stops
     try:
         return run_stdio(METHODS, precheck=_check_protocol_version)
     finally:

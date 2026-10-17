@@ -5,6 +5,10 @@ packaging decision: ``docs/decisions/0010``). Ships in the fibaro-flua
 wheel as the ``flua-mcp`` entry point; one-way dependency — flua core never
 imports this package.
 
-V1: stdio transport, JSON-RPC 2.0, two one-shot tools (``qa_check``,
-``qa_run``). Sessions and Streamable HTTP come later.
+Two transports share one dispatch core: stdio (newline-delimited JSON-RPC,
+the default) and Streamable HTTP (stateless mode, ``flua-mcp --http``).
+Tools: ``qa_check``/``qa_run``/``qa_ui`` one-shot, the session tier
+(``qa_start``/``qa_probe``/``qa_action``/``qa_sessions``/``qa_stop``),
+the docs as resources (``flua://docs/*``), and two prompts
+(``qa_debug``/``qa_skeleton``).
 """

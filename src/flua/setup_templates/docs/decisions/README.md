@@ -16,3 +16,4 @@ decision changes.
 | [0008](0008-fqa-files-runnable-as-scripts.md) | `.fqa` files are directly runnable as scripts | active |
 | [0009](0009-real-logs-over-rest.md) | the sim serves real logs over REST (debugMessages + systemLog) | active |
 | [0010](0010-mcp-ships-in-the-wheel.md) | the MCP server ships in the fibaro-flua wheel as a second entry point | active |
+| [0011](0011-streamable-http-transport.md) | flua-mcp serves Streamable HTTP in stateless mode, opt-in, loopback + token-guarded | active |
