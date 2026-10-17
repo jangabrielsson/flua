@@ -22,7 +22,15 @@ directives, multi-file QAs, the offline HC3, and deploying to the HC3.
 **New to QuickApps entirely?** Start with the
 [step-by-step tutorial](docs/tutorial/README.md) — it builds one QuickApp
 (the Sunset Lamp) from zero, no programming background assumed.
-The rest of this file is how flua works under the hood.
+The rest of this file is how flua works under the hood. Deeper references:
+[ARCHITECTURE.md](ARCHITECTURE.md) (internals),
+[docs/concurrency.md](docs/concurrency.md) (threading model),
+[docs/invariants.md](docs/invariants.md) (behavioral contracts + pinning
+tests), [docs/rest-endpoints.md](docs/rest-endpoints.md) (REST route
+reference), [docs/decisions/](docs/decisions/) (the ADR log), and
+[docs/notes/](docs/notes/) (design notes).
+Community: the [flua forum thread](https://forum.fibaro.com/topic/80420-flua-the-qa-development-tool/)
+— feature posts, install guides, and discussion.
 
 ## Install
 
@@ -86,6 +94,11 @@ plus flua's `.luals/` type library — autocomplete for `QuickApp`, `fibaro`,
 
 # remote debugging (mobdebug; VS Code Lua extension or ZeroBrane)
 .venv/bin/flua --debugger script.lua     # port 8172 (default)
+
+# machine surface: JSON logs, system events, runnable exports
+.venv/bin/flua --log json script.lua     # one JSON object per log line
+.venv/bin/flua --syslog events.jsonl script.lua  # append structured system events
+.venv/bin/flua script.fqa                # an exported .fqa file runs directly
 ```
 
 With no `--run-for`, flua exits gracefully when no timers, messages, or open
@@ -93,7 +106,7 @@ network connections are pending — a script with no timers just runs and exits,
 like the standard interpreter (`--ui` is the exception: it keeps the run alive
 until Ctrl-C so the viewer never loses its API). On startup flua prints a
 one-line greeting with the versions and the resolved mode —
-`flua 0.1.1 (Lua 5.5, Python 3.14.3), mode online` (offline / `proxy:<id>`
+`flua 0.1.45 (Lua 5.5, Python 3.14.3), mode online` (offline / `proxy:<id>`
 in the other modes; `--nogreet` to skip it).
 
 Each file is started as a tracked `setTimeout` callback with delay 0, so it
@@ -208,6 +221,24 @@ interactions through the sim API, the same contract the real HC3 UI uses:
   still bounds the session
 - the same page works against a real HC3: point it at the gateway's address
   and fill in credentials
+
+## MCP server (flua-mcp)
+
+The same surface is available as an MCP server for agent hosts (Claude
+Desktop, Copilot, Cursor, …) — typed tool calls instead of shell commands:
+
+```bash
+flua-mcp                  # stdio JSON-RPC (dual-era protocol, 2026-07-28 + legacy)
+flua-mcp --http           # Streamable HTTP instead (127.0.0.1:8091, stateless)
+```
+
+Tools: `qa_check` (static checks), `qa_run` (run to completion →
+`{exitCode, logs, verdict, summary}`), `devices` (the final device list),
+`qa_ui` (structured UI), and the session tier
+(`qa_start`/`qa_probe`/`qa_action`/`qa_stop`) for live probing — plus the
+docs served as `flua://docs/*` resources and `qa_debug`/`qa_skeleton`
+prompts. Offline by default; `FLUA_MCP_TOKEN` guards non-loopback HTTP
+binds. Full reference: [docs/mcp.md](docs/mcp.md).
 
 ## Network clients
 
@@ -343,6 +374,9 @@ src/flua/websocket.py   RFC 6455 client over stdlib sockets + ssl
 src/flua/mqtt.py        MQTT 3.1.1 client over stdlib sockets + ssl
 src/flua/sync_socket.py blocking LuaSocket-compatible TCP/UDP pools
 src/flua/devices/       device type skeletons (devices.json catalog)
+src/flua/tools/         the --tool commands (setup, newQA, uploadQA, ...)
+src/flua/mcp/           the MCP server (flua-mcp): transports, tools, sessions,
+                        resources, prompts
 src/flua/lua/init.lua   Lua runtime: registry, timers, dispatch, bootstrap
 src/flua/lua/quickapp.lua  QuickApp/QuickAppBase/QuickAppChild classes
 src/flua/lua/fibaro.lua    the fibaro API (HC3-compatible)
@@ -351,13 +385,16 @@ src/flua/lua/mqtt.lua      mqtt.* client wrapper
 src/flua/lua/json.lua      HC3-compatible json
 src/flua/lua/socket.lua    LuaSocket-compatible subset (mobdebug)
 src/flua/lua/mobdebug.lua  vendored remote debugger (Paul Kulchenko, MIT)
+src/flua/lua/lib/          shared Lua libs (flua-test assertions, eventlib, ...)
 src/flua/cli.py         CLI: bootstrap, --run-for, --seed, --debugger, ...
 ```
 
 ## Testing
 
 ```bash
-.venv/bin/pytest                    # everything (158 tests)
+.venv/bin/pytest                    # everything (offline; ~500 tests, parallel by default)
+.venv/bin/pytest -q -m "not slow"   # fast gate: skip wall-clock-bound tests
+.venv/bin/pytest --serial           # one process (debugging; -n 0 also works)
 .venv/bin/pytest tests/test_api.py  # the offline HC3 REST API
 .venv/bin/pytest tests/test_http.py # network clients
 ```
@@ -369,7 +406,14 @@ MQTT broker / an RFC 6455 server), and CLI-level tests that run the actual
 `flua` binary end to end. `tests/lua/*.lua` are end-to-end Lua scripts run
 through the CLI by `tests/test_lua.py` (the shared harness is
 `tests/lua/helpers.lua`; every `test_*.lua` there is discovered
-automatically).
+automatically). The live-HC3 suites are opt-in (`HC3_TEST=1`).
+
+QAs test themselves with **flua-test** (`require("flua-test")`):
+`t:expect`/`t:assert_eq` print `PASS:`/`FAIL:` lines and `t:finish()` exits
+with the failure count — the exit code is the verdict, so a QA is its own
+test suite and CI/agents read it directly.
+`--%%file:$flua-test.lua,flua_test` ships the same assertions to a real
+HC3, where they become no-ops.
 
 ## Virtual time
 
@@ -500,8 +544,8 @@ makes debugger pauses freeze time. All other I/O stays on the message model.
 ## Design notes
 
 - No FastAPI subprocess and no telnet/REPL — the offline HC3 API is served
-  by the same in-process dispatch the QAs use (an external HTTP server can
-  be added later as a second transport over the same layer).
+  by the same in-process dispatch the QAs use; flua-mcp adds stdio and
+  Streamable HTTP transports over the same JSON-RPC dispatch core.
 - No third-party network dependencies — HTTP (urllib), RFC 6455
   WebSockets, and MQTT 3.1.1 run over stdlib sockets in worker threads.
 - Timer completion is delivered as a `timerExpired` message through the
