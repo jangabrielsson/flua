@@ -14,6 +14,7 @@ from typing import Any
 
 from .. import __version__
 from .jsonrpc import INVALID_PARAMS, METHOD_NOT_FOUND, JsonRpcError, run_stdio
+from .prompts import get_prompt, list_prompts
 from .resources import list_resources, read_resource
 from .tools import _SESSIONS, TOOLS
 
@@ -52,7 +53,7 @@ def _check_protocol_version(msg: dict[str, Any]) -> None:
 def _initialize(_params: dict[str, Any]) -> dict[str, Any]:
     return {
         "protocolVersion": LEGACY_PROTOCOL_VERSION,
-        "capabilities": {"tools": {}, "resources": {}},
+        "capabilities": {"tools": {}, "resources": {}, "prompts": {}},
         "serverInfo": {"name": "flua-mcp", "version": __version__},
     }
 
@@ -63,7 +64,7 @@ def _discover(_params: dict[str, Any]) -> dict[str, Any]:
     return {
         "resultType": "complete",
         "supportedVersions": SUPPORTED_VERSIONS,
-        "capabilities": {"tools": {}, "resources": {}},
+        "capabilities": {"tools": {}, "resources": {}, "prompts": {}},
         "instructions": SERVER_INSTRUCTIONS,
         "_meta": {
             "io.modelcontextprotocol/serverInfo": {"name": "flua-mcp", "version": __version__}
@@ -115,6 +116,8 @@ METHODS: dict[str, Any] = {
     "tools/call": _tools_call,
     "resources/list": list_resources,
     "resources/read": read_resource,
+    "prompts/list": list_prompts,
+    "prompts/get": get_prompt,
     # client notifications: handled, never answered (the core drops the id)
     "notifications/initialized": lambda _params: None,
     "notifications/cancelled": lambda _params: None,

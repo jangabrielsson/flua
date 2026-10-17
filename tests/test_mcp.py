@@ -93,7 +93,7 @@ def test_initialize_handshake() -> None:
     # the legacy (initialize-era) handshake: still served for older clients
     result = _call("initialize", {"protocolVersion": LEGACY_PROTOCOL_VERSION})
     assert result["protocolVersion"] == LEGACY_PROTOCOL_VERSION
-    assert result["capabilities"] == {"tools": {}, "resources": {}}
+    assert result["capabilities"] == {"tools": {}, "resources": {}, "prompts": {}}
     assert result["serverInfo"]["name"] == "flua-mcp"
 
 
@@ -103,7 +103,7 @@ def test_discover_lists_supported_versions() -> None:
     assert result["resultType"] == "complete"
     assert result["supportedVersions"] == SUPPORTED_VERSIONS
     assert "2026-07-28" in result["supportedVersions"]
-    assert result["capabilities"] == {"tools": {}, "resources": {}}
+    assert result["capabilities"] == {"tools": {}, "resources": {}, "prompts": {}}
     assert result["_meta"]["io.modelcontextprotocol/serverInfo"]["name"] == "flua-mcp"
     assert result["instructions"]
 
@@ -239,6 +239,75 @@ def test_resources_read_rejects_non_docs_uri() -> None:
     )
     assert response is not None
     assert response["error"]["code"] == core.INVALID_PARAMS
+
+
+# -- prompts --------------------------------------------------------------------
+
+
+def test_prompts_list_shape() -> None:
+    result = _call("prompts/list", {})
+    assert result["resultType"] == "complete"
+    assert [p["name"] for p in result["prompts"]] == ["qa_debug", "qa_skeleton"]
+    debug = next(p for p in result["prompts"] if p["name"] == "qa_debug")
+    assert debug["title"] and debug["description"]
+    assert [a["name"] for a in debug["arguments"] if a["required"]] == ["error"]
+    skeleton = next(p for p in result["prompts"] if p["name"] == "qa_skeleton")
+    assert [a["name"] for a in skeleton["arguments"]] == ["name"]
+    assert skeleton["arguments"][0].get("required") is not True
+
+
+def test_prompt_get_qa_debug_binds_error_and_code() -> None:
+    result = _call(
+        "prompts/get",
+        {"name": "qa_debug", "arguments": {"error": "BOOM", "code": "print('x'"}},
+    )
+    assert result["resultType"] == "complete"
+    message = result["messages"][0]
+    assert message["role"] == "user"
+    assert message["content"]["type"] == "text"
+    assert "BOOM" in message["content"]["text"]
+    assert "print('x'" in message["content"]["text"]
+    # guidance points at the docs resources
+    assert "flua://docs/invariants.md" in message["content"]["text"]
+
+
+def test_prompt_get_qa_debug_requires_error() -> None:
+    response = _dispatch(
+        json.dumps(
+            {"jsonrpc": "2.0", "id": 1, "method": "prompts/get", "params": {"name": "qa_debug"}}
+        )
+    )
+    assert response is not None
+    assert response["error"]["code"] == core.INVALID_PARAMS
+    assert "error" in response["error"]["message"]
+
+
+def test_prompt_get_unknown_prompt_is_an_error() -> None:
+    response = _dispatch(
+        json.dumps(
+            {"jsonrpc": "2.0", "id": 1, "method": "prompts/get", "params": {"name": "nope"}}
+        )
+    )
+    assert response is not None
+    assert response["error"]["code"] == core.METHOD_NOT_FOUND
+
+
+def test_qa_skeleton_substitutes_name_and_stays_runnable(tmp_path) -> None:
+    result = _call("prompts/get", {"name": "qa_skeleton", "arguments": {"name": "kitchen-lamp"}})
+    text = result["messages"][0]["content"]["text"]
+    assert "--%%name:kitchen-lamp" in text
+    assert "__NAME__" not in text
+    # the shipped skeleton must actually run: extract the lua block and
+    # drive it through the real qa_run tool
+    import re as _re
+
+    block = _re.search(r"```lua\n(.*?)\n```", text, _re.DOTALL)
+    assert block, "no lua block in the skeleton prompt"
+    script = tmp_path / "kitchen-lamp.lua"
+    script.write_text(block.group(1))
+    run = _tool("qa_run", {"files": [str(script)], "instant": True})
+    assert run["exitCode"] == 0, run["logs"]
+    assert run["summary"]["failures"] == 0
 
 
 # -- qa_check --------------------------------------------------------------------

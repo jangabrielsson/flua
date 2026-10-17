@@ -1,11 +1,12 @@
 # Note: flua as an MCP server
 
-Status: V1 + sessions + resources implemented (2026-10-17) — stdio
-transport, JSON-RPC core, `qa_check`/`qa_run`/`qa_ui` one-shot tools, the
-session tier (`qa_start`/`qa_probe`/`qa_action`/`qa_sessions`/`qa_stop` on
-in-process engines), dual-era protocol (2026-07-28 modern + 2025-06-18
-legacy), and the resource tier (`flua://docs/*` from the packaged docs).
-Prompts and Streamable HTTP are still open.
+Status: V1 + sessions + resources + prompts implemented (2026-10-17) —
+stdio transport, JSON-RPC core, `qa_check`/`qa_run`/`qa_ui` one-shot
+tools, the session tier (`qa_start`/`qa_probe`/`qa_action`/`qa_sessions`/
+`qa_stop` on in-process engines), dual-era protocol (2026-07-28 modern +
+2025-06-18 legacy), the resource tier (`flua://docs/*` from the packaged
+docs), and the prompt tier (`qa_debug`/`qa_skeleton`). Streamable HTTP is
+still open.
 
 ## Context
 
@@ -82,10 +83,10 @@ and typed:
   the MCP works from pip alone. Text only, paths canonicalized, traversal
   rejected. (Skills are not resources — the `.github/skills` bodies stay a
   repo-level mechanism; the docs overlap covers the same knowledge.)
-- **Prompts**: `qa_debug` (paste an error + file → structured next-step
-  guidance: read the log shape, `--check`, shrink-the-problem),
-  `qa_skeleton` (emit a QA template with flua-test assertions and the
-  deferred-onInit/mock-server patterns).
+- **Prompts**: `qa_debug` (error + file → structured next-step guidance:
+  read the log shape, `--check`, shrink-the-problem) and `qa_skeleton`
+  (a runnable QA template with flua-test assertions and the
+  deferred-onInit pattern) — implemented, see `docs/mcp.md`.
 - Best practices live in the docs they already live in; the MCP just makes
   them retrievable by URI. (Copilot hosts get the same knowledge via the
   existing `.github/skills` — MCP resources are the transport for hosts
@@ -121,7 +122,7 @@ Yes — that is exactly the V1, and it stays valid for V2:
 Resources (implemented): `flua://docs/<file>` — the packaged docs tree,
 e.g. `flua://docs/USAGE.md`, `flua://docs/walkthroughs.md`,
 `flua://docs/tutorial/{chapter}.md`, `flua://docs/specs/hc3-api.json`,
-`flua://docs/mcp.md`. Prompts: `qa_debug`, `qa_skeleton` (planned).
+`flua://docs/mcp.md`. Prompts (implemented): `qa_debug`, `qa_skeleton`.
 
 ## Transport notes (stateless spec)
 

@@ -14,8 +14,8 @@ with flua (design: `docs/notes/notes-mcp.md`, packaging: ADR 0010).
   Unsupported versions answer error `-32022` with `{supported, requested}`.
 - **stdout is pure JSON-RPC** — one response line per request; server
   diagnostics go to stderr. Agents can parse stdout unconditionally.
-- **Capabilities**: `tools` and `resources` (the packaged docs as
-  `flua://docs/*`). Prompts come later.
+- **Capabilities**: `tools`, `resources` (the packaged docs as
+  `flua://docs/*`), and `prompts` (`qa_debug`, `qa_skeleton`).
 
 | Method | Era | Purpose |
 |---|---|---|
@@ -26,6 +26,8 @@ with flua (design: `docs/notes/notes-mcp.md`, packaging: ADR 0010).
 | `tools/call` | both | run one tool → `{resultType, content, isError}` |
 | `resources/list` | both | every doc resource → `{resultType, resources: [{uri, name, title, description, mimeType}]}` |
 | `resources/read` | both | one resource's text → `{resultType, contents: [{uri, mimeType, text}]}` |
+| `prompts/list` | both | the prompts with their argument schemas → `{resultType, prompts: [{name, title, description, arguments}]}` |
+| `prompts/get` | both | one rendered prompt → `{resultType, description, messages: [{role, content}]}` |
 | `notifications/initialized`, `notifications/cancelled` | legacy | accepted, never answered |
 
 Error semantics: invalid JSON/requests and unknown methods answer with the
@@ -123,6 +125,27 @@ Examples: `flua://docs/USAGE.md`, `flua://docs/ARCHITECTURE.md`,
 paths are canonicalized and traversal (`..`) is rejected with a JSON-RPC
 error, never a filesystem escape.
 
+## Prompts
+
+Two reusable guidance prompts:
+
+- **`qa_debug`** — `{error (required), code?}` → one message with the
+  debugging workflow in order: static checks (`qa_check`), offline
+  reproduction (`qa_run`), how to read each error shape (syntax vs
+  traceback vs timeout/drain), the JSON log format, shrinking the problem,
+  and the doc resources to consult (`flua://docs/invariants.md`,
+  `flua://docs/walkthroughs.md`, the tutorial's debugging chapter,
+  `flua://docs/USAGE.md`). The reported error and code are bound into the
+  message.
+- **`qa_skeleton`** — `{name?}` → a runnable, self-testing QA template:
+  `--%%file:$flua-test.lua` (assertions that no-op on a real HC3), the
+  deferred-onInit pattern, and `t:expect`/`t:assert_eq`/`t:finish()` with
+  the exit code as the verdict. The emitted skeleton is pinned by a test
+  that extracts it and runs it through `qa_run` — it never rots.
+
+Missing required arguments and unknown prompt names are JSON-RPC errors
+(`-32602`/`-32601`), like the tools.
+
 ## Running it
 
 ```bash
@@ -150,6 +173,7 @@ no extra dependencies:
 - `initialize` and `tools/list` are the discovery surface — schemas are
   complete and typed; never parse `tools/list` prose. `resources/list` is
   the same for docs: read `resources/read`, don't guess file locations.
+  `prompts/list` is the same for guidance: `prompts/get` renders it.
 - Tool results are JSON inside the MCP `text` content block (single block).
 - `qa_run` never talks to a controller unless `mode: "remote"` is explicit;
   the default is the offline sim.
@@ -164,6 +188,7 @@ no extra dependencies:
 
 - Done: stdio core, one-shot tools (`qa_check`, `qa_run`, `qa_ui`), the
   session tier (`qa_start`/`qa_probe`/`qa_action`/`qa_sessions`/`qa_stop`),
-  the resource tier (`flua://docs/*`), packaging, tests (`tests/test_mcp.py`).
-- Planned: prompts (`prompts/list`/`prompts/get`), more one-shot tools
-  (`devices` from the REST feeds), and the Streamable HTTP transport.
+  the resource tier (`flua://docs/*`), the prompt tier
+  (`qa_debug`/`qa_skeleton`), packaging, tests (`tests/test_mcp.py`).
+- Planned: more one-shot tools (`devices` from the REST feeds), and the
+  Streamable HTTP transport.
