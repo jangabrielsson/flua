@@ -194,6 +194,26 @@ def test_fqa_as_script_runs_the_packaged_qa(tmp_path) -> None:
     assert "RUNS ok" in result.stdout
 
 
+def test_fqa_as_script_applies_initial_interfaces(tmp_path) -> None:
+    # a packaged QA's initialInterfaces survive the CLI unpack: the engine
+    # applies them to the device at load (like import_qa does for uploads)
+    main = tmp_path / "main.lua"
+    main.write_text(
+        "--%%name:ifaces\n"
+        "print('IFACES', table.concat(api.get('/devices/'.._FLUA.qaId).interfaces, ','))\n"
+        "exit(0)\n"
+    )
+    package = tmp_path / "ifaces.fqa"
+    result = _run("export", str(main), "-o", str(package))
+    assert result.returncode == 0, result.stdout + result.stderr
+    fqa = json.loads(package.read_text())
+    fqa["initialInterfaces"] = ["light", "quickApp"]
+    package.write_text(json.dumps(fqa))
+    result = _run("--api", "local", str(package))
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "light" in result.stdout  # quickApp is skipped (the skeleton has it)
+
+
 def test_fqa_as_script_check(tmp_path) -> None:
     # flua --check <file>.fqa checks the unpacked package
     main = tmp_path / "main.lua"

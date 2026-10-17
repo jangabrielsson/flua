@@ -547,6 +547,27 @@ async def test_system_log_records_boot_failures(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_debug_messages_record_runtime_and_system_lines() -> None:
+    # the console buffer is complete in both log modes: flua notices carry
+    # the 'flua' tag, runtime-level lines (print from -e/runtime code) land
+    # untagged, and QA lines are not double-recorded
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.post_log("info", "hello flua")
+        engine.execute('print("from runtime")')
+        await wait_until(lambda: not engine.has_pending_work())
+        data, _ = engine.api.dispatch("GET", "/debugMessages")
+        messages = data["messages"]
+        system = [(m["type"], m["message"]) for m in messages if m.get("tag") == "flua"]
+        assert ("info", "hello flua") in system
+        runtime = [(m["type"], m["message"]) for m in messages if m.get("tag") is None]
+        assert ("info", "from runtime") in runtime
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
 async def test_dynamic_load_from_string(tmp_path, capsys) -> None:
     loader = tmp_path / "loader.lua"
     loader.write_text(

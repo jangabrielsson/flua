@@ -372,6 +372,18 @@ changes land live (the viewer merges `device.view` over the static
 properties). The API server stays up after the QA's timers drain, so the
 viewer keeps working while you tweak the file.
 
+Two more flua-only channels round out the machine surface:
+
+- `GET /flua/systemLog` — the structured lifecycle/crash feed (the
+  machine-readable system log the real HC3 lacks): `run_start`/`run_stop`,
+  `qa_load`/`qa_restart`/`qa_exit`, boot failures, callback crashes, and
+  engine errors as JSON entries, with `last`/`offset` polling and
+  `DELETE /flua/systemLog`.
+- `GET /debugMessages` — the QA console buffer (QA lines with their tag,
+  flua notices under the `flua` tag, runtime lines untagged), with the
+  HC3's `filter`/`types`/`from`/`to`/`last`/`offset` query params,
+  `GET /debugMessages/tags`, and `DELETE /debugMessages`.
+
 On top of the QA's own UI, the viewer renders the device type's **default
 view** (the elements the HC3 adds itself): a binarySwitch gets a colored
 TRUE/FALSE state label and Turn On/Turn Off buttons, a multilevelSwitch
@@ -966,11 +978,12 @@ logic deterministic with `--start`, `--speed`, `--instant`, and `--seed`.
 The `quickapp-test` skill installed by `--tool setup` documents the whole
 loop for coding agents.
 
-Every QA console line also lands in the sim's `GET /debugMessages` buffer
-(the HC3's console log, served over REST): `last`/`offset`/`filter`/`types`
-query params, `DELETE /debugMessages` clears it, `GET /debugMessages/tags`
-lists the QA tags seen — a machine-readable log feed with the same surface
-the real HC3 offers.
+Every console line lands in the sim's `GET /debugMessages` buffer (the
+HC3's console log, served over REST): QA lines with their tag, flua's own
+notices under the `flua` tag, and runtime-level lines untagged.
+`last`/`offset`/`filter`/`types` query params, `DELETE /debugMessages`
+clears it, `GET /debugMessages/tags` lists the QA tags seen — a
+machine-readable log feed with the same surface the real HC3 offers.
 
 ## The HC3 REST API reference
 

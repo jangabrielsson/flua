@@ -241,12 +241,10 @@ def existing_proxy(engine: LuaEngine, proxy_name: str, device_type: str) -> dict
         engine.api.dispatch_hc3("DELETE", f"/devices/{int(old['id'])}")
     device = proxies[0]
     if device.get("type") != device_type:
-        engine.post(
-            messages.log(
-                "info",
-                f"flua: existing proxy of wrong type, deleted: "
-                f"{device.get('id')} {device.get('name')}",
-            )
+        engine.post_log(
+            "info",
+            f"flua: existing proxy of wrong type, deleted: "
+            f"{device.get('id')} {device.get('name')}",
         )
         engine.api.dispatch_hc3("DELETE", f"/devices/{int(device['id'])}")
         return None
@@ -317,11 +315,9 @@ def register_proxy_children(engine: LuaEngine, device_id: int) -> None:
         if not isinstance(child, dict) or child.get("id") is None:
             continue
         engine.api.state.register_proxy_child(child)
-        engine.post(
-            messages.log(
-                "info",
-                f"flua: existing child proxy found: {child.get('id')} {child.get('name')}",
-            )
+        engine.post_log(
+            "info",
+            f"flua: existing child proxy found: {child.get('id')} {child.get('name')}",
         )
 
 
@@ -344,16 +340,14 @@ def resolve_proxy(
         device = deploy_proxy(engine, name, resolved_type, device_properties)
         if device is None:
             raise ValueError(f"cannot create proxy {proxy_name} on the HC3")
-        engine.post(messages.log("info", f"flua: proxy installed: {device.get('id')} {proxy_name}"))
+        engine.post_log("info", f"flua: proxy installed: {device.get('id')} {proxy_name}")
     else:
         if no_ui:
             # --%%mode:proxy,noUI — the developer edits the proxy's UI in the
             # HC3's own editor; leave it untouched
-            engine.post(
-                messages.log(
-                    "info",
-                    f"flua: proxy UI left untouched: {device.get('id')} {proxy_name}",
-                )
+            engine.post_log(
+                "info",
+                f"flua: proxy UI left untouched: {device.get('id')} {proxy_name}",
             )
         else:
             # the proxy is reused, but the QA's UI may have changed since it

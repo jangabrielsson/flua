@@ -70,19 +70,17 @@ side (`_PY.system_event`). Pins: `tests/test_api.py::test_flua_system_log`,
 `tests/test_qa.py::test_system_log_records_lifecycle_and_crashes`,
 `test_system_log_records_boot_failures`.
 
-## Real vs stub — visibility
+## Real vs stub — the inventory
 
-Planned, not done: a table generated from `routes/ROUTES` marking each
-route real vs stub (shape-only), so contributors and agents know which
-endpoints carry data. Stubs stay: weather (zeroed), alarms v1 devices,
-notificationCenter, energy devices, …
+The canonical table lives in **[../rest-endpoints.md](../rest-endpoints.md)**
+(contributor reference); update it when `routes/__init__.py` changes.
 
 ## Open questions
 
-1. Should text-mode untagged runtime lines (the greeting, `-e` prints) land
-   in `/debugMessages` too? Requires tagging them at the Python source
-   (`engine.post(messages.log(...))` call sites) — cheap but touches the
-   greeting/UI-viewer paths.
+1. ~~Text-mode untagged runtime lines in `/debugMessages`~~ — done:
+   `engine.post_log` records flua notices under the `flua` tag, and the
+   Lua-side `postLog`/runtime `print` taps record untagged lines; the
+   buffer is complete in both log modes (single record per line).
 2. System-log transport: the `/flua/*` REST route is done; a `--log
    system`-style file copy is still open (would mirror `--logfile` for
    agents that prefer files).

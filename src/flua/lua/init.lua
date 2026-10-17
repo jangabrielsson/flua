@@ -101,7 +101,11 @@ local function postLog(level, ...)
   for i = 1, select("#", ...) do
     parts[i] = tostring(select(i, ...))
   end
-  _PY.log(level, sanitizeMsg(table.concat(parts, "\t")))
+  local msg = sanitizeMsg(table.concat(parts, "\t"))
+  -- runtime-level lines (tracebacks, -e output) also land in the
+  -- /debugMessages buffer — untagged, like their console form
+  _PY.debug_message(level, nil, nil, msg)
+  _PY.log(level, msg)
 end
 
 print = function(...)
@@ -112,6 +116,7 @@ print = function(...)
   -- the HC3 console renders a small HTML subset in log messages; flua
   -- renders it to the terminal (ANSI with colors on, tags stripped off)
   local text = sanitizeMsg(table.concat(parts, "\t"))
+  _PY.debug_message("info", nil, nil, _PY.render_html(text, true))
   if _FLUA.logJson then
     -- no tag/qaid outside QA code (-e, the runtime itself)
     _PY.log_structured("info", nil, nil, _PY.render_html(text, true))

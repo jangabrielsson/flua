@@ -26,6 +26,8 @@ notes at a glance.
 
 - **[../USAGE.md](../USAGE.md)** — the user guide: directives, modes,
   `--%%` reference, all runtime features.
+- **[rest-endpoints.md](rest-endpoints.md)** — which REST endpoints are
+  real vs shape-only stubs, and the rule for promoting one.
 - **[../AGENTS.md](../AGENTS.md)** — working rules for AI agents (any
   framework).
 - **[../CHANGELOG.md](../CHANGELOG.md)** — release notes.

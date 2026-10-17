@@ -188,11 +188,14 @@ def _build_parser() -> argparse.ArgumentParser:
 _FQA_UNPACK_DIRS: list[str] = []
 
 
-def _unpack_fqa_script(parser: argparse.ArgumentParser, path: Path) -> str:
-    """Unpack a .fqa package into a temp dir; returns the generated main's
-    path. Uses the same machinery as the upload path (engine.fqa_to_files),
-    so the regenerated --%% header (name/type/properties/UI/--%%file) drives
-    the standard pipeline."""
+def _unpack_fqa_script(
+    parser: argparse.ArgumentParser, path: Path
+) -> tuple[str, dict[str, Any]]:
+    """Unpack a .fqa package into a temp dir; returns (main_path, fqa).
+    Uses the same machinery as the upload path (engine.fqa_to_files), so the
+    regenerated --%% header (name/type/properties/UI/--%%file) drives the
+    standard pipeline. The fqa dict comes back so callers can apply package
+    metadata the header cannot express (initialInterfaces)."""
     try:
         raw = path.read_text(encoding="utf-8")
         body = json.loads(raw)
@@ -208,7 +211,7 @@ def _unpack_fqa_script(parser: argparse.ArgumentParser, path: Path) -> str:
     if err is not None or main_path is None:
         parser.error(f"cannot open {path}: {err or 'package has no main file'}")
     _FQA_UNPACK_DIRS.append(base)
-    return main_path
+    return main_path, fqa
 
 
 def _load_qas(
@@ -236,14 +239,22 @@ def _load_qas(
         path = Path(script)
         if not path.exists():
             parser.error(f"cannot open {script}: no such file")
+        fqa_meta: dict[str, Any] | None = None
         if path.suffix.lower() == ".fqa":
-            path = Path(_unpack_fqa_script(parser, path))
+            main_path, fqa_meta = _unpack_fqa_script(parser, path)
+            path = Path(main_path)
         source = path.read_text(encoding="utf-8")
         try:
             annotations = expand_includes(parse_annotations(source), path.parent)
         except ValueError as exc:
             parser.error(f"error in {script}: {exc}")
         global_params, local_params = split_annotations(annotations)
+        if fqa_meta is not None:
+            interfaces = fqa_meta.get("initialInterfaces")
+            if isinstance(interfaces, list) and interfaces:
+                # package metadata the --%% header cannot express; the engine
+                # applies it to the device at load (_prepare_qa)
+                local_params["initialInterfaces"] = list(interfaces)
         global_config.update(global_params)  # last file wins
         specs.append((str(path.resolve()), None, local_params))
     if not specs:
@@ -481,15 +492,13 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             info = engine.qa_info(main_qa_id)
             if info and info.get("proxy"):
                 mode = f"proxy:{main_qa_id}"
-        engine.post(
-            messages.log(
-                "info",
-                f"🚀 flua {__version__} ({engine.lua_version()}, "
-                f"Python {sys.version.split()[0]}), mode {mode}",
-            )
+        engine.post_log(
+            "info",
+            f"🚀 flua {__version__} ({engine.lua_version()}, "
+            f"Python {sys.version.split()[0]}), mode {mode}",
         )
     if ui_viewer_msg is not None:
-        engine.post(messages.log("info", ui_viewer_msg))
+        engine.post_log("info", ui_viewer_msg)
 
     if args.watch:
         args.run_for = 0  # stay alive until exit() or Ctrl-C
@@ -508,11 +517,8 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
                         await asyncio.sleep(0.2)  # let editors finish writing
                         for qa_id in sorted(qa_ids):
                             engine.restart_qa(qa_id)
-                            engine.post(
-                                messages.log(
-                                    "info",
-                                    f"[watch] restarted QA {qa_id} ({Path(path).name})",
-                                )
+                            engine.post_log(
+                                "info", f"[watch] restarted QA {qa_id} ({Path(path).name})"
                             )
 
         asyncio.create_task(watch_loop(), name="flua-watch")
@@ -559,7 +565,8 @@ def _check_cli(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         if not path.exists():
             parser.error(f"cannot open {script}: no such file")
         if path.suffix.lower() == ".fqa":
-            path = Path(_unpack_fqa_script(parser, path))
+            main_path, _fqa = _unpack_fqa_script(parser, path)
+            path = Path(main_path)
             unpack_dirs = list(_FQA_UNPACK_DIRS)
         findings += check_file(str(path.resolve()), lua)
     # check mode never starts the engine: clean the unpack dirs here

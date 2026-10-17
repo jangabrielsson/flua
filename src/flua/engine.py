@@ -377,6 +377,14 @@ class LuaEngine:
         """Append a Lua -> Python message. Never blocks, never calls Lua."""
         self._inbound.append(msg)
 
+    def post_log(self, level: str, text: str) -> None:
+        """Post a flua notice through the pump in the plain console format
+        AND record it in the /debugMessages buffer with the 'flua' tag — the
+        greeting, viewer announces, proxy lifecycle, watch notices all use
+        this, so the console buffer is complete in both log modes."""
+        self.api.state.record_debug_message(str(level).lower(), "flua", text, self.clock.time)
+        self.post(messages.log(level, text))
+
     def _debug_message(self, level: str, tag: str | None, text: str) -> None:
         """Record one QA console line in the sim's /debugMessages buffer
         (same sync/depth guarantees as log_line: pure state append, never
@@ -688,6 +696,20 @@ class LuaEngine:
         if created is not None:
             # every RefreshStateSubscriber learns the new device appeared
             self.enqueue_outbound(messages.refresh_state_event(created))
+        # a packaged .fqa can declare interfaces beyond the type skeleton
+        # (e.g. a child device's extra interfaces) — apply them, like
+        # import_qa does for uploads
+        interfaces = qa_config.get("initialInterfaces")
+        if isinstance(interfaces, list):
+            device = self.api.state.devices.get(qa_id)
+            if device is not None:
+                current = device.get("interfaces")
+                if not isinstance(current, list):
+                    current = []
+                    device["interfaces"] = current
+                for interface in interfaces:
+                    if interface != "quickApp" and interface not in current:
+                        current.append(interface)
         self.mark_db_dirty()
         if proxy_enabled:
             # the sim only shadows the HC3's device from here on
@@ -982,12 +1004,10 @@ class LuaEngine:
 
     def _proxy_connect_done(self, qa_id: int, name: str, ip: str, port: int, status: int) -> None:
         if status in (200, 202):
-            self.post(
-                messages.log(
-                    "info",
-                    f"flua: proxy connected — {name}_Proxy ({qa_id}) sends "
-                    f"actions and UI events to http://{ip}:{port}",
-                )
+            self.post_log(
+                "info",
+                f"flua: proxy connected — {name}_Proxy ({qa_id}) sends "
+                f"actions and UI events to http://{ip}:{port}",
             )
         else:
             logger.warning(
@@ -1904,10 +1924,8 @@ class LuaEngine:
             "qaid": msg.get("qaid"),
             "msg": str(msg.get("text", "")),
         }
-        if entry["tag"] is None:
-            # untagged lines (runtime print, notices): QA lines reach the
-            # buffer through _PY.debug_message instead (no double record)
-            self._debug_message(entry["level"], None, entry["msg"])
+        # the /debugMessages buffer is fed by the Lua-side taps
+        # (_PY.debug_message) and flua_log/post_log — no recording here
         line = json.dumps(entry, ensure_ascii=False)
         _print_stdout(line)
         self._logfile_write(line)

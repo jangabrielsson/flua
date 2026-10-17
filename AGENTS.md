@@ -16,6 +16,7 @@ against a real HC3, or in proxy mode (a mirror QA on the HC3).
   `docs/concurrency.md` (threading/execution model, blocking rules,
   graceful exit), `docs/walkthroughs.md` (guided traces of key flows),
   `docs/invariants.md` (behavioral contracts with their pinning tests),
+  `docs/rest-endpoints.md` (real vs shape-only-stub REST routes),
   `docs/decisions/` (ADR-lite — update when a decision changes).
   `README.md` (overview).
 - **Examples**: `examples/` — runnable QuickApps; the test suite treats them

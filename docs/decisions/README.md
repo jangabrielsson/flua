@@ -13,3 +13,5 @@ decision changes.
 | [0005](0005-pump-polls-get_nowait.md) | the pump polls the outbound queue with get_nowait, never wait_for | active |
 | [0006](0006-in-flight-api-calls-are-pending-work.md) | suspended QAs' remote calls count as pending work | active |
 | [0007](0007-tests-parallel-by-default.md) | tests run parallel by default with a serial hatch and a slow-marker gate | active |
+| [0008](0008-fqa-files-runnable-as-scripts.md) | `.fqa` files are directly runnable as scripts | active |
+| [0009](0009-real-logs-over-rest.md) | the sim serves real logs over REST (debugMessages + systemLog) | active |
