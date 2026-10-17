@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.40] - 2026-10-17
+
+### Fixed
+- ensure EOF handling reports closed state correctly in tests
+
 ## [0.1.39] - 2026-10-17
 
 ### Added
