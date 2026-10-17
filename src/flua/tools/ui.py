@@ -9,6 +9,7 @@ element.
 from __future__ import annotations
 
 import argparse
+import json
 from typing import Any
 
 from .common import build_fqa
@@ -19,6 +20,11 @@ HELP = "print a QA's UI as text (elements, callbacks, options) — no browser ne
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("script", help="the QA main file")
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="structured dump instead of text: {name, type, useUiView, elements, callbacks}",
+    )
 
 
 def _callback_map(initial: dict[str, Any]) -> dict[str, dict[str, str]]:
@@ -101,6 +107,27 @@ def _component_line(component: dict[str, Any], cbs: dict[str, dict[str, str]]) -
     return f"{typ} {name} {label}".strip()
 
 
+def _components(initial: dict[str, Any]) -> list[dict[str, Any]]:
+    """The active format's components, flattened (containers descend)."""
+    components: list[dict[str, Any]] = []
+    if initial.get("useUiView"):
+        rows = initial.get("uiView") or []
+        for row in rows:
+            if isinstance(row, dict):
+                components.extend(
+                    c for c in row.get("components") or [] if isinstance(c, dict)
+                )
+        return components
+    jason = (initial.get("viewLayout") or {}).get("$jason") or {}
+    sections = ((jason.get("body") or {}).get("sections") or {}).get("items") or []
+    for item in sections:
+        if isinstance(item, dict):
+            components.extend(
+                c for c in item.get("components") or [] if isinstance(c, dict)
+            )
+    return components
+
+
 def _render_view_layout(layout: Any, cbs: dict[str, dict[str, str]]) -> list[str]:
     jason = (layout or {}).get("$jason") or {}
     sections = ((jason.get("body") or {}).get("sections") or {}).get("items") or []
@@ -136,6 +163,18 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         parser.error(str(exc))
     initial = fqa.get("initialProperties") or {}
     cbs = _callback_map(initial)
+    if args.json:
+        # structured dump: agents read elements/callbacks/values without
+        # parsing prose — the same components the text renderer walks
+        payload = {
+            "name": fqa.get("name"),
+            "type": fqa.get("type"),
+            "useUiView": bool(initial.get("useUiView")),
+            "elements": _components(initial),
+            "callbacks": initial.get("uiCallbacks") or [],
+        }
+        print(json.dumps(payload))
+        return 0
     print(f'QA "{fqa.get("name")}" ({fqa.get("type", "?")})')
     if initial.get("useUiView"):
         lines = _render_ui_view(initial.get("uiView"), cbs)

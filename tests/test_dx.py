@@ -87,6 +87,42 @@ def test_check_flags_deprecated_api() -> None:
         assert "deprecated API: GET /quickApp/export/5000" in result.stdout
 
 
+def test_version_machine_json() -> None:
+    # --version --machine: one JSON line agents/installers can probe
+    result = _run("--version", "--machine")
+    assert result.returncode == 0, result.stdout + result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["version"].count(".") >= 2
+    assert payload["lua"].startswith("Lua 5")
+    assert payload["python"].count(".") == 2
+    # the plain form stays human text
+    result = _run("--version")
+    assert result.returncode == 0
+    assert result.stdout.strip().startswith("flua ")
+
+
+def test_check_json_output() -> None:
+    # --check --json: structured findings instead of prose lines
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        good = Path(d) / "good.lua"
+        good.write_text("--%%name:x\nprint('hi')\n")
+        result = _run("--check", "--json", str(good))
+        assert result.returncode == 0, result.stdout + result.stderr
+        payload = json.loads(result.stdout)
+        assert payload == {"ok": True, "findings": []}
+        bad = Path(d) / "bad.lua"
+        bad.write_text("print(\n")
+        result = _run("--check", "--json", str(bad))
+        assert result.returncode == 1
+        payload = json.loads(result.stdout)
+        assert payload["ok"] is False
+        assert payload["findings"][0]["severity"] == "error"
+        assert "syntax" in payload["findings"][0]["message"]
+        assert payload["findings"][0]["file"] == str(bad.resolve())
+
+
 def test_check_follows_file_includes() -> None:
     # --check validates the whole project: the main file plus every
     # --%%file include, each with its own file context

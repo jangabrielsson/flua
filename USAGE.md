@@ -54,6 +54,10 @@ python3 -m venv .venv
 flua --version
 ```
 
+`flua --version --machine` prints one JSON line instead
+(`{"version", "lua", "python"}`) — the stable capability probe for agents,
+installers, and scripts.
+
 ## Your first QuickApp
 
 A QuickApp is an ordinary Lua file. `QuickApp:onInit` runs exactly like on
@@ -914,7 +918,9 @@ Checks syntax, unknown `--%%` directives (typos), and deprecated API calls.
 Warnings don't fail the run; syntax errors exit 1. Good in CI. It checks the
 **whole project**: the main file plus every `--%%file` include (a missing
 include is an error, and `$name` entries resolve to flua's bundled
-libraries).
+libraries). `--check --json` prints the findings as one JSON document
+(`{"ok", "findings": [{file, severity, message}]}`) instead of prose — the
+agent/CI form.
 
 ### Self-testing a QA (no repo needed)
 
@@ -963,13 +969,19 @@ exit code.
 For machine-readable runs (agents parsing the log), `--log json` emits one
 JSON object per line — `{time, level, tag, qaid, msg}` — with stdout kept
 pure JSON and flua's own notices on stderr; `--logfile FILE` writes a copy
-of the log (ANSI stripped, JSON lines with `--log json`).
+of the log (ANSI stripped, JSON lines with `--log json`). `--syslog FILE`
+appends every structured system/crash event as one JSON line — the
+complete history, where `GET /flua/systemLog` is the bounded in-memory
+buffer.
 
 UI behavior folds into the same loop from Lua: `_FLUA.uiEvent(element,
 eventType[, value])` injects a UI event exactly as the HC3 UI would deliver
 it (values arrive as strings, like the real UI), and `self:getView()`
 returns the current rendered view — `updateView` changes included. A text
-rendering of the UI without a browser: `flua --tool ui script.lua`.
+rendering of the UI without a browser: `flua --tool ui script.lua`; the
+structured form `flua --tool ui --json script.lua` returns
+`{name, type, useUiView, elements, callbacks}` — the agent form, no prose
+to parse.
 
 When the logic under test needs external interactions, serve the sim API
 with `--ui PORT` and drive it over HTTP (`/plugins/callUIEvent`,

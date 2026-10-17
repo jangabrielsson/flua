@@ -296,23 +296,6 @@ def mock_hc3() -> str:
     server.shutdown()
 
 
-async def _run_qa(script: str, sleep: float = 0.6, capsys=None) -> str:
-    import tempfile
-
-    with tempfile.TemporaryDirectory() as d:
-        path = f"{d}/qa.lua"
-        with open(path, "w", encoding="utf-8") as handle:
-            handle.write(script)
-        engine = LuaEngine(api_mode="remote")
-        await engine.start()
-        try:
-            engine.start_qa(path, None, {}, path)
-            await asyncio.sleep(sleep)
-        finally:
-            await engine.stop()
-    return capsys.readouterr().out
-
-
 @pytest.mark.asyncio
 async def test_hybrid_routing_local_sim_and_remote_hc3(
     tmp_path, capsys, mock_hc3, monkeypatch

@@ -212,6 +212,7 @@ class LuaEngine:
         self._exit_code = 0
         self._log_json = False  # --log json: QA log lines as JSON
         self._logfile: Any = None  # --logfile FILE: log copy (ANSI stripped)
+        self._syslog: Any = None  # --syslog FILE: system events, one JSON line each
         self._pump_task: asyncio.Task[None] | None = None
         self.env = EnvChain()  # os.getenv chain: local .env > ~/.env > process env
         # HC3 REST API: the offline sim with api_mode="local" (the explicit
@@ -401,9 +402,15 @@ class LuaEngine:
             info = self.qa_info(int(qa))
             if info is not None:
                 tag = f"{info['name']}{qa}"
-        self.api.state.record_system_event(
+        entry = self.api.state.record_system_event(
             event, None if qa is None else int(qa), tag, detail, self.clock.time, code=code
         )
+        if self._syslog is not None:
+            try:
+                self._syslog.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                self._syslog.flush()
+            except OSError:
+                pass
 
     def log_line(self, level: str, text: str) -> None:
         """Print a QA log line directly (safe at any call depth: only stdout
@@ -433,6 +440,12 @@ class LuaEngine:
         self._lua.globals()["_FLUA"]["logJson"] = self._log_json
         if logfile:
             self._logfile = open(logfile, "a", encoding="utf-8")
+
+    def set_syslog(self, path: str) -> None:
+        """--syslog FILE: append every system/crash event as one JSON line —
+        the complete on-disk history, where /flua/systemLog is the bounded
+        in-memory buffer."""
+        self._syslog = open(path, "a", encoding="utf-8")
 
     def _logfile_write(self, line: str) -> None:
         if self._logfile is None:
@@ -1439,6 +1452,12 @@ class LuaEngine:
             except OSError:
                 pass
             self._logfile = None
+        if self._syslog is not None:
+            try:
+                self._syslog.close()
+            except OSError:
+                pass
+            self._syslog = None
         if self._pump_task is not None:
             self._pump_task.cancel()
             try:

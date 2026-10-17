@@ -81,9 +81,9 @@ The canonical table lives in **[../rest-endpoints.md](../rest-endpoints.md)**
    `engine.post_log` records flua notices under the `flua` tag, and the
    Lua-side `postLog`/runtime `print` taps record untagged lines; the
    buffer is complete in both log modes (single record per line).
-2. System-log transport: the `/flua/*` REST route is done; a `--log
-   system`-style file copy is still open (would mirror `--logfile` for
-   agents that prefer files).
+2. ~~System-log file copy~~ — done: `--syslog FILE` appends every system
+   event as one JSON line (the complete history, complementing the bounded
+   `/flua/systemLog` buffer).
 3. Buffer bounds (10 000 / 2 000) — enough for agent probing sessions, or
    should they be configurable?
 4. Should `offset`'s HC3 quirk ("number of returned messages") be

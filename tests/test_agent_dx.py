@@ -235,6 +235,35 @@ def test_tool_ui_renders_elements(tmp_path) -> None:
     assert 'select sel1 "Pick" = {11} [One=11] -> onToggled' in result.stdout
 
 
+def test_tool_ui_json_dump(tmp_path) -> None:
+    # --tool ui --json: the structured UI (elements/callbacks/values) — the
+    # agent form, no prose to parse
+    (tmp_path / "qa.lua").write_text(
+        "--%%name:uitool\n"
+        "--%%type:com.fibaro.binarySwitch\n"
+        '--%%u:{label="l1",text="Status"}\n'
+        '--%%u:{button="B1",text="Press me",onReleased="fopp"}\n'
+        '--%%u:{select="sel1",text="Pick",value="11",options={{type="option",text="One",value="11"}}}\n'
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:fopp() end\n"
+        "function QuickApp:onInit() end\n"
+    )
+    result = _run("--tool", "ui", "--json", "qa.lua", cwd=tmp_path, nogreet=False)
+    assert result.returncode == 0, result.stdout + result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["name"] == "uitool"
+    assert payload["type"] == "com.fibaro.binarySwitch"
+    assert payload["useUiView"] is False
+    assert {"callback": "fopp", "eventType": "onReleased", "name": "B1"} in payload["callbacks"]
+    kinds = {e.get("name"): e for e in payload["elements"]}
+    assert kinds["l1"]["type"] == "label"
+    assert kinds["B1"]["type"] == "button"
+    select = kinds["sel1"]
+    assert select["type"] == "select" and select["selectionType"] == "single"
+    assert select["values"] == ["11"]  # the select-value fix flows into the dump
+    assert select["options"][0]["value"] == "11"
+
+
 def test_multi_qa_exit_aggregation(tmp_path) -> None:
     # a failing QA in a multi-QA run must fail the process (last failing wins)
     (tmp_path / "ok.lua").write_text("function QuickApp:onInit() exit(0) end\n")

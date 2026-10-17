@@ -1,6 +1,7 @@
 """QuickApp model: isolated environments, per-QA timers, config copy."""
 
 import asyncio
+import json
 import re
 import subprocess
 import sys
@@ -565,6 +566,36 @@ async def test_debug_messages_record_runtime_and_system_lines() -> None:
         assert ("info", "from runtime") in runtime
     finally:
         await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_syslog_file_records_system_events(tmp_path) -> None:
+    # --syslog FILE: every system event as one JSON line — the complete
+    # history, where /flua/systemLog is the bounded in-memory buffer
+    syslog_path = tmp_path / "events.jsonl"
+    script = tmp_path / "boom.lua"
+    script.write_text(
+        "--%%name:boom\nsetTimeout(function() error('kaboom') end, 20)\n"
+    )
+    engine = LuaEngine()
+    engine.set_syslog(str(syslog_path))
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await wait_until(lambda: not engine.has_pending_work())
+    finally:
+        await engine.stop()
+    lines = [
+        json.loads(line)
+        for line in syslog_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    events = [entry["event"] for entry in lines]
+    assert "run_start" in events and "qa_load" in events and "run_stop" in events
+    crash = next(e for e in lines if e["event"] == "crash")
+    assert crash["qa"] == 5000 and crash["tag"] == "boom5000"
+    assert "kaboom" in crash["detail"]
+    assert all("time" in e and "id" in e for e in lines)
 
 
 @pytest.mark.asyncio

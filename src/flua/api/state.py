@@ -427,11 +427,11 @@ class SimState:
         detail: str,
         timestamp: float,
         code: int = 0,
-    ) -> None:
+    ) -> dict[str, Any]:
         """Append one structured lifecycle/crash entry to /flua/systemLog.
         Called from the pump and worker threads — pure deque append, never
         Lua. Event names: run_start, run_stop, qa_load, qa_restart, qa_exit,
-        qa_error, crash, error."""
+        qa_error, crash, error. Returns the recorded entry."""
         self._sys_seq += 1
         try:
             when = datetime.fromtimestamp(timestamp).isoformat(timespec="seconds")
@@ -439,17 +439,17 @@ class SimState:
             # exotic --start values: the virtual clock can leave the range
             # datetime handles — fall back to the raw epoch seconds
             when = str(int(timestamp))
-        self.system_events.append(
-            {
-                "id": self._sys_seq,
-                "time": when,
-                "event": event,
-                "qa": qa,
-                "tag": tag,
-                "code": code,
-                "detail": detail,
-            }
-        )
+        entry = {
+            "id": self._sys_seq,
+            "time": when,
+            "event": event,
+            "qa": qa,
+            "tag": tag,
+            "code": code,
+            "detail": detail,
+        }
+        self.system_events.append(entry)
+        return entry
 
     def clear_system_events(self) -> None:
         """DELETE /flua/systemLog: empty the lifecycle buffer (ids keep

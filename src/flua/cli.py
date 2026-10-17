@@ -150,6 +150,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "JSON lines with --log json)",
     )
     parser.add_argument(
+        "--syslog",
+        metavar="FILE",
+        default=None,
+        help="append every structured system/crash event as one JSON line to FILE "
+        "(the complete history; /flua/systemLog is the bounded in-memory buffer)",
+    )
+    parser.add_argument(
         "--examples",
         action="store_true",
         help="print the installed examples directory and exit",
@@ -179,7 +186,17 @@ def _build_parser() -> argparse.ArgumentParser:
         "port is printed at startup)",
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="enable debug logging")
-    parser.add_argument("--version", action="version", version=f"flua {__version__}")
+    parser.add_argument("--version", action="store_true", help="print the flua version and exit")
+    parser.add_argument(
+        "--machine",
+        action="store_true",
+        help="with --version: one JSON line (version, lua, python) for agents/installers",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="with --check: machine-readable findings (JSON on stdout)",
+    )
     return parser
 
 
@@ -424,6 +441,8 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             location=location,
         )
         engine.set_log_mode(args.log, args.logfile)
+        if args.syslog:
+            engine.set_syslog(args.syslog)
         for directory in _FQA_UNPACK_DIRS:
             # CLI-unpacked .fqa packages die with the engine
             engine.track_temp_dir(directory)
@@ -573,6 +592,15 @@ def _check_cli(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
     for directory in unpack_dirs:
         with contextlib.suppress(OSError):
             shutil.rmtree(directory, ignore_errors=True)
+    if args.json:
+        parsed = []
+        for line in findings:
+            file, _, rest = line.partition(": ")
+            severity, _, message = rest.partition(": ")
+            parsed.append({"file": file, "severity": severity, "message": message})
+        payload = {"ok": not any(f["severity"] == "error" for f in parsed), "findings": parsed}
+        print(json.dumps(payload))
+        return 0 if payload["ok"] else 1
     if not findings:
         print("ok")
         return 0
@@ -675,6 +703,23 @@ def main(argv: list[str] | None = None) -> int:
         return _tool_main(raw)
     parser = _build_parser()
     args = parser.parse_args(_normalize_debugger_argv(raw))
+    if args.version:
+        if args.machine:
+            # one JSON line: a stable capability probe (agents, installers,
+            # the future MCP layer) — no prose to parse
+            engine = LuaEngine()
+            print(
+                json.dumps(
+                    {
+                        "version": __version__,
+                        "lua": engine.lua_version(),
+                        "python": sys.version.split()[0],
+                    }
+                )
+            )
+        else:
+            print(f"flua {__version__}")
+        return 0
     if args.examples:
         print(_examples_dir())
         return 0
