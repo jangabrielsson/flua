@@ -32,7 +32,8 @@ The MCP server lives in **this repo** (`src/flua/mcp/`) and ships in the
 
 - `pip install fibaro-flua` provides both `flua` and `flua-mcp`.
 - The existing test suite covers the MCP layer (subprocess JSON-RPC on
-  stdin/stdout); the CI matrix (3.11–3.14) applies unchanged.
+  stdin/stdout); the CI matrix (3.11, 3.12, 3.14, 3.15 — the floor, the
+  installed base, the mainstream, the newest) applies unchanged.
 - Host registration (Claude Desktop/Copilot config) stays documentation —
   USAGE.md + the skills — never code.
 - Sessions (the stateful tier from notes-mcp.md) will use the in-process

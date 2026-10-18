@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             platform: linux
             arch: x86_64
           - os: windows-latest
@@ -112,7 +112,7 @@ jobs:
   # Job 2: Update release with summary (runs after build completes)
   update-release:
     needs: [build-executables]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - name: Update release description
       uses: softprops/action-gh-release@v1

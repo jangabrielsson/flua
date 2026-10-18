@@ -7,10 +7,10 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.11", "3.12", "3.14", "3.15"]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -21,7 +21,7 @@ jobs:
       - run: pytest tests/ -q --ignore=tests/test_hc3_live.py --ignore=tests/test_hc3_compat.py
 
   wheel:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
