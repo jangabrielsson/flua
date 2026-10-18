@@ -110,6 +110,10 @@ def test_discover_lists_supported_versions() -> None:
     assert result["capabilities"] == {"tools": {}, "resources": {}, "prompts": {}}
     assert result["_meta"]["io.modelcontextprotocol/serverInfo"]["name"] == "flua-mcp"
     assert result["instructions"]
+    # the instructions are the discovery hook for the knowledge tiers:
+    # they must steer agents at resources/prompts, not at web search
+    assert "flua://docs/USAGE.md" in result["instructions"]
+    assert "qa_probe" in result["instructions"]
 
 
 def test_modern_per_request_version_check() -> None:

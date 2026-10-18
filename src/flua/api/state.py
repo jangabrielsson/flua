@@ -16,7 +16,7 @@ from collections import deque
 from datetime import datetime
 from typing import Any
 
-from ..devices import skeleton_for
+from ..devices import catalog_types, skeleton_for
 from ..suncalc import sunrise_sunset
 
 FIRST_RUNTIME_ID = 900000
@@ -33,13 +33,24 @@ DEFAULT_DEVICE_TYPE = "com.fibaro.binarySwitch"
 DEFAULT_LOCATION = {"latitude": 59.3293, "longitude": 18.0686}
 
 
+def _type_error(device_type: str) -> ValueError:
+    """Unknown --%%type: suggest close matches (typos) and point at the
+    catalog command — the error is read by agents, so it must be actionable."""
+    from difflib import get_close_matches
+
+    close = get_close_matches(device_type, catalog_types(), n=3, cutoff=0.6)
+    hint = f" — did you mean {', '.join(repr(t) for t in close)}?" if close else ""
+    hint += " (all supported types: flua --tool catalog)"
+    return ValueError(f"unknown device type: {device_type!r}{hint}")
+
+
 def _device_skeleton(device_id: int, name: str, device_type: str | None) -> dict[str, Any]:
     # No --%%type defaults to com.fibaro.binarySwitch; a type that is not in
     # the catalog is an error (the HC3 would not have it either).
     resolved = device_type or DEFAULT_DEVICE_TYPE
     base = skeleton_for(resolved)
     if base is None:
-        raise ValueError(f"unknown device type: {resolved!r}")
+        raise _type_error(resolved)
     base["id"] = device_id
     base["name"] = name
     return base

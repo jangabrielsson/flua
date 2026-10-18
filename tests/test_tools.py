@@ -9,6 +9,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -22,6 +23,7 @@ from flua import tools  # noqa: E402
 
 def test_registry_discovers_all_tools() -> None:
     assert tools.tool_names() == [
+        "catalog",
         "createDB",
         "downloadFQA",
         "downloadQA",
@@ -746,6 +748,31 @@ def test_sync_skills_script_restores_drift(tmp_path) -> None:
     # ...and the docs copy matches the docs tree (plus the root READMEs)
     assert doc_victim.read_bytes() == (docs / "walkthroughs.md").read_bytes()
     assert (packaged_docs / "USAGE.md").read_bytes() == (repo / "USAGE.md").read_bytes()
+
+
+def test_tool_catalog_lists_device_types() -> None:
+    # the answer to "unknown device type": the full --%%type catalog, as
+    # lines and as JSON
+    repo = Path(__file__).resolve().parent.parent
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--tool", "catalog"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "com.fibaro.binarySwitch" in result.stdout
+    assert "com.fibaro.multilevelSwitch" in result.stdout
+    result_json = subprocess.run(
+        [sys.executable, "-m", "flua", "--tool", "catalog", "--json"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    types = json.loads(result_json.stdout)
+    assert isinstance(types, list) and "com.fibaro.binarySwitch" in types
 
 
 def test_packaged_viewer_serves_from_the_package() -> None:

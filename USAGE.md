@@ -922,6 +922,10 @@ libraries). `--check --json` prints the findings as one JSON document
 (`{"ok", "findings": [{file, severity, message}]}`) instead of prose — the
 agent/CI form.
 
+A wrong `--%%type` is an error with directions: it names close matches
+(typos) and points at `flua --tool catalog`, which lists every device type
+the sim supports (`--json` for a JSON array).
+
 ### Self-testing a QA (no repo needed)
 
 A QA can be its own test suite — no pytest, no repo. Assert inside the QA,

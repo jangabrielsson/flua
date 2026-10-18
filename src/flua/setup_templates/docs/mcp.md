@@ -235,7 +235,9 @@ no extra dependencies:
 - Runs are bounded (`timeout`) and capped: at most 4 concurrent one-shot
   runs (`qa_run`/`devices`) — further ones fail fast with `isError`.
   Every tool failure is either an `isError` result or a JSON-RPC error —
-  the server process never dies on a bad request.
+  the server process never dies on a bad request. Engine errors are
+  actionable: a wrong `--%%type` names close matches and points at
+  `flua --tool catalog`.
 
 ## Status & next
 

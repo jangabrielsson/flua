@@ -72,8 +72,17 @@ def test_register_qa_defaults_to_binary_switch_skeleton() -> None:
 
 def test_register_qa_unknown_type_raises() -> None:
     api = Api()
-    with pytest.raises(ValueError, match="unknown device type"):
+    with pytest.raises(ValueError, match="unknown device type") as info:
         api.register_qa(5000, "qa", "com.no.such.type", {})
+    # the error is actionable: it points at the catalog
+    assert "flua --tool catalog" in str(info.value)
+
+
+def test_register_qa_typo_suggests_close_matches() -> None:
+    api = Api()
+    with pytest.raises(ValueError, match="did you mean") as info:
+        api.register_qa(5000, "qa", "com.fibaro.binaryswitc", {})
+    assert "com.fibaro.binarySwitch" in str(info.value)
 
 
 def test_cli_unknown_type_is_an_error(tmp_path) -> None:
@@ -88,6 +97,7 @@ def test_cli_unknown_type_is_an_error(tmp_path) -> None:
     )
     assert result.returncode == 2
     assert "unknown device type" in result.stderr
+    assert "flua --tool catalog" in result.stderr
 
 
 def test_register_qa_uses_type_skeleton() -> None:
