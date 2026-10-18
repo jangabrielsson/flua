@@ -4,6 +4,13 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.46] - 2026-10-18
+
+### Added
+- implement concurrency cap for one-shot tools and update documentation
+- update README with MCP server details and new tools
+- add 'devices' tool to run QA files and return final device list
+
 ## [0.1.45] - 2026-10-17
 
 ### Added
