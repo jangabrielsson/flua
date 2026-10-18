@@ -250,6 +250,13 @@ the mode, following each mode's source of truth:
 - **proxy** — everything worth keeping is already on the HC3; the `+` is
   ignored with a warning (seed still applies).
 
+Seeded physical devices (no QA behind them) react to the canonical light
+actions: `POST /devices/{id}/action/turnOn|turnOff|setValue` updates their
+`value` like a real device (dimmers use 0/99 levels, `"on"`/`"off"`
+strings work), gated by the catalog's `light` interface — sensors stay
+inert. QAs and proxy devices are untouched. Giving seeded devices real QA
+logic is the layer-2 design in `docs/notes/notes-device-emulation.md`.
+
 Running QAs are never persisted as devices — they are rebuilt from code each
 run. Children survive restarts and re-register under their parent QA, so a
 QA's usual `api.get("/devices?parentId="..self.id)` startup check finds

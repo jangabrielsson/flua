@@ -731,6 +731,41 @@ def test_put_configures_sim_world_values() -> None:
     assert weather["Humidity"] == 62.0  # untouched fields keep the defaults
 
 
+def test_seeded_devices_react_to_light_actions() -> None:
+    # layer 1 emulation: seeded physical devices behave without a QA
+    api = Api(
+        seed={
+            "devices": [
+                {"id": 100, "name": "Lamp", "type": "com.fibaro.binarySwitch"},
+                {"id": 101, "name": "Dimmer", "type": "com.fibaro.multilevelSwitch"},
+                {"id": 102, "name": "Sensor", "type": "com.fibaro.temperatureSensor"},
+            ]
+        }
+    )
+    api.dispatch("POST", "/devices/100/action/turnOn")
+    assert api.dispatch("GET", "/devices/100")[0]["properties"]["value"] is True
+    api.dispatch("POST", "/devices/100/action/turnOff")
+    assert api.dispatch("GET", "/devices/100")[0]["properties"]["value"] is False
+    api.dispatch("POST", "/devices/101/action/turnOn")
+    assert api.dispatch("GET", "/devices/101")[0]["properties"]["value"] == 99
+    api.dispatch("POST", "/devices/101/action/setValue", {"args": [42]})
+    assert api.dispatch("GET", "/devices/101")[0]["properties"]["value"] == 42
+    # a sensor stays inert (the catalog's interfaces are the gate)
+    before = api.dispatch("GET", "/devices/102")[0]
+    api.dispatch("POST", "/devices/102/action/turnOn")
+    assert api.dispatch("GET", "/devices/102")[0] == before
+    # the change rides the refreshStates feed
+    feed, _ = api.dispatch("GET", "/refreshStates")
+    assert any(
+        e["type"] == "DevicePropertyUpdatedEvent" and e["objects"][0]["objectId"] == 100
+        for e in feed["events"]
+    )
+    # a QA's actions still run the QA's code, never the default
+    api.register_qa(5000, "qa", "com.fibaro.binarySwitch", {})
+    api.dispatch("POST", "/devices/5000/action/turnOn")
+    assert api.dispatch("GET", "/devices/5000")[0]["properties"]["value"] is False
+
+
 def test_sim_world_default_shapes() -> None:
     api = Api()
     # device 1 is the zwave primary controller with virtual-time sun data

@@ -197,7 +197,10 @@ state. Unknown paths return `(nil, 404)` like the HC3. Implemented:
   `updateProperty`, `updateView`, `interfaces`, `restart`
 - **actions** — `POST /devices/{id}/action/{name}` and `groupAction` run
   `QuickApp` methods via the pump (`fibaro.call` between QAs works offline);
-  `customEvents` fire `onCustomEvent` handlers
+  `customEvents` fire `onCustomEvent` handlers. Seeded physical devices
+  (no QA) react to `turnOn`/`turnOff`/`setValue` by updating `value` —
+  the house behaves out of the box (layer-2 QA emulation: see
+  `docs/notes/notes-device-emulation.md`)
 - **scenes / alarms / profiles** — metadata + run state, arm/disarm,
   active-profile switching
 - **globalVariables / rooms** — seeded + mutable

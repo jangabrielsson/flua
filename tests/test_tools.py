@@ -93,7 +93,7 @@ class _MockHc3(BaseHTTPRequestHandler):
                 {
                     "id": 1,
                     "name": "my-hc3",
-                    "type": "HC3",
+                    "type": "com.fibaro.zwavePrimaryController",
                     "properties": {"sunriseHour": "06:00", "sunsetHour": "21:30"},
                 }
             )
@@ -498,6 +498,7 @@ def test_create_db_tool(tmp_path, monkeypatch, capsys) -> None:
         doc = json.loads(out.read_text(encoding="utf-8"))
         assert doc["location"] == {"latitude": 57.7, "longitude": 11.97}
         assert doc["devices"][0]["name"] == "my-hc3"
+        assert doc["devices"][0]["type"] == "com.fibaro.zwavePrimaryController"
         assert doc["devices"][0]["properties"]["sunsetHour"] == "21:30"
         assert doc["familyLocations"][0]["name"] == "Home"
         # an existing file is protected unless --force

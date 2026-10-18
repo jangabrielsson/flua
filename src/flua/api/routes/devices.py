@@ -7,6 +7,7 @@ import urllib.parse
 from typing import Any
 
 from ... import messages
+from ...devices import skeleton_for
 from ..request import ApiRequest, forward_to_proxy
 from ..state import SimState, public
 
@@ -133,6 +134,59 @@ def device_property_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     return public(value), 200
 
 
+def _default_action_value(action: str, device_type: Any, args: list[Any]) -> Any:
+    """The canonical light-action semantics for seeded (non-plugin)
+    devices: binary switches flip value, dimmers use 0/99 levels — the same
+    values the quickapp-types templates use."""
+    dimmer = str(device_type or "").endswith("multilevelSwitch")
+    if action == "turnOn":
+        return 99 if dimmer else True
+    if action == "turnOff":
+        return 0 if dimmer else False
+    if action == "setValue" and args:
+        raw = args[0]
+        if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+            return raw
+        if isinstance(raw, str):
+            lowered = raw.lower()
+            if lowered == "on":
+                return 99 if dimmer else True
+            if lowered == "off":
+                return 0 if dimmer else False
+            try:
+                return int(raw)
+            except ValueError:
+                return None
+    return None
+
+
+def _apply_default_action(
+    state: SimState, req: ApiRequest, dev: dict[str, Any], args: list[Any]
+) -> None:
+    """Layer 1 device emulation: seeded physical devices (no QA behind
+    them) react to the canonical light actions by updating their value —
+    the house behaves without starting any QA. QAs/plugins and proxy
+    devices never reach here (their actions run real code / the HC3)."""
+    if dev.get("isPlugin") or state.is_proxy(dev["id"]):
+        return
+    new_value = _default_action_value(req.path_params["action"], dev.get("type"), args)
+    if new_value is None:
+        return
+    # the catalog's interfaces are the gate: light-like devices switch
+    # value, sensors and meters stay inert
+    skeleton = skeleton_for(dev.get("type"))
+    interfaces = dev.get("interfaces") or (skeleton or {}).get("interfaces") or []
+    if "light" not in interfaces:
+        return
+    properties = dev.setdefault("properties", {})
+    old = properties.get("value")
+    properties["value"] = new_value
+    dev["modified"] = int(_now(req))
+    entry = state.record_property_event(dev["id"], "value", new_value, old, _now(req))
+    if entry is not None and req.emit is not None:
+        req.emit(messages.refresh_state_event(entry))
+
+
 def action_device(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     """POST /devices/{id}/action/{action}: accepted here, run via the pump."""
     dev = state.device(req.path_params["id"])
@@ -155,6 +209,7 @@ def action_device(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     )
     if entry is not None and req.emit is not None:
         req.emit(messages.refresh_state_event(entry))
+    _apply_default_action(state, req, dev, list(args))
     return None, 202
 
 

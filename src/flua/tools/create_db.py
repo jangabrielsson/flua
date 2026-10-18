@@ -52,7 +52,7 @@ def grab_db(engine) -> dict:
             {
                 "id": 1,
                 "name": name,
-                "type": "HC3",
+                "type": dev1.get("type") or "com.fibaro.zwavePrimaryController",
                 "properties": {
                     "sunriseHour": props.get("sunriseHour", "00:00"),
                     "sunsetHour": props.get("sunsetHour", "00:00"),
