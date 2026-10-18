@@ -232,9 +232,10 @@ no extra dependencies:
 - Credentials: `mode: "remote"` uses the server process's environment
   (`HC3_URL`/`HC3_USER`/`HC3_PASSWORD`, the same chain `flua` uses) — never
   tool arguments.
-- Runs are bounded (`timeout`), and every tool failure is either an
-  `isError` result or a JSON-RPC error — the server process never dies on a
-  bad request.
+- Runs are bounded (`timeout`) and capped: at most 4 concurrent one-shot
+  runs (`qa_run`/`devices`) — further ones fail fast with `isError`.
+  Every tool failure is either an `isError` result or a JSON-RPC error —
+  the server process never dies on a bad request.
 
 ## Status & next
 

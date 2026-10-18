@@ -14,6 +14,7 @@ import json
 import re
 import subprocess
 import sys
+import threading
 import time
 from typing import Any
 
@@ -26,6 +27,21 @@ from .sessions import DEFAULT_TTL, SessionManager
 Tool = dict[str, Any]
 
 _SESSIONS = SessionManager()
+
+# One-shot run tools (qa_run subprocesses, devices engines) share a run-slot
+# cap: a host cannot make the server spawn unbounded processes/engines at
+# once. Extra runs fail fast with isError — the agent retries. Sessions are
+# a separate lifecycle (TTL-reaped), not covered here.
+MAX_CONCURRENT_RUNS = 4
+_RUN_SLOTS = threading.BoundedSemaphore(MAX_CONCURRENT_RUNS)
+
+
+def _acquire_run_slot() -> None:
+    if not _RUN_SLOTS.acquire(blocking=False):
+        raise JsonRpcError(
+            INTERNAL_ERROR,
+            f"server busy: {MAX_CONCURRENT_RUNS} runs already in flight (the cap); retry shortly",
+        )
 
 
 def _file_list(args: dict[str, Any]) -> list[str]:
@@ -135,6 +151,7 @@ def _devices(args: dict[str, Any]) -> dict[str, Any]:
     if timeout is not None and (not isinstance(timeout, (int, float)) or timeout <= 0):
         raise JsonRpcError(INVALID_PARAMS, "timeout must be a positive number of seconds")
     loop = asyncio.new_event_loop()
+    _acquire_run_slot()
     try:
         engine = LuaEngine(
             api_mode="local" if mode is None else mode,
@@ -153,6 +170,7 @@ def _devices(args: dict[str, Any]) -> dict[str, Any]:
     except ValueError as exc:
         raise JsonRpcError(INVALID_PARAMS, str(exc)) from None
     finally:
+        _RUN_SLOTS.release()
         loop.close()
 
 
@@ -205,6 +223,7 @@ def _qa_run(args: dict[str, Any]) -> dict[str, Any]:
     if args.get("start") is not None:
         command += ["--start", str(args["start"])]
     command += _file_list(args)
+    _acquire_run_slot()
     try:
         result = subprocess.run(
             command,
@@ -217,6 +236,8 @@ def _qa_run(args: dict[str, Any]) -> dict[str, Any]:
         raise JsonRpcError(
             INTERNAL_ERROR, f"run timed out after {timeout if timeout is not None else 120}s"
         ) from None
+    finally:
+        _RUN_SLOTS.release()
     logs: list[Any] = []
     for line in result.stdout.splitlines():
         if not line.strip():

@@ -143,19 +143,22 @@ e.g. `flua://docs/USAGE.md`, `flua://docs/walkthroughs.md`,
   live sessions, one standard surface) map onto the table above; sessions
   are the only stateful piece and they are explicit by design.
 
-## Open questions
+## Open questions — all resolved
 
 1. ~~V1 transport order — stdio first, or Streamable HTTP first?~~ Both
    shipped: stdio default, `--http` opt-in (ADR 0011).
-2. In-process sessions: one shared event loop per server, or one thread +
-   loop per session? (One loop is simpler; per-session is better
-   isolation. flua's engine is designed for one engine per loop — a
-   single-loop, many-engines server matches the existing tests.)
-3. `qa_run` concurrency: parallel runs are independent subprocesses —
-   fine. Should the server cap them?
-4. Do we pin the MCP spec version in the server's manifest and reject
-   old-protocol clients explicitly?
+2. ~~In-process sessions: one shared event loop per server, or one thread +
+   loop per session?~~ One engine per session on its own loop/thread
+   (sessions.py) — per-session isolation, mirroring how the tests drive
+   engines.
+3. ~~Should the server cap `qa_run` concurrency?~~ Yes —
+   `MAX_CONCURRENT_RUNS` (4) shared by `qa_run` and `devices`; extra runs
+   fail fast with `isError` (server busy), never queue.
+4. ~~Do we pin the MCP spec version and reject old-protocol clients?~~
+   `SUPPORTED_VERSIONS` is the pin: unsupported per-request versions answer
+   `-32022`, and the legacy `initialize` era is still served (dual-era).
 5. ~~Should `qa_probe` include the refreshStates feed?~~ Yes — implemented:
    the feed rides the same cursor-delta machinery as the logs (HC3 polling
    shape `{status, last, changes, events}`).
-6. Naming: `qa_*` prefix everywhere, or drop it (`run`, `check`, `probe`)?
+6. ~~Naming: `qa_*` prefix everywhere, or drop it?~~ Kept: `qa_*` for every
+   tool — one convention, no renames.

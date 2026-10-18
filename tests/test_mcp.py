@@ -9,6 +9,8 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -16,12 +18,14 @@ import pytest
 pytest.importorskip("lupa")
 
 from flua.mcp import jsonrpc as core  # noqa: E402
+from flua.mcp import tools as mcp_tools  # noqa: E402
 from flua.mcp.server import (  # noqa: E402
     LEGACY_PROTOCOL_VERSION,
     METHODS,
     SUPPORTED_VERSIONS,
     _check_protocol_version,
 )
+from flua.mcp.tools import MAX_CONCURRENT_RUNS  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -465,6 +469,52 @@ def test_devices_times_out_on_a_qa_that_never_drains(tmp_path) -> None:
     result = _tool("devices", {"files": [str(script)], "timeout": 0.5})
     assert result["isError"] is True
     assert "timed out" in result["message"]
+
+
+# -- run-slot cap ------------------------------------------------------------------
+
+
+def test_run_tools_fail_fast_when_the_cap_is_exhausted(tmp_path, monkeypatch) -> None:
+    # a fully exhausted semaphore: qa_run and devices both answer busy,
+    # never queue — the cap is shared and fail-fast
+    script = tmp_path / "quick.lua"
+    script.write_text("print('hi')\nexit(0)\n")
+    exhausted = threading.BoundedSemaphore(MAX_CONCURRENT_RUNS)
+    for _ in range(MAX_CONCURRENT_RUNS):
+        exhausted.acquire()
+    monkeypatch.setattr(mcp_tools, "_RUN_SLOTS", exhausted)
+    for tool in ("qa_run", "devices"):
+        result = _tool(tool, {"files": [str(script)]})
+        assert result["isError"] is True
+        assert "busy" in result["message"]
+
+
+@pytest.mark.slow
+def test_qa_run_caps_concurrent_subprocesses(tmp_path) -> None:
+    # MAX_CONCURRENT_RUNS real qa_run subprocesses hold the slots (a 2s
+    # realtime timer each); a further run answers busy, then everything
+    # finishes cleanly
+    script = tmp_path / "hold.lua"
+    script.write_text("setTimeout(function() exit(0) end, 2000)\n")
+    results: list[dict | None] = [None] * MAX_CONCURRENT_RUNS
+    barrier = threading.Barrier(MAX_CONCURRENT_RUNS)
+
+    def run(index: int) -> None:
+        barrier.wait()  # start together so all four are in flight
+        results[index] = _tool("qa_run", {"files": [str(script)]})
+
+    threads = [
+        threading.Thread(target=run, args=(i,), daemon=True) for i in range(MAX_CONCURRENT_RUNS)
+    ]
+    for thread in threads:
+        thread.start()
+    time.sleep(0.8)  # the four subprocesses have booted and hold their slots
+    busy = _tool("qa_run", {"files": [str(script)]})
+    assert busy["isError"] is True
+    assert "busy" in busy["message"]
+    for thread in threads:
+        thread.join(timeout=30)
+    assert all(result is not None and result["exitCode"] == 0 for result in results)
 
 
 # -- qa_ui -----------------------------------------------------------------------
