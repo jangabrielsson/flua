@@ -29,8 +29,23 @@ _SYSTEM_EVENTS_MAX = 2000
 
 DEFAULT_DEVICE_TYPE = "com.fibaro.binarySwitch"
 
-# the sim's default controller location (Stockholm) until seeded/configured
-DEFAULT_LOCATION = {"latitude": 59.3293, "longitude": 18.0686}
+# the sim's default controller location (Stockholm) until seeded/configured;
+# the full HC3 settings/location shape (the plua reference)
+DEFAULT_LOCATION = {
+    "houseNumber": 0,
+    "timezone": "Europe/Stockholm",
+    "timezoneOffset": 7200,
+    "ntp": True,
+    "ntpServer": "pool.ntp.org",
+    "latitude": 59.3293,
+    "longitude": 18.0686,
+    "city": "Stockholm, Sweden",
+    "temperatureUnit": "C",
+    "windUnit": "km/h",
+    "timeFormat": 24,
+    "dateFormat": "dd.mm.yy",
+    "decimalMark": ".",
+}
 
 
 def _type_error(device_type: str) -> ValueError:
@@ -78,6 +93,13 @@ class SimState:
         # the controller's location (GET/PUT /settings/location): the HC3
         # computes sunrise/sunset for device 1 from it
         self.location: dict[str, Any] = dict(DEFAULT_LOCATION)
+        # runtime overrides from PUT /settings/info and PUT /home — the way
+        # a test QA configures the simulated controller at run time. The
+        # virtual-clock fields (sun times, date, timestamp) stay computed.
+        self.info_overrides: dict[str, Any] = {}
+        self.home_overrides: dict[str, Any] = {}
+        # PUT /weather (flua extension): fake weather overrides
+        self.weather_overrides: dict[str, Any] = {}
         # refreshStates feed: (seq, entry) pairs with strictly increasing seq.
         self.changes: list[tuple[int, dict[str, Any]]] = []
         self.events: list[tuple[int, dict[str, Any]]] = []
@@ -106,14 +128,16 @@ class SimState:
             self.alarms[1] = {"id": 1, "name": "Home", "armed": False, "breached": False}
         if not self.profiles:
             self.profiles[1] = {"id": 1, "name": "Home", "active": True}
-        # Device 1 is the HC3 itself: its name is the controller name and
-        # its properties carry the day's sunrise/sunset (computed on read —
+        # Device 1 is the HC3 itself: the zwave primary controller (the
+        # HC3's own type for it); its name is the controller name and its
+        # properties carry the day's sunrise/sunset (computed on read —
         # see sun_times). A seed may override the entry.
         if 1 not in self.devices:
             self.devices[1] = {
                 "id": 1,
                 "name": "HC3",
-                "type": "HC3",
+                "type": "com.fibaro.zwavePrimaryController",
+                "roomID": 219,
                 "properties": {"sunriseHour": "00:00", "sunsetHour": "00:00"},
                 "modified": int(time.time()),
             }
@@ -121,9 +145,36 @@ class SimState:
         # there — see devices.DEFAULT_ROOM_ID) and the default section, also
         # 219, which the default room belongs to. Seeds may override them.
         if 219 not in self.rooms:
-            self.rooms[219] = {"id": 219, "name": "Default room", "sectionID": 219}
+            self.rooms[219] = {
+                "id": 219,
+                "name": "Default room",
+                "sectionID": 219,
+                "isDefault": True,
+                "visible": True,
+                "icon": "room_boy",
+                "iconExtension": "png",
+                "iconColor": "purple",
+                "defaultSensors": {"temperature": 0, "humidity": 0, "light": 0},
+                "meters": {"energy": 0},
+                "defaultThermostat": 0,
+                "sortOrder": 1,
+                "category": "pantry",
+            }
         if 219 not in self.sections:
-            self.sections[219] = {"id": 219, "name": "Default section"}
+            self.sections[219] = {"id": 219, "name": "Default section", "sortOrder": 1}
+        # The home location panel (GET /panels/location): the panel's
+        # lat/long follow the configured location (injected on read, like
+        # device 1's sun times). Seeds may override it.
+        if not self.family_locations:
+            self.family_locations = [
+                {
+                    "id": 219,
+                    "name": "HC3",
+                    "radius": 150,
+                    "address": "",
+                    "home": True,
+                }
+            ]
         # The controller comes with a default climate zone (panels/climate)
         if not self.climate_zones:
             self.climate_zones[1] = {"id": 1, "name": "Home", "mode": 0, "active": False}

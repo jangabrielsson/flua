@@ -183,7 +183,16 @@ surface, served by a simulated HC3 built from the running QAs plus `--seed`
 state. Unknown paths return `(nil, 404)` like the HC3. Implemented:
 
 - **devices** — list/query (`type`, `parentId`, `interface`, `visible`,
-  `enabled`, `roomID`), get/update/delete, `/properties/{name}`
+  `enabled`, `roomID`), get/update/delete, `/properties/{name}`. Device 1
+  is the controller itself (`com.fibaro.zwavePrimaryController`): its
+  `sunriseHour`/`sunsetHour` follow the **virtual clock** and the configured
+  location — also in online mode, where the sim answers first
+- **system** — `/settings/info` (controller identity + the virtual day's
+  sun times and date), `/settings/location` (the full settings shape), 
+  `/home`, `/weather` (stable fake data), `/panels/location` (the home
+  panel, id 219, lat/long from the configured location). QAs can PUT
+  `/settings/info`, `/home` and `/panels/location/{id}` to configure the
+  simulated controller for a run (virtual-clock fields stay computed)
 - **plugins** — variables CRUD with the HC3 status contract, `createChildDevice`,
   `updateProperty`, `updateView`, `interfaces`, `restart`
 - **actions** — `POST /devices/{id}/action/{name}` and `groupAction` run

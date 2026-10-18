@@ -168,7 +168,10 @@ def test_location_directive_wins_over_config(tmp_path, monkeypatch) -> None:
     )
     monkeypatch.chdir(tmp_path)
     engine = LuaEngine(location={"latitude": 59.33, "longitude": 18.07})
-    assert engine.api.state.location == {"latitude": 59.33, "longitude": 18.07}
+    assert engine.api.state.location["latitude"] == 59.33
+    assert engine.api.state.location["longitude"] == 18.07
+    # the directive overrides within the full default settings shape
+    assert engine.api.state.location["timezone"] == "Europe/Stockholm"
     # a runtime PUT wins over the directive
     engine.api.dispatch("PUT", "/settings/location", {"latitude": 9.0, "longitude": 9.0})
     assert engine.api.state.location["latitude"] == 9.0

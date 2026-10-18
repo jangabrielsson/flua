@@ -687,11 +687,77 @@ def test_misc_system_endpoints(api: Api) -> None:
     # shapes worth pinning
     home, _ = api.dispatch("GET", "/home")
     assert home["hcName"] == "HC3"
+    assert home["defaultSensors"] == {"temperature": 0, "humidity": 0, "light": 0}
     info, _ = api.dispatch("GET", "/settings/info")
     assert info["defaultRoomId"] == 219
     assert info["sunsetHour"].count(":") == 1
+    assert info["serialNumber"] == "HC3-00000000"
+    assert info["platform"] == "HC3"
     users, _ = api.dispatch("GET", "/users")
     assert users[0]["name"] == "admin"
+
+
+def test_put_configures_sim_world_values() -> None:
+    # a test QA can PUT /settings/info, /home and the location panel to
+    # set up the simulated controller at run time
+    api = Api()
+    api.dispatch("PUT", "/settings/info", {"hcName": "Villa", "skin": "dark"})
+    info, _ = api.dispatch("GET", "/settings/info")
+    assert info["hcName"] == "Villa" and info["skin"] == "dark"
+    # hcName IS device 1's name on the HC3
+    dev1, _ = api.dispatch("GET", "/devices/1")
+    assert dev1["name"] == "Villa"
+    # the virtual-clock fields ignore PUTs (they stay computed)
+    api.dispatch("PUT", "/settings/info", {"sunriseHour": "99:99", "date": "nope"})
+    info, _ = api.dispatch("GET", "/settings/info")
+    assert info["sunriseHour"] != "99:99"
+    assert info["date"] != "nope"
+    api.dispatch("PUT", "/home", {"fireAlarmTemperature": 70, "currency": "SEK"})
+    home, _ = api.dispatch("GET", "/home")
+    assert home["fireAlarmTemperature"] == 70 and home["currency"] == "SEK"
+    api.dispatch("PUT", "/panels/location/219", {"name": "Summer house", "radius": 300})
+    panels, _ = api.dispatch("GET", "/panels/location")
+    assert panels[0]["name"] == "Summer house" and panels[0]["radius"] == 300
+    # the panel's lat/long stay driven by the configured location
+    api.dispatch("PUT", "/settings/location", {"latitude": 55.6, "longitude": 12.9})
+    panels, _ = api.dispatch("GET", "/panels/location")
+    assert panels[0]["latitude"] == 55.6
+    # unknown panels 404
+    assert api.dispatch("PUT", "/panels/location/999", {"name": "x"})[1] == 404
+    # PUT /weather (flua extension): override any field, defaults fill in
+    api.dispatch("PUT", "/weather", {"Temperature": -5, "WeatherCondition": "Snowy"})
+    weather, _ = api.dispatch("GET", "/weather")
+    assert weather["Temperature"] == -5 and weather["WeatherCondition"] == "Snowy"
+    assert weather["Humidity"] == 62.0  # untouched fields keep the defaults
+
+
+def test_sim_world_default_shapes() -> None:
+    api = Api()
+    # device 1 is the zwave primary controller with virtual-time sun data
+    dev1, status = api.dispatch("GET", "/devices/1")
+    assert status == 200
+    assert dev1["type"] == "com.fibaro.zwavePrimaryController"
+    assert dev1["roomID"] == 219
+    assert dev1["properties"]["sunriseHour"].count(":") == 1
+    # settings/location carries the full shape with virtual date/time
+    location, _ = api.dispatch("GET", "/settings/location")
+    assert location["timezone"] == "Europe/Stockholm"
+    assert location["latitude"] and location["longitude"]
+    assert set(location["date"]) == {"day", "month", "year"}
+    assert "hour" in location["time"] and "minute" in location["time"]
+    # the home location panel follows the configured location
+    panels, _ = api.dispatch("GET", "/panels/location")
+    assert panels[0]["id"] == 219 and panels[0]["home"] is True
+    assert panels[0]["latitude"] == location["latitude"]
+    # the default room/section carry the HC3's full shape
+    room, _ = api.dispatch("GET", "/rooms/219")
+    assert room["isDefault"] is True and room["defaultSensors"]
+    section, _ = api.dispatch("GET", "/sections/219")
+    assert section["sortOrder"] == 1
+    # weather serves stable fake data in the configured units
+    weather, _ = api.dispatch("GET", "/weather")
+    assert weather["Temperature"] is not None
+    assert weather["WindUnit"] == "km/h"
 
 
 class _ProxyHandler(BaseHTTPRequestHandler):

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime
 from typing import Any
 
 from ... import messages
@@ -15,20 +14,35 @@ def _now(req: ApiRequest) -> float:
     return req.clock.time if req.clock is not None else time.time()
 
 
+def _date_time_parts(now: float) -> tuple[dict[str, int], dict[str, int]]:
+    """The HC3's date/time settings fields, from the virtual clock's local
+    date (so online runs report virtual time, like device 1's sun times)."""
+    local = time.localtime(now)
+    return (
+        {"day": local.tm_mday, "month": local.tm_mon, "year": local.tm_year},
+        {"hour": local.tm_hour, "minute": local.tm_min},
+    )
+
+
 def location_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     # GET /settings/location — the controller's location (drives device 1's
-    # sunrise/sunset)
-    return public(state.location), 200
+    # sunrise/sunset); date/time follow the virtual clock
+    out = dict(state.location)
+    date, clock = _date_time_parts(_now(req))
+    out["date"] = date
+    out["time"] = clock
+    return public(out), 200
 
 
 def location_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     # PUT /settings/location — the HC3 accepts the full settings object;
-    # the sim keeps latitude/longitude (the fields suncalc uses)
+    # the sim merges every scalar field (latitude/longitude drive suncalc)
     if not isinstance(req.body, dict):
         return None, 400
-    for key in ("latitude", "longitude"):
-        if key in req.body:
-            state.location[key] = req.body[key]
+    for key, value in req.body.items():
+        # date/time are computed fields (virtual clock); everything scalar merges
+        if key not in ("date", "time") and not isinstance(value, (dict, list)):
+            state.location[key] = value
     return None, 200
 
 
@@ -115,20 +129,72 @@ def room_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 def settings_info(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     # GET /settings/info — the controller's identity + the day's sun times
-    sun = state.sun_times(_now(req))
-    offset = datetime.now().astimezone().utcoffset()
-    timezone_offset = int(offset.total_seconds() // 60) if offset else 0
-    return public(
-        {
-            "serialNumber": "HC3-00000000",
-            "softVersion": "flua",
-            "hcName": (state.devices.get(1) or {}).get("name", "HC3"),
-            "defaultRoomId": 219,
-            "timezoneOffset": timezone_offset,
-            "sunriseHour": sun["sunriseHour"],
-            "sunsetHour": sun["sunsetHour"],
-        }
-    ), 200
+    # (all virtual-clock-derived: online runs report the simulated time);
+    # PUT overrides merge on top
+    now = _now(req)
+    sun = state.sun_times(now)
+    name = (state.devices.get(1) or {}).get("name", "HC3")
+    info = {
+        "serialNumber": "HC3-00000000",
+        "platform": "HC3",
+        "zwaveEngineVersion": "2.0",
+        "zigbeeStatus": True,
+        "hcName": name,
+        "mac": "ac:17:a2:0d:35:e8",
+        "zwaveVersion": "4.33",
+        "timeFormat": 24,
+        "zwaveRegion": "EU",
+        "serverStatus": int(now),
+        "defaultLanguage": "en",
+        "defaultRoomId": 219,
+        "sunsetHour": sun["sunsetHour"],
+        "sunriseHour": sun["sunriseHour"],
+        "hotelMode": False,
+        "temperatureUnit": "C",
+        "batteryLowNotification": False,
+        "date": time.strftime("%H:%M | %d.%m.%Y", time.localtime(now)),
+        "dateFormat": "dd.mm.yy",
+        "decimalMark": ".",
+        "timezoneOffset": state.location.get("timezoneOffset", 7200),
+        "currency": "EUR",
+        "softVersion": "flua",  # the honest identity: flua is not a firmware
+        "beta": False,
+        "currentVersion": {"version": "flua", "type": "stable"},
+        "installVersion": {"version": "", "type": "", "status": "", "progress": 0},
+        "timestamp": int(now),
+        "online": False,
+        "tosAccepted": True,
+        "skin": "light",
+        "skinSetting": "manual",
+        "updateStableAvailable": False,
+        "updateBetaAvailable": False,
+        "newestStableVersion": "flua",
+        "newestBetaVersion": "5.0.0",
+        "isFTIConfigured": True,
+        "isSlave": False,
+        "hasFIDConnected": True,
+        "oemId": "HC3",
+    }
+    info.update(state.info_overrides)
+    return public(info), 200
+
+
+_INFO_COMPUTED = ("sunriseHour", "sunsetHour", "date", "timestamp", "serverStatus")
+
+
+def settings_info_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # PUT /settings/info — the HC3 accepts the full settings object; the
+    # sim merges scalar fields (computed virtual-clock fields stay computed)
+    if not isinstance(req.body, dict):
+        return None, 400
+    for key, value in req.body.items():
+        if key in _INFO_COMPUTED or isinstance(value, (dict, list)):
+            continue
+        state.info_overrides[key] = value
+    # hcName IS device 1's name on the HC3 — keep them in sync
+    if "hcName" in req.body and 1 in state.devices:
+        state.devices[1]["name"] = req.body["hcName"]
+    return None, 200
 
 
 def sections_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
@@ -161,13 +227,36 @@ def ios_devices_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def home_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    return public(
-        {
-            "hcName": (state.devices.get(1) or {}).get("name", "HC3"),
-            "timestamp": int(_now(req)),
-            "defaultSensors": {"temperature": True, "light": True},
-        }
-    ), 200
+    home = {
+        "timestamp": int(_now(req)),
+        "defaultSensors": {"temperature": 0, "humidity": 0, "light": 0},
+        "notificationClient": {"marketingNotificationAllowed": True},
+        "hcName": (state.devices.get(1) or {}).get("name", "HC3"),
+        "weatherProvider": 3,
+        "currency": "EUR",
+        "fireAlarmTemperature": 60,
+        "freezeAlarmTemperature": 1,
+        "timeFormat": 24,
+        "dateFormat": "dd.mm.yy",
+        "firstRunAfterUpdate": False,
+    }
+    home.update(state.home_overrides)
+    return public(home), 200
+
+
+def home_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # PUT /home — the HC3 accepts the full settings object; scalars merge,
+    # the two known object fields replace wholesale, timestamp stays virtual
+    if not isinstance(req.body, dict):
+        return None, 400
+    for key, value in req.body.items():
+        if key == "timestamp":
+            continue
+        if key in ("defaultSensors", "notificationClient") or not isinstance(
+            value, (dict, list)
+        ):
+            state.home_overrides[key] = value
+    return None, 200
 
 
 def _int_param(query: dict[str, str], name: str) -> int | None:
@@ -254,19 +343,32 @@ def flua_system_log_delete(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def weather_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    # no weather provider in the sim: zeroed values, HC3-shaped
-    return public(
-        {
-            "ConditionCode": 0,
-            "Humidity": None,
-            "Temperature": None,
-            "TemperatureUnit": "C",
-            "WeatherCondition": "",
-            "WeatherConditionConverted": "",
-            "Wind": None,
-            "WindUnit": "m/s",
-        }
-    ), 200
+    # no weather provider in the sim: stable fake data, HC3-shaped, units
+    # from the configured location; PUT /weather overrides any field (a
+    # flua extension — the HC3's weather is provider-owned)
+    weather = {
+        "ConditionCode": 1,
+        "Humidity": 62.0,
+        "Temperature": 12.5,
+        "TemperatureUnit": state.location.get("temperatureUnit", "C"),
+        "WeatherCondition": "Partly cloudy",
+        "WeatherConditionConverted": "Partly cloudy",
+        "Wind": 4.2,
+        "WindUnit": state.location.get("windUnit", "km/h"),
+    }
+    weather.update(state.weather_overrides)
+    return public(weather), 200
+
+
+def weather_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # PUT /weather — flua-only (no HC3 counterpart): a test QA sets the
+    # weather its scene logic reacts to
+    if not isinstance(req.body, dict):
+        return None, 400
+    for key, value in req.body.items():
+        if not isinstance(value, (dict, list)):
+            state.weather_overrides[key] = value
+    return None, 200
 
 
 def alarm_devices_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
@@ -304,7 +406,36 @@ def energy_devices_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def panels_location(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    return public(list(state.family_locations)), 200
+    # the location panels; the home panel's lat/long always follow the
+    # configured location (like device 1's sun times follow the clock)
+    latitude = state.location.get("latitude")
+    longitude = state.location.get("longitude")
+    panels = []
+    for panel in state.family_locations:
+        out = dict(panel)
+        if panel.get("home"):
+            out["latitude"] = latitude
+            out["longitude"] = longitude
+        panels.append(out)
+    return public(panels), 200
+
+
+def panel_location_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # PUT /panels/location/{id} — update a location panel (name/radius/
+    # address/home); lat/long stay driven by the configured location
+    if not isinstance(req.body, dict):
+        return None, 400
+    try:
+        panel_id = int(req.path_params["id"])
+    except (KeyError, TypeError, ValueError):
+        return None, 404
+    for panel in state.family_locations:
+        if panel.get("id") == panel_id:
+            for key in ("name", "radius", "address", "home"):
+                if key in req.body:
+                    panel[key] = req.body[key]
+            return None, 200
+    return None, 404
 
 
 def panels_climate(state: SimState, req: ApiRequest) -> tuple[Any, int]:

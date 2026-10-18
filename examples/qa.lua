@@ -35,6 +35,13 @@ function QuickApp:onInit()
     local iv = self:internalStorageGet("foo")
     self:debug("Internal storage variable", json.encode(iv))
 
-    local iv = setInterval(function() print("OK") end, 1000)
+    local dev1 = api.get("/devices/1")
+    local home = api.get("/home")
+    local info = api.get("/settings/info")
+    local location = api.get("/settings/location")
+    local locations = api.get("/panels/location")
+    local weather = api.get("/weather")
+
+    local _ = setInterval(function() print("OK") end, 1000)
     setTimeout(function() print("Timeout reached") clearInterval(iv)  end, 5000)
 end
