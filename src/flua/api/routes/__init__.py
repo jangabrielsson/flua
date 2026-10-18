@@ -29,6 +29,7 @@ from .devices import (
     device_delete,
     device_get,
     device_property_get,
+    device_property_put,
     device_update,
     devices_list,
     flua_devices_list,
@@ -122,6 +123,7 @@ ROUTES: list[tuple[str, str, Handler]] = [
     ("PUT", "/devices/{id}", device_update),
     ("DELETE", "/devices/{id}", device_delete),
     ("GET", "/devices/{id}/properties/{name}", device_property_get),
+    ("PUT", "/devices/{id}/properties/{name}", device_property_put),
     ("POST", "/devices/{id}/action/{action}", action_device),
     ("POST", "/devices/groupAction/{action}", group_action),
     # -- plugins ---------------------------------------------------------------

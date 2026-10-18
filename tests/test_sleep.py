@@ -327,6 +327,102 @@ async def test_plugin_restart_reruns_qa(tmp_path, capsys) -> None:
         await engine.stop()
 
 
+async def test_device_put_restarts_qa(tmp_path, capsys) -> None:
+    # the HC3 restarts a plugin when its top-level fields change: PUT
+    # /devices/{id} with name/visible/enabled/roomID (and /plugins/interfaces)
+    # re-runs the QA; other fields are rejected
+    script = tmp_path / "n.lua"
+    script.write_text(
+        "function QuickApp:onInit()\n"
+        "  local n = tonumber(self:getVariable('count')) or 0\n"
+        "  self:setVariable('count', tostring(n + 1))\n"
+        "  print('BOOT', n + 1)\n"
+        "end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await wait_until(lambda: not engine.has_pending_work())
+        # a name change restarts the QA (onInit runs again)
+        assert engine.api.dispatch("PUT", "/devices/5000", {"name": "renamed"}) == (
+            None,
+            204,
+        )
+        await wait_until(lambda: not engine.has_pending_work())
+        out = capsys.readouterr().out
+        assert "BOOT 1" in out and "BOOT 2" in out and "BOOT 3" not in out
+        assert engine.api.dispatch("GET", "/devices/5000")[0]["name"] == "renamed"
+        # a roomID move restarts too
+        engine.api.dispatch("PUT", "/devices/5000", {"roomID": 220})
+        await wait_until(lambda: not engine.has_pending_work())
+        out = capsys.readouterr().out
+        assert "BOOT 3" in out
+        # an interface add restarts too
+        engine.api.dispatch(
+            "POST",
+            "/plugins/interfaces",
+            {"deviceId": 5000, "action": "add", "interfaces": ["power"]},
+        )
+        await wait_until(lambda: not engine.has_pending_work())
+        out = capsys.readouterr().out
+        assert "BOOT 4" in out
+        # disallowed top-level fields are rejected, not silently dropped
+        status = engine.api.dispatch(
+            "PUT", "/devices/5000", {"type": "com.fibaro.x"}
+        )[1]
+        assert status == 400
+    finally:
+        await engine.stop()
+
+
+async def test_device_property_put_restarts_qa(tmp_path, capsys) -> None:
+    # the HC3's distinction: /plugins/updateProperty updates a property
+    # WITHOUT a restart; the device-route properties PUT DOES restart
+    script = tmp_path / "p.lua"
+    script.write_text(
+        "function QuickApp:onInit()\n"
+        "  local n = tonumber(self:getVariable('count')) or 0\n"
+        "  self:setVariable('count', tostring(n + 1))\n"
+        "  print('BOOT', n + 1)\n"
+        "end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await wait_until(lambda: not engine.has_pending_work())
+        # device-route property PUT: updates AND restarts
+        assert engine.api.dispatch(
+            "PUT", "/devices/5000/properties/value", {"value": True}
+        ) == (None, 204)
+        await wait_until(lambda: not engine.has_pending_work())
+        out = capsys.readouterr().out
+        assert "BOOT 1" in out and "BOOT 2" in out and "BOOT 3" not in out
+        assert engine.api.dispatch("GET", "/devices/5000/properties/value") == (True, 200)
+        # /plugins/updateProperty: updates WITHOUT a restart
+        engine.api.dispatch(
+            "POST",
+            "/plugins/updateProperty",
+            {"deviceId": 5000, "propertyName": "value", "value": False},
+        )
+        await wait_until(lambda: not engine.has_pending_work())
+        out = capsys.readouterr().out
+        assert "BOOT 3" not in out
+        assert engine.api.dispatch("GET", "/devices/5000/properties/value") == (False, 200)
+        # the device PUT merges properties and restarts (a real change)
+        engine.api.dispatch(
+            "PUT", "/devices/5000", {"properties": {"value": 7, "extra": 5}}
+        )
+        await wait_until(lambda: not engine.has_pending_work())
+        out = capsys.readouterr().out
+        assert "BOOT 3" in out and "BOOT 4" not in out
+        assert engine.api.dispatch("GET", "/devices/5000/properties/value") == (7, 200)
+        assert engine.api.dispatch("GET", "/devices/5000/properties/extra") == (5, 200)
+    finally:
+        await engine.stop()
+
+
 def test_example_restart_restarts_with_variable() -> None:
     # examples/restart.lua: sleep in onInit + plugin.restart, bounded by a
     # quickAppVariable counter that survives the restarts

@@ -99,7 +99,31 @@ def test_device_update(api: Api) -> None:
     data, _ = api.dispatch("GET", "/devices/10")
     assert data["name"] == "lamp2"
     assert data["visible"] is False
+    # only name/visible/enabled/roomID (+ a merged properties dict) are
+    # updatable; everything else 400s
+    status = api.dispatch("PUT", "/devices/10", {"type": "com.fibaro.x"})[1]
+    assert status == 400
+    # properties merge: only the given keys change, the rest stay
+    assert api.dispatch(
+        "PUT", "/devices/10", {"properties": {"value": True, "extra": 1}}
+    ) == (None, 204)
+    data, _ = api.dispatch("GET", "/devices/10")
+    assert data["properties"]["value"] is True
+    assert data["properties"]["extra"] == 1
+    assert api.dispatch("PUT", "/devices/10", {"properties": "nope"})[1] == 400
+    assert api.dispatch("PUT", "/devices/10", {"roomID": 220}) == (None, 204)
     assert api.dispatch("PUT", "/devices/99", {"name": "x"}) == (None, 404)
+
+
+def test_device_property_put(api: Api) -> None:
+    # the device-route properties PUT (the restarting channel)
+    assert api.dispatch("PUT", "/devices/10/properties/value", {"value": True}) == (
+        None,
+        204,
+    )
+    assert api.dispatch("GET", "/devices/10/properties/value") == (True, 200)
+    assert api.dispatch("PUT", "/devices/10/properties/value", {"nope": 1}) == (None, 400)
+    assert api.dispatch("PUT", "/devices/99/properties/value", {"value": 1}) == (None, 404)
 
 
 def test_device_delete(api: Api) -> None:

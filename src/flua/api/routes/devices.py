@@ -88,17 +88,46 @@ def device_update(state: SimState, req: ApiRequest) -> tuple[Any, int]:
         return None, 404
     if not isinstance(req.body, dict):
         return None, 400
+    # the HC3 only lets a handful of top-level fields be updated: the four
+    # restarting scalars plus a MERGED properties dict (changed keys restart
+    # too — only /plugins/updateProperty is the non-restarting channel)
+    disallowed = sorted(
+        k for k in req.body if k not in ("name", "enabled", "visible", "roomID", "properties")
+    )
+    if disallowed:
+        return {"error": f"cannot update field(s): {', '.join(disallowed)}"}, 400
     proxy = state.is_proxy(dev["id"])
+    restart = False
     for key in ("name", "enabled", "visible", "roomID"):
         if key in req.body:
             old = dev.get(key)
             dev[key] = req.body[key]
             if not proxy:
                 state.record_change(dev["id"], key, req.body[key], old)
+            if req.body[key] != old:
+                restart = True
+    if "properties" in req.body:
+        incoming = req.body["properties"]
+        if not isinstance(incoming, dict):
+            return None, 400
+        properties = dev.setdefault("properties", {})
+        for name, value in incoming.items():
+            old = properties.get(name)
+            properties[name] = value  # merge: other properties stay untouched
+            if proxy:
+                continue  # the HC3 owns the device; its events come back via the poll
+            entry = state.record_property_event(dev["id"], name, value, old, _now(req))
+            if entry is not None:
+                restart = True  # a real change through the device route restarts
+                if req.emit is not None:
+                    req.emit(messages.refresh_state_event(entry))
+        dev["modified"] = int(_now(req))
     if proxy:
-        # the HC3 owns the device: mirror the update there; its change feed
-        # comes back through the refreshStates poll
+        # the HC3 owns the device: mirror the update there; it restarts its
+        # own plugin, and the change feed comes back through the poll
         forward_to_proxy(req, True)
+    elif restart and dev.get("isPlugin") and req.restart_qa is not None:
+        req.restart_qa(int(dev["id"]))
     return None, 204
 
 
@@ -132,6 +161,33 @@ def device_property_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     if value is None:
         return None, 404
     return public(value), 200
+
+
+def device_property_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # PUT /devices/{id}/properties/{name} — the device-route properties
+    # update. Unlike /plugins/updateProperty (the HC3's non-restarting
+    # channel) a change here restarts the QA, like every other top-level
+    # device PUT.
+    dev = state.device(req.path_params["id"])
+    if dev is None:
+        return None, 404
+    name = req.path_params["name"]
+    if not isinstance(req.body, dict) or "value" not in req.body:
+        return None, 400
+    properties = dev.setdefault("properties", {})
+    old = properties.get(name)
+    value = req.body["value"]
+    properties[name] = value
+    dev["modified"] = int(_now(req))
+    if state.is_proxy(dev["id"]):
+        forward_to_proxy(req, True)
+        return None, 204
+    entry = state.record_property_event(dev["id"], name, value, old, _now(req))
+    if entry is not None and req.emit is not None:
+        req.emit(messages.refresh_state_event(entry))
+    if entry is not None and dev.get("isPlugin") and req.restart_qa is not None:
+        req.restart_qa(int(dev["id"]))
+    return None, 204
 
 
 def _default_action_value(action: str, device_type: Any, args: list[Any]) -> Any:

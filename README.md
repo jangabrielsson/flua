@@ -183,7 +183,11 @@ surface, served by a simulated HC3 built from the running QAs plus `--seed`
 state. Unknown paths return `(nil, 404)` like the HC3. Implemented:
 
 - **devices** — list/query (`type`, `parentId`, `interface`, `visible`,
-  `enabled`, `roomID`), get/update/delete, `/properties/{name}`. Device 1
+  `enabled`, `roomID`), get/update/delete, `/properties/{name}`
+  (GET + PUT `{value}`). Every updatable top-level field — and the
+  device-route properties PUT (which merges: only the given property keys
+  change) — restarts the QA like on the HC3; `/plugins/updateProperty` is
+  the one non-restarting channel. Device 1
   is the controller itself (`com.fibaro.zwavePrimaryController`): its
   `sunriseHour`/`sunsetHour` follow the **virtual clock** and the configured
   location — also in online mode, where the sim answers first

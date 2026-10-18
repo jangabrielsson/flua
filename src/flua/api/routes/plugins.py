@@ -318,6 +318,10 @@ def plugin_update_interfaces(state: SimState, req: ApiRequest) -> tuple[Any, int
         elif action == "remove" and interface in current:
             current.remove(interface)
     forward_to_proxy(req, state.is_proxy(dev["id"]))
+    # interface changes restart the plugin on the HC3 (the proxy path
+    # forwards above — the HC3 restarts its own plugin there)
+    if not state.is_proxy(dev["id"]) and dev.get("isPlugin") and req.restart_qa is not None:
+        req.restart_qa(int(dev["id"]))
     return None, 204
 
 
