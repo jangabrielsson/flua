@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.56] - 2026-10-18
+
+### Added
+- add POST /devices endpoint to create base devices from type skeleton
+- add caching and building for lupa wheel in CI for Python 3.15
+
 ## [0.1.55] - 2026-10-18
 
 ### Added
