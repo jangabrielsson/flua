@@ -103,3 +103,22 @@ def test_stop_clears_pending() -> None:
     clock.time = 1000.1
     assert tm.fire_due() == 0
     assert tm.active_count() == 0
+
+
+def test_beyond_horizon_timers_do_not_count_as_pending() -> None:
+    # a run limit (fixed --run-for / maxhours) makes beyond-horizon timers
+    # dead: they never fire AND never keep the run alive
+    clock, fired = FakeClock(), []
+    tm = make_manager(clock, fired)
+    tm.set_timeout(1, 50)  # deadline 1000.05 — inside
+    tm.set_timeout(2, 50_000)  # deadline 1050 — beyond
+    tm.set_horizon(1000.10)
+    assert tm.active_count() == 1
+    clock.time = 1000.05
+    assert tm.fire_due() == 1
+    assert fired == [1]
+    assert tm.active_count() == 0  # only the dead beyond-horizon timer is left
+    # without a horizon the same timer stays pending and can fire
+    tm2 = make_manager(FakeClock(), [])
+    tm2.set_timeout(3, 50_000)
+    assert tm2.active_count() == 1

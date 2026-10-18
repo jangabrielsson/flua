@@ -70,6 +70,7 @@ One-shot: the run ends when the QAs drain.
 
 Arguments: `files` (required), `mode` (`local`|`remote`), `instant`,
 `speed`, `start` (virtual start time, e.g. `"2027/10/6 18:30:00"`),
+`maxHours` (cap virtual time; timers beyond the horizon never fire),
 `timeout` (wall seconds, default 120), `filter` (`{levels?, match?}` —
 server-side log narrowing; the agent asks for "just the failures" instead
 of shelling out).
@@ -100,6 +101,7 @@ house after the run — plus the aggregated `exitCode`.
 ```
 
 Arguments: `files` (required), `mode`, `instant`, `speed`, `start`,
+`maxHours` (cap virtual time; timers beyond the horizon never fire),
 `timeout`. Result: `{"exitCode", "devices": [{id, name, type, properties,
 ...}]}` — `/devices` verbatim (the HC3 pseudo-device id 1 is included).
 `--%%` directives reach the engine exactly as the CLI parses them, so the

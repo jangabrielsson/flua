@@ -162,6 +162,13 @@ def _devices(args: dict[str, Any]) -> dict[str, Any]:
             start=_parse_start(args.get("start")),
             log_stream=sys.stderr,  # stdout stays pure JSON-RPC on the stdio transport
         )
+        max_hours = args.get("maxHours")
+        if max_hours is not None:
+            if not isinstance(max_hours, (int, float)) or max_hours <= 0:
+                raise JsonRpcError(
+                    INVALID_PARAMS, "maxHours must be a positive number of virtual hours"
+                )
+            engine.limit_run(float(max_hours) * 3600.0)
         exit_code = loop.run_until_complete(
             _drain_engine(
                 engine, _file_list(args), float(timeout if timeout is not None else 120.0)
@@ -244,6 +251,9 @@ def _qa_run(args: dict[str, Any]) -> dict[str, Any]:
     timeout = args.get("timeout")
     if timeout is not None and (not isinstance(timeout, (int, float)) or timeout <= 0):
         raise JsonRpcError(INVALID_PARAMS, "timeout must be a positive number of seconds")
+    max_hours = args.get("maxHours")
+    if max_hours is not None and (not isinstance(max_hours, (int, float)) or max_hours <= 0):
+        raise JsonRpcError(INVALID_PARAMS, "maxHours must be a positive number of virtual hours")
     command = [sys.executable, "-m", "flua", "--log", "json"]
     if mode is not None:
         command += ["--api", mode]
@@ -253,6 +263,8 @@ def _qa_run(args: dict[str, Any]) -> dict[str, Any]:
         command += ["--speed", str(args["speed"])]
     if args.get("start") is not None:
         command += ["--start", str(args["start"])]
+    if max_hours is not None:
+        command += ["--max-hours", str(max_hours)]
     command += _file_list(args)
     _acquire_run_slot()
     try:
@@ -401,6 +413,13 @@ TOOLS: dict[str, Tool] = {
                     "type": "string",
                     "description": "virtual start time, e.g. '2027/10/6 18:30:00'",
                 },
+                "maxHours": {
+                    "type": "number",
+                    "description": (
+                        "cap virtual time at N virtual hours (--max-hours): "
+                        "timers beyond the horizon never fire"
+                    ),
+                },
                 "timeout": {
                     "type": "number",
                     "description": "wall-clock seconds before the run is killed (default 120)",
@@ -474,6 +493,13 @@ TOOLS: dict[str, Tool] = {
                 "instant": {"type": "boolean"},
                 "speed": {"type": "number"},
                 "start": {"type": "string", "description": "virtual start time"},
+                "maxHours": {
+                    "type": "number",
+                    "description": (
+                        "cap virtual time at N virtual hours (--max-hours): "
+                        "timers beyond the horizon never fire"
+                    ),
+                },
                 "timeout": {
                     "type": "number",
                     "description": "wall seconds (default 120)",

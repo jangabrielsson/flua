@@ -211,7 +211,7 @@ Parsing stops at the end-of-header marker:
 | `--%%file:lib.lua,lib` | extra QA file, loads before main (see below) |
 | `--%%speed:60` | virtual time speed (global) |
 | `--%%instant:true` | instant mode (global) |
-| `--%%maxhours:48` | stop after 48 virtual hours (global) |
+| `--%%maxhours:48` | stop after 48 virtual hours (global); timers beyond the horizon never fire and never keep the run alive — the run drains exactly at the limit |
 | `--%%time:speed=2,instant=true,hours=48,start=2027/10/6 12:00:20` | combined runtime settings (global) |
 | `--%%time:2027/10/6 12:00:20` | bare form: set the virtual start time |
 | `--%%u:{label="lbl",text="Status"}` | one UI row (see below); repeatable, order kept |

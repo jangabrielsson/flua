@@ -523,6 +523,34 @@ def test_devices_times_out_on_a_qa_that_never_drains(tmp_path) -> None:
     assert "timed out" in result["message"]
 
 
+def test_qa_run_maxhours_caps_the_virtual_horizon(tmp_path) -> None:
+    # a 10-virtual-hour timer: instant mode with maxHours=0.1 never fires
+    # it; without the cap it does (the control arm)
+    script = tmp_path / "late.lua"
+    script.write_text("setTimeout(function() print('LATE') end, 10 * 3600 * 1000)\n")
+    capped = _tool("qa_run", {"files": [str(script)], "instant": True, "maxHours": 0.1})
+    assert capped["exitCode"] == 0
+    assert not any("LATE" in str(entry) for entry in capped["logs"])
+    uncapped = _tool("qa_run", {"files": [str(script)], "instant": True})
+    assert any("LATE" in str(entry) for entry in uncapped["logs"])
+
+
+def test_devices_maxhours_caps_the_virtual_horizon(tmp_path) -> None:
+    script = tmp_path / "late_dev.lua"
+    script.write_text(
+        "--%%name:late_dev\n"
+        "function QuickApp:onInit()\n"
+        "  setTimeout(function() self:updateProperty('value', 99) end, 10 * 3600 * 1000)\n"
+        "end\n"
+    )
+    capped = _tool("devices", {"files": [str(script)], "instant": True, "maxHours": 0.1})
+    qa = next(d for d in capped["devices"] if d["id"] == 5000)
+    assert qa["properties"]["value"] != 99
+    uncapped = _tool("devices", {"files": [str(script)], "instant": True})
+    qa = next(d for d in uncapped["devices"] if d["id"] == 5000)
+    assert qa["properties"]["value"] == 99
+
+
 # -- run-slot cap ------------------------------------------------------------------
 
 

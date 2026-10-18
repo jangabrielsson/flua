@@ -60,7 +60,13 @@ class TimerManager:
         return False
 
     def active_count(self) -> int:
-        return len(self._deadlines)
+        """Timers that can still fire. Beyond-horizon timers are dead by
+        definition (fire_due never fires them), so with a run limit set they
+        do not count as pending work — otherwise a fixed --run-for / maxhours
+        run could never drain."""
+        if self._horizon is None:
+            return len(self._deadlines)
+        return sum(1 for deadline in self._deadlines.values() if deadline <= self._horizon)
 
     def qa_timer_count(self, qa_id: int) -> int:
         """Active timers attributed to a QA."""
