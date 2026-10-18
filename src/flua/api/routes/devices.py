@@ -131,6 +131,41 @@ def device_update(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     return None, 204
 
 
+def device_create(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # POST /devices — the HC3 creates plugin devices here; flua extends the
+    # route to create BASE devices (no QA): name + type are required, the
+    # rest of the fields come from the type skeleton, and a properties dict
+    # merges over the skeleton defaults. The device behaves like a
+    # db-seeded one (layer-1 default actions).
+    if not isinstance(req.body, dict):
+        return None, 400
+    name = req.body.get("name")
+    device_type = req.body.get("type")
+    if (
+        not isinstance(name, str)
+        or not name
+        or not isinstance(device_type, str)
+        or not device_type
+    ):
+        return None, 400
+    properties = req.body.get("properties")
+    if properties is not None and not isinstance(properties, dict):
+        return None, 400
+    room_id = req.body.get("roomID")
+    if room_id is not None:
+        try:
+            room_id = int(room_id)
+        except (TypeError, ValueError):
+            return None, 400
+    try:
+        device, event = state.add_base_device(name, device_type, properties, room_id, _now(req))
+    except ValueError as exc:
+        return {"error": str(exc)}, 400
+    if event is not None and req.emit is not None:
+        req.emit(messages.refresh_state_event(event))
+    return public(device), 200
+
+
 def device_delete(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     dev = state.device(req.path_params["id"])
     if dev is None:

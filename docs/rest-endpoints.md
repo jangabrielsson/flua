@@ -8,7 +8,7 @@ stub for real only when (a) a QA calls it, (b) a tool/agent reads it, or
 
 | Area | Real (state-backed) | Stub (shape-only: empty/zeroed) |
 |---|---|---|
-| Devices | CRUD (`GET/PUT/DELETE /devices/{id}` — PUT: `name`/`visible`/`enabled`/`roomID` + a merged `properties` dict, all restart the QA; `PUT /devices/{id}/properties/{name}` restarts too), actions, groupAction, `/flua/devices` | — |
+| Devices | CRUD (`POST /devices` = base device from the type skeleton, flua extension; `GET/PUT/DELETE /devices/{id}` — PUT: `name`/`visible`/`enabled`/`roomID` + a merged `properties` dict, all restart the QA; `PUT /devices/{id}/properties/{name}` restarts too), actions, groupAction, `/flua/devices` | — |
 | Plugins | variables, child devices, views, restart, UI events, `/flua/embeddedUI` | — |
 | House | scenes, rooms, sections, globals, alarm partitions, profiles, customEvents (CRUD + `{name}/publish`; firing uncreated events 404s), `/home` (+ PUT) | `/iosDevices`, `/alarms/v1/devices`, `/notificationCenter`, `/energy/devices` |
 | Panels | `/panels/location` (+ PUT `{id}`) | `/panels/climate`, `/panels/{id}`, `/panels/notifications`, `/panels/family`, `/panels/sprinklers`, `/panels/humidity`, `/panels/favoriteColors` |

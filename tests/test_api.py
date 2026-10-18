@@ -815,6 +815,43 @@ def test_seeded_devices_react_to_light_actions() -> None:
     assert api.dispatch("GET", "/devices/5000")[0]["properties"]["value"] is False
 
 
+def test_post_devices_creates_a_base_device(api: Api) -> None:
+    # flua extension: POST /devices builds a base (non-plugin) device from
+    # the type skeleton — the runtime equivalent of a db-seeded device
+    device, status = api.dispatch(
+        "POST", "/devices", {"name": "mydevice", "type": "com.fibaro.binarySwitch"}
+    )
+    assert status == 200
+    device_id = device["id"]
+    assert device_id >= 900000  # runtime-device namespace
+    assert device["name"] == "mydevice"
+    assert device["type"] == "com.fibaro.binarySwitch"
+    assert device["isPlugin"] is False
+    assert "quickApp" not in device["interfaces"]
+    assert "light" in device["interfaces"]  # skeleton fields filled in
+    assert device["properties"]["value"] is False  # catalog default
+    # properties merge over the defaults; the device behaves (layer 1)
+    device, _ = api.dispatch(
+        "POST",
+        "/devices",
+        {"name": "bright", "type": "com.fibaro.multilevelSwitch", "properties": {"value": 42}},
+    )
+    assert device["properties"]["value"] == 42
+    api.dispatch("POST", f"/devices/{device['id']}/action/turnOff")
+    assert api.dispatch("GET", f"/devices/{device['id']}")[0]["properties"]["value"] == 0
+    # the create event rides the refreshStates feed
+    feed, _ = api.dispatch("GET", "/refreshStates")
+    assert any(
+        e["type"] == "DeviceCreatedEvent" and e["objects"][0]["objectId"] == device["id"]
+        for e in feed["events"]
+    )
+    # errors: unknown type (with the catalog hint), missing name, bad body
+    bad_type, status = api.dispatch("POST", "/devices", {"name": "x", "type": "com.nope.nope"})
+    assert status == 400 and "flua --tool catalog" in bad_type["error"]
+    assert api.dispatch("POST", "/devices", {"type": "com.fibaro.binarySwitch"})[1] == 400
+    assert api.dispatch("POST", "/devices", {"name": "x", "type": 42})[1] == 400
+
+
 def test_sim_world_default_shapes() -> None:
     api = Api()
     # device 1 is the zwave primary controller with virtual-time sun data

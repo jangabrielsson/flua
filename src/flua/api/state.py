@@ -592,6 +592,36 @@ class SimState:
             return None
         return self.record_device_created(dev, now if now is not None else time.time())
 
+    def add_base_device(
+        self,
+        name: str,
+        device_type: str,
+        properties: Any = None,
+        room_id: int | None = None,
+        now: float | None = None,
+    ) -> tuple[dict[str, Any], dict[str, Any] | None]:
+        """Create a base (non-plugin) device from the type skeleton — a
+        physical device without a QA behind it, like a db-seeded one, but
+        created at runtime (POST /devices). Layer-1 default actions apply.
+        Returns (device, DeviceCreatedEvent). Raises ValueError for unknown
+        types."""
+        device_id = self.new_id()
+        dev = _device_skeleton(device_id, name, device_type)
+        dev["isPlugin"] = False  # a base device, not a QA
+        dev["interfaces"] = [
+            i for i in (dev.get("interfaces") or []) if i != "quickApp"
+        ]
+        if room_id is not None:
+            dev["roomID"] = room_id
+        if isinstance(properties, dict):
+            merged = dict(dev.get("properties") or {})
+            merged.update(properties)
+            dev["properties"] = merged
+        timestamp = now if now is not None else time.time()
+        dev["modified"] = int(timestamp)
+        self.devices[device_id] = dev
+        return dev, self.record_device_created(dev, timestamp)
+
     # -- proxy mode -------------------------------------------------------------
 
     def mark_proxy(self, device_id: Any) -> None:
