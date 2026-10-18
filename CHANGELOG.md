@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.53] - 2026-10-18
+
+### Added
+- implement layer 1 device emulation for seeded physical devices with canonical light actions
+
 ## [0.1.52] - 2026-10-18
 
 ### Added
