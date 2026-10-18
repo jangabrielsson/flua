@@ -160,5 +160,19 @@ e.g. `flua://docs/USAGE.md`, `flua://docs/walkthroughs.md`,
 5. ~~Should `qa_probe` include the refreshStates feed?~~ Yes — implemented:
    the feed rides the same cursor-delta machinery as the logs (HC3 polling
    shape `{status, last, changes, events}`).
-6. ~~Naming: `qa_*` prefix everywhere, or drop it?~~ Kept: `qa_*` for every
-   tool — one convention, no renames.
+6. ~~Naming: `qa_*` prefix everywhere, or drop it?~~ `qa_*` for the QA
+   tools; the docs tools are their own `docs_*` family (the same tree the
+   resource tier serves — see the dogfood note below).
+
+## Dogfood findings
+
+Copilot (2026-10-18, two rounds): the host consumes **tools** well
+(`qa_check`/`qa_start`/`qa_probe`/`qa_stop` drove a full build-test loop),
+but never touched `resources/read` even with discover instructions pointing
+at it — it web-searched for knowledge that ships in the wheel (PyPI,
+flua.dev, deepwiki, a guessed repo name). Likely the client exposes tools
+only. Fix: the same docs tree is also served as `docs_list`/`docs_read`
+**tools** (tools are the lowest common denominator across hosts), and the
+instructions name the tool form first. Second finding: a wrong `--%%type`
+had no local way to enumerate valid types — `flua --tool catalog` now lists
+them, and the error names close matches.

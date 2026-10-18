@@ -22,6 +22,7 @@ from ..check import check_file
 from ..engine import LuaEngine
 from ..tools.ui import ui_dump
 from .jsonrpc import INTERNAL_ERROR, INVALID_PARAMS, JsonRpcError
+from .resources import list_resources, read_resource
 from .sessions import DEFAULT_TTL, SessionManager
 
 Tool = dict[str, Any]
@@ -192,6 +193,31 @@ async def _drain_engine(engine: LuaEngine, files: list[str], timeout: float) -> 
         return engine.exit_code
     finally:
         await engine.stop()
+
+
+def _docs_list(args: dict[str, Any]) -> dict[str, Any]:
+    """The docs tree as a tool: the same listing resources/list serves, for
+    hosts whose MCP client only exposes tools (see the dogfood note in
+    notes-mcp.md)."""
+    return {"docs": list_resources({})["resources"]}
+
+
+def _docs_read(args: dict[str, Any]) -> dict[str, Any]:
+    """Read one doc: the same tree resources/read serves. Accepts both
+    "USAGE.md" and "flua://docs/USAGE.md"."""
+    path = args.get("path")
+    if not isinstance(path, str) or not path.strip():
+        raise JsonRpcError(INVALID_PARAMS, "path (string) is required — see docs_list")
+    uri = path.strip()
+    if not uri.startswith("flua://docs/"):
+        uri = "flua://docs/" + uri.lstrip("/")
+    try:
+        result = read_resource({"uri": uri})
+    except JsonRpcError as exc:
+        raise JsonRpcError(
+            INVALID_PARAMS, f"{exc.message} — docs_list lists the available docs"
+        ) from None
+    return {"path": uri[len("flua://docs/") :], "text": result["contents"][0]["text"]}
 
 
 def _session_for(args: dict[str, Any]) -> Any:
@@ -529,5 +555,36 @@ TOOLS: dict[str, Tool] = {
         "description": "List the live sessions: [{sessionId, qaIds, ageSeconds}].",
         "inputSchema": {"type": "object", "properties": {}},
         "handler": _qa_sessions,
+    },
+    "docs_list": {
+        "description": (
+            "List the flua documentation that ships with this server: "
+            "[{uri, name, title, description, mimeType}] — USAGE.md (QA "
+            "directives incl. --%%file multi-file rules, network, deploy), "
+            "ARCHITECTURE.md, the tutorial chapters (09/10: multi-file QAs "
+            "and debugging), mcp.md (this server), specs/hc3-api.json. "
+            "Read them with docs_read instead of searching the web."
+        ),
+        "inputSchema": {"type": "object", "properties": {}},
+        "handler": _docs_list,
+    },
+    "docs_read": {
+        "description": (
+            "Read one flua doc by path (e.g. 'USAGE.md', "
+            "'tutorial/09-multi-file-qas.md', 'flua://docs/mcp.md') and "
+            "return its full text. The docs ship in the wheel — this is the "
+            "authoritative local reference, no web search needed."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "the doc path, with or without the flua://docs/ prefix",
+                },
+            },
+            "required": ["path"],
+        },
+        "handler": _docs_read,
     },
 }

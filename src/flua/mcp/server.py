@@ -34,13 +34,15 @@ SERVER_INSTRUCTIONS = (
     "static-check QA files and qa_run to run them to completion; runs are "
     "offline by default and never touch a controller unless mode=remote. "
     "devices returns the final device list after a run; qa_start + qa_probe + "
-    "qa_action keep a QA alive for live probing. The flua docs ship with this "
-    "server — read them with resources/read (flua://docs/USAGE.md has the QA "
-    "directives and multi-file rules, flua://docs/mcp.md documents this "
-    "server) instead of searching the web; prompts qa_debug and qa_skeleton "
-    "give debugging guidance and a self-testing QA template. In terminals "
-    "prefer the `flua` command over `python -m flua` — tool subprocesses use "
-    "this server's interpreter, which may differ from the shell's default python."
+    "qa_action keep a QA alive for live probing. The flua docs ship with "
+    "this server — read them with the docs_list/docs_read tools "
+    "(USAGE.md has the QA directives and multi-file rules, mcp.md documents "
+    "this server) instead of searching the web; hosts with resource support "
+    "can read the same tree via resources/read (flua://docs/USAGE.md). Prompts "
+    "qa_debug and qa_skeleton give debugging guidance and a self-testing QA "
+    "template. In terminals prefer the `flua` command over `python -m flua` "
+    "— tool subprocesses use this server's interpreter, which may differ "
+    "from the shell's default python."
 )
 
 

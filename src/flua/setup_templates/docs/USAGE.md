@@ -996,7 +996,8 @@ keeps a running engine, `qa_probe` reads devices + new log/refreshState
 lines (cursor-based deltas), `qa_action` dispatches device actions into
 it, `qa_stop`/`qa_sessions` manage it. Resources: the docs ship in the wheel and are served as
 `flua://docs/*` (e.g. `flua://docs/USAGE.md`, `flua://docs/tutorial/…`) via
-`resources/list`/`resources/read` — an agent host can read the flua docs
+`resources/list`/`resources/read`, with `docs_list`/`docs_read` tools for
+hosts without resource support — an agent host can read the flua docs
 without a repo checkout. Prompts: `qa_debug` (seeded debugging guidance)
 and `qa_skeleton` (a runnable self-testing QA template). Host
 registration: add `flua-mcp` as a stdio server in your host's MCP config —

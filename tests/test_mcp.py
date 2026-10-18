@@ -111,7 +111,8 @@ def test_discover_lists_supported_versions() -> None:
     assert result["_meta"]["io.modelcontextprotocol/serverInfo"]["name"] == "flua-mcp"
     assert result["instructions"]
     # the instructions are the discovery hook for the knowledge tiers:
-    # they must steer agents at resources/prompts, not at web search
+    # they must steer agents at docs/prompts, not at web search
+    assert "docs_list" in result["instructions"]
     assert "flua://docs/USAGE.md" in result["instructions"]
     assert "qa_probe" in result["instructions"]
 
@@ -166,6 +167,8 @@ def test_tools_list_shape() -> None:
         "qa_action",
         "qa_stop",
         "qa_sessions",
+        "docs_list",
+        "docs_read",
     ]
     for tool in result["tools"]:
         assert tool["description"]
@@ -317,6 +320,31 @@ def test_qa_skeleton_substitutes_name_and_stays_runnable(tmp_path) -> None:
     run = _tool("qa_run", {"files": [str(script)], "instant": True})
     assert run["exitCode"] == 0, run["logs"]
     assert run["summary"]["failures"] == 0
+
+
+def test_docs_tools_serve_the_same_tree_as_resources() -> None:
+    # hosts whose MCP client only exposes tools (Copilot) get the docs tree
+    # as tools — the same content resources/read serves
+    listed = _tool("docs_list", {})
+    assert any(d["uri"] == "flua://docs/USAGE.md" for d in listed["docs"])
+    read = _tool("docs_read", {"path": "USAGE.md"})
+    assert read["path"] == "USAGE.md"
+    assert "--%%file" in read["text"]
+    # the flua://docs/ prefix form resolves to the same doc
+    via_uri = _tool("docs_read", {"path": "flua://docs/tutorial/09-multi-file-qas.md"})
+    assert "--%%file" in via_uri["text"]
+
+
+def test_docs_read_unknown_path_points_at_docs_list() -> None:
+    result = _tool("docs_read", {"path": "nope.md"})
+    assert result["isError"] is True
+    assert "docs_list" in result["message"]
+
+
+def test_docs_read_rejects_traversal() -> None:
+    result = _tool("docs_read", {"path": "../pyproject.toml"})
+    assert result["isError"] is True
+    assert "escapes" in result["message"] or "no such resource" in result["message"]
 
 
 # -- qa_check --------------------------------------------------------------------

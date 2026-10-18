@@ -103,6 +103,21 @@ Arguments: `files` (required), `mode`, `instant`, `speed`, `start`,
 `--%%` directives reach the engine exactly as the CLI parses them, so the
 device names and properties are the run's real ones.
 
+#### `docs_list` / `docs_read`
+
+The docs tree **as tools** — the same content `resources/*` serves, for
+hosts whose MCP client only exposes tools (Copilot, for example).
+
+```json
+{"name": "docs_list", "arguments": {}}
+{"name": "docs_read", "arguments": {"path": "USAGE.md"}}
+```
+
+`docs_read` accepts a bare path (`USAGE.md`, `tutorial/09-multi-file-qas.md`)
+or the full `flua://docs/...` URI and returns `{path, text}`. Unknown paths
+and traversal answer `isError` pointing at `docs_list`. Prefer these over
+web search — the wheel is the authoritative reference.
+
 ### Sessions (live probing)
 
 A session is a running flua engine an agent can probe across tool calls.
@@ -243,9 +258,10 @@ no extra dependencies:
 
 - Done: stdio core, one-shot tools (`qa_check`, `qa_run`, `qa_ui`,
   `devices`), the session tier (`qa_start`/`qa_probe`/`qa_action`/
-  `qa_sessions`/`qa_stop`), the resource tier (`flua://docs/*`), the
-  prompt tier (`qa_debug`/`qa_skeleton`), the Streamable HTTP transport
-  (stateless), packaging, tests (`tests/test_mcp.py`,
+  `qa_sessions`/`qa_stop`), the resource tier (`flua://docs/*`) plus its
+  tool fallback (`docs_list`/`docs_read` — hosts without resource
+  support), the prompt tier (`qa_debug`/`qa_skeleton`), the Streamable
+  HTTP transport (stateless), packaging, tests (`tests/test_mcp.py`,
   `tests/test_mcp_http.py`).
 - Planned: nothing concrete — candidates: more REST parity tools
   (rooms/sections/scenes), HTTP session mode (deliberately out of scope
