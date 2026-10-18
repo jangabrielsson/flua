@@ -453,9 +453,11 @@ class SimState:
         self.changes.append((self._refresh_seq, entry))
 
     def record_event(self, name: str) -> None:
+        """Record a fired custom event in the refreshStates feed. Firing
+        does NOT create the event — creation is POST /customEvents; firing
+        (POST /customEvents/{name}) 404s for unknown names."""
         self._refresh_seq += 1
         self.events.append((self._refresh_seq, {"type": "CustomEvent", "data": {"name": name}}))
-        self.custom_events.append({"name": name})
 
     # -- debugMessages ------------------------------------------------------------
 

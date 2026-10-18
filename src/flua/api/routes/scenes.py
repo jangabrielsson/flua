@@ -41,23 +41,75 @@ def scene_kill(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     return None, 202
 
 
+def _custom_event(state: SimState, name: str) -> dict[str, Any] | None:
+    for entry in state.custom_events:
+        if entry.get("name") == name:
+            return entry
+    return None
+
+
 def custom_event_post(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # POST /customEvents/{name}: FIRE an existing event — the HC3 404s
+    # unknown names (firing must not create)
     name = req.path_params["name"]
+    if _custom_event(state, name) is None:
+        return None, 404
     state.record_event(name)
     if req.emit is not None:
         req.emit(messages.custom_event(name))
-    return None, 202
+    return None, 204
 
 
 def custom_event_post_body(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    # POST /customEvents with a body ({name=..., userDescription=...}) — the
-    # CustomEventDto form the HC3 accepts
+    # POST /customEvents with a body ({name=..., userDescription=...}) —
+    # CREATES the CustomEventDto (200 + dto, 409 on a duplicate name).
+    # Creation does not fire; firing is POST /customEvents/{name}.
     if not isinstance(req.body, dict) or not req.body.get("name"):
         return None, 400
-    entry = {"name": str(req.body["name"])}
+    name = str(req.body["name"])
+    if _custom_event(state, name) is not None:
+        return None, 409
+    entry = {"name": name}
     if req.body.get("userDescription") is not None:
         entry["userDescription"] = req.body["userDescription"]
     state.custom_events.append(entry)
+    return public(entry), 200
+
+
+def custom_event_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # PUT /customEvents/{name}: update name/userDescription (404 unknown,
+    # 409 when the rename collides with another event)
+    if not isinstance(req.body, dict):
+        return None, 400
+    name = req.path_params["name"]
+    entry = _custom_event(state, name)
+    if entry is None:
+        return None, 404
+    new_name = str(req.body.get("name", name))
+    if new_name != name and _custom_event(state, new_name) is not None:
+        return None, 409
+    entry["name"] = new_name
+    if req.body.get("userDescription") is not None:
+        entry["userDescription"] = req.body["userDescription"]
+    return public(entry), 200
+
+
+def custom_event_delete(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    name = req.path_params["name"]
+    for index, entry in enumerate(state.custom_events):
+        if entry.get("name") == name:
+            del state.custom_events[index]
+            return None, 204
+    return None, 404
+
+
+def custom_event_publish(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # GET /customEvents/{name}/publish — the HC3's second fire endpoint
+    # (a GET that publishes; 404 for unknown names, like the POST)
+    name = req.path_params["name"]
+    if _custom_event(state, name) is None:
+        return None, 404
+    state.record_event(name)
     if req.emit is not None:
-        req.emit(messages.custom_event(entry["name"]))
-    return public(entry), 201
+        req.emit(messages.custom_event(name))
+    return None, 204

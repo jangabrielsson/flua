@@ -10,7 +10,7 @@ stub for real only when (a) a QA calls it, (b) a tool/agent reads it, or
 |---|---|---|
 | Devices | CRUD (`GET/PUT/DELETE /devices/{id}`), actions, groupAction, `/flua/devices` | — |
 | Plugins | variables, child devices, views, restart, UI events, `/flua/embeddedUI` | — |
-| House | scenes, rooms, sections, globals, alarm partitions, profiles, customEvents, `/home` (+ PUT) | `/iosDevices`, `/alarms/v1/devices`, `/notificationCenter`, `/energy/devices` |
+| House | scenes, rooms, sections, globals, alarm partitions, profiles, customEvents (CRUD + `{name}/publish`; firing uncreated events 404s), `/home` (+ PUT) | `/iosDevices`, `/alarms/v1/devices`, `/notificationCenter`, `/energy/devices` |
 | Panels | `/panels/location` (+ PUT `{id}`) | `/panels/climate`, `/panels/{id}`, `/panels/notifications`, `/panels/family`, `/panels/sprinklers`, `/panels/humidity`, `/panels/favoriteColors` |
 | Logs & feeds | `/refreshStates`, `/debugMessages` (+ `tags`, DELETE), `/flua/systemLog` (+ DELETE) | — |
 | System | `/settings/info` (+ PUT), `/settings/location` (+ PUT), `/weather`, `/quickApp/*` (files/export), `/proxy`, `/diagnostics` | `/icons`, `/users` |

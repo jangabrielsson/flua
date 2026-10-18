@@ -643,11 +643,36 @@ def test_group_action(api: Api) -> None:
 
 
 def test_custom_event(api: Api) -> None:
-    assert api.dispatch("POST", "/customEvents/wakeup") == (None, 202)
+    # firing an uncreated event 404s — creation is explicit
+    assert api.dispatch("POST", "/customEvents/wakeup") == (None, 404)
+    created, status = api.dispatch("POST", "/customEvents", {"name": "wakeup"})
+    assert status == 200 and created["name"] == "wakeup"
+    # creation does not fire; the explicit POST does
+    assert api.emitted == []
+    assert api.dispatch("POST", "/customEvents/wakeup") == (None, 204)
     assert api.emitted == [{"type": "customEvent", "name": "wakeup"}]
     assert api.state.custom_events == [{"name": "wakeup"}]
     data, _ = api.dispatch("GET", "/refreshStates")
     assert data["events"] == [{"type": "CustomEvent", "data": {"name": "wakeup"}}]
+
+
+def test_custom_event_crud(api: Api) -> None:
+    # POST duplicate -> 409; PUT renames/describes (404 unknown, 409
+    # collision); DELETE removes; the GET publish endpoint fires too
+    api.dispatch("POST", "/customEvents", {"name": "a", "userDescription": "x"})
+    assert api.dispatch("POST", "/customEvents", {"name": "a"})[1] == 409
+    assert api.dispatch("PUT", "/customEvents/nope", {"userDescription": "y"})[1] == 404
+    updated, status = api.dispatch("PUT", "/customEvents/a", {"userDescription": "y"})
+    assert status == 200 and updated["userDescription"] == "y"
+    api.dispatch("POST", "/customEvents", {"name": "b"})
+    assert api.dispatch("PUT", "/customEvents/a", {"name": "b"})[1] == 409
+    assert api.dispatch("DELETE", "/customEvents/nope")[1] == 404
+    assert api.dispatch("DELETE", "/customEvents/b") == (None, 204)
+    assert [e["name"] for e in api.state.custom_events] == ["a"]
+    # GET /customEvents/{name}/publish fires (the HC3's second endpoint)
+    assert api.dispatch("GET", "/customEvents/nope/publish")[1] == 404
+    assert api.dispatch("GET", "/customEvents/a/publish") == (None, 204)
+    assert api.emitted == [{"type": "customEvent", "name": "a"}]
 
 
 def test_misc_system_endpoints(api: Api) -> None:
@@ -933,7 +958,8 @@ def test_refresh_states(api: Api) -> None:
     data, _ = api.dispatch("GET", "/refreshStates?last=2")
     assert "events" not in data
     assert "changes" not in data  # nothing new: absent
-    api.dispatch("POST", "/customEvents/x")
+    api.dispatch("POST", "/customEvents", {"name": "x"})  # create, no fire
+    api.dispatch("POST", "/customEvents/x")  # fire the existing event
     data, _ = api.dispatch("GET", "/refreshStates?last=2")
     assert data["last"] == 3
     assert data["events"] == [{"type": "CustomEvent", "data": {"name": "x"}}]
@@ -1146,6 +1172,7 @@ async def test_qa_actions_and_events_offline(tmp_path, capsys) -> None:
         "setTimeout(function()\n"
         "  fibaro.call(5001, 'turnOn')\n"
         "  fibaro.callGroupAction('setValue', {devices = {5001}, args = {true}})\n"
+        "  api.post('/customEvents', {name='wakeup'})  -- create, then fire\n"
         "  fibaro.emitCustomEvent('wakeup')\n"
         "  local rs = api.get('/refreshStates')\n"
         "  print('RS', type(rs.last) == 'number' and rs.last >= 1)\n"

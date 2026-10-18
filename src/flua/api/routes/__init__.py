@@ -54,8 +54,11 @@ from .plugins import (
     variables_list,
 )
 from .scenes import (
+    custom_event_delete,
     custom_event_post,
     custom_event_post_body,
+    custom_event_publish,
+    custom_event_put,
     scene_execute,
     scene_get,
     scene_kill,
@@ -147,6 +150,9 @@ ROUTES: list[tuple[str, str, Handler]] = [
     ("POST", "/scenes/{id}/kill", scene_kill),
     ("POST", "/customEvents", custom_event_post_body),
     ("POST", "/customEvents/{name}", custom_event_post),
+    ("PUT", "/customEvents/{name}", custom_event_put),
+    ("DELETE", "/customEvents/{name}", custom_event_delete),
+    ("GET", "/customEvents/{name}/publish", custom_event_publish),
     # -- alarms (breached before {id}: overlapping patterns) ---------------------
     ("GET", "/alarms/v1/partitions", partitions_list),
     ("GET", "/alarms/v1/partitions/breached", partitions_breached),
