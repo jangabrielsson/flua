@@ -16,7 +16,29 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install -e ".[dev]"
+      # lupa has no cp315 binary wheels yet, so the 3.15 track compiles it
+      # from source — build once and cache the wheel (keyed on pyproject, so
+      # a lupa bump rebuilds). The other tracks install binary wheels and
+      # skip this entirely.
+      - name: Cache built lupa wheel (3.15)
+        if: matrix.python-version == '3.15'
+        uses: actions/cache@v4
+        with:
+          path: wheels
+          key: lupa-cp315-${{ hashFiles('pyproject.toml') }}
+      - name: Build lupa wheel (3.15)
+        if: matrix.python-version == '3.15'
+        run: |
+          pip install wheel
+          if ! ls wheels/lupa-*.whl >/dev/null 2>&1; then
+            pip wheel lupa --no-deps -w wheels
+          fi
+      - name: Install (3.15, with the built lupa wheel)
+        if: matrix.python-version == '3.15'
+        run: pip install --find-links wheels -e ".[dev]"
+      - name: Install
+        if: matrix.python-version != '3.15'
+        run: pip install -e ".[dev]"
       - run: ruff check src/ tests/
       - run: pytest tests/ -q --ignore=tests/test_hc3_live.py --ignore=tests/test_hc3_compat.py
 
