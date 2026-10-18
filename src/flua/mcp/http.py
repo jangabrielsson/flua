@@ -189,9 +189,7 @@ def serve_http(
 ) -> int:
     server = StreamableHttpServer(host, port, methods, precheck, token=token)
     try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
+        server.serve_forever()  # Ctrl-C propagates to the caller (server.main)
     finally:
         server.shutdown()
         server.server_close()

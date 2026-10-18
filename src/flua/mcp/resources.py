@@ -9,6 +9,8 @@ paths are canonicalized and traversal is rejected.
 
 from __future__ import annotations
 
+from difflib import get_close_matches
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote
@@ -55,6 +57,17 @@ def _mime(path: Path) -> str:
     return MIME_TYPES.get(path.suffix.lower(), "text/plain")
 
 
+@lru_cache(maxsize=1)
+def _docs_paths() -> tuple[str, ...]:
+    """Every text doc as a relative posix path — the suggestion pool for
+    unknown-URI errors (agents guess paths and read the error)."""
+    return tuple(
+        path.relative_to(DOCS_DIR).as_posix()
+        for path in DOCS_DIR.rglob("*")
+        if path.is_file() and _is_text(path)
+    )
+
+
 def _is_text(path: Path) -> bool:
     # text only; the tutorial PDF and any binary stay out of the list
     return path.suffix.lower() in MIME_TYPES
@@ -73,7 +86,9 @@ def _resolve(uri: Any) -> Path:
         raise JsonRpcError(INVALID_PARAMS, f"path escapes the docs tree: {rel}")
     candidate = (DOCS_DIR / path).resolve()
     if not candidate.is_relative_to(DOCS_DIR.resolve()) or not candidate.is_file():
-        raise JsonRpcError(INVALID_PARAMS, f"no such resource: {uri}")
+        close = get_close_matches(rel, _docs_paths(), n=3, cutoff=0.5)
+        hint = f" — did you mean {', '.join(repr(p) for p in close)}?" if close else ""
+        raise JsonRpcError(INVALID_PARAMS, f"no such resource: {uri}{hint}")
     if not _is_text(candidate):
         raise JsonRpcError(INVALID_PARAMS, f"not a text resource: {uri}")
     return candidate

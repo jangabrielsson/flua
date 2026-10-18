@@ -243,6 +243,24 @@ def test_resources_reject_traversal_and_unknown() -> None:
         assert response["error"]["code"] == core.INVALID_PARAMS, uri
 
 
+def test_resources_read_suggests_close_matches() -> None:
+    # agents guess doc paths; the error must name the right one (dogfood:
+    # 'tutorial/10-debugging-the-ensemble.md' -> '10-multi-qa-debugging.md')
+    response = _dispatch(
+        json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "resources/read",
+                "params": {"uri": "flua://docs/tutorial/10-debugging-the-ensemble.md"},
+            }
+        )
+    )
+    assert response is not None
+    assert "did you mean" in response["error"]["message"]
+    assert "tutorial/10-multi-qa-debugging.md" in response["error"]["message"]
+
+
 def test_resources_read_rejects_non_docs_uri() -> None:
     response = _dispatch(
         json.dumps(
@@ -336,9 +354,11 @@ def test_docs_tools_serve_the_same_tree_as_resources() -> None:
 
 
 def test_docs_read_unknown_path_points_at_docs_list() -> None:
-    result = _tool("docs_read", {"path": "nope.md"})
+    result = _tool("docs_read", {"path": "tutorial/01-first-qa.md"})
     assert result["isError"] is True
     assert "docs_list" in result["message"]
+    # the close-match hint names the real chapter
+    assert "tutorial/02-your-first-qa.md" in result["message"]
 
 
 def test_docs_read_rejects_traversal() -> None:
@@ -666,6 +686,23 @@ def test_session_ttl_reaps_idle_sessions(tmp_path) -> None:
     assert _tool("qa_sessions", {})["sessions"] == []
 
 
+def test_session_probe_revives_an_idle_past_ttl_session(tmp_path) -> None:
+    # a probe IS usage: asking about an idle session must revive it, not
+    # let the lazy reap kill it first (dogfood: qa_probe answered "unknown
+    # session" right after qa_start because the ttl had elapsed)
+    started = _tool("qa_start", {"files": [_ticking_qa(tmp_path)], "ttl": 0.3})
+    session_id = started["sessionId"]
+    import time as _time
+
+    _time.sleep(0.6)
+    try:
+        probe = _tool("qa_probe", {"sessionId": session_id})
+        assert probe["qas"][0]["name"] == "tick"
+        assert any(s["sessionId"] == session_id for s in _tool("qa_sessions", {})["sessions"])
+    finally:
+        _tool("qa_stop", {"sessionId": session_id})
+
+
 def test_session_unknown_id_errors() -> None:
     result = _tool("qa_probe", {"sessionId": "nope"})
     assert result["isError"] is True
@@ -722,3 +759,40 @@ def test_stdio_transport_end_to_end(tmp_path) -> None:
     assert responses[4]["result"]["contents"][0]["uri"] == "flua://docs/rest-endpoints.md"
     assert responses[4]["result"]["contents"][0]["text"]
     assert responses[5]["result"] == {}
+
+
+def test_stdio_ctrl_c_exits_cleanly(tmp_path) -> None:
+    # Ctrl-C on stdio: one stderr line, exit 130, no traceback — even with
+    # a live session the teardown must not leak a KeyboardInterrupt
+    import signal as _signal
+
+    script = tmp_path / "sig.lua"
+    script.write_text("print('sig')\n")
+    process = subprocess.Popen(
+        [sys.executable, "-m", "flua.mcp.server"],
+        cwd=REPO_ROOT,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    # a live session, so the interrupt tears an engine down too
+    process.stdin.write(
+        json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {"name": "qa_start", "arguments": {"files": [str(script)]}},
+            }
+        )
+        + "\n"
+    )
+    process.stdin.flush()
+    response = json.loads(process.stdout.readline())
+    assert "sessionId" in json.loads(response["result"]["content"][0]["text"])
+    process.send_signal(_signal.SIGINT)
+    _, stderr = process.communicate(timeout=15)
+    assert process.returncode == 130
+    assert "flua-mcp: interrupted" in stderr
+    assert "Traceback" not in stderr

@@ -160,6 +160,7 @@ def _devices(args: dict[str, Any]) -> dict[str, Any]:
             if args.get("instant")
             else (args.get("speed") if args.get("speed") is not None else 1.0),
             start=_parse_start(args.get("start")),
+            log_stream=sys.stderr,  # stdout stays pure JSON-RPC on the stdio transport
         )
         exit_code = loop.run_until_complete(
             _drain_engine(
@@ -227,7 +228,11 @@ def _session_for(args: dict[str, Any]) -> Any:
     try:
         return _SESSIONS.get(session_id)
     except KeyError:
-        raise JsonRpcError(INVALID_PARAMS, f"unknown session: {session_id}") from None
+        raise JsonRpcError(
+            INVALID_PARAMS,
+            f"unknown session: {session_id} — it may have expired (ttl); "
+            "qa_sessions lists the live sessions",
+        ) from None
 
 
 def _qa_run(args: dict[str, Any]) -> dict[str, Any]:

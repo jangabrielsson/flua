@@ -17,7 +17,9 @@ with flua (design: `docs/notes/notes-mcp.md`, packaging: ADR 0010).
   `initialize` handshake (2025-06-18) is still served for older clients.
   Unsupported versions answer error `-32022` with `{supported, requested}`.
 - **stdout is pure JSON-RPC** — one response line per request; server
-  diagnostics go to stderr. Agents can parse stdout unconditionally.
+  diagnostics go to stderr, and session QAs' own prints are redirected
+  there too (the engines run with their log stream on stderr). Agents can
+  parse stdout unconditionally.
 - **Capabilities**: `tools`, `resources` (the packaged docs as
   `flua://docs/*`), and `prompts` (`qa_debug`, `qa_skeleton`).
 
@@ -115,8 +117,9 @@ hosts whose MCP client only exposes tools (Copilot, for example).
 
 `docs_read` accepts a bare path (`USAGE.md`, `tutorial/09-multi-file-qas.md`)
 or the full `flua://docs/...` URI and returns `{path, text}`. Unknown paths
-and traversal answer `isError` pointing at `docs_list`. Prefer these over
-web search — the wheel is the authoritative reference.
+answer `isError` with close-match suggestions (`did you mean ...`) and a
+pointer at `docs_list`; traversal is rejected. Prefer these over web
+search — the wheel is the authoritative reference.
 
 ### Sessions (live probing)
 
@@ -141,7 +144,9 @@ argument, never connection state.
 
 Sessions run in-process (each engine owns its asyncio loop on a daemon
 thread, like the test suite drives them) and are always torn down when the
-stdio pipe closes — an agent cannot leak engines.
+stdio pipe closes — an agent cannot leak engines. The idle TTL is reset by
+**use**: a probe of a session that has idled past its TTL revives it
+(asking about a session is usage, not abandonment).
 
 ## Resources
 

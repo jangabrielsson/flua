@@ -10,6 +10,7 @@ forgetful agent cannot leak engines.
 from __future__ import annotations
 
 import asyncio
+import sys
 import threading
 import time
 import uuid
@@ -68,6 +69,7 @@ class SessionManager:
                 api_mode="local" if mode is None else mode,
                 speed=float("inf") if instant else (speed if speed is not None else 1.0),
                 start=start,
+                log_stream=sys.stderr,  # stdout stays pure JSON-RPC on the stdio transport
             )
         except ValueError as exc:
             loop.close()
@@ -155,6 +157,14 @@ class SessionManager:
             self._teardown(session)
 
     def get(self, session_id: str) -> _Session:
+        """Look the session up, touching it (a probe IS usage): an idle-
+        past-TTL session that is being asked about is revived, never reaped
+        by its own request. Reaping stays lazy for everything else."""
+        with self._lock:
+            session = self._sessions.get(session_id)
+        if session is not None:
+            session.last_used = time.monotonic()
+            return session
         self.reap()
         with self._lock:
             session = self._sessions.get(session_id)

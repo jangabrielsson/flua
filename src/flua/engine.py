@@ -70,14 +70,6 @@ from .websocket import WebSocketPool
 logger = logging.getLogger(__name__)
 
 
-def _print_stdout(text: str) -> None:
-    """Print text even when stdout's encoding cannot represent every character."""
-    encoding = sys.stdout.encoding
-    if encoding:
-        text = text.encode(encoding, errors="backslashreplace").decode(encoding)
-    print(text, flush=True)
-
-
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")  # logfile copies carry no colors
 
 
@@ -171,7 +163,12 @@ class LuaEngine:
         db_path: str | None = None,
         db_persist: bool = False,
         location: dict[str, Any] | None = None,
+        log_stream: Any = None,
     ) -> None:
+        # QA log lines print here: the injected stream when the embedder
+        # sets one (the MCP server uses stderr), else late-bound sys.stdout
+        # so test capture (capsys) and monkeypatching keep working.
+        self._log_stream = log_stream
         self._lua = lupa.LuaRuntime(unpack_returned_tuples=True, encoding="UTF-8")
         self._inbound: deque[dict[str, Any]] = deque()
         self._outbound: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
@@ -456,6 +453,15 @@ class LuaEngine:
         except OSError:
             pass
 
+    def _print(self, text: str) -> None:
+        """Print a QA log line to the engine's log stream, tolerating
+        encodings the stream cannot represent (backslash escapes)."""
+        stream = self._log_stream if self._log_stream is not None else sys.stdout
+        encoding = getattr(stream, "encoding", None)
+        if encoding:
+            text = text.encode(encoding, errors="backslashreplace").decode(encoding)
+        print(text, file=stream, flush=True)
+
     def flua_log(self, level: str, qa_id: int | None, message: str) -> None:
         """Flua's own log lines — visually distinct from QA logs: a [FLUA]
         level column plus the QA tag (name+id) the message belongs to, with
@@ -475,9 +481,9 @@ class LuaEngine:
             print(f"{date}[FLUA   ][{tag}]: {text}", file=sys.stderr)
             return
         if self.color_enabled():
-            _print_stdout(f"\x1b[37m{date}\x1b[35m[FLUA   ]\x1b[37m[{tag}]: {text}\x1b[0m")
+            self._print(f"\x1b[37m{date}\x1b[35m[FLUA   ]\x1b[37m[{tag}]: {text}\x1b[0m")
         else:
-            _print_stdout(f"{date}[FLUA   ][{tag}]: {text}")
+            self._print(f"{date}[FLUA   ][{tag}]: {text}")
 
     def render_html(self, text: str, plain: bool = False) -> str:
         """Render the HTML subset the HC3 console supports in QA log
@@ -1932,7 +1938,7 @@ class LuaEngine:
             return
         logger.debug("Lua [%s]: %s", level, text)
         # colors (if enabled) are embedded in the text by the Lua side
-        _print_stdout(text)
+        self._print(text)
         self._logfile_write(_ANSI_RE.sub("", text))
 
     def _handle_log_structured(self, msg: dict[str, Any]) -> None:
@@ -1946,7 +1952,7 @@ class LuaEngine:
         # the /debugMessages buffer is fed by the Lua-side taps
         # (_PY.debug_message) and flua_log/post_log — no recording here
         line = json.dumps(entry, ensure_ascii=False)
-        _print_stdout(line)
+        self._print(line)
         self._logfile_write(line)
 
     def color_enabled(self) -> bool:

@@ -273,3 +273,28 @@ def test_cli_http_flag_serves_requests() -> None:
     finally:
         process.terminate()
         process.wait(timeout=10)
+
+
+def test_cli_http_ctrl_c_exits_cleanly() -> None:
+    # Ctrl-C on the HTTP transport: one stderr line, exit 130, no traceback
+    import signal as _signal
+
+    process = subprocess.Popen(
+        [sys.executable, "-m", "flua.mcp.server", "--http", "127.0.0.1:0"],
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        line = process.stderr.readline().strip()
+        assert "listening on http://127.0.0.1:" in line, line
+        process.send_signal(_signal.SIGINT)
+        _, stderr = process.communicate(timeout=15)
+        assert process.returncode == 130
+        assert "flua-mcp: interrupted" in stderr
+        assert "Traceback" not in stderr
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            process.wait(timeout=10)

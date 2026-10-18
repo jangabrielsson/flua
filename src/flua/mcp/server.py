@@ -154,22 +154,24 @@ def main(argv: list[str] | None = None) -> int:
         supported = ", ".join(SUPPORTED_VERSIONS)
         print(f"flua-mcp {__version__} (protocols {supported})")
         return 0
-    if args.http:
-        host, _, port = args.http.rpartition(":")
-        try:
-            bind_port = int(port)
-        except ValueError:
-            print(f"flua-mcp: bad --http bind address: {args.http}", file=sys.stderr)
-            return 1
-        token = os.environ.get("FLUA_MCP_TOKEN") or None
-        try:
-            return serve_http(host, bind_port, METHODS, _check_protocol_version, token=token)
-        finally:
-            _SESSIONS.shutdown()  # never leak engines when the server stops
     try:
+        if args.http:
+            host, _, port = args.http.rpartition(":")
+            try:
+                bind_port = int(port)
+            except ValueError:
+                print(f"flua-mcp: bad --http bind address: {args.http}", file=sys.stderr)
+                return 1
+            token = os.environ.get("FLUA_MCP_TOKEN") or None
+            return serve_http(host, bind_port, METHODS, _check_protocol_version, token=token)
         return run_stdio(METHODS, precheck=_check_protocol_version)
+    except KeyboardInterrupt:
+        # Ctrl-C: one clean line, the conventional 130 — same contract the
+        # flua CLI keeps ("flua: interrupted"), never a traceback
+        print("flua-mcp: interrupted", file=sys.stderr)
+        return 130
     finally:
-        _SESSIONS.shutdown()  # never leak engines when the stdio pipe closes
+        _SESSIONS.shutdown()  # never leak engines when the server stops
 
 
 if __name__ == "__main__":
