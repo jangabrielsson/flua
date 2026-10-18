@@ -275,6 +275,56 @@ async def test_mqtt_unsubscribe(capsys) -> None:
     assert "ERROR" not in out
 
 
+class MalformedBroker(MiniBroker):
+    """CONNACKs normally, then answers the first SUBSCRIBE with a truncated
+    SUBACK (a protocol violation) — the client must not die silently."""
+
+    def _handle(self, conn: socket.socket) -> None:
+        with conn:
+            packet = _read_packet(conn)
+            assert packet is not None and packet[0] >> 4 == 1
+            conn.sendall(_packet(0x20, b"\x00\x00"))  # CONNACK: session 0, accepted
+            while True:
+                packet = _read_packet(conn)
+                if packet is None:
+                    break
+                header, body = packet
+                if header >> 4 == 8:  # SUBSCRIBE -> truncated SUBACK
+                    conn.sendall(_packet(0x90, b"\x00"))
+                elif header >> 4 == 14:  # DISCONNECT
+                    break
+
+
+def test_malformed_suback_reports_error_and_drains() -> None:
+    # a truncated SUBACK must not kill the receiver silently and hang the
+    # run: the client emits 'error' and the engine drains (CI: the mqtt
+    # example once hung 90s after the broker misbehaved)
+    broker = MalformedBroker()
+    env = {**os.environ, "MQTT_URL": f"mqtt://127.0.0.1:{broker.port}"}
+    script = (
+        "setTimeout(function()\n"
+        "  local client = mqtt.Client.connect(os.getenv('MQTT_URL'))\n"
+        "  client:addEventListener('connected', function()\n"
+        "    print('CONNECTED')\n"
+        "    client:subscribe('flua/test')\n"
+        "  end)\n"
+        "  client:addEventListener('error', function(e) print('ERROR', e.code) end)\n"
+        "end, 20)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--api", "local", "-e", script],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        env=env,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "CONNECTED" in result.stdout
+    assert "ERROR" in result.stdout
+    assert "stack traceback" not in result.stdout
+
+
 def test_example_mqtt_runs_cleanly() -> None:
     # the example defaults to the public broker broker.hivemq.com; point it
     # at the local MiniBroker instead, so the suite never depends on the

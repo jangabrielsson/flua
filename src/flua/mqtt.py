@@ -168,7 +168,9 @@ class MqttClient:
                 self.close()
                 raise MqttError(f"connection refused (return code {return_code})")
             self._connected = True
-            self._on_event("connected", {"sessionPresent": session_present, "returnCode": 0})
+            # the pool emits the connected/connectDone events — it owns the
+            # event order across the bridge
+            return session_present, return_code
         except Exception:
             try:
                 sock.close()
@@ -269,7 +271,15 @@ class MqttClient:
                         self._emit_closed()
                     break
                 self._buffer += chunk
-                self._parse_buffer()
+                try:
+                    self._parse_buffer()
+                except Exception as exc:
+                    # a malformed packet must not kill the receiver silently
+                    # (the client would stay "connected" and hang the run)
+                    if not self._stop.is_set():
+                        self._on_event("error", {"code": -1, "message": f"parse: {exc}"})
+                        self._emit_closed()
+                    break
         finally:
             self.close()
 
@@ -439,21 +449,39 @@ class MqttPool:
         entry = self._entry(conn)
         return entry["qa"] if entry else None
 
+    def _op_done(
+        self, conn: int, kind: str, packet_id: int, code: int, message: str | None = None
+    ) -> None:
+        data: dict[str, Any] = {"kind": kind, "packetId": packet_id, "code": code}
+        if message is not None:
+            data["message"] = message
+        self._emit(conn, "opDone", data)
+
     def connect(
         self, conn: int, uri: str, options: dict[str, Any], timeout: float
     ) -> tuple[bool, str | None]:
+        """The completion events (connectDone + connected) are emitted HERE,
+        from the connect worker thread, in order — so the pump delivers them
+        in the order they happened, whatever the thread scheduling does."""
         entry = self._entry(conn)
         if entry is None:
             return False, "unknown connection"
-        client = MqttClient(
-            uri, options, timeout, lambda event, data: self._emit(conn, event, data)
-        )
         try:
-            client.connect()
+            client = MqttClient(
+                uri, options, timeout, lambda event, data: self._emit(conn, event, data)
+            )
+            session_present, return_code = client.connect()
         except Exception as exc:
+            self._emit(conn, "connectDone", {"code": -1, "message": str(exc)})
             return False, str(exc)
         with self._lock:
             entry["client"] = client
+        self._emit(conn, "connectDone", {"code": 0})
+        self._emit(
+            conn,
+            "connected",
+            {"sessionPresent": session_present, "returnCode": return_code},
+        )
         return True, None
 
     def start_receiver(self, conn: int) -> None:
@@ -471,40 +499,51 @@ class MqttPool:
     ) -> tuple[bool, str | None]:
         client = self._client(conn)
         if client is None or not client.is_connected():
+            self._op_done(conn, "mqttSubscribe", packet_id, -1, "client not connected")
             return False, "client not connected"
         try:
             client.subscribe(packet_id, topics)
-            return True, None
         except Exception as exc:
+            self._op_done(conn, "mqttSubscribe", packet_id, -1, str(exc))
             return False, str(exc)
+        self._op_done(conn, "mqttSubscribe", packet_id, 0)
+        return True, None
 
     def unsubscribe(self, conn: int, packet_id: int, topics: list[str]) -> tuple[bool, str | None]:
         client = self._client(conn)
         if client is None or not client.is_connected():
+            self._op_done(conn, "mqttUnsubscribe", packet_id, -1, "client not connected")
             return False, "client not connected"
         try:
             client.unsubscribe(packet_id, topics)
-            return True, None
         except Exception as exc:
+            self._op_done(conn, "mqttUnsubscribe", packet_id, -1, str(exc))
             return False, str(exc)
+        self._op_done(conn, "mqttUnsubscribe", packet_id, 0)
+        return True, None
 
     def publish(
         self, conn: int, packet_id: int, topic: str, payload: str, qos: int, retain: bool
     ) -> tuple[bool, str | None]:
         client = self._client(conn)
         if client is None or not client.is_connected():
+            self._op_done(conn, "mqttPublish", packet_id, -1, "client not connected")
             return False, "client not connected"
         try:
             client.publish(packet_id, topic, payload, qos, retain)
-            return True, None
         except Exception as exc:
+            self._op_done(conn, "mqttPublish", packet_id, -1, str(exc))
             return False, str(exc)
+        self._op_done(conn, "mqttPublish", packet_id, 0)
+        return True, None
 
     def disconnect(self, conn: int) -> tuple[bool, str | None]:
         client = self._client(conn)
         if client is None:
+            self._op_done(conn, "mqttDisconnect", 0, -1, "unknown connection")
             return False, "unknown connection"
         client.disconnect()
+        self._op_done(conn, "mqttDisconnect", 0, 0)
         return True, None
 
     def close_all(self) -> None:

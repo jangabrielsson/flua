@@ -1826,20 +1826,24 @@ class LuaEngine:
         task.add_done_callback(self._http_tasks.discard)
 
     async def _run_mqtt_op(self, msg: dict[str, Any], func: Any, *args: Any) -> None:
+        # completion events (opDone) are emitted by the pool methods from the
+        # op worker thread — the same thread that sent the packet — so the
+        # pump sees ops complete in causal order (opDone before the broker's
+        # ack event). This catch is only the safety net for pool bugs.
         try:
             ok, err = await asyncio.to_thread(func, *args)
         except Exception as exc:
             ok, err = False, str(exc)
-        conn = int(msg["conn"])
-        if ok:
+        if not ok:
             self._on_mqtt_event(
-                conn, "opDone", {"kind": msg["type"], "packetId": msg.get("packetId"), "code": 0}
-            )
-        else:
-            self._on_mqtt_event(
-                conn,
+                int(msg["conn"]),
                 "opDone",
-                {"kind": msg["type"], "packetId": msg.get("packetId"), "code": -1, "message": err},
+                {
+                    "kind": msg["type"],
+                    "packetId": msg.get("packetId"),
+                    "code": -1,
+                    "message": err,
+                },
             )
 
     def _handle_mqtt_connect(self, msg: dict[str, Any]) -> None:
@@ -1847,18 +1851,17 @@ class LuaEngine:
         options = dict(msg.get("options") or {})
 
         async def run() -> None:
-            ok, err = await asyncio.to_thread(
+            # the pool emits connectDone + connected (in order) from the
+            # connect worker thread; here we only start the receiver
+            ok, _err = await asyncio.to_thread(
                 self.qa_mqtt.connect,
                 conn,
                 str(msg["uri"]),
                 options,
                 float(options.get("timeout") or 10.0),
             )
-            if not ok:
-                self._on_mqtt_event(conn, "connectDone", {"code": -1, "message": err})
-                return
-            self._on_mqtt_event(conn, "connectDone", {"code": 0})
-            self.qa_mqtt.start_receiver(conn)
+            if ok:
+                self.qa_mqtt.start_receiver(conn)
 
         task = asyncio.create_task(run(), name="flua-mqtt")
         self._http_tasks.add(task)
