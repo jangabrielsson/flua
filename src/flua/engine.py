@@ -214,6 +214,7 @@ class LuaEngine:
             messages.SET_TIMEOUT: self._handle_set_timeout,
             messages.HTTP_REQUEST: self._handle_http_request,
             messages.TCP_CONNECT: self._handle_tcp_connect,
+            messages.SCENE_TRIGGER: self._handle_scene_trigger,
             messages.TCP_SEND: self._handle_tcp_send,
             messages.TCP_READ: self._handle_tcp_read,
             messages.TCP_CLOSE: self._handle_tcp_close,
@@ -710,6 +711,16 @@ class LuaEngine:
         if created is not None:
             # every RefreshStateSubscriber learns the new device appeared
             self.enqueue_outbound(messages.refresh_state_event(created))
+        if qa_config.get("scene"):
+            # a scene QA also lives in the scene table: GET /scenes serves it
+            # and POST /scenes/{id}/execute runs its actions (phase 1: manual
+            # runs only — the conditions evaluator arrives in phase 2)
+            self.api.state.scenes[qa_id] = {
+                "id": qa_id,
+                "name": name,
+                "running": False,
+                "kind": "luaScene",
+            }
         # a packaged .fqa can declare interfaces beyond the type skeleton
         # (e.g. a child device's extra interfaces) — apply them, like
         # import_qa does for uploads
@@ -1691,6 +1702,12 @@ class LuaEngine:
             int(msg["port"]),
             float(msg.get("timeout") or 1.0),
         )
+
+    def _handle_scene_trigger(self, msg: dict[str, Any]) -> None:
+        """QA-posted scene trigger events (scene.lua's date timers and the
+        refreshEvents transform): forward to the Lua dispatch, where the
+        scene runners evaluate them."""
+        self.enqueue_outbound(msg)
 
     def _handle_tcp_close(self, msg: dict[str, Any]) -> None:
         # net.TCPSocket:close() — release the connection in the QA's pool.

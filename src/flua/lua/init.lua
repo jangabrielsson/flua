@@ -700,7 +700,7 @@ local function installQaGlobals(env)
   }
 end
 
-local qaRuntimeLibs = { "quickapp.lua", "fibaro.lua", "net.lua", "mqtt.lua" }
+local qaRuntimeLibs = { "quickapp.lua", "fibaro.lua", "net.lua", "mqtt.lua", "scene.lua" }
 
 local function installQaLibs(env)
   installQaGlobals(env)
@@ -962,14 +962,18 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
     _FLUA.exit(1)
     return
   end
-  -- QA code loaded: construct the QuickApp instance (calls onInit)
-  local bok, berr = pcall(bootstrapQa, env, qaId, config)
-  if not bok then
-    print("Error in bootstrap:", berr)
-    print(debug.traceback(nil, 2))
-    _PY.system_event("qa_error", qaId, "bootstrap failed: " .. tostring(berr))
-    _FLUA.exit(1)
-    return
+  -- QA code loaded: construct the QuickApp instance (calls onInit).
+  -- Scene QAs skip this — a scene has no QuickApp instance, just
+  -- declarations + actions re-run per trigger.
+  if not config.scene then
+    local bok, berr = pcall(bootstrapQa, env, qaId, config)
+    if not bok then
+      print("Error in bootstrap:", berr)
+      print(debug.traceback(nil, 2))
+      _PY.system_event("qa_error", qaId, "bootstrap failed: " .. tostring(berr))
+      _FLUA.exit(1)
+      return
+    end
   end
   _PY.post{ type = "qaLoaded", id = qaId }
 end
@@ -1005,6 +1009,10 @@ function _FLUA.startQaFile(qaId, path, config, args)
   runQa(env, qaId, config, args, function()
     local ok, err = loadExtraFiles(config and config.files, env)
     if not ok then return nil, err end
+    if config.scene then
+      -- scenes: parse the declarations at boot; the actions run per trigger
+      return env._FLUA.sceneDeclarations(path)  -- per-QA proxy: defined by scene.lua in the env
+    end
     return loadfile(path, "bt", env)
   end, path)
 end
@@ -1039,6 +1047,26 @@ end
 -- Python -> Lua entry point: batch is an array of messages.
 -- forward-declared in the sleep section (the deferred-delivery machinery uses it)
 handlers = {}
+
+-- scene QA id -> runScene(sourceTrigger) closure, registered by scene.lua
+-- when a scene QA boots. Lives on the shared _FLUA (QA envs reach it via
+-- __index) so the pump-level handler below can route to any scene.
+_FLUA.sceneRunners = _FLUA.sceneRunners or {}
+
+handlers.sceneExecute = function(msg)
+  local runner = _FLUA.sceneRunners[msg.qa]
+  if runner then
+    runInQa(msg.qa, function() runner.run({ type = "manual", property = "execute" }) end)
+  end
+end
+
+handlers.sceneTrigger = function(msg)
+  -- a sourceTrigger event (refreshEvents transform or a date trigger):
+  -- every scene checks whether it matches one of its trigger leaves
+  for qaId, runner in pairs(_FLUA.sceneRunners) do
+    runInQa(qaId, function() runner.eval(msg.event) end)
+  end
+end
 
 handlers.timerExpired = function(msg)
   local fn = callbacks[msg.id]
@@ -1151,9 +1179,12 @@ end
 handlers.startQA = function(msg)
   local env = qaEnvFor(msg.id)
   runInQa(msg.id, function()
-    startQaInEnv(env, msg.id, msg.config or {}, msg.arg0, function()
+    startQaInEnv(env, msg.id, msg.config or {}, { [0] = msg.arg0 }, function()
       local ok, err = loadExtraFiles(msg.files, env)
       if not ok then return nil, err end
+      if msg.config and msg.config.scene then
+        return env._FLUA.sceneDeclarations(msg.path)  -- scene: parse only at boot
+      end
       return loadfile(msg.path, "bt", env)
     end, msg.path)
   end)
@@ -1170,9 +1201,12 @@ handlers.restartQA = function(msg)
   _PY.flua_log("info", msg.id, "restarting QA")
   local env = qaEnvFor(msg.id)
   runInQa(msg.id, function()
-    startQaInEnv(env, msg.id, msg.config or {}, msg.arg0, function()
+    startQaInEnv(env, msg.id, msg.config or {}, { [0] = msg.arg0 }, function()
       local ok, err = loadExtraFiles(msg.files, env)
       if not ok then return nil, err end
+      if msg.config and msg.config.scene then
+        return env._FLUA.sceneDeclarations(msg.path)  -- scene: parse only at boot
+      end
       return loadfile(msg.path, "bt", env)
     end, msg.path)
   end)
@@ -1285,6 +1319,12 @@ handlers.refreshStateEvent = function(msg)
     else
       runInQa(qaId, function() handle(msg.event) end)
     end
+  end
+  -- scene runners: transform the raw event to sourceTrigger tables (the
+  -- transform runs in the scene env — it reads api state) and re-post each
+  -- through the pump as sceneTrigger messages
+  for qaId, runner in pairs(_FLUA.sceneRunners) do
+    runInQa(qaId, function() runner.onRawEvent(msg.event) end)
   end
 end
 

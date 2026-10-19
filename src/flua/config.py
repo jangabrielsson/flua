@@ -564,6 +564,7 @@ KNOWN_DIRECTIVES = frozenset(
         "keep-alive",
         "u",
         "useUiView",
+        "scene",  # --%%scene:true — run this QA as an HC3 Lua scene (COND + actions)
         DEVICE_ID_DIRECTIVE,  # --%%deviceId:123 — downloaded-file metadata (--tool uploadFile)
         QA_FILE_DIRECTIVE,  # --%%qaFile:main — the QA file name a downloaded file maps to
         INCLUDE_DIRECTIVE,  # --%%include:defaults.lua — insert another file's directives

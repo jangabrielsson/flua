@@ -80,18 +80,42 @@ Notifications: same rules as QuickApps — see the quickapp-api skill, `assets/n
 
 ## flua and scenes
 
-flua does **not execute scene Lua code** — scenes in the offline sim are metadata + run
-state, and `fibaro.getSceneVariable` / `setSceneVariable` are stubs (real HC3 only).
-What flua does support:
+flua now **runs scene code**: a QA with `--%%scene:true` is a scene — the
+file's declarations (`COND = {...}`) go above a marker line, the actions
+below it (`-- ===== SCENE ACTIONS =====`), and the actions re-run on every
+scene start with `sourceTrigger` and `_sceneId` in scope, like the HC3.
 
-- **Seeding**: the `--seed` JSON file accepts a `"scenes"` array (`{id, name, ...}`).
+- **Phase 1**: boot parses the declarations only (actions do NOT run at
+  boot); `POST /scenes/{id}/execute` — or `fibaro.scene("execute", {id})` —
+  runs the actions with `sourceTrigger = {type = "manual", property = "execute"}`.
+  The scene answers `GET /scenes`.
+- **Phase 2 (current)**: the conditions evaluator. refreshEvents are
+  transformed to sourceTrigger tables and posted through the pump; date
+  triggers (cron `match`, `matchInterval`, `sunrise`/`sunset`) arm
+  virtual-clock timers; `se-start` fires at boot. On each event the scene
+  checks whether any **trigger** leaf (`isTrigger = true`) matches, then
+  evaluates the whole tree against current state and runs the actions.
+  `duration` defers the run and re-checks the whole tree at `now + duration`
+  (a change that breaks the condition cancels the pending run).
+- **Semantics** (verified against the spec): filters never start a check —
+  only trigger leaves do; `anyValue` triggers on any change; `match>` /
+  `match>=` / `match<` / `match<=` are filters-only (a trigger flag on them
+  warns and is ignored); cron is `{minute, hour, dom, month, dow, year}`
+  with dow 1=Monday, lists like `"1,3"` allowed; `matchInterval` fires at
+  `date + k*interval` (grid-aligned); sunrise/sunset take a minute offset
+  (−before, +after).
+- **Not yet**: `getSceneVariable`/`setSceneVariable` (still stubs), the
+  allowRestart option, and weather/profile/alarm state fidelity is
+  best-effort in the sim.
+- **Seeding**: the `--seed` JSON file accepts a `"scenes"` array
+  (`{id, name, ...}`) — metadata-only scenes (no runner).
 - **Reading**: `api.get("/scenes")`, `api.get("/scenes/{id}")`.
-- **Running/killing**: `fibaro.scene("execute"|"kill", {ids})` → `POST /scenes/{id}/{action}`
-  (202) — the sim flips the scene's `running` state.
-- **Custom events**: `fibaro.emitCustomEvent(name)` — on the real HC3 these trigger scenes;
-  flua delivers them to QAs that define `onCustomEvent(name)` (a flua extension), so the QA
-  side of a scene-based design is testable offline.
+- **Custom events**: `fibaro.emitCustomEvent(name)` — on the real HC3 these
+  trigger scenes; flua delivers them to QAs that define `onCustomEvent(name)`
+  (a flua extension).
 
-To develop scene *logic* in flua: port the actions into a QA and drive it with the
-quickapp-test skill (simulate the trigger via `--start`, timers, or `api` calls). The
-declarations table itself is only testable on a real HC3 (hc3_compat suite).
+To develop scene *logic* in flua: `--%%scene:true`, drive the triggers with
+`--start`, timers, or `api` calls, and execute the scene to see the actions
+run with a chosen `sourceTrigger`. Living example: `examples/scenes.lua` —
+a self-testing driver that loads a scene from an inline string, triggers it
+by flipping a device, and checks the result.

@@ -30,6 +30,10 @@ def scene_execute(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     if scene is None:
         return None, 404
     scene["running"] = True
+    if req.emit is not None:
+        # a scene QA runs its actions (sourceTrigger = user); seeded
+        # metadata-only scenes just flip their running state
+        req.emit(messages.scene_execute(scene["id"]))
     return None, 202
 
 

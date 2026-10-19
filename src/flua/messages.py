@@ -67,6 +67,8 @@ API_CALL = (
     "apiCall"
 )
 API_RESULT = "apiResult"  # engine -> QA: the response — {"qa", "data", "status"}
+SCENE_EXECUTE = "sceneExecute"  # engine -> scene QA: manual run — {"qa": int}
+SCENE_TRIGGER = "sceneTrigger"  # QA -> engine -> Lua: a sourceTrigger event for the scene runner
 POST_REFRESH_EVENT = (
     # QA -> engine: fake a refreshStates event — {"event": {...}}
     "postRefreshEvent"
@@ -241,6 +243,11 @@ def api_result(qa: int, data: Any, status: int) -> dict[str, Any]:
         msg["data"] = data
     msg["status"] = int(status)
     return msg
+
+
+def scene_execute(qa: int) -> dict[str, Any]:
+    """A scene QA should run (manual execute): actions with sourceTrigger=user."""
+    return {"type": SCENE_EXECUTE, "qa": int(qa)}
 
 
 def mqtt_event(qa: int, conn: int, event: str, data: Any = None) -> dict[str, Any]:

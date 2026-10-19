@@ -147,6 +147,7 @@ baking policy, and the import-vs-update semantics: `assets/fqa-format.md`.
 | `--%%debug:refreshState=true,api=true,http=true` | debug logging categories |
 | `--%%loglength:120` | debug line length cap (default 120) |
 | `--%%keep-alive:true` | keep the online run alive past idle |
+| `--%%scene:true` | run this QA as an HC3 Lua scene (`COND` + actions; the hc3-lua-scenes skill) |
 | `--%%file:path,name` | extra QA file |
 
 A typo'd directive warns at runtime (`unknown --%% directive`) and
