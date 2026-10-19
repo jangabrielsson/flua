@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.64] - 2026-10-19
+
+### Added
+- enhance device filtering and add urlencode function with tests
+- add SolarEdge Modbus demo and mock server for Fibaro HC3
+
 ## [0.1.63] - 2026-10-19
 
 ### Added
