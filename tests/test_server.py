@@ -81,6 +81,59 @@ def test_require_loads_sibling_test_libs(tmp_path) -> None:
     assert "GOT HI" in result.stdout
 
 
+def test_require_module_sees_qa_globals(tmp_path) -> None:
+    # a required sibling file loads INTO the QA's environment (like a
+    # --%%file): the module can use net/fibaro/setInterval directly —
+    # including hosting a mock server — and returns a per-QA cached table
+    lib = tmp_path / "serverlib.lua"
+    lib.write_text(
+        "local M = {}\n"
+        "M.sawNet = type(net.TCPServer) == 'table'\n"
+        "M.sawFibaro = type(fibaro) == 'table'\n"
+        "M.sawSetInterval = type(setInterval) == 'function'\n"
+        "function M.start(handler)\n"
+        "  local srv = net.TCPServer()\n"
+        "  srv:listen(0, handler)\n"
+        "  return srv\n"
+        "end\n"
+        "return M\n"
+    )
+    result = run_qa(
+        tmp_path,
+        "--%%name:req_env\n"
+        "function QuickApp:onInit()\n"
+        "  if require then require('serverlib') end  -- guarded: no-op on the HC3\n"
+        "  local M = require('serverlib')\n"
+        "  print('GLOBALS', M.sawNet, M.sawFibaro, M.sawSetInterval)\n"
+        "  local srv = M.start(function(data) return data:upper() end)\n"
+        "  local c = net.TCPSocket({timeout=5000})\n"
+        "  c:connect('127.0.0.1', srv.port, {\n"
+        "    success = function()\n"
+        "      c:send('hi', {\n"
+        "        success = function()\n"
+        "          c:read({\n"
+        "            success = function(d)\n"
+        "              print('GOT', d)\n"
+        "              local again = require('serverlib') == M\n"
+        "              print('CACHED', again)\n"
+        "              exit(d == 'HI' and again and 0 or 1)\n"
+        "            end,\n"
+        "            error = function(e) print('ERR', e); exit(1) end,\n"
+        "          })\n"
+        "        end,\n"
+        "        error = function(e) print('ERR', e); exit(1) end,\n"
+        "      })\n"
+        "    end,\n"
+        "    error = function(e) print('ERR', e); exit(1) end,\n"
+        "  })\n"
+        "end\n",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "GLOBALS true true true" in result.stdout
+    assert "GOT HI" in result.stdout
+    assert "CACHED true" in result.stdout
+
+
 def test_http_server_contract(tmp_path) -> None:
     # handler request fields, status/body/headers replies, string reply
     # (200 text/plain), nil reply (204), and an unknown route (404)
@@ -243,6 +296,71 @@ def test_tcp_udp_ws_servers_round_trip(tmp_path) -> None:
         "end\n",
     )
     assert result.returncode == 0, result.stdout + result.stderr
+    assert "failures: 0" in result.stdout
+
+
+def test_tcp_server_persistent_connection_and_binary(tmp_path) -> None:
+    # the TCP server keeps ONE connection open across requests (until the
+    # client closes), the handler gets a stable conn id, nil = no reply, and
+    # binary payloads cross the bridge byte-exact both ways
+    result = run_qa(
+        tmp_path,
+        "--%%name:persist\n"
+        "function QuickApp:onInit()\n"
+        "  local failures = 0\n"
+        "  local function eq(a, b, msg)\n"
+        "    if tostring(a) ~= tostring(b) then\n"
+        "      failures = failures + 1\n"
+        "      print('FAIL: ' .. msg .. ' ' .. tostring(a) .. '!=' .. tostring(b))\n"
+        "    else print('PASS: ' .. msg) end\n"
+        "  end\n"
+        "  local function fail(what, e)\n"
+        "    failures = failures + 1\n"
+        "    print('FAIL: ' .. what .. ' ' .. tostring(e))\n"
+        "    exit(1)\n"
+        "  end\n"
+        "  local conns, requests = {}, 0\n"
+        "  local srv = net.TCPServer()\n"
+        "  srv:listen(0, function(data, conn)\n"
+        "    requests = requests + 1\n"
+        "    conns[#conns + 1] = conn\n"
+        "    if data:sub(1, 6) == 'SILENT' then return nil end\n"
+        "    return '>' .. data\n"
+        "  end)\n"
+        "  local c = net.TCPSocket({timeout=5000})\n"
+        "  c:connect('127.0.0.1', srv.port, {\n"
+        "    success = function()\n"
+        "      c:send('a', { success = function()\n"
+        "        c:read({ success = function(d)\n"
+        "          eq(d, '>a', 'first reply')\n"
+        "          c:send('SILENT', { success = function()\n"
+        "            c:send('b', { success = function()\n"
+        "              c:read({ success = function(d)\n"
+        "                eq(d, '>b', 'reply after nil')\n"
+        "                local blob = string.char(0, 1, 127, 128, 156, 255)\n"
+        "                c:send(blob, { success = function()\n"
+        "                  c:read({ success = function(d)\n"
+        "                    eq(d, '>' .. blob, 'binary round trip')\n"
+        "                    eq(conns[1], conns[2], 'stable conn id')\n"
+        "                    eq(conns[1], conns[3], 'stable conn id across requests')\n"
+        "                    eq(requests, 4, 'four requests')\n"
+        "                    print('failures:', failures)\n"
+        "                    exit(failures > 0 and 1 or 0)\n"
+        "                  end, error = function(e) fail('read', e) end })\n"
+        "                end, error = function(e) fail('send', e) end })\n"
+        "              end, error = function(e) fail('read', e) end })\n"
+        "            end, error = function(e) fail('send', e) end })\n"
+        "          end, error = function(e) fail('send', e) end })\n"
+        "        end, error = function(e) fail('read', e) end })\n"
+        "      end, error = function(e) fail('send', e) end })\n"
+        "    end,\n"
+        "    error = function(e) fail('connect', e) end,\n"
+        "  })\n"
+        "end\n",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    for line in ("first reply", "reply after nil", "binary round trip", "stable conn id"):
+        assert f"PASS: {line}" in result.stdout
     assert "failures: 0" in result.stdout
 
 

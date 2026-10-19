@@ -792,7 +792,8 @@ run in your QA, timers keep running while requests are in flight):
   (constructor timeout sets the per-request default; `options.timeout` overrides it.
   `options.checkCertificate = false` skips HTTPS certificate verification,
   like the HC3 — handy for self-signed certs; the default verifies)
-- `net.TCPSocket({timeout=ms})` → `connect/send/read/readUntil/close` — `examples/tcp.lua`
+- `net.TCPSocket({timeout=ms})` → `connect/send/write/read/readUntil/close` — `examples/tcp.lua`
+  (`write` is the HC3-documented alias of `send`)
 - `net.UDPSocket({broadcast, timeout})` → `sendTo/receive` — `examples/udp.lua`
 - `net.WebSocketClient()/WebSocketClientTls()` → `addEventListener`, `connect`, `send`, `sendBinary` — `examples/websocket.lua` (`connect(url, headers)` takes a headers table, like the HC3; `sendBinary` sends binary frames, and `dataReceived(payload, isBinary)` receives them — the new HC3 binary mode)
 - `mqtt.Client.connect(uri, options)` → `subscribe/publish/unsubscribe/disconnect`, `mqtt.QoS` — `examples/mqtt.lua` (`mqtts://` or `options.tls` enables TLS: `useSNI` on by default like the HC3 ≥ 5.191, `tls.useSNI = false` switches SNI off; also `allowUnauthorized`, `certificateAuthority`, `clientCertificate`)
@@ -815,7 +816,11 @@ http:listen(0, function(req)               -- {method,url,headers,body}
   return {status = 200, body = "ok", headers = {["X-Mock"] = "1"}}  -- or a string, or nil (204)
 end)
 local tcp = net.TCPServer()
-tcp:listen(0, function(data) return data:upper() end)   -- first package in, reply out, close
+tcp:listen(0, function(data, conn) return data:upper() end)
+  -- one handler call per request; return the reply, or nil for no reply.
+  -- The connection stays open until the CLIENT closes it; conn is a stable
+  -- per-connection id for per-client state. Payloads are binary-safe
+  -- (raw bytes arrive and return byte-exact).
 local udp = net.UDPServer()
 udp:listen(0, function(data, ip, port) return "got:" .. data end)  -- nil = no reply
 local ws = net.WebSocketServer()
@@ -824,12 +829,23 @@ ws:listen(0, function(message, isBinary) return "echo:" .. message end)
 http:close()
 ```
 
-Semantics are deliberately one-shot (request/response): the TCP handler sees
-the first data package the peer sends, the UDP handler one datagram, the WS
-handler one message (binary messages echo back as binary frames, byte-safe).
-A handler that raises replies `500` (HTTP) or nothing; a handler that never
-returns answers `504` after 10 s. See `examples/mockServer.lua` — a QA that
-hosts all four and verifies its own clients against them.
+Semantics: HTTP and WS are one-shot (request/response); TCP keeps the
+connection open across requests until the client closes, UDP is one datagram
+in, optional reply out. WS binary messages echo back as binary frames,
+byte-safe, and TCP/UDP payloads cross the engine bridge byte-safe. A handler
+that raises replies `500` (HTTP) or nothing; a handler that never returns
+answers `504` after 10 s. Mock scaffolding can live in a sibling file loaded
+with `require` — it runs in the QA's own environment (so it can use
+`net.*Server`, `fibaro`, timers directly), and stays runtime-only, never
+part of the `.fqa` package. Guard the line so the QA still runs on the real
+HC3, where `require` does not exist:
+
+```lua
+if require then require("mocklib") end  -- flua only; no-op on the HC3
+```
+
+See `examples/mockServer.lua` — a QA that hosts all four and verifies its
+own clients against them.
 
 ## Deploying to the HC3
 

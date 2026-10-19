@@ -41,6 +41,7 @@ from . import messages
 from .api import Api
 from .api.state import public
 from .bindings import install_bindings, lua_to_python
+from .bytebridge import _unescape_data
 from .clock import VirtualClock
 from .config import (
     DEVICE_ID_DIRECTIVE,
@@ -118,35 +119,6 @@ def sanitize_filename(text: str) -> str:
     (used for the downloaded project file names)."""
     sanitized = re.sub(r"[^A-Za-z0-9]+", "_", str(text)).strip("_")
     return sanitized or "qa"
-
-
-def _unescape_data(text: Any) -> bytes | str:
-    """Inverse of the Lua side's byte escaper (_FLUA.escapeBytes) for socket
-    and HTTP payloads: ``\\xHH`` becomes the raw byte. A literal backslash
-    arrived escaped as ``\\x5C``, so the transform is exact. Payloads without
-    escapes return unchanged (kept as str — plain text behaves as before)."""
-    if isinstance(text, bytes):
-        return text
-    s = str(text)
-    if "\\x" not in s:
-        return s
-    out = bytearray()
-    i, n = 0, len(s)
-    hexdigits = "0123456789abcdefABCDEF"
-    while i < n:
-        if (
-            s[i] == "\\"
-            and i + 3 < n
-            and s[i + 1] == "x"
-            and s[i + 2] in hexdigits
-            and s[i + 3] in hexdigits
-        ):
-            out.append(int(s[i + 2 : i + 4], 16))
-            i += 4
-            continue
-        out += s[i].encode("utf-8")
-        i += 1
-    return bytes(out)
 
 
 class LuaEngine:
@@ -244,6 +216,7 @@ class LuaEngine:
             messages.TCP_CONNECT: self._handle_tcp_connect,
             messages.TCP_SEND: self._handle_tcp_send,
             messages.TCP_READ: self._handle_tcp_read,
+            messages.TCP_CLOSE: self._handle_tcp_close,
             messages.UDP_SEND: self._handle_udp_send,
             messages.UDP_RECEIVE: self._handle_udp_receive,
             messages.WS_CONNECT: self._handle_ws_connect,
@@ -1718,6 +1691,13 @@ class LuaEngine:
             int(msg["port"]),
             float(msg.get("timeout") or 1.0),
         )
+
+    def _handle_tcp_close(self, msg: dict[str, Any]) -> None:
+        # net.TCPSocket:close() — release the connection in the QA's pool.
+        # (The _PY.tcp_close bridge is the mobdebug facade's pool — a
+        # different registry; closing there once popped the debugger's own
+        # socket id and killed it with "invalid connection id".)
+        self.qa_sockets.close(int(msg["conn"]))
 
     def _handle_tcp_send(self, msg: dict[str, Any]) -> None:
         self._spawn_tcp(

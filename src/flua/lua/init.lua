@@ -90,6 +90,32 @@ function _FLUA.escapeBytes(v)
   return table.concat(out)
 end
 
+-- Inverse of escapeBytes (engine -> QA payloads): \xHH becomes the raw byte,
+-- so data the engine escaped arrives back as exact bytes.
+function _FLUA.unescapeBytes(v)
+  if type(v) ~= "string" then return v end
+  local out, m, i, n = {}, 0, 1, #v
+  while i <= n do
+    if string.byte(v, i) == 0x5C and i + 3 <= n and string.byte(v, i + 1) == 0x78 then
+      local h = tonumber(v:sub(i + 2, i + 3), 16)
+      if h then
+        m = m + 1
+        out[m] = string.char(h)
+        i = i + 4
+      else
+        m = m + 1
+        out[m] = "\\"
+        i = i + 1
+      end
+    else
+      m = m + 1
+      out[m] = string.char(string.byte(v, i))
+      i = i + 1
+    end
+  end
+  return table.concat(out)
+end
+
 -- ------------------------------------------------------------------ logging
 -- Log lines print directly from Python (_PY.log): writing to stdout never
 -- touches Lua state, so it is safe at any call depth — including inside
@@ -761,13 +787,12 @@ local function qaEnvFor(qaId)
     return chunk()
   end
   -- require() resolves its search path through the C-level global 'package',
-  -- so wrap it: swap in this QA's path for the (synchronous, single-threaded)
-  -- call — one QA's directories are never visible to another's require.
-  -- (require consults the registry tables for loaded/preload, not the
-  -- package.* globals, so those can't be swapped — flua-test gets its own
-  -- env-bound path below.)
-  local baseRequire = require
-  env.require = function(name)
+  -- and C require loads chunks with the DEFAULT environment (the shared
+  -- _G) — so a required module could never see this QA's globals (net,
+  -- fibaro, api, setInterval...). Resolve and load here instead: the chunk
+  -- runs in THIS QA's env (like a --%%file), and loaded/preload stay
+  -- per-QA (the C registry is shared across QAs — never touch it).
+  local function qaRequire(name)
     if name == "flua-test" then
       local cached = env.package.loaded[name]
       if cached == nil then
@@ -777,13 +802,25 @@ local function qaEnvFor(qaId)
       end
       return cached
     end
-    local saved = package.path
-    package.path = env.package.path
-    local ok, res = pcall(baseRequire, name)
-    package.path = saved
-    if not ok then error(res, 2) end
-    return res
+    local cached = env.package.loaded[name]
+    if cached ~= nil then return cached end
+    local loader = env.package.preload[name]
+    local mod
+    if loader then
+      mod = loader(name)
+    else
+      local filename, err = package.searchpath(name, env.package.path)
+      if not filename then
+        error(string.format("module '%s' not found:\n\t%s", name, err), 2)
+      end
+      local chunk, loaderr = loadfile(filename, "bt", env)
+      if not chunk then error(loaderr, 2) end
+      mod = chunk()
+    end
+    env.package.loaded[name] = mod ~= nil and mod or true
+    return env.package.loaded[name]
   end
+  env.require = qaRequire
   return env
 end
 

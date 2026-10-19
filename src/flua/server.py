@@ -10,14 +10,19 @@ comes back through the ``net_server_reply`` bridge call (synchronous — the
 pump runs on the loop thread), resolving the connection's future, which
 writes the wire response.
 
-Semantics are deliberately simple (request/response, one shot):
+Semantics are deliberately simple:
 
 - HTTP: full request in (method/url/headers/body), response out.
-- TCP: the handler receives the first data package the peer sends; its
-  reply is written back and the connection closes.
+- TCP: the connection stays open until the CLIENT closes it. The handler is
+  called once per data package with a stable per-connection id
+  (``handler(data, conn)``); its return value is the reply. ``nil`` = no
+  reply, keep reading the next request. Handler errors/timeouts drop the
+  connection.
 - UDP: one datagram in, optional reply datagram out.
 - WebSocket: one message in, optional reply message out (text frames;
   binary replies echo byte-safe).
+
+TCP and UDP payloads cross the engine bridge byte-safe (\\xHH escaping).
 
 All servers bind 127.0.0.1 only.
 """
@@ -35,6 +40,7 @@ import struct
 from typing import Any
 
 from . import messages
+from .bytebridge import _escape_data, _unescape_data
 
 logger = logging.getLogger(__name__)
 
@@ -273,16 +279,20 @@ class _Server:
 
     async def _tcp_conn(self, sock: socket.socket) -> None:
         reader, writer = await self._streams(sock)
+        conn = self._new_conn()  # one stable id per connection, for the handler
         try:
-            data = await reader.read(_MAX_MESSAGE)  # the first data package
-            if data in (b"", None):
-                return
-            conn = self._new_conn()
-            fut = self._post(conn, data=data.decode("latin-1"))
-            response = await self._await(fut)
-            if response is not _TIMEOUT and response:
-                writer.write(_to_bytes(response))
-                await writer.drain()
+            while True:
+                data = await reader.read(_MAX_MESSAGE)
+                if data in (b"", None):
+                    return  # the client closed the connection
+                fut = self._post(conn, data=_escape_data(data))
+                response = await self._await(fut)
+                if response is _TIMEOUT:
+                    return  # the handler never answered — drop the connection
+                if response:
+                    writer.write(_to_bytes(_unescape_data(response)))
+                    await writer.drain()
+                # nil response: no reply — the connection stays open and reads on
         except (asyncio.IncompleteReadError, ConnectionError, OSError):
             pass
         finally:
@@ -360,12 +370,12 @@ class _UdpProtocol(asyncio.DatagramProtocol):
         server = self._server
         host, port = addr
         conn = server._new_conn()
-        fut = server._post(conn, data=data.decode("latin-1"), addr=str(host), port=int(port))
+        fut = server._post(conn, data=_escape_data(data), addr=str(host), port=int(port))
 
         async def reply() -> None:
             response = await server._await(fut)
             if response is not _TIMEOUT and response and server.udp_transport is not None:
-                server.udp_transport.sendto(_to_bytes(response), (host, port))
+                server.udp_transport.sendto(_to_bytes(_unescape_data(response)), (host, port))
 
         server._tasks.append(asyncio.get_running_loop().create_task(reply()))
 

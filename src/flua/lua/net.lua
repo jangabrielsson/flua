@@ -28,7 +28,6 @@ end
 -- Like the HC3: any completed HTTP exchange (including 4xx/5xx) reaches
 -- success; only transport failures (DNS, refused, timeout) reach error.
 local HTTPClient = {}
-setmetatable(HTTPClient, HTTPClient)  -- the class is its own metatable (__call + __index)
 HTTPClient.__index = HTTPClient
 HTTPClient.__call = function(_, options)
   -- constructor timeout (ms, optional): the per-request default — a request
@@ -38,6 +37,10 @@ HTTPClient.__call = function(_, options)
   local timeout = options and options.timeout or 30000
   return setmetatable({ _timeout = tonumber(timeout) / 1000 }, HTTPClient)
 end
+setmetatable(HTTPClient, {
+  __call = HTTPClient.__call,
+  __index = function() return nil end,  -- missing keys end here, never loop
+})
 
 function HTTPClient:request(url, params)
   params = params or {}
@@ -90,12 +93,15 @@ end
 --   sock:readUntil("\n", {success = function(data) ... end, error = fn})
 --   sock:close()
 local TCPSocket = {}
-setmetatable(TCPSocket, TCPSocket)
 TCPSocket.__index = TCPSocket
 TCPSocket.__call = function(_, options)
   local timeout = options and options.timeout or 10000  -- ms (docs example)
   return setmetatable({ _conn = nil, _timeout = tonumber(timeout) / 1000 }, TCPSocket)
 end
+setmetatable(TCPSocket, {
+  __call = TCPSocket.__call,
+  __index = function() return nil end,  -- missing keys end here, never loop
+})
 
 local function tcpRequest(sock, kind, cb, msg)
   local id = nextId
@@ -124,6 +130,9 @@ function TCPSocket:send(data, callbacks)
   })
 end
 
+-- the HC3 documents write() (with the same signature) — alias it
+TCPSocket.write = TCPSocket.send
+
 function TCPSocket:read(callbacks)
   tcpRequest(self, "read", callbacks, { type = "tcpRead", conn = self._conn })
 end
@@ -138,7 +147,7 @@ end
 
 function TCPSocket:close()
   if self._conn then
-    _PY.tcp_close(self._conn)
+    _PY.post{ type = "tcpClose", conn = self._conn, qa = qaId }
     self._conn = nil
   end
 end
@@ -317,7 +326,11 @@ end
 --     return {status=200, body="ok", headers={["X-Mock"]="1"}}  -- or a string
 --   end)
 --   local tcp = net.TCPServer()
---   tcp:listen(0, function(data) return data:upper() end)  -- first package in, reply out, close
+--   tcp:listen(0, function(data, conn) return data:upper() end)
+--     -- one handler call per request; return the reply, or nil for no reply.
+--     -- The connection stays open until the CLIENT closes it; conn is a
+--     -- stable per-connection id (use it for per-client state).
+--     -- Payloads are binary-safe (raw bytes arrive and return byte-exact).
 --   local udp = net.UDPServer()
 --   udp:listen(0, function(data, ip, port) return "got "..data end)  -- nil = no reply
 --   local ws = net.WebSocketServer()
@@ -366,9 +379,9 @@ local function handleServerRequest(msg)
     if msg.kind == "http" then
       return handler{ method = msg.method, url = msg.url, headers = msg.headers or {}, body = msg.body or "" }
     elseif msg.kind == "tcp" then
-      return handler(msg.data or "")
+      return handler(_FLUA.unescapeBytes(msg.data or ""), msg.conn)
     elseif msg.kind == "udp" then
-      return handler(msg.data or "", msg.addr, msg.port)
+      return handler(_FLUA.unescapeBytes(msg.data or ""), msg.addr, msg.port)
     elseif msg.kind == "ws" then
       return handler(msg.message or "", msg.binary == true)
     end
@@ -383,6 +396,9 @@ local function handleServerRequest(msg)
       _PY.net_server_reply(msg.server, msg.conn, nil)
     end
     return
+  end
+  if (msg.kind == "tcp" or msg.kind == "udp") and type(resp) == "string" then
+    resp = _FLUA.escapeBytes(resp)  -- byte-safe reply across the bridge
   end
   _PY.net_server_reply(msg.server, msg.conn, resp)
 end

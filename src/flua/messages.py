@@ -57,6 +57,7 @@ HTTP_RESULT = (
 TCP_RESULT = (
     "tcpResult"  # {"id": int, "qa": int?, "ok": bool, "conn"?: int, "data"?: str, "err"?: str}
 )
+TCP_CLOSE = "tcpClose"  # QA -> engine: release a net.TCPSocket connection — {"conn": int}
 UDP_RESULT = "udpResult"  # {"id": int, "qa": int?, "ok": bool, "data"?: str, "err"?: str}
 WS_EVENT = "wsEvent"  # {"qa": int, "conn": int, "event": str, "data"?: str}
 SERVER_REQUEST = "serverRequest"  # mock server -> QA handler (flua extension, net.*Server)

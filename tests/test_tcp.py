@@ -158,6 +158,94 @@ async def test_tcp_binary_roundtrip(capsys) -> None:
 
 
 @pytest.mark.asyncio
+async def test_tcp_close_releases_the_connection(capsys) -> None:
+    # net.TCPSocket:close() must release the connection in the QA's pool —
+    # it once called the mobdebug facade's close instead (a different
+    # registry), which both leaked the connection and, when a debugger was
+    # attached, popped the DEBUGGER's own socket id ("invalid connection
+    # id: 1").
+    _, port = _echo_server()
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        import socket as _socket
+
+        # a debugger socket (mobdebug facade pool) registered first — the QA
+        # closing ITS connection must never pop this one (the 0.1.62 bug)
+        engine.sync_sockets._register(_socket.socket())
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            path = f"{d}/qa.lua"
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(
+                    "setTimeout(function()\n"
+                    "  local sock = net.TCPSocket({timeout = 2000})\n"
+                    f"  sock:connect('127.0.0.1', {port}, {{\n"
+                    "    success = function()\n"
+                    "      print('CONNECTED')\n"
+                    "      sock:close()\n"
+                    "      print('CLOSED')\n"
+                    "    end,\n"
+                    "    error = function(e) print('CONNECT ERR', e) end,\n"
+                    "  })\n"
+                    "end, 20)\n"
+                )
+            engine.start_qa(path, None, {}, path)
+            import asyncio
+
+            async def released() -> bool:
+                while "CLOSED" not in capsys.readouterr().out:
+                    await asyncio.sleep(0.01)
+                # the pump has delivered the tcpClose message by the time the
+                # next pump cycle ran — give it one tick
+                await asyncio.sleep(0.05)
+                return engine.qa_sockets._sockets == {}
+
+            assert await released()
+            # the facade pool (the debugger's) is untouched
+            assert engine.sync_sockets._sockets  # id 1 still registered
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_tcp_write_alias_and_missing_methods(capsys) -> None:
+    # HC3 documents sock:write(data, callbacks) — flua's send() under an
+    # alias. And a missing method/field must end cleanly ("attempt to call a
+    # nil value"), never spin the class __index chain ("chain too long").
+    _, port = _echo_server()
+    out = await _run_qa(
+        "setTimeout(function()\n"
+        "  local sock = net.TCPSocket({timeout = 2000})\n"
+        "  local ok, err = pcall(function() return sock:noSuchMethod() end)\n"
+        "  print('MISSING', ok, tostring(err):match('chain too long') == nil)\n"
+        f"  sock:connect('127.0.0.1', {port}, {{\n"
+        "    success = function()\n"
+        "      sock:write('via write\\n', {\n"
+        "        success = function()\n"
+        "          sock:readUntil('\\n', {\n"
+        "            success = function(data)\n"
+        "              print('READ', data)\n"
+        "              sock:close()\n"
+        "            end,\n"
+        "            error = function(e) print('READ ERR', e) end,\n"
+        "          })\n"
+        "        end,\n"
+        "        error = function(e) print('SEND ERR', e) end,\n"
+        "      })\n"
+        "    end,\n"
+        "    error = function(e) print('CONNECT ERR', e) end,\n"
+        "  })\n"
+        "end, 20)\n",
+        capsys=capsys,
+    )
+    assert "MISSING false true" in out  # it errored, but not with a chain loop
+    assert "READ via write" in out
+    assert "ERR" not in out
+
+
+@pytest.mark.asyncio
 async def test_tcp_connect_refused(capsys) -> None:
     out = await _run_qa(
         "setTimeout(function()\n"
