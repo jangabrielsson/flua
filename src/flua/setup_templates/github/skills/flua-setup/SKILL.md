@@ -131,7 +131,8 @@ every unpacked file).
 | `--logfile FILE` | append a copy of the log to FILE (ANSI stripped; JSON lines with `--log json`) |
 
 `flua export script.lua -o script.fqa` builds the HC3 deploy artifact;
-`flua unpack script.fqa -d project/` reverses it.
+`flua unpack script.fqa -d project/` reverses it. The package format, the variable
+baking policy, and the import-vs-update semantics: `assets/fqa-format.md`.
 
 ## Key `--%%` directives
 

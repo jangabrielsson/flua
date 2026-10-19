@@ -134,6 +134,10 @@ fibaro.alert("push", {userId}, "msg")
 fibaro.emitCustomEvent("myEventName")     -- fire custom event
 ```
 
+Full notification landscape (direct push vs push-by-user vs simplePush vs e-mail vs
+notification centre, phone/user ID semantics, no critical push):
+`assets/notifications.md`.
+
 ### Logging (global)
 ```lua
 fibaro.debug(tag, message)

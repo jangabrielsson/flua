@@ -144,15 +144,24 @@ print(w.Temperature, w.WeatherCondition)
 ## Miscellaneous
 
 ### Icons (3 endpoints)
-- `GET /api/icons` — List available icons
-- `POST /api/icons` — Upload new icon
-  ```json
-  { "name": "my_icon", "content": "data:image/png;base64,..." }
-  ```
-- `DELETE /api/icons` — Delete icon
-  ```json
-  { "type": "custom", "name": "my_icon", "fileExtension": "svg" }
-  ```
+- `GET /api/icons` — list icons (query: `deviceType`; response shape varies across
+  firmwares — accept both list-of-icon-objects and `{icons: [...]}`)
+- `POST /api/icons` — upload an **icon set** (observed on 5.x firmware; the swagger
+  schema is empty, `multipart/form-data`):
+  - `type=device`, `deviceTemplate=<exact device type>` (e.g. `com.fibaro.rollerShutter`)
+  - one file per state: `icon0` only (single-image types), `icon0` + `icon100` (binary),
+    or `icon0`…`icon100` (multilevel, 11 images)
+  - `fileExtension=png` (svg also accepted)
+  - → **201** `{"id": 1055, "iconSetName": "User1055", "fileExtension": "png"}`;
+    user icon ids start around 1000. Re-uploading the same set creates a **duplicate** —
+    list first and reuse an existing id.
+- `DELETE /api/icons?id=&type=&name=&fileExtension=` — delete an icon
+
+Applying: `PUT /api/devices/{id}` `{"properties": {"deviceIcon": <iconId>}}` from outside.
+Inside a QA use `self:updateProperty("deviceIcon", id)` — a device PUT on your own id
+restarts the QA (hc3-write-safety). State-dependent icons: upload one set per state, keep
+the ids in QA variables, switch with `updateProperty`. Single-image types (deviceController,
+sensors, most QA parents) cannot change their picture by themselves.
 
 ### RGB Programs (5 endpoints)
 - `GET /api/RGBPrograms` — List all RGB programs
