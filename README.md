@@ -562,6 +562,16 @@ These calls run on the main thread and may block the asyncio loop — that is
 the one deliberate exception to flua's message-passing model, and it is what
 makes debugger pauses freeze time. All other I/O stays on the message model.
 
+## Credits
+
+flua bundles a few third-party Lua components, each under its own license:
+
+- [MobDebug](https://github.com/pkulchenko/MobDebug) (MIT, Paul Kulchenko) — the remote debugger, flua-patched; embeds [serpent](https://github.com/pkulchenko/serpent) (MIT) for serialization
+- [aeslua](https://github.com/bighil/aeslua) (LGPL 2.1+, Matthias Hilbig) — AES, as a bundled `--%%file:$` library
+- [pure_lua_SHA](https://github.com/Egor-Skriptunoff/pure_lua_SHA) (MIT, Egor Skriptunoff) — SHA digests, trimmed by tinman/Intuitech for the HC3
+
+Attribution, license texts, and locations: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ## Design notes
 
 - No FastAPI subprocess and no telnet/REPL — the offline HC3 API is served

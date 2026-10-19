@@ -49,7 +49,7 @@ dev = [
 ]
 
 [tool.setuptools]
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
 
 [tool.setuptools.packages.find]
 # flua.examples maps onto the repo's examples/ directory (package-dir), so
