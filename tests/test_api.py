@@ -98,6 +98,23 @@ def test_devices_query_filters(api: Api) -> None:
     data, _ = api.dispatch("GET", "/devices?property=[nosuchprop,1]")
     assert data == []
 
+    # names containing '&': the HC3 cannot match them at all (verified live:
+    # both the encoded and the raw form return 0 — the controller re-splits
+    # on the decoded '&', leaving a trailing-space name). flua matches the
+    # encoded form correctly — a deliberate, documented difference.
+    dev, _ = api.dispatch(
+        "POST",
+        "/devices",
+        {"name": "Thermostat & Heating Zone", "type": "com.fibaro.setPointForwarder"},
+    )
+    data, _ = api.dispatch("GET", "/devices?name=Thermostat%20%26%20Heating%20Zone")
+    assert [d["id"] for d in data] == [dev["id"]]
+    # ... and the divergence is called out: a warning rides the pump
+    assert any(
+        e.get("level") == "warning" and "&" in e.get("text", "")
+        for e in api.emitted
+    )
+
 
 def test_devices_query_interface_sees_qa_devices(api: Api) -> None:
     api.register_qa(5000, "qa", None, {"value": True})

@@ -1220,6 +1220,12 @@ handlers.serverRequest = function(msg)
   end
 end
 
+handlers.log = function(msg)
+  -- engine-side notices (e.g. the sim's ?name= '&' quirk warning) print
+  -- through the pump like QA logs, untagged
+  postLog(msg.level or "info", tostring(msg.text or ""))
+end
+
 handlers.apiResult = function(msg)
   -- the response to a suspended QA's api.* call: resume its coroutine with
   -- (data, status) — the api.get that yielded returns these values. This is

@@ -9,7 +9,12 @@ Full reference for Devices (15), Plugins (15), QuickApp (11), and Additional Int
 ### Core Device Operations
 - `GET /api/devices` — List all devices; supports filtering:
   - `?name=MyQuickApp` (case-insensitive **exact** match — "Wake on LAN" hits
-    "Wake on Lan", "Wake" hits nothing; verified against a live HC3)
+    "Wake on Lan", "Wake" hits nothing; verified against a live HC3). Names
+    containing `&` cannot be matched on the HC3 at all (encoded or raw — both
+    return 0; the controller re-splits on the decoded `&`). Narrow by
+    `type`/`interface`/`roomID` and match the name client-side instead. flua's
+    sim matches the encoded `&` form correctly (and logs a warning) — a
+    deliberate difference.
   - `?interface=quickApp`
   - `?type=com.fibaro.binarySwitch`
   - `?roomID=5`

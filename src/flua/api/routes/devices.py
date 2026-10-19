@@ -71,6 +71,19 @@ def _with_sun(dev: dict, state: SimState, clock: Any) -> dict:
 
 
 def devices_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    name_query = req.query.get("name")
+    if name_query is not None and "&" in name_query and req.emit is not None:
+        # the HC3 cannot match names containing '&' at all (its filter
+        # re-splits on the decoded ampersand and returns 0 — verified live).
+        # flua matches correctly, so a QA that works here returns nothing on
+        # the controller: warn, don't silently diverge.
+        req.emit(
+            messages.log(
+                "warning",
+                "flua: ?name= filter contains '&' — the HC3 returns 0 matches "
+                "for such names; this QA will behave differently on the controller",
+            )
+        )
     devices = [d for d in state.devices.values() if _matches(d, req.query)]
     if req.remote is not None:
         # online: the developer should feel at home on the HC3 — serve the

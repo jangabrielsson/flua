@@ -34,6 +34,39 @@ again and the check passes. flua behaves the same: the sim starts a
 disabled QA and `PUT /devices/{id} {enabled = false}` restarts it, so the
 pattern is testable offline exactly as it runs on the HC3.
 
+## Device Lookup — filter on the server
+
+Fetching `/devices` and iterating client-side to find a device by name is a
+common (and wasteful) pattern — on a big HC3 that pulls hundreds of devices
+into the QA. The REST API filters server-side; use them:
+
+```lua
+local qa = api.get("/devices?name=My Helper")[1]          -- by name (case-insensitive exact)
+local qas = api.get("/devices?interface=quickApp")         -- all QuickApps
+local switches = api.get("/devices?type=com.fibaro.binarySwitch")
+local byUuid = api.get("/devices?property=[quickAppUuid," .. HELPER_UUID .. "]")
+local roomLights = api.get("/devices?roomID=1&type=com.fibaro.binarySwitch")
+```
+
+- `?name=` — case-insensitive **exact** match (verified against a live HC3;
+  no substring). **Quirk**: names containing `&` can NOT be matched on the
+  HC3 at all (encoded or raw — both return 0; the controller re-splits on
+  the decoded `&`). Workaround: narrow server-side by `type`/`interface`/
+  `roomID`, then match the name client-side. flua's sim matches the encoded
+  `&` form correctly (and logs a warning) — a deliberate difference.
+- `?property=[name,value]` — the property value is **stringified** and
+  compared to the filter value as a string (Lua-style: booleans are
+  `true`/`false`).
+- Filters combine (`&`), return a **list** (empty, not nil, when nothing
+  matches) — index `[1]` and nil-check before use.
+- Names with spaces need no encoding (verified on a live HC3: raw
+  `?name=Wake on LAN` works). `urlencode(name)` is still worth it for names
+  containing reserved query characters (`&`, `=`, `%`, `#`) — those would
+  corrupt the query unencoded.
+- flua's sim implements the same filter semantics, so the pattern is
+  testable offline. More endpoints and shapes: the hc3-rest-api skill,
+  `assets/devices.md`.
+
 ## Timer Patterns
 
 ### Polling loop (setInterval)
