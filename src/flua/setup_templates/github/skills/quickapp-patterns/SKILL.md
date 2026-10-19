@@ -9,6 +9,31 @@ Practical patterns for timers, event polling, HTTP, networking, child devices, a
 
 ---
 
+## Startup Patterns
+
+### Disabled check (the `enabled` flag)
+
+Unchecking a device in the HC3 web UI does NOT stop its QA — the HC3
+starts the QA anyway, and the QA must check the flag itself. Do it first
+in `onInit` and bail before any timers or work are set up:
+
+```lua
+function QuickApp:onInit()
+    self:debug(self.name, self.id)
+    if not api.get("/devices/" .. self.id).enabled then
+        self:debug(self.name, self.id, "Device is disabled")
+        return  -- no timers, no work: the QA stays idle
+    end
+    -- ...start timers and init here...
+end
+```
+
+Re-enabling in the UI restarts the QA (an `enabled` change restarts it,
+like every other device PUT — see hc3-write-safety), so `onInit` runs
+again and the check passes. flua behaves the same: the sim starts a
+disabled QA and `PUT /devices/{id} {enabled = false}` restarts it, so the
+pattern is testable offline exactly as it runs on the HC3.
+
 ## Timer Patterns
 
 ### Polling loop (setInterval)
@@ -24,6 +49,36 @@ function QuickApp:poll()
     self:updateProperty("value", getReading())
 end
 ```
+
+### Fixed-rate loop (no drift) — prefer this for scheduled work
+
+`setInterval` chains from *completion*: each cycle takes `interval + work
+time`, so a daily task drifts a few seconds every day and minutes over
+weeks. For anything that must stay on a schedule (00:00:00 runs, hourly
+syncs), target ABSOLUTE times and let each delay absorb the work time:
+
+```lua
+-- fires every `seconds`, on the original cadence — the work time is
+-- compensated, never accumulated
+function QuickApp:loopEvery(seconds, fun)
+    local next = os.time() + seconds
+    local function tick()
+        fun()
+        next = next + seconds
+        setTimeout(tick, math.max(0, (next - os.time()) * 1000))
+    end
+    setTimeout(tick, math.max(0, (next - os.time()) * 1000))
+end
+
+function QuickApp:onInit()
+    self:loopEvery(60, function() self:checkTime() end)
+end
+```
+
+Live example: `examples/drift.lua` shows `setInterval` drifting next to
+this pattern. `os.time()` is whole seconds, so the delay math is
+second-quantized — the cadence is exact on the second, and the leftover
+fraction is re-absorbed every cycle.
 
 ### One-shot delayed action
 ```lua
@@ -395,20 +450,37 @@ self:turnOn()  -- prefer self:method() over fibaro.call(self.id, ...) for self
 
 ## Scheduler / Time-Based Actions
 
+The naive version — `setInterval` every minute checking the clock — drifts
+by the check's execution time each cycle and can also miss the exact minute
+if the check runs just before it. Use the fixed-rate pattern (above) and
+fire at the exact target instead:
+
 ```lua
-function QuickApp:onInit()
-    setInterval(function() self:checkTime() end, 60000)
+-- Run exactly at every local midnight — recompute the next midnight from
+-- the date each cycle so DST shifts are handled, never +86400 blindly.
+function QuickApp:scheduleMidnight(fun)
+    local function nextMidnightAfter(now)
+        local t = os.date("*t", now)
+        t.hour, t.min, t.sec = 0, 0, 0
+        local midnight = os.time(t)
+        if midnight <= now then
+            -- os.time normalizes day overflow (day 32 -> next month)
+            midnight = os.time{year = t.year, month = t.month, day = t.day + 1, hour = 0, min = 0, sec = 0}
+        end
+        return midnight
+    end
+    local function tick()
+        fun()
+        local now = os.time()
+        setTimeout(tick, math.max(0, (nextMidnightAfter(now) - now) * 1000))
+    end
+    setTimeout(tick, math.max(0, (nextMidnightAfter(os.time()) - os.time()) * 1000))
 end
 
-function QuickApp:checkTime()
-    local hour   = tonumber(os.date("%H"))
-    local minute = tonumber(os.date("%M"))
-
-    if hour == 7 and minute == 0 then
-        fibaro.call(10, "turnOn")
-    elseif hour == 23 and minute == 0 then
-        fibaro.call(10, "turnOff")
-    end
+function QuickApp:onInit()
+    self:scheduleMidnight(function()
+        fibaro.call(10, "turnOff")  -- lights out at 00:00:00
+    end)
 end
 ```
 
