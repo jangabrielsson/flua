@@ -727,6 +727,14 @@ def main(argv: list[str] | None = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(levelname)s %(name)s: %(message)s",
     )
+    # -v shows the exact invocation (argv + debugger env) — the quickest way
+    # to see what a host like VS Code passes flua (launch configs, injected
+    # mobdebug bootstraps, MOBDEBUG_PORT)
+    logging.debug("argv: %s", sys.argv)
+    logging.debug(
+        "env: MOBDEBUG_PORT=%s",
+        os.environ.get("MOBDEBUG_PORT"),
+    )
     try:
         return asyncio.run(_run(parser, args))
     except KeyboardInterrupt:

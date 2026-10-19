@@ -1,6 +1,6 @@
 ---
 name: hc3-rest-api
-description: HC3 REST API reference: quick-reference for the most-used ~60 endpoints inline, plus full 269-endpoint coverage via assets/ subdirectory (5 files grouped by category: devices, scenes-automation, energy-climate, system, misc). Includes Lua api.* examples for each endpoint. USE FOR: calling HC3 REST endpoints from QA code or externally, understanding request/response shapes, filtering devices, triggering scenes or events. Ask the agent to read a specific asset file for deep coverage of any category.
+description: HC3 REST API reference: quick-reference for the most-used ~60 endpoints inline, plus ~250 endpoints covered in the assets/ subdirectory (5 files grouped by category: devices, scenes-automation, energy-climate, system, misc). Includes Lua api.* examples for each endpoint. USE FOR: calling HC3 REST endpoints from QA code or externally, understanding request/response shapes, filtering devices, triggering scenes or events. Ask the agent to read a specific asset file for deep coverage of any category.
 ---
 
 # HC3 REST API Reference
@@ -68,7 +68,6 @@ GET  /api/devices?interface=quickApp           -- filter by interface
 GET  /api/devices?type=com.fibaro.binarySwitch -- filter by type
 GET  /api/devices?roomID=5                     -- filter by room
 GET  /api/devices/{id}                         -- single device
-GET  /api/devices/{id}/properties             -- all properties
 GET  /api/devices/{id}/properties/{propName}  -- one property
 ```
 
@@ -186,9 +185,11 @@ fibaro.setGlobalVariable("HomeMode", "Away")
 ## Custom Events
 
 ```
-GET    /api/customEvents           -- list all
-POST   /api/customEvents           -- create: {name, userDescription}
-POST   /api/customEvents/{name}    -- trigger event
+GET  /api/customEvents           -- list all
+POST /api/customEvents           -- create: {name, userDescription}
+PUT  /api/customEvents/{name}    -- update name/userDescription
+POST /api/customEvents/{name}    -- trigger event
+GET  /api/customEvents/{name}/publish  -- trigger event (GET form)
 DELETE /api/customEvents/{name}
 ```
 
@@ -225,12 +226,17 @@ fibaro.scene("kill", 10)
 ## Alarm Partitions
 
 ```
-GET  /api/alarms/v1/partitions
-POST /api/alarms/v1/partitions/{id}/actions   -- arm/disarm/breach
+GET    /api/alarms/v1/partitions
+POST   /api/alarms/v1/partitions/actions/arm            -- arm all
+POST   /api/alarms/v1/partitions/actions/tryArm         -- try to arm all
+DELETE /api/alarms/v1/partitions/actions/arm            -- disarm all
+POST   /api/alarms/v1/partitions/{partitionID}/actions/arm
+POST   /api/alarms/v1/partitions/{partitionID}/actions/tryArm
+DELETE /api/alarms/v1/partitions/{partitionID}/actions/arm  -- disarm
 ```
 
 ```lua
-api.post("/alarms/v1/partitions/1/actions", { type = "arm" })
+api.post("/alarms/v1/partitions/1/actions/arm")
 fibaro.alarm(1, "arm")
 fibaro.alarm(1, "disarm")
 ```
@@ -333,22 +339,22 @@ Fields: `Temperature`, `Humidity`, `Wind`, `WeatherCondition`, `ConditionCode`.
 
 ```
 GET    /api/debugMessages   -- recent log entries
-POST   /api/debugMessages   -- add entry
 DELETE /api/debugMessages   -- clear
+GET    /api/debugMessages/tags  -- distinct QA tags
 ```
 
 ---
 
 ## Full Endpoint Reference
 
-Detailed coverage of all 269 HC3 REST endpoints is in the `assets/` subdirectory alongside this skill. These files are distributed with the `/install-qa-skills` installer and available in any workspace that has installed the skills.
+Detailed coverage of ~250 HC3 REST endpoints is in the `assets/` subdirectory alongside this skill. These files are distributed with the `/install-qa-skills` installer and available in any workspace that has installed the skills.
 
 Ask the agent to read the relevant file when you need deeper coverage:
 
 | File | Contents | Endpoints |
 |------|----------|-----------|
-| `.github/skills/hc3-rest-api/assets/devices.md` | Devices, Plugins, QuickApp files, Interfaces | 59 |
-| `.github/skills/hc3-rest-api/assets/scenes-automation.md` | Scenes, Profiles, Custom Events, Global Variables | 35 |
+| `.github/skills/hc3-rest-api/assets/devices.md` | Devices, Plugins, QuickApp files, Interfaces | 43 |
+| `.github/skills/hc3-rest-api/assets/scenes-automation.md` | Scenes, Profiles, Custom Events, Global Variables | 38 |
 | `.github/skills/hc3-rest-api/assets/energy-climate.md` | Energy, Billing, Climate, Humidity, Sprinklers | 52 |
-| `.github/skills/hc3-rest-api/assets/system.md` | Network, Users, Alarms, Rooms, Sections | 55 |
-| `.github/skills/hc3-rest-api/assets/misc.md` | Notifications, Location, Debug, Weather, Icons, RGB, Push, System | 46 |
+| `.github/skills/hc3-rest-api/assets/system.md` | Network, Users, Alarms, Rooms, Sections | 60 |
+| `.github/skills/hc3-rest-api/assets/misc.md` | Notifications, Location, Debug, Weather, Icons, RGB, Push, System | 55 |

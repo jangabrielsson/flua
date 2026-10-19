@@ -362,6 +362,7 @@ end
 -- Every QA callback entry point goes through here. qaId == nil means a
 -- runtime (main-state) timer: run it plain, like before — fibaro.sleep
 -- cannot work there and errors clearly.
+local _lastMirroredMask  -- observability: log mask changes, not every tick
 runInQa = function(qaId, fn, ...)
   if qaId == nil then
     xpcall(fn, traceback)
@@ -374,7 +375,19 @@ runInQa = function(qaId, fn, ...)
   -- coroutine, so debugged QAs behave like they ran on the main thread.
   local hook, mask, count = debug.gethook()
   if hook then
+    -- flua patch: the main thread's hook mask can lag behind the intended
+    -- one (sethook inside a hook only affects the hooking thread) — take
+    -- the debugger's intended mask instead, so new coroutines don't inherit
+    -- stale line hooks
+    if _FLUA.mobdebug and _FLUA.mobdebug.currentMask then
+      mask = _FLUA.mobdebug.currentMask()
+    end
     debug.sethook(co, hook, mask, count)
+    if mask ~= _lastMirroredMask then
+      -- observability: what mask the QA coroutine actually inherited
+      _PY.flua_log("info", qaId, "debug hook mirrored to QA coroutine (mask: " .. tostring(mask) .. ")")
+      _lastMirroredMask = mask
+    end
   end
   resumeQa(qaId, co, ...)
 end
@@ -405,7 +418,13 @@ end
 -- package.path, so the injected dir can never shadow it.
 local function loadRuntimeMobdebug()
   local chunk = loadfile(_PY.runtime_dir .. "/mobdebug.lua")
-  return chunk and chunk() or nil
+  local mod = chunk and chunk() or nil
+  if mod then
+    _FLUA.mobdebug = mod  -- both startup flows (--debugger AND the VS Code
+                          -- injected bootstrap) leave the table registered,
+                          -- so runInQa can ask for the intended hook mask
+  end
+  return mod
 end
 package.preload["mobdebug"] = loadRuntimeMobdebug
 package.preload["vscode-mobdebug"] = loadRuntimeMobdebug

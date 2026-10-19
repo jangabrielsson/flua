@@ -190,7 +190,7 @@ print(w.Temperature, w.WeatherCondition)
   ```
 
 ### System Control
-- `POST /api/service/factoryReset` — Perform factory reset (**destructive**)
+- `POST /api/factoryReset` — Perform factory reset (**destructive**)
 - `POST /api/service/reboot` — Reboot the system
 
 ### UI Sort Order

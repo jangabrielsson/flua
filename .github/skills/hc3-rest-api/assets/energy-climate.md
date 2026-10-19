@@ -4,7 +4,7 @@ Full reference for Energy (25), Consumption (6), Climate Panel (7), Humidity Pan
 
 ---
 
-## Energy (25 endpoints)
+## Energy (24 endpoints)
 
 ### Device and Consumption Monitoring
 - `GET /api/energy/devices` — List energy-enabled devices
@@ -145,7 +145,7 @@ flua --api remote -e "print(json.encode(api.get('/energy/consumption/device/42/d
 
 ---
 
-## Sprinklers Panel (9 endpoints)
+## Sprinklers Panel (10 endpoints)
 
 ### Schedule Management
 - `GET /api/panels/sprinklers` — All sprinkler schedules

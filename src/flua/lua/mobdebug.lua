@@ -3,6 +3,15 @@
 -- Upstream: https://github.com/pkulchenko/MobDebug
 -- License:  MIT (see file)
 --
+-- flua patch (search "flua patch"): the per-line pending-I/O poll crosses
+-- the Lua->Python bridge (~1us) and made tight loops ~100x slower under
+-- the debugger; it now runs every 100th line event instead. Also: Socket:peek
+-- propagates the socket error (upstream drops it, which produced
+-- "Unexpected socket error: nil" on a closed connection), a closed debugger
+-- connection detaches the debugger, and the hook is INSTALLED ONLY while
+-- stepping or when breakpoints exist — with neither, there is no hook at
+-- all and flua's poll timer (mobdebug.poll) watches the socket instead.
+--
 -- MobDebug -- Lua remote debugger
 -- Copyright 2011-20 Paul Kulchenko
 -- Based on RemDebug 1.0 Copyright Kepler Project 2005
@@ -518,7 +527,13 @@ function Socket:peek(n, sync)
 
   self:buffer_append(res or partial)
 
-  return self:buffer_peek(n)
+  data = self:buffer_peek(n)
+  if data then
+    return data
+  end
+  -- flua patch: propagate the socket error (upstream dropped it here,
+  -- which made loop_detect_protocol report "Unexpected socket error: nil")
+  return nil, err
 end
 
 function Socket:receive_line(sync)
@@ -608,6 +623,11 @@ function Socket:is_pending()
     self:settimeout() -- back to blocking
     self:buffer_append(res or part)
     self.checkcount = 0
+    if not res then
+      -- flua patch: surface the socket error so the debug hook can
+      -- detach on a closed connection
+      return false, err
+    end
   else
     self.checkcount = self.checkcount + 1
   end
@@ -943,7 +963,62 @@ local function in_debugger()
   return false
 end
 
-local function debug_hook(event, line)
+-- flua patch: pending-I/O poll batching (see the header)
+local pending_poll = 100
+local done  -- flua patch: forward declaration; the hook calls done() to
+            -- detach when the debugger connection dies (defined below)
+local debug_hook  -- flua patch: forward declaration for ensure_hookmask
+local hookmask = "lcr"  -- flua patch: the active sethook mask (nil = off)
+
+-- flua patch: dynamic hook mask — line hooks only while stepping or when
+-- breakpoints exist; a plain attached run uses call events only, so tight
+-- loops run at full speed (VS Code F5/^F5 both attach a debug session).
+local function ensure_hookmask(want)
+  want = want
+    or ((state.step_into or state.step_over or next(state.breakpoints) ~= nil)
+        and "lcr" or "c")
+  if want ~= hookmask then
+    debug.sethook(debug_hook, want)
+    hookmask = want
+    -- flua patch: observe what the adapter synced (debuggee-visible answer
+    -- to "did VS Code give the debugger breakpoints?") — only under flua
+    if _PY and _PY.flua_log then
+      _PY.flua_log(
+        "info", nil,
+        ("mobdebug hook -> %s (breakpoints: %s, stepping: %s)"):format(
+          want or "off",
+          next(state.breakpoints) ~= nil and "yes" or "none",
+          (state.step_into or state.step_over) and "yes" or "no"
+        )
+      )
+    end
+  end
+end
+
+debug_hook = function(event, line)
+  pending_poll = pending_poll - 1
+  local pending = false
+  if pending_poll <= 0 then
+    pending_poll = 100
+    local err
+    pending, err = server:is_pending()
+    if not pending then
+      -- flua patch: under the "c" mask events are rare (calls only), so
+      -- the checkcount batching would delay commands by minutes — probe
+      -- the socket for real on every poll
+      server:enforce_pending_check()
+      pending, err = server:is_pending()
+    end
+    if err == "closed" then
+      -- flua patch: the IDE went away mid-run — detach silently and let
+      -- the QA keep running at full speed (no error, no traceback)
+      done()
+      return
+    end
+    -- flua patch: step-flag/breakpoint changes (RUN/STEP/SETB/DELB) land
+    -- here — on the debugee thread, where sethook targets the right thread
+    ensure_hookmask()
+  end
   -- (1) LuaJIT needs special treatment. Because debug_hook is set for
   -- *all* coroutines, and not just the one being debugged as in regular Lua
   -- (http://lua-users.org/lists/lua-l/2011-06/msg00513.html),
@@ -979,6 +1054,14 @@ local function debug_hook(event, line)
 
   if event == "call" then
     state.stack_level = state.stack_level + 1
+    if pending then
+      -- flua patch: process mid-run commands while the hook is installed
+      if not state.protocol then
+        debugger.loop_detect_protocol()  -- first byte is buffered: safe
+      end
+      debugger.loop_pending_io()
+      ensure_hookmask()
+    end
   elseif event == "return" or event == "tail return" then
     state.stack_level = state.stack_level - 1
   elseif event == "line" then
@@ -996,7 +1079,7 @@ local function debug_hook(event, line)
     -- (5) at least one watch is registered
     if not (
       state.step_into or state.step_over or state.breakpoints[line] or state.watchescnt > 0
-      or server:is_pending()
+      or pending
     ) then return end
 
     server:enforce_pending_check() -- force check on the next command
@@ -1041,6 +1124,7 @@ local function debug_hook(event, line)
     end
 
     local possible_pending_io = debugger.loop_pending_io()
+    ensure_hookmask()  -- flua patch: pending SETB/DELB may have changed the mask
 
     local vars, status, res
     if (state.watchescnt > 0) then
@@ -1107,18 +1191,24 @@ end
 -- this is a function that removes all hooks and closes the socket to
 -- report back to the controller that the debugging is done.
 -- the script that called `done` can still continue.
-local function done()
-  if not (isrunning() and server) then return end
+done = function()
+  -- flua patch: the original guard (isrunning()) refused to tear down when
+  -- the debugger coroutine had already died (mid-run IDE disconnect) —
+  -- leaving the line hook installed forever. server is the real session
+  -- marker.
+  if not server then return end
 
   if not jit then
     for co, debugged in pairs(coroutines) do
       if debugged then debug.sethook(co) end
     end
   end
+  if coro_debugee then debug.sethook(coro_debugee) end
 
   debug.sethook()
   server:close()
 
+  hookmask = "lcr"  -- flua patch: reset for the next session
   coro_debugger = nil -- to make sure isrunning() returns `false`
   state.seen_hook = nil -- to make sure that the next start() call works
   abort = nil -- to make sure that callback calls use proper "abort" value
@@ -1572,6 +1662,8 @@ local fix_file_name do
   end
 
   fix_file_name = function(reverse, file)
+    -- flua patch: tolerate nil (e.g. C functions in the stack report no file)
+    if not file then return file end
     if vscode_pathmap then
       for _, map in ipairs(vscode_pathmap) do
         local pattern, substitution = map[reverse and 2 or 1], map[reverse and 1 or 2]
@@ -2054,6 +2146,9 @@ function debugger.loop_detect_protocol()
     if err == "timeout" then
       if mobdebug.yield then mobdebug.yield() end
     elseif err == "closed" then
+      -- flua patch: detach before raising — the QA survives the IDE going
+      -- away (the hook is uninstalled, so the error fires exactly once)
+      done()
       error("Debugger connection closed", 1)
     else
       error(("Unexpected socket error: %s"):format(err), 1)
@@ -2762,6 +2857,9 @@ mobdebug.off = off
 mobdebug.moai = moai
 mobdebug.coro = coro
 mobdebug.done = done
+-- flua patch: the mask ensure_hookmask intends (the main thread's actual
+-- hook can lag — sethook inside a hook only affects the current thread)
+mobdebug.currentMask = function() return hookmask end
 mobdebug.pause = function() state.step_into = true end
 mobdebug.yield = nil -- callback
 mobdebug.output = output

@@ -25,6 +25,16 @@ the guards.
 > `api.get` / `api.put` / `api.post` from your QuickApp. The hazards
 > and defensive patterns are the important part.
 
+> **flua note (the emulator):** flua's sim models the same write-path
+> rules with two deliberate differences: `PUT /api/devices/{id}`
+> **merges** the `properties` dict (the real-HC3 array-replace is NOT
+> simulated — the sim is the safe path), and the restart-on-PUT
+> semantics of section 1 apply in the sim (`name`/`visible`/`enabled`/
+> `roomID`/`properties` all restart the QA; `/plugins/updateProperty`
+> does not). Action POSTs return plain 202s offline — the JSON-RPC
+> error envelope of section 8 is real-HC3-only, so the defensive check
+> is a harmless no-op in the sim.
+
 ---
 
 ## 1. `PUT /api/devices/{id}` — top-level merges, nested `properties.*` arrays fully replace
@@ -69,6 +79,17 @@ api.put("/devices/42", { properties = { quickAppVariables = vars } })
 `properties.parameters`, `properties.associations` and
 `properties.multichannelAssociations` are array-valued *and* have their
 own additional silent-write trap — see section 7.
+
+**A side-effect every device PUT carries: the plugin restarts.** On the
+HC3, `PUT /api/devices/{id}` — top-level fields *and* `properties`
+writes — restarts the QA (timers cancelled, `onInit` runs again, runtime
+state lost). The one write channel that does NOT restart is
+`POST /api/plugins/updateProperty` (section 6). Treat a device PUT as a
+configuration-time write, not a per-event write: writing a variable via
+PUT on every state change would reboot the QA every time. Confirmed on
+the real HC3: variable writes via PUT restart too — that is exactly why
+`QuickApp:setVariable` goes through `/plugins/updateProperty` instead
+(section 5). flua's sim implements the same model.
 
 ## 2. `PUT /api/panels/climate/{id}` — same shape as devices
 
@@ -135,30 +156,38 @@ from the UI.
   ```
   This is why `quickapp-patterns` examples use `tostring()` — it's
   defending against this coercion, not just type hygiene.
+- `QuickApp:setVariable` itself writes through
+  `POST /api/plugins/updateProperty` — deliberately, to avoid the
+  device-PUT restart (section 1). A raw `api.put` of
+  `properties.quickAppVariables` restarts the QA.
 - From outside HC3 (MCP, external REST): use `set_quickapp_variable`
   from the HC3_mcp server, which reads the declared type and coerces
   correctly, or write directly via `PUT /api/devices/{id}` with the
-  full `properties.quickAppVariables` array (see section 1).
+  full `properties.quickAppVariables` array (see section 1) — that PUT
+  restarts the QA (section 1), so batch variable writes and use the
+  non-restarting property channel (section 6) for frequent updates.
 - Never use `control_device` with `action: "setVariable"` — the HC3_mcp
   fork hard-rejects this call at the tool boundary for exactly this
   reason.
 
-## 6. `POST /api/plugins/updateProperty` — avoid from external callers
+## 6. `POST /api/plugins/updateProperty` — the non-restarting property channel
 
-This endpoint does not appear in HC3's Swagger documentation and its
-behaviour is not guaranteed stable across firmware versions when called
-directly. The `hc3-rest-api` skill lists it for completeness.
+This is the documented way to update a device property WITHOUT
+restarting the QA (official Plugins API swagger — operationId
+`updateProperty`; the repo carries the source of truth at
+`fibaro_api_docs/plugins.json`). Every other device write path — PUT
+`/api/devices/{id}` with top-level fields or `properties` — restarts
+the plugin on the HC3 (section 1).
 
-**Inside a QuickApp**, prefer `self:updateProperty(name, value)` — it
-goes through the same internal path safely and is the canonical way for
-a QA to update its own properties. Don't rewrite working
-`self:updateProperty` calls into `PUT /api/devices/{id}`.
-
-**From external callers** (other QAs, scenes, MCP, REST clients) writing
-to a *different* device's properties, prefer `PUT /api/devices/{id}` —
-it's the documented endpoint and goes through the merge/replace
-semantics in section 1. `modify_device` in HC3_mcp wraps the documented
-path.
+- **Inside a QuickApp**, `self:updateProperty(name, value)` calls this
+  endpoint and also updates the QA's own `self.properties` table, so
+  Lua code sees the new value immediately. Prefer it for the QA's own
+  properties; don't rewrite working `self:updateProperty` calls into
+  `PUT /api/devices/{id}` (that would add a needless restart).
+- **From external callers** (other QAs, scenes, MCP, REST clients)
+  writing another device's properties, this is the channel to prefer —
+  no restart, no array-replace hazard. `PUT /api/devices/{id}` is the
+  restarting alternative.
 
 ## 7. Z-wave mesh-config writes are cache-only — do not use REST
 

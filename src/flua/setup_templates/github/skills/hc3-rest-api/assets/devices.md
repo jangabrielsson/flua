@@ -1,10 +1,10 @@
 # HC3 REST API — Device Management
 
-Full reference for Devices (28), Plugins (18), QuickApp (11), and Additional Interfaces (2) endpoints.
+Full reference for Devices (15), Plugins (15), QuickApp (11), and Additional Interfaces (2) endpoints.
 
 ---
 
-## Devices (28 endpoints)
+## Devices (15 endpoints)
 
 ### Core Device Operations
 - `GET /api/devices` — List all devices; supports filtering:
@@ -36,7 +36,6 @@ Full reference for Devices (28), Plugins (18), QuickApp (11), and Additional Int
   ```
 
 ### Device Properties
-- `GET /api/devices/{deviceID}/properties` — All device properties
 - `GET /api/devices/{deviceID}/properties/{propName}` — Single property value
 
 ### Device Actions
@@ -88,7 +87,7 @@ end
 
 ---
 
-## Plugins (18 endpoints)
+## Plugins (15 endpoints)
 
 ### Plugin Management
 - `GET /api/plugins` — Get all plugins information

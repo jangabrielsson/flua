@@ -402,7 +402,8 @@ src/flua/lua/net.lua       HTTPClient, TCPSocket, UDPSocket, WebSocketClient
 src/flua/lua/mqtt.lua      mqtt.* client wrapper
 src/flua/lua/json.lua      HC3-compatible json
 src/flua/lua/socket.lua    LuaSocket-compatible subset (mobdebug)
-src/flua/lua/mobdebug.lua  vendored remote debugger (Paul Kulchenko, MIT)
+src/flua/lua/mobdebug.lua  vendored remote debugger (Paul Kulchenko, MIT; flua
+                           patch: batched pending-I/O poll, see the file header)
 src/flua/lua/lib/          shared Lua libs (flua-test assertions, eventlib, ...)
 src/flua/cli.py         CLI: bootstrap, --run-for, --seed, --debugger, ...
 ```
@@ -514,7 +515,9 @@ annotations.
 ## Debugging (mobdebug)
 
 flua bundles [MobDebug](https://github.com/pkulchenko/MobDebug) (v0.801, MIT,
-vendored unmodified) so VS Code (Lua/mobdebug extension) or ZeroBrane Studio
+vendored with one small flua patch: the per-line pending-I/O poll runs every
+100th line event, so tight loops stay faster under the debugger) so VS Code
+(Lua/mobdebug extension) or ZeroBrane Studio
 can debug flua scripts remotely:
 
 ```bash
