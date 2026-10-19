@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.59] - 2026-10-19
+
+### Added
+- update net.HTTPClient to support constructor timeout and enhance usage documentation
+- add third-party notices and update license files in pyproject.toml
+
 ## [0.1.58] - 2026-10-19
 
 ### Added
