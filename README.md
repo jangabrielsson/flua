@@ -1,6 +1,7 @@
 <p align="center">
     <img src="https://raw.githubusercontent.com/jangabrielsson/flua/main/docs/Flua.png" alt="Flua Logo" width="320"/>
 </p>
+
 # flua
 
 A Lua engine for Fibaro QuickApps: [lupa](https://github.com/scoder/lupa) (bundled
