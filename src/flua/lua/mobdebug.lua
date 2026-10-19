@@ -980,18 +980,6 @@ local function ensure_hookmask(want)
   if want ~= hookmask then
     debug.sethook(debug_hook, want)
     hookmask = want
-    -- flua patch: observe what the adapter synced (debuggee-visible answer
-    -- to "did VS Code give the debugger breakpoints?") — only under flua
-    if _PY and _PY.flua_log then
-      _PY.flua_log(
-        "info", nil,
-        ("mobdebug hook -> %s (breakpoints: %s, stepping: %s)"):format(
-          want or "off",
-          next(state.breakpoints) ~= nil and "yes" or "none",
-          (state.step_into or state.step_over) and "yes" or "no"
-        )
-      )
-    end
   end
 end
 

@@ -7,7 +7,20 @@ summarizes the commits in that release (full history:
 ## [0.1.57] - 2026-10-19
 
 ### Changed
-- Enhance documentation and code for flua
+- Debugger overhaul: the mobdebug line hook installs only while stepping
+  or when breakpoints exist — a plain attached run (VS Code F5/^F5 without
+  breakpoints) runs at full speed instead of ~100x slower on hot loops.
+  Closed IDE connections detach cleanly (no more "Unexpected socket error:
+  nil"), and a `-v` run logs flua's argv + MOBDEBUG_PORT for diagnosing
+  host launches.
+- Skill corrections: hc3-rest-api endpoints verified against the official
+  spec (bogus endpoints removed, alarm partition paths fixed, counts
+  reconciled), hc3-write-safety rewritten around the documented
+  non-restarting updateProperty channel and device-PUT restart semantics,
+  flua-troubleshooting updated, obsolete hc3-vfs skill removed.
+
+### Added
+- examples/drift.lua — setInterval drift and work-timing demo.
 
 ## [0.1.56] - 2026-10-18
 

@@ -362,7 +362,6 @@ end
 -- Every QA callback entry point goes through here. qaId == nil means a
 -- runtime (main-state) timer: run it plain, like before — fibaro.sleep
 -- cannot work there and errors clearly.
-local _lastMirroredMask  -- observability: log mask changes, not every tick
 runInQa = function(qaId, fn, ...)
   if qaId == nil then
     xpcall(fn, traceback)
@@ -383,11 +382,6 @@ runInQa = function(qaId, fn, ...)
       mask = _FLUA.mobdebug.currentMask()
     end
     debug.sethook(co, hook, mask, count)
-    if mask ~= _lastMirroredMask then
-      -- observability: what mask the QA coroutine actually inherited
-      _PY.flua_log("info", qaId, "debug hook mirrored to QA coroutine (mask: " .. tostring(mask) .. ")")
-      _lastMirroredMask = mask
-    end
   end
   resumeQa(qaId, co, ...)
 end

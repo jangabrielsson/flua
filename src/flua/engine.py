@@ -297,6 +297,15 @@ class LuaEngine:
                 if location.get(key) is not None:
                     self.api.state.location[key] = location[key]
 
+    def virtual_now(self) -> float:
+        """The virtual clock, advanced to wall. os.time()/millitime reads
+        mid-callback must see current time — the pump cannot tick while a
+        long QA callback runs, so the raw clock would lag by the callback's
+        duration and timer-compensation math (loop patterns in QAs) would
+        drift. tick() is delta-based, so the pump's own ticks stay exact."""
+        self.clock.tick(time.monotonic())
+        return self.clock.time
+
     def qa_is_offline(self, qa_id: int | None) -> bool:
         """--%%mode:offline (legacy --%%offline:true) on a QA pins its api.*
         calls to the sim."""

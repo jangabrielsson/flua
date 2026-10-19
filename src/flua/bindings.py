@@ -117,7 +117,7 @@ def install_bindings(engine: "LuaEngine") -> None:
     # Virtual engine time (see clock.py): realtime by default, accelerated
     # with --speed, frozen during debugger pauses, jumping with --instant.
     py["now"] = lambda: engine.clock.time
-    py["vtime"] = lambda: engine.clock.time
+    py["vtime"] = engine.virtual_now
     py["vclock"] = lambda: engine.clock.elapsed()
     py["note_debugger_pause"] = engine.note_debugger_pause
     py["log"] = engine.log_line
