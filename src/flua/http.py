@@ -9,9 +9,11 @@ it is one synchronous function, safe to run in any thread.
 
 from __future__ import annotations
 
+import contextlib
 import ssl
 import urllib.error
 import urllib.request
+from typing import Any
 
 USER_AGENT = "flua/0.1"
 
@@ -34,6 +36,27 @@ def http_call(
     HC3's checkCertificate option; Python verifies by default, like the
     HC3's default true).
     """
+    status, response_headers, response = open_http(
+        method, url, headers, data, timeout, check_certificate
+    )
+    try:
+        return status, response.read().decode("utf-8", errors="replace"), response_headers
+    finally:
+        with contextlib.suppress(Exception):
+            response.close()
+
+
+def open_http(
+    method: str,
+    url: str,
+    headers: dict[str, str] | None = None,
+    data: str | bytes | None = None,
+    timeout: float = 30.0,
+    check_certificate: bool = True,
+) -> tuple[int, dict[str, str], Any]:
+    """Open an HTTP exchange: (status, headers, response). The caller owns
+    and must close the response; transport failures raise. HTTP errors
+    (4xx/5xx) return their response as the file-like object, like http_call."""
     headers = dict(headers or {})
     headers.setdefault("User-Agent", USER_AGENT)
     if isinstance(data, bytes):
@@ -45,15 +68,22 @@ def http_call(
     context = None if check_certificate else ssl._create_unverified_context()
     request = urllib.request.Request(url, data=payload, headers=headers, method=method.upper())
     try:
-        with urllib.request.urlopen(request, timeout=timeout, context=context) as response:
-            status = response.status
-            body = response.read()
-            response_headers = dict(response.headers.items())
+        response = urllib.request.urlopen(request, timeout=timeout, context=context)
+        return response.status, dict(response.headers.items()), response
     except urllib.error.HTTPError as exc:
-        status = exc.code
-        body = exc.read()
-        # close while the socket is alive (see hc3.py): a late finalization
-        # of an unclosed error response raises from close() at GC time
-        exc.close()
-        response_headers = dict(exc.headers.items()) if exc.headers else {}
-    return status, body.decode("utf-8", errors="replace"), response_headers
+        return exc.code, dict(exc.headers.items()) if exc.headers else {}, exc
+
+
+def read_sse_block(response: Any) -> str | None:
+    """One raw SSE event block from a text/event-stream response: the lines
+    through the terminating blank line (the block the HC3 hands its success
+    callback). None on EOF (the stream ended — silent on the HC3). Read
+    errors and timeouts raise."""
+    block: list[str] = []
+    while True:
+        line = response.readline()
+        if line == b"":
+            return None
+        block.append(line.decode("utf-8", errors="replace"))
+        if line in (b"\n", b"\r\n"):
+            return "".join(block)

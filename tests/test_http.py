@@ -43,6 +43,17 @@ async def _wait_for_all(capsys, needles: list[str], timeout: float = 5.0) -> str
 
 class _Handler(BaseHTTPRequestHandler):
     def _respond(self):
+        if self.path.startswith("/sse"):
+            # text/event-stream: a few events, then close — the HC3's success
+            # fires per event and the stream end is silent
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.end_headers()
+            for i in range(1, 4):
+                self.wfile.write(f"data: hello {i}\n\n".encode())
+                self.wfile.flush()
+                time.sleep(0.05)
+            return
         if self.path.startswith("/slow"):
             time.sleep(1.0)  # slow enough that the 0.2s timeout test times out
         payload = json.dumps(
@@ -294,3 +305,34 @@ def test_example_http_runs_cleanly() -> None:
     assert "refused:" in result.stdout
     assert "SHOULD NOT HAPPEN" not in result.stdout
     assert "stack traceback" not in result.stdout
+
+
+@pytest.mark.asyncio
+async def test_http_sse_streams_events(tmp_path, capsys, http_server: str) -> None:
+    # a text/event-stream response delivers each RAW event block to success
+    # (more=True keeps the entry alive); the stream end is silent — the HC3
+    # quirk: no extra callback, no error
+    script = tmp_path / "sse.lua"
+    script.write_text(
+        "local n = 0\n"
+        "net.HTTPClient():request('" + http_server + "/sse', {\n"
+        "  success = function(resp)\n"
+        "    n = n + 1\n"
+        "    print('EVENT', n, resp.status, resp.data)\n"
+        "  end,\n"
+        "  error = function(e) print('ERR', e) end,\n"
+        "})\n"
+        "setTimeout(function() print('COUNT', n); exit(n == 3 and 0 or 1) end, 500)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        out = await _wait_for_all(capsys, ["EVENT 3", "COUNT 3"])
+    finally:
+        await engine.stop()
+    assert "EVENT 1 200 data: hello 1" in out
+    assert "EVENT 2 200 data: hello 2" in out
+    assert "EVENT 3 200 data: hello 3" in out
+    assert "COUNT 3" in out  # exactly three: the close delivered nothing
+    assert "ERR" not in out

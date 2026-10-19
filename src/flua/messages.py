@@ -50,6 +50,7 @@ QA_LOADED = "qaLoaded"  # {"id": int}  a QA finished loading its code
 
 TIMER_EXPIRED = "timerExpired"  # {"id": int}  run registered callback id
 START_QA = "startQA"  # {"id": int, "path": str, "config": dict, "arg0": str}
+HTTP_END = "httpEnd"  # an SSE stream ended silently (the HC3 quirk): cleanup only, no callback
 HTTP_RESULT = (
     "httpResult"  # {"id": int, "qa": int?, "status": int?, "data": str?,
     # "headers": dict?, "error": str?}
@@ -135,11 +136,17 @@ def http_result(
     data: str | None = None,
     headers: dict[str, str] | None = None,
     error: str | None = None,
+    more: bool = False,
 ) -> dict[str, Any]:
-    """Response for a net.HTTPClient request: status/data/headers or error."""
+    """Response for a net.HTTPClient request: status/data/headers or error.
+
+    ``more=True`` marks an SSE stream event: the Lua side keeps the request
+    entry alive and calls success again on the next event."""
     msg: dict[str, Any] = {"type": HTTP_RESULT, "id": int(request_id)}
     if qa is not None:
         msg["qa"] = qa
+    if more:
+        msg["more"] = True
     if error is not None:
         msg["error"] = error
     else:
@@ -233,6 +240,15 @@ def server_request(
         "qa": int(qa),
     }
     msg.update(fields)
+    return msg
+
+
+def http_end(request_id: int, qa: int | None) -> dict[str, Any]:
+    """An SSE stream ended (server closed): remove the request entry, fire
+    no callback — the HC3 stays silent on stream end."""
+    msg: dict[str, Any] = {"type": HTTP_END, "id": int(request_id)}
+    if qa is not None:
+        msg["qa"] = qa
     return msg
 
 

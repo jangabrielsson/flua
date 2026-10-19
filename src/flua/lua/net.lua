@@ -66,7 +66,7 @@ end
 local function handleHttpResult(msg)
   local cb = requests[msg.id]
   if not cb then return end
-  requests[msg.id] = nil
+  if not msg.more then requests[msg.id] = nil end  -- SSE: the entry lives on
   local fn = msg.error and cb.error or cb.success
   if not fn then return end
   xpcall(function()
@@ -415,6 +415,8 @@ net.WebSocketServer = serverClass("ws")
 _FLUA.netHandlers[qaId] = function(msg)
   if msg.type == "httpResult" then
     handleHttpResult(msg)
+  elseif msg.type == "httpEnd" then
+    requests[msg.id] = nil  -- SSE stream ended silently: cleanup, no callback
   elseif msg.type == "tcpResult" then
     handleTcpResult(msg)
   elseif msg.type == "udpResult" then

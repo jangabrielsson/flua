@@ -792,6 +792,10 @@ run in your QA, timers keep running while requests are in flight):
   (constructor timeout sets the per-request default; `options.timeout` overrides it.
   `options.checkCertificate = false` skips HTTPS certificate verification,
   like the HC3 — handy for self-signed certs; the default verifies)
+  **SSE**: a `text/event-stream` response streams — `success` fires per raw
+  event block (`{status, data, headers}`), and the stream ends **silently**
+  when the server closes (the HC3's behavior); a mid-stream read timeout is
+  a transport failure and reaches `error`.
 - `net.TCPSocket({timeout=ms})` → `connect/send/write/read/readUntil/close` — `examples/tcp.lua`
   (`write` is the HC3-documented alias of `send`)
 - `net.UDPSocket({broadcast, timeout})` → `sendTo/receive` — `examples/udp.lua`

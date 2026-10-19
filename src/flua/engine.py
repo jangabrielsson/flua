@@ -57,7 +57,7 @@ from .config import (
 from .devices import catalog_types
 from .environment import EnvChain
 from .hc3 import Hc3Remote
-from .http import http_call
+from .http import http_call, open_http, read_sse_block
 from .http_server import ApiServer
 from .loghtml import render_html as render_html_tags
 from .mqtt import MqttPool
@@ -1933,22 +1933,66 @@ class LuaEngine:
         self._post_from_worker(out, self._loop)
 
     async def _run_http_request(self, msg: dict[str, Any]) -> None:
-        result: dict[str, Any]
+        method = str(msg.get("method") or "GET")
+        url = str(msg["url"])
+        headers = {str(k): str(v) for k, v in (msg.get("headers") or {}).items()}
+        payload = _unescape_data(msg.get("data")) if msg.get("data") is not None else None
+        timeout = float(msg.get("timeout") or 30.0)
+        check = bool(msg.get("checkCertificate", True))
         try:
-            status, data, headers = await asyncio.to_thread(
-                http_call,
-                str(msg.get("method") or "GET"),
-                str(msg["url"]),
-                {str(k): str(v) for k, v in (msg.get("headers") or {}).items()},
-                _unescape_data(msg.get("data")) if msg.get("data") is not None else None,
-                float(msg.get("timeout") or 30.0),
-                bool(msg.get("checkCertificate", True)),
+            status, resp_headers, response = await asyncio.to_thread(
+                open_http, method, url, headers, payload, timeout, check
             )
-            result = messages.http_result(msg["id"], msg.get("qa"), status, data, headers)
+        except Exception as exc:
+            self.enqueue_outbound(messages.http_result(msg["id"], msg.get("qa"), error=str(exc)))
+            return
+        content_type = ""
+        for key, value in resp_headers.items():
+            if str(key).lower() == "content-type":
+                content_type = str(value)
+                break
+        if content_type.lower().startswith("text/event-stream"):
+            # SSE: the HC3's success fires per raw event block; the stream
+            # ends silently when the server closes (an HC3 quirk we mirror)
+            await self._run_http_stream(msg, response, status, resp_headers)
+            return
+        try:
+            data = await asyncio.to_thread(response.read)
+            result = messages.http_result(
+                msg["id"], msg.get("qa"), status,
+                data.decode("utf-8", errors="replace"), resp_headers,
+            )
         except Exception as exc:
             result = messages.http_result(msg["id"], msg.get("qa"), error=str(exc))
+        finally:
+            with contextlib.suppress(Exception):
+                response.close()
         logger.debug("http result id=%s %s", msg["id"], result.get("status", result.get("error")))
         self.enqueue_outbound(result)
+
+    async def _run_http_stream(
+        self, msg: dict[str, Any], response: Any, status: int, headers: dict[str, str]
+    ) -> None:
+        """SSE streaming: one httpResult per raw event block (more=True keeps
+        the Lua-side request entry alive), silent cleanup at the end."""
+        request_id = msg["id"]
+        qa = msg.get("qa")
+        try:
+            while True:
+                block = await asyncio.to_thread(read_sse_block, response)
+                if block is None:
+                    break  # EOF: the HC3 stays silent on stream end
+                self.enqueue_outbound(
+                    messages.http_result(request_id, qa, status, block, headers, more=True)
+                )
+        except Exception as exc:
+            # a stalled/read timeout mid-stream IS a transport failure
+            self.enqueue_outbound(messages.http_result(request_id, qa, error=str(exc)))
+            return
+        finally:
+            with contextlib.suppress(Exception):
+                response.close()
+        self.enqueue_outbound(messages.http_end(request_id, qa))
 
     def _handle_clear_timeout(self, msg: dict[str, Any]) -> None:
         self._timers.clear_timeout(int(msg["id"]))
