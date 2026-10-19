@@ -342,7 +342,7 @@ end
 | **QuickApp variable** (`self:getVariable`) | Yes | Yes | No | User-configurable parameters (API keys, IP addresses, poll intervals) — shown in the QA panel and exported with the QA `.fqa` file |
 | **internalStorage** | No | No | No | Private runtime state that must survive QA restarts but should not be visible or user-editable (e.g. last-seen timestamps, cached values, counters) |
 
-> **Fibaro Global Variables** are the right choice when a value needs to be read or written by more than one QuickApp or Scene.
+> **Fibaro Global Variables** are the right choice when a value needs to be read or written by more than one QuickApp or Scene. Note. They need to be created before they can be set, otherwise attempts to read or write them will fail. api.post("/globalVariables", { name = "HomeMode", value = "Away" }) can be used to create them programmatically.
 
 > **QuickApp variables** are the right choice for settings the user may want to change — they appear in the HC3 UI under the device panel and are bundled into the QA when it is downloaded as a `.fqa` file.
 

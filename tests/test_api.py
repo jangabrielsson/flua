@@ -75,6 +75,29 @@ def test_devices_query_filters(api: Api) -> None:
     data, _ = api.dispatch("GET", "/devices?roomID=1")
     assert [d["id"] for d in data] == [10]
 
+    data, _ = api.dispatch("GET", "/devices?name=lamp")
+    assert [d["id"] for d in data] == [10]
+
+    # case-insensitive, like the HC3 (observed: "Wake on LAN" hit "Wake on Lan")
+    data, _ = api.dispatch("GET", "/devices?name=LAMP")
+    assert [d["id"] for d in data] == [10]
+
+    data, _ = api.dispatch("GET", "/devices?name=nomatch")
+    assert data == []
+
+    # ?property=[name,value]: the value is stringified (Lua-style: true/false)
+    data, _ = api.dispatch("GET", "/devices?property=[value,false]")
+    assert [d["id"] for d in data] == [10, 20]  # both seeded devices hold value=false
+
+    data, _ = api.dispatch("GET", "/devices?property=[value,true]")
+    assert data == []
+
+    data, _ = api.dispatch("GET", "/devices?property=[value,False]")  # string compare
+    assert data == []
+
+    data, _ = api.dispatch("GET", "/devices?property=[nosuchprop,1]")
+    assert data == []
+
 
 def test_devices_query_interface_sees_qa_devices(api: Api) -> None:
     api.register_qa(5000, "qa", None, {"value": True})

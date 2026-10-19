@@ -146,6 +146,13 @@ fibaro.warning(tag, message)
 fibaro.error(tag, message)
 ```
 
+### urlencode (global)
+```lua
+urlencode(str)  -- HC3-style URL percent-encoding: "\n" becomes "\r\n" first,
+               -- space -> %20, unreserved -_.~ kept, other bytes -> %XX
+               -- (multibyte text encoded per UTF-8 byte). nil passes through.
+```
+
 ---
 
 ## plugin.* API

@@ -1304,3 +1304,24 @@ function _FLUA.dispatch(batch)
     end
   end
 end
+
+function string.split(inputstr, sep)
+  local t={}
+  for str in string.gmatch(inputstr, "([^"..(sep or "%s").."]+)") do t[#t+1] = str end
+  return t
+end
+
+---@diagnostic disable-next-line: lowercase-global
+function urlencode(str) -- very useful
+  if str then
+    str = str:gsub("\n", "\r\n")
+    -- the classic HC3 snippet's [^%w ...] class is locale-dependent: on
+    -- flua's Lua build %w matched some multibyte bytes, half-encoding
+    -- them. An explicit ASCII class is byte-deterministic everywhere.
+    str = str:gsub("([^A-Za-z0-9 %-%_%.%~])", function(c)
+      return ("%%%02X"):format(string.byte(c))
+    end)
+    str = str:gsub(" ", "%%20")
+  end
+  return str
+end

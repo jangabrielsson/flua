@@ -8,11 +8,16 @@ Full reference for Devices (15), Plugins (15), QuickApp (11), and Additional Int
 
 ### Core Device Operations
 - `GET /api/devices` — List all devices; supports filtering:
-  - `?name=MyQuickApp`
+  - `?name=MyQuickApp` (case-insensitive **exact** match — "Wake on LAN" hits
+    "Wake on Lan", "Wake" hits nothing; verified against a live HC3)
   - `?interface=quickApp`
   - `?type=com.fibaro.binarySwitch`
   - `?roomID=5`
   - `?enabled=true`
+  - `?property=[name,value]` — filter by a device property; the HC3 stringifies
+    the property value and compares it to the filter value **as a string**
+    (Lua-style: booleans are `true`/`false`). e.g.
+    `?property=[quickAppUuid,1a2b3c...]`, `?property=[value,true]`
 - `POST /api/devices` — Create new plugin device (use `POST /api/quickApp` for QuickApps)
   ```json
   { "name": "Device Name", "type": "plugin_device_type", "roomID": 1,

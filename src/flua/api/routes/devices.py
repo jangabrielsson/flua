@@ -18,9 +18,33 @@ def _truthy(value: Any) -> bool:
     return str(value).lower() in ("true", "1", "yes")
 
 
+def _stringify(value: Any) -> str | None:
+    """The HC3's property-filter stringification: Lua-style tostring."""
+    if value is None:
+        return None
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    return str(value)
+
+
 def _matches(dev: dict[str, Any], query: dict[str, str]) -> bool:
     if "type" in query and dev.get("type") != query["type"]:
         return False
+    if "name" in query and str(dev.get("name") or "").lower() != query["name"].lower():
+        # the HC3 matches case-insensitively (observed: "Wake on LAN" hit "Wake on Lan")
+        return False
+    if "property" in query:
+        # ?property=[name,value] — the HC3 stringifies the property value and
+        # compares it to the filter value as a string (e.g. [value,false])
+        prop = query["property"].strip()
+        if not (prop.startswith("[") and prop.endswith("]")):
+            return False
+        name, _, value = prop[1:-1].partition(",")
+        got = _stringify((dev.get("properties") or {}).get(name.strip()))
+        if got is None or got != value.strip():
+            return False
     if "parentId" in query and str(dev.get("parentId", 0)) != query["parentId"]:
         return False
     if "interface" in query and query["interface"] not in (dev.get("interfaces") or []):
