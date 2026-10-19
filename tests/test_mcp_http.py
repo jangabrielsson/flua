@@ -290,7 +290,19 @@ def test_cli_http_ctrl_c_exits_cleanly() -> None:
         line = process.stderr.readline().strip()
         assert "listening on http://127.0.0.1:" in line, line
         process.send_signal(_signal.SIGINT)
-        _, stderr = process.communicate(timeout=15)
+        # Poll instead of a hard communicate() timeout: the exit itself is
+        # instant, but under heavy CI load (xdist workers on a busy runner)
+        # the signal delivery and the child's KeyboardInterrupt can take a
+        # while to be scheduled — the 0.1.61 release run flaked exactly this
+        # way (TimeoutExpired after 15 s on an idle server). Slowness must
+        # not fail the test; a wedged child still does (terminate -> the
+        # 130/line/no-traceback contract below fails loudly).
+        deadline = time.monotonic() + 30.0
+        while process.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.1)
+        if process.poll() is None:
+            process.terminate()
+        _, stderr = process.communicate(timeout=10)
         assert process.returncode == 130
         assert "flua-mcp: interrupted" in stderr
         assert "Traceback" not in stderr
