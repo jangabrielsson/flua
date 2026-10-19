@@ -150,3 +150,35 @@ def test_log_message_from_engine_still_queues(capsys) -> None:
     engine.post(messages.log("info", "QUEUED"))
     assert "QUEUED" not in capsys.readouterr().out
     assert len(engine._inbound) == 1
+
+
+def test_api_result_handoff_is_atomic() -> None:
+    # ADR 0006 amendment: the api-result handoff (enqueue + inflight
+    # decrement) must run together on the pump loop — never "counter zero,
+    # result not yet queued", the window where the CLI's idle poll ended a
+    # run between a returned api.* call and its delivery (dev/hc3_api_filter
+    # test.lua quitting silently in online mode).
+    engine = LuaEngine()
+    captured: list = []
+
+    class FakeLoop:
+        def call_soon_threadsafe(self, fn, *_a, **_k):
+            captured.append(fn)  # deferred, like the real loop
+
+    engine._loop = FakeLoop()
+    engine.api.dispatch = lambda method, url, body, qa_id=None: ({"x": 1}, 200)
+    engine._handle_api_call(
+        {"type": messages.API_CALL, "qa": 0, "method": "GET", "url": "/x", "body": None}
+    )
+    deadline = time.monotonic() + 3.0
+    while not captured and time.monotonic() < deadline:
+        time.sleep(0.001)
+    assert captured, "the worker never handed the result over"
+    # the handoff is scheduled but not yet run: the counter must still hold
+    # the run open — otherwise has_pending_work() sees idle and the CLI exits
+    assert engine._api_calls_inflight == 1
+    assert engine.has_pending_work()
+    captured[0]()  # the pump loop runs the handoff
+    assert engine._api_calls_inflight == 0
+    assert engine.has_pending_work()  # the result is now in the outbound queue
+    assert engine._outbound.get_nowait()["type"] == messages.API_RESULT

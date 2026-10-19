@@ -160,6 +160,14 @@ and `exit(code)` from a QA sets the process exit code (last failing QA wins).
    decrement in `finally`) closed it. New worker types need the same
    treatment: track → count → verify with a load test.
 
+3. **The handoff must be atomic too.** Even with the counter, a worker that
+   enqueues its result via `call_soon_threadsafe` and decrements its counter
+   immediately reopens the hole — between the two, the poll sees idle
+   (0.1.60: online QAs quit silently between `api.*` calls). Enqueue and
+   counter decrement run together in one loop callback
+   (`_post_from_worker`'s `done`; ADR 0006 amendment; pin:
+   `tests/test_engine.py::test_api_result_handoff_is_atomic`).
+
 ## Shutdown
 
 `engine.stop()` sets `_running = False`, cancels the pump/poller/proxy/http

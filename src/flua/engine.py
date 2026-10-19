@@ -524,21 +524,34 @@ class LuaEngine:
         """Queue a Python -> Lua message for the pump to deliver."""
         self._outbound.put_nowait(msg)
 
-    def _post_from_worker(self, out: dict[str, Any], loop: Any) -> None:
-        """Hand a message from a worker thread to the pump loop. Drops it
-        when the loop is already closed (the engine was torn down while the
-        call was in flight — the QA is gone, the result means nothing)."""
+    def _post_from_worker(
+        self, out: dict[str, Any], loop: Any, done: Callable[[], None] | None = None
+    ) -> None:
+        """Hand a message from a worker thread to the pump loop, with the
+        enqueue and an optional bookkeeping callback (``done``) run together
+        on the loop — atomically as seen by has_pending_work(): never a state
+        where the counter is already decremented but the result is not yet in
+        the outbound queue (the window where the CLI's 50 ms idle poll ended
+        the run mid-call). Drops both when the loop is already closed (the
+        engine was torn down while the call was in flight — the QA is gone,
+        the result means nothing)."""
+
+        def finish() -> None:
+            self.enqueue_outbound(out)
+            if done is not None:
+                done()
+
         try:
             running = asyncio.get_running_loop()
         except RuntimeError:
             running = None
         if loop is not None and running is not loop:
             try:
-                loop.call_soon_threadsafe(self.enqueue_outbound, out)
+                loop.call_soon_threadsafe(finish)
                 return
             except RuntimeError:
                 return  # loop closed — the run is over
-        self.enqueue_outbound(out)
+        finish()
 
     def lua_runtime(self) -> lupa.LuaRuntime:
         return self._lua
@@ -1669,10 +1682,21 @@ class LuaEngine:
                     self.flua_log("warning", qa, f"api {method} {url} -> {status}")
                 info = self._qas.get(qa)
                 if info is not None and info.get("exited") is not None:
-                    return  # the QA died while the call was in flight — drop it
+                    self._api_calls_inflight -= 1  # QA died mid-call — drop it
+                    return
                 out = messages.api_result(qa, data, status)
-                self._post_from_worker(out, self._loop)
-            finally:
+
+                # Atomic handoff: the enqueue and the counter decrement run
+                # together on the pump loop (_post_from_worker's finish), so
+                # has_pending_work() never observes "counter zero, result not
+                # yet queued" — the window where the CLI's idle poll ended the
+                # run between a returned api.* call and its delivery (ADR 0006).
+                def done() -> None:
+                    self._api_calls_inflight -= 1
+
+                self._post_from_worker(out, self._loop, done=done)
+            except Exception:
+                logger.exception("api worker failed for %s %s", method, url)
                 self._api_calls_inflight -= 1
 
         threading.Thread(target=worker, name="flua-api", daemon=True).start()

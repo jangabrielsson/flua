@@ -84,7 +84,9 @@ deferred queue and cancels the wake timer (`tests/test_sleep.py`).
    `handlers.apiResult` resumes the coroutine with `(data, status)`.
 
 `_api_calls_inflight` keeps the graceful-exit check honest while the call is
-in flight (race lesson 2 in concurrency.md).
+in flight, and the result enqueue + counter decrement run together in one
+loop callback (`_post_from_worker`'s `done`) — atomic handoff, ADR 0006
+amendment (race lessons 2 and 3 in concurrency.md).
 
 ## 4. A refreshStates event reaches a subscriber
 

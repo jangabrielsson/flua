@@ -28,3 +28,17 @@ counter is behind), decremented in the worker's `finally`, and included in
   (`_post_from_worker`), so the counter and the exit path stay orthogonal.
 - Pin: `tests/test_hc3.py::test_cli_mode_online_directive_selects_hc3`
   under load; the fix is exercised by every online-mode test.
+
+## Amendment — 2026-10-19: the handoff must be atomic
+
+The original fix still had a hole: the worker enqueued the result via
+`loop.call_soon_threadsafe` (deferred until the loop runs the callback) and
+decremented `_api_calls_inflight` in its `finally` **immediately**. Between
+the two, `has_pending_work()` saw "counter zero, result not yet queued" and
+the CLI's 50 ms idle poll ended the run — `dev/hc3_api_filter_test.lua` quit
+silently between `api.get` calls in online mode.
+
+`_post_from_worker` now takes a `done` callback and runs enqueue + `done`
+together in one loop callback: the counter is decremented only once the
+result is visible in `_outbound` (pending or delivered), so the exit poll can
+never observe the gap. Pin: `tests/test_engine.py::test_api_result_handoff_is_atomic`.
