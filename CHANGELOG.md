@@ -4,6 +4,18 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.67] - 2026-10-19
+
+### Added
+- implement SSE support for HTTP client and update documentation
+- enhance flua philosophy section with agent-friendly features
+- add Flua logo image to setup templates
+- add Flua logo to README and include image file
+- enhance caching strategy for lupa wheel in CI workflow
+
+### Changed
+- Add logo image to README fix
+
 ## [0.1.66] - 2026-10-19
 
 ### Added
