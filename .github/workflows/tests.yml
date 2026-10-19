@@ -20,12 +20,21 @@ jobs:
       # from source — build once and cache the wheel (keyed on pyproject, so
       # a lupa bump rebuilds). The other tracks install binary wheels and
       # skip these entirely.
+      #
+      # restore-keys reuses the previous wheel when the exact key misses —
+      # pyproject.toml changes with EVERY release (the version bump), so a
+      # strict key would force a full lupa compile per release. A restored
+      # wheel still satisfies "lupa>=2.8"; if the constraint is ever raised,
+      # pip finds no matching wheel and compiles from source again — correct,
+      # just slower, exactly when it matters.
       - name: Cache built lupa wheel (3.15 only)
         if: matrix.python-version == '3.15'
         uses: actions/cache@v4
         with:
           path: wheels
           key: lupa-cp315-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            lupa-cp315-
       - name: Build lupa wheel (3.15 only)
         if: matrix.python-version == '3.15'
         run: |
