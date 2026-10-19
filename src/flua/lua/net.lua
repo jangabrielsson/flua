@@ -18,7 +18,7 @@ end
 -- ------------------------------------------------------------------ HTTP
 -- net.HTTPClient: asynchronous HTTP.
 --
---   local client = net.HTTPClient()
+--   local client = net.HTTPClient({timeout = 10000})  -- ms, per-request default
 --   client:request("https://...", {
 --     options = { method = "POST", headers = {...}, data = "...", timeout = 10 },
 --     success = function(resp) ... resp.status, resp.data, resp.headers ... end,
@@ -30,8 +30,13 @@ end
 local HTTPClient = {}
 setmetatable(HTTPClient, HTTPClient)  -- the class is its own metatable (__call + __index)
 HTTPClient.__index = HTTPClient
-HTTPClient.__call = function()
-  return setmetatable({}, HTTPClient)
+HTTPClient.__call = function(_, options)
+  -- constructor timeout (ms, optional): the per-request default — a request
+  -- can still override it with params.options.timeout. Default 30000
+  -- (matches the engine's default). The field must always exist: the class
+  -- is its own metatable, so a missing field would loop in __index.
+  local timeout = options and options.timeout or 30000
+  return setmetatable({ _timeout = tonumber(timeout) / 1000 }, HTTPClient)
 end
 
 function HTTPClient:request(url, params)
@@ -50,7 +55,7 @@ function HTTPClient:request(url, params)
     data = options.data ~= nil and _FLUA.escapeBytes(options.data) or nil,
     -- HC3 option for HTTPS: verify the server certificate (default true)
     checkCertificate = options.checkCertificate ~= false,
-    timeout = options.timeout,
+    timeout = options.timeout or self._timeout,
   }
   return id
 end

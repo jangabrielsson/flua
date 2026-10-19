@@ -199,6 +199,36 @@ async def test_http_client_lua_roundtrip(tmp_path, capsys, http_server: str) -> 
     assert "SHOULD_NOT_FIRE" not in out  # transport failures must not reach success
 
 
+@pytest.mark.asyncio
+async def test_http_client_constructor_timeout(tmp_path, capsys, http_server: str) -> None:
+    # net.HTTPClient({timeout}) sets the per-request default;
+    # params.options.timeout overrides it per request
+    script = tmp_path / "httptimeout.lua"
+    script.write_text(
+        "local client = net.HTTPClient({timeout = 200})\n"
+        "setTimeout(function()\n"
+        "  client:request('" + http_server + "/slow', {\n"
+        "    error = function(err) print('CTIMEOUT', err ~= nil) end,\n"
+        "  })\n"
+        "  client:request('" + http_server + "/slow', {\n"
+        "    options = { timeout = 5000 },\n"
+        "    success = function(resp) print('COVERRIDE', resp.status) end,\n"
+        "    error = function(err) print('COVERRIDE_ERR', err) end,\n"
+        "  })\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        out = await _wait_for_all(capsys, ["CTIMEOUT true", "COVERRIDE 200"])
+    finally:
+        await engine.stop()
+    assert "CTIMEOUT true" in out  # the constructor timeout timed the request out
+    assert "COVERRIDE 200" in out  # the per-request option overrode it
+    assert "COVERRIDE_ERR" not in out
+
+
 def test_http_keeps_process_alive_until_response(tmp_path, http_server: str) -> None:
     # the CLI's graceful exit must wait for in-flight HTTP requests: no
     # --run-for, no other pending work — the response callback still runs

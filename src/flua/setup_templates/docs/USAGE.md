@@ -788,8 +788,9 @@ overrides. Both functions return the new QA id (or `nil, error`).
 Real network, HC3-style APIs, all asynchronous through the pump (callbacks
 run in your QA, timers keep running while requests are in flight):
 
-- `net.HTTPClient()` → `request(url, {options, success, error})` — `examples/http.lua`
-  (`options.checkCertificate = false` skips HTTPS certificate verification,
+- `net.HTTPClient({timeout=ms})` → `request(url, {options, success, error})` — `examples/http.lua`
+  (constructor timeout sets the per-request default; `options.timeout` overrides it.
+  `options.checkCertificate = false` skips HTTPS certificate verification,
   like the HC3 — handy for self-signed certs; the default verifies)
 - `net.TCPSocket({timeout=ms})` → `connect/send/read/readUntil/close` — `examples/tcp.lua`
 - `net.UDPSocket({broadcast, timeout})` → `sendTo/receive` — `examples/udp.lua`
