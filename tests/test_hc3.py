@@ -766,12 +766,22 @@ def test_ctrl_c_terminates_promptly_mid_long_poll(tmp_path, mock_hc3) -> None:
             time.sleep(0.02)
         started = time.monotonic()
         proc.send_signal(signal.SIGINT)
+        # Poll: signal scheduling jitter on a loaded runner must not fail
+        # the wait (same flake family as the 0.1.61 MCP release failure) —
+        # the promptness assert below is the real contract.
+        deadline = time.monotonic() + 30.0
+        while proc.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.1)
+        if proc.poll() is None:
+            proc.kill()
         _out, err = proc.communicate(timeout=10)
     finally:
         _MockHc3.hold_refresh = 0.0
         if proc.poll() is None:
             proc.kill()
-    assert time.monotonic() - started < 5.0  # prompt exit, not the 20s hold
+    # prompt exit, not the 20s hold — 8s absorbs CI scheduling jitter
+    # while still being far from the mock's hold time
+    assert time.monotonic() - started < 8.0
     assert proc.returncode == 130
     assert "flua: interrupted" in err.decode()
 

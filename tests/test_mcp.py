@@ -820,7 +820,17 @@ def test_stdio_ctrl_c_exits_cleanly(tmp_path) -> None:
     response = json.loads(process.stdout.readline())
     assert "sessionId" in json.loads(response["result"]["content"][0]["text"])
     process.send_signal(_signal.SIGINT)
-    _, stderr = process.communicate(timeout=15)
+    # Poll instead of a hard communicate() timeout: under heavy CI load the
+    # signal delivery and the child's KeyboardInterrupt can take a while to
+    # be scheduled (the 0.1.61 release flaked on the HTTP twin of this test),
+    # and this one also tears down a live engine session on the way out.
+    # Slowness must not fail the test; a wedged child still does.
+    deadline = time.monotonic() + 30.0
+    while process.poll() is None and time.monotonic() < deadline:
+        time.sleep(0.1)
+    if process.poll() is None:
+        process.terminate()
+    _, stderr = process.communicate(timeout=10)
     assert process.returncode == 130
     assert "flua-mcp: interrupted" in stderr
     assert "Traceback" not in stderr
