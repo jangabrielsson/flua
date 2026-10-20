@@ -4,6 +4,14 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.72] - 2026-10-20
+
+### Added
+- update qwikchild documentation and add self-testing example for child device management
+
+### Fixed
+- remove unnecessary debug prints and ensure proper exit on failures in QwikChildTest
+
 ## [0.1.71] - 2026-10-20
 
 ### Fixed
