@@ -301,6 +301,7 @@ function QuickApp:__init(dev)
   self.childsInitialized = false
   self:setupUICallbacks()
   if self.onInit then self:onInit() end
+  quickApp = self
   if not self.childsInitialized then self:initChildDevices() end
 end
 
