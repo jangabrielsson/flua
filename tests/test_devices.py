@@ -127,7 +127,7 @@ def test_create_child_device_uses_type_skeleton() -> None:
             "initialInterfaces": ["light"],
         },
     )
-    assert status == 201
+    assert status == 200  # the HC3 returns 200 (spec: 200/400/500)
     assert child["properties"]["value"] == 10  # initialProperties win
     assert "deviceControlType" in child["properties"]  # skeleton default present
     assert child["interfaces"] == ["light"]  # the lib controls child interfaces
@@ -191,3 +191,27 @@ async def test_qa_remove_child_device(tmp_path, capsys) -> None:
     assert "LEFT 0" in out  # and no longer listed under the parent
     assert "AGAIN 404" in out  # unknown ids 404
     assert "PARENT 501" in out  # the QA itself is not a child
+
+
+def test_qwikchild_example_self_tests() -> None:
+    # examples/qwikchildtest.lua is the living fixture: qwikchild children
+    # driven through their UI (button, slider) and the updateChildren pattern
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--api", "local", "examples/qwikchildtest.lua"],
+        cwd=Path(__file__).resolve().parent.parent,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    for line in (
+        "children created",
+        "button press updated childB's label",
+        "slider set childA's value property",
+        "updateChildren refreshed childA's label",
+    ):
+        assert f"PASS: {line}" in result.stdout
+    assert "failures: 0" in result.stdout

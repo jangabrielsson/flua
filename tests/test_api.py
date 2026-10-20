@@ -241,7 +241,7 @@ def test_create_child_device(api: Api) -> None:
             "initialInterfaces": ["light"],
         },
     )
-    assert status == 201
+    assert status == 200  # the HC3 returns 200 (spec: 200/400/500)
     assert child["id"] >= FIRST_RUNTIME_ID
     assert child["parentId"] == 5000
     assert child["properties"]["value"] is False
@@ -1080,7 +1080,7 @@ def test_device_created_and_removed_events(api: Api) -> None:
     child, status = api.dispatch(
         "POST", "/plugins/createChildDevice", {"name": "light", "parentId": 5000}
     )
-    assert status == 201
+    assert status == 200  # the HC3 returns 200 (spec: 200/400/500)
     child_id = child["id"]
     assert api.dispatch("DELETE", f"/devices/{child_id}") == (None, 204)
     child2, _ = api.dispatch(

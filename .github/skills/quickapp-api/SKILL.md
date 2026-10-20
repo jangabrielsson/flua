@@ -57,6 +57,10 @@ self:updateView("switchId", "value", "true")    -- "true" or "false" as string
 ```
 
 ### Children
+
+> Advanced child management (attach-or-create by UID, per-child classes and
+> UIs): the **qwikchild** library — `--%%file:$qwikchild.lua,qwikchild`, see
+> the qwikchild skill.
 ```lua
 -- Create a child device
 local child = self:createChildDevice({

@@ -318,6 +318,12 @@ self.rss:subscribe(
 
 ## Child Device Patterns
 
+> **Advanced / multi-child QAs**: prefer the **qwikchild** library
+> (`--%%file:$qwikchild.lua,qwikchild`) — UID-based attach-or-create, a class
+> per child, per-child UIs, and `internalStorage` state. The qwikchild skill
+> has the full API; `examples/qwikchildtest.lua` is the self-tested fixture.
+> The patterns below show the manual primitives it builds on.
+
 ### Defining a child class
 ```lua
 class 'MyChild'(QuickAppChild)

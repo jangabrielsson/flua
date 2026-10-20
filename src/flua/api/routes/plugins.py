@@ -180,12 +180,12 @@ def child_device_create(state: SimState, req: ApiRequest) -> tuple[Any, int]:
         if not isinstance(child, dict) or child.get("id") is None:
             return None, 400
         state.register_proxy_child(child)
-        return public(child), 201
+        return public(child), 200  # the HC3 returns 200 (spec: 200/400/500)
     dev = state.create_child_device(int(req.body["parentId"]), req.body)
     entry = state.record_device_created(dev, _now(req))
     if req.emit is not None:
         req.emit(messages.refresh_state_event(entry))
-    return dev, 201
+    return dev, 200  # the HC3 returns 200 (spec: 200/400/500)
 
 
 def child_device_remove(state: SimState, req: ApiRequest) -> tuple[Any, int]:
@@ -254,8 +254,21 @@ def plugin_update_view(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     if not isinstance(view, dict):
         view = {}  # catalog skeletons carry a list-shaped template view
         dev["view"] = view
-    component = view.setdefault(str(req.body.get("componentName", "")), {})
-    component[str(req.body.get("propertyName", ""))] = req.body.get("newValue")
+    component_name = str(req.body.get("componentName", ""))
+    property_name = str(req.body.get("propertyName", ""))
+    new_value = req.body.get("newValue")
+    component = view.setdefault(component_name, {})
+    component[property_name] = new_value
+    # uiView-format devices (useUiView / qwikchild's generated UI): updateView
+    # patches the COMPONENT itself — the HC3 contract the lib relies on (the
+    # legacy tree merge above does not cover them)
+    ui_view = (dev.get("properties") or {}).get("uiView")
+    if isinstance(ui_view, list):
+        for row in ui_view:
+            for comp in row.get("components") or []:
+                if comp.get("name") == component_name:
+                    comp[property_name] = new_value
+                    break
     forward_to_proxy(req, state.is_proxy(dev["id"]))
     return None, 204
 
