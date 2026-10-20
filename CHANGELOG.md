@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.68] - 2026-10-20
+
+### Added
+- add Flua_round logo image to setup templates
+- initialize quickApp reference in QuickApp constructor
+
 ## [0.1.67] - 2026-10-19
 
 ### Added
