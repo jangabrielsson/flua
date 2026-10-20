@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.71] - 2026-10-20
+
+### Fixed
+- implement abort_http_response to force-close HTTP responses and prevent blocking on live streams
+
 ## [0.1.70] - 2026-10-20
 
 ### Added
