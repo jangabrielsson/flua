@@ -243,6 +243,7 @@ class LuaEngine:
         # in-flight net.HTTPClient tasks: they count as pending work, so the
         # CLI keeps running until responses are delivered
         self._http_tasks: set[asyncio.Task[None]] = set()
+        self._qa_http_tasks: dict[int, set[asyncio.Task[None]]] = {}  # qa -> in-flight HTTP/SSE
         # remote api.* calls in flight on flua-api worker threads (a
         # suspended QA is waiting on each). Counted by has_pending_work so
         # the graceful-exit check never ends a run mid-call; incremented
@@ -1630,7 +1631,18 @@ class LuaEngine:
             self.debug_log(f"http {msg.get('method') or 'GET'} {msg.get('url')}")
         task = asyncio.create_task(self._run_http_request(msg), name="flua-http")
         self._http_tasks.add(task)
-        task.add_done_callback(self._http_tasks.discard)
+        qa = msg.get("qa")
+        if qa is not None:
+            bucket = self._qa_http_tasks.setdefault(int(qa), set())
+            bucket.add(task)
+
+            def http_done(t: asyncio.Task[None]) -> None:
+                self._http_tasks.discard(t)
+                bucket.discard(t)
+
+            task.add_done_callback(http_done)
+        else:
+            task.add_done_callback(self._http_tasks.discard)
 
     def _handle_api_call(self, msg: dict[str, Any]) -> None:
         """A suspended QA's api.* call (remote mode): dispatch in a worker
@@ -2054,6 +2066,11 @@ class LuaEngine:
             qa_id = int(msg["qa"])
             self._timers.cancel_qa(qa_id)
             self.server_host.close_qa(qa_id)  # mock servers die with their QA
+            # in-flight HTTP/SSE requests die with their QA too — an open
+            # SSE stream would otherwise keep the run alive until its socket
+            # read timed out (~60s of lingering after exit())
+            for task in list(self._qa_http_tasks.pop(qa_id, ())):
+                task.cancel()
             info = self._qas.get(qa_id)
             if info is not None:
                 info["exited"] = code

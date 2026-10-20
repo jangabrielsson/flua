@@ -43,6 +43,16 @@ async def _wait_for_all(capsys, needles: list[str], timeout: float = 5.0) -> str
 
 class _Handler(BaseHTTPRequestHandler):
     def _respond(self):
+        if self.path.startswith("/hold-sse"):
+            # one event, then HOLD: the QA's exit() must not wait for the
+            # open stream's read timeout
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.end_headers()
+            self.wfile.write(b"data: one\n\n")
+            self.wfile.flush()
+            time.sleep(120)
+            return
         if self.path.startswith("/sse"):
             # text/event-stream: a few events, then close — the HC3's success
             # fires per event and the stream end is silent
@@ -336,3 +346,28 @@ async def test_http_sse_streams_events(tmp_path, capsys, http_server: str) -> No
     assert "EVENT 3 200 data: hello 3" in out
     assert "COUNT 3" in out  # exactly three: the close delivered nothing
     assert "ERR" not in out
+
+
+@pytest.mark.asyncio
+async def test_qa_exit_cancels_open_sse_stream(tmp_path, capsys, http_server: str) -> None:
+    # exit() in a QA cancels its in-flight requests: an open SSE stream must
+    # not keep the run alive until its (very long) read timeout
+    script = tmp_path / "exit.lua"
+    script.write_text(
+        "net.HTTPClient({timeout = 300000}):request('" + http_server + "/hold-sse', {\n"
+        "  success = function(resp) print('EVENT', resp.data) end,\n"
+        "  error = function(e) print('ERR', e) end,\n"
+        "})\n"
+        "setTimeout(function() print('EXITING'); exit(0) end, 100)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        await _wait_for_all(capsys, ["EXITING"])
+        deadline = time.monotonic() + 2.0
+        while engine.has_pending_work() and time.monotonic() < deadline:
+            await asyncio.sleep(0.02)
+        assert not engine.has_pending_work()  # the stream died with the QA
+    finally:
+        await engine.stop()

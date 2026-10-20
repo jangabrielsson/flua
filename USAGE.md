@@ -90,7 +90,10 @@ makes flua exit; QAs with timers or open connections keep running.
 .venv/bin/flua script.lua              # one QA
 .venv/bin/flua qa1.lua qa2.lua         # several QAs, isolated, can talk to each other
 .venv/bin/flua -e 'setTimeout(function() print("hi") end, 100)'
-.venv/bin/flua --run-for 5 script.lua  # at least 5 virtual s, then exit when idle
+.venv/bin/flua --run-for 5 script.lua  # at least 5 virtual s, then exit when idle —
+                                        # but never past 5 WALL s (a hard deadline:
+                                        # an open SSE stream or keep-alive QA can't
+                                        # keep the run alive past it)
 .venv/bin/flua --run-for -3 script.lua # exactly 3 virtual s
 ```
 
@@ -795,7 +798,10 @@ run in your QA, timers keep running while requests are in flight):
   **SSE**: a `text/event-stream` response streams — `success` fires per raw
   event block (`{status, data, headers}`), and the stream ends **silently**
   when the server closes (the HC3's behavior); a mid-stream read timeout is
-  a transport failure and reaches `error`.
+  a transport failure and reaches `error` — real services send keepalives
+  just inside typical read timeouts (Hue ≈ every 58s), so treat mid-stream
+  timeouts as transient: catch and reconnect, don't fail the QA. `exit()`
+  cancels the QA's in-flight requests — an open stream dies with its QA.
 - `net.TCPSocket({timeout=ms})` → `connect/send/write/read/readUntil/close` — `examples/tcp.lua`
   (`write` is the HC3-documented alias of `send`)
 - `net.UDPSocket({broadcast, timeout})` → `sendTo/receive` — `examples/udp.lua`

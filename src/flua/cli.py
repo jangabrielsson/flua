@@ -363,8 +363,12 @@ def _keep_running(
     virtual = engine.clock.elapsed()
     wall = time.monotonic() - start
     if run_for > 0:
-        # at least N virtual seconds, then exit when idle
-        return (virtual < run_for and wall < run_for) or engine.has_pending_work()
+        # at least N virtual seconds, then exit when idle — and N WALL
+        # seconds is a hard deadline: an open SSE stream (never idle) or a
+        # keep-alive QA must not run past it
+        if wall >= run_for:
+            return False
+        return virtual < run_for or engine.has_pending_work()
     # fixed duration: exactly N virtual seconds (never longer than N wall)
     return virtual < -run_for and wall < -run_for
 

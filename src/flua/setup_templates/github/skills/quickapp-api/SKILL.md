@@ -218,6 +218,30 @@ setTimeout(function() self:doSomething() end, 0)
 
 ## net.* — Networking in QuickApps
 
+**The mental model**: offline mode simulates the HC3's REST API — but
+`net.*` is **always real network**. A QA in the offline sim can still reach
+the internet, and that is the point (test your Hue/Tibber/weather
+integration without the controller). Mock the far end with `net.*Server`
+(flua extension) when you want determinism instead of real services.
+
+- **Routing**: a *completed* HTTP exchange — any status, 4xx/5xx included —
+  reaches `success`; only *transport* failures (DNS, refused, timeout)
+  reach `error`. The error argument is the underlying system message
+  (`"timed out"`, `"[Errno 61] Connection refused"`, ...) — match on
+  presence, not equality. TCP reads surface `"timeout"` / `"closed"` and
+  prefixed op errors (`"connect: ..."`, `"send: ..."`).
+- **SSE**: a `text/event-stream` response streams — `success` fires once per
+  **raw event block** (`{status, data, headers}`), the stream ends
+  **silently** when the server closes (HC3 behavior), and a mid-stream read
+  timeout is a transport failure → `error`. Real services send keepalives
+  just inside typical read timeouts (Hue ≈ every 58s) — treat mid-stream
+  timeouts as **transient**: catch and reconnect, don't fail the QA.
+- **exit()**: cancels the QA's in-flight requests — an open SSE stream dies
+  with its QA.
+- Full semantics and the mock-server API: USAGE.md "Network clients" and
+  "Mock servers"; living examples: `examples/http.lua`, `examples/tcp.lua`,
+  `examples/mockServer.lua`, `examples/scenes.lua`.
+
 ### HTTP Client
 ```lua
 local http = net.HTTPClient()

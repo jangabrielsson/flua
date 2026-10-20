@@ -155,6 +155,9 @@ A typo'd directive warns at runtime (`unknown --%% directive`) and
 
 ## Migrating from plua
 
+- **Check first**: `flua --check` warns on the plua spelling
+  (`-- %%save` with a space — silently ignored otherwise) and on unknown
+  directives.
 - **Emulator marker**: plua code checks `if fibaro.plua then` — flua does
   NOT set `fibaro.plua` (it is nil). flua's marker is the global `_FLUA`:
   `if _FLUA then ... end` (always set by flua, absent on the HC3).

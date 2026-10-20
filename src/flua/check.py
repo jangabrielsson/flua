@@ -44,6 +44,15 @@ def check_source(source: str, name: str, lua: Any, base_dir: str | Path = ".") -
     for key in annotations:
         if key not in KNOWN_DIRECTIVES:
             findings.append(f"{name}: warning: unknown directive --%%{key}")
+    # plua-era spelling: a space between the comment dashes and %%. flua's
+    # parser only matches "--%%" with no space, so these lines are silently
+    # ignored — say so, it is almost always a stale plua directive.
+    for match in re.finditer(r"--\s+%%\s*(\S*)", source):
+        findings.append(
+            f"{name}: warning: plua-style directive spelling (space before %%): "
+            f"line {source[:match.start()].count(chr(10)) + 1} — flua parses '--%%' "
+            "with no space; this line is ignored"
+        )
     for method, prefix, advice in DEPRECATED_API:
         pattern = rf"api\.{method.lower()}\s*\(\s*['\"]({re.escape(prefix)}[^'\"]*)['\"]"
         for match in re.finditer(pattern, source):

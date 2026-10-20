@@ -97,3 +97,52 @@ def test_unknown_directive_warns_at_runtime(tmp_path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     assert "unknown --%% directive: --%%instnat:true" in result.stderr
     assert "RAN" in result.stdout  # the warning does not stop the QA
+
+
+def test_plua_spelling_warns_in_check(tmp_path) -> None:
+    # plua-era "-- %%save" (space before %%) is silently ignored by the
+    # parser — --check names it so stale plua directives surface on migration
+    script = tmp_path / "pluaspell.lua"
+    script.write_text('-- %%save:state.json\n-- %%desktop:true\nprint("x")\n')
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--check", str(script)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "plua-style directive spelling" in result.stdout
+    assert "line 1" in result.stdout
+    assert "line 2" in result.stdout
+
+
+def test_run_for_is_a_hard_wall_deadline() -> None:
+    # --run-for N>0: at least N virtual seconds, then exit when idle — but N
+    # WALL seconds is a hard deadline: an open SSE stream (never idle) or a
+    # keep-alive QA must not run past it (the Hue SSE session found this)
+    import time as _time
+
+    from flua.cli import _keep_running
+
+    class _Engine:
+        def __init__(self):
+            self.running = True
+            self._clock = type("Clock", (), {"elapsed": lambda self: 0.0})()
+
+        def is_running(self) -> bool:
+            return self.running
+
+        def has_pending_work(self) -> bool:
+            return True  # e.g. a live SSE stream: never idle
+
+        @property
+        def clock(self):
+            return self._clock
+
+    engine = _Engine()
+    now = _time.monotonic()
+    # before the wall deadline: still running (virtual time below N)
+    assert _keep_running(engine, 5.0, now, None) is True
+    # past the wall deadline: hard stop, pending work or not
+    assert _keep_running(engine, 5.0, now - 6.0, None) is False
