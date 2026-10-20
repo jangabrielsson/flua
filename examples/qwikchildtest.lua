@@ -44,19 +44,15 @@ function QuickApp:onInit()
   end
   local function finish()
     print("failures:", failures)
-    setInterval(function() end,2000)
-    --exit(failures > 0 and 1 or 0)
+    exit(failures > 0 and 1 or 0)
   end
 
-  print('DBG step1')
   local map = self:getChildrenUidMap()
-  print('DBG step2 map', map.childA and map.childA.id, map.childB and map.childB.id)
   local childA = self.childDevices[map.childA.id]
   local childB = self.childDevices[map.childB.id]
-  print('DBG step3', childA and childA.id, childB and childB.id)
   check(childA ~= nil and childB ~= nil, "children created")
   if not (childA and childB) then finish() return end
---[[
+
   -- does a child's uiView contain the given label text?
   local function uiTextContains(devId, needle)
     local dev = api.get("/devices/" .. devId)
@@ -71,7 +67,6 @@ function QuickApp:onInit()
 
   -- UI events deliver through the pump: poll for the effect
   local function waitFor(what, cond, deadline, done)
-    print('DBG waitFor', what, os.time(), deadline)
     if cond() then check(true, what) done() return end
     if os.time() > deadline then check(false, what) done() return end
     setTimeout(function() waitFor(what, cond, deadline, done) end, 50)
@@ -79,10 +74,8 @@ function QuickApp:onInit()
 
   -- button on childA: myBtn writes the current time into childB's label
   local stamp = os.date('%c')
-  print('DBG posting button event')
   api.post("/plugins/callUIEvent?deviceID=" .. childA.id
     .. "&elementName=b1&eventType=onReleased", nil)
-  print('DBG posted')
   waitFor("button press updated childB's label",
     function() return uiTextContains(childB.id, stamp) end, os.time() + 5, function()
     -- slider on childB: mySlider sets childA's value property (values arrive
@@ -98,7 +91,6 @@ function QuickApp:onInit()
       finish()
     end)
   end)
-  --]]
 end
 
 function QuickApp:updateChildren(data)
@@ -108,27 +100,23 @@ function QuickApp:updateChildren(data)
   end
 end
 
-MyChildA = {}
 class 'MyChildA'(QwikAppChild)
 function MyChildA:__init(dev)
   QwikAppChild.__init(self, dev)
 end
 function MyChildA:myBtn(ev)
   self.parent.children.childB:updateView('l1', 'text', os.date('%c'))
-  print("Button pressed, updating childB's label")
 end
 function MyChildA:update(data)
   self:updateView('value', "text", fmt("value: %s", data.A.value))
 end
 
-MyChildB = {}
 class 'MyChildB'(QwikAppChild)
 function MyChildB:__init(dev)
   QwikAppChild.__init(self, dev)
 end
 function MyChildB:mySlider(ev)
   self.parent.children.childA:updateProperty('value', ev.values[1])
-  print("Slider", ev.values[1])
 end
 function MyChildB:update(data)
   self:updateView('value', "text", fmt("value: %s", data.B.value))
