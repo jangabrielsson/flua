@@ -10,10 +10,13 @@ it is one synchronous function, safe to run in any thread.
 from __future__ import annotations
 
 import contextlib
+import socket
 import ssl
 import urllib.error
 import urllib.request
 from typing import Any
+
+SHUT_RDWR = socket.SHUT_RDWR
 
 USER_AGENT = "flua/0.1"
 
@@ -72,6 +75,30 @@ def open_http(
         return response.status, dict(response.headers.items()), response
     except urllib.error.HTTPError as exc:
         return exc.code, dict(exc.headers.items()) if exc.headers else {}, exc
+
+
+def abort_http_response(response: Any) -> None:
+    """Force-close an HTTP response's socket.
+
+    urllib's response.close() DRAINS chunked responses (to keep the
+    connection reusable), which blocks on a live SSE stream until the next
+    event arrives — the exit() linger seen against the Hue bridge. Closing
+    the socket directly unblocks the reader immediately."""
+    try:
+        fp = getattr(response, "fp", None)
+        raw = getattr(fp, "raw", None)
+        sock = getattr(raw, "_sock", None)
+        if sock is not None:
+            # shutdown interrupts a recv() blocked in another thread; a bare
+            # close() does not (verified: the parked chunked readline ignores
+            # it until data arrives — the Hue bridge linger)
+            with contextlib.suppress(OSError):
+                sock.shutdown(SHUT_RDWR)
+            sock.close()
+    except Exception:
+        pass
+    with contextlib.suppress(Exception):
+        response.close()
 
 
 def read_sse_block(response: Any) -> str | None:

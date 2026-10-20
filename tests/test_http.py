@@ -44,12 +44,15 @@ async def _wait_for_all(capsys, needles: list[str], timeout: float = 5.0) -> str
 class _Handler(BaseHTTPRequestHandler):
     def _respond(self):
         if self.path.startswith("/hold-sse"):
-            # one event, then HOLD: the QA's exit() must not wait for the
-            # open stream's read timeout
+            # one chunked event, then HOLD — chunked like a real SSE bridge
+            # (Hue): urllib's close() would DRAIN this stream and block exit
+            # until the next event arrived; the fix force-closes the socket
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Transfer-Encoding", "chunked")
             self.end_headers()
-            self.wfile.write(b"data: one\n\n")
+            chunk = b"data: one\n\n"
+            self.wfile.write(b"%x\r\n" % len(chunk) + chunk + b"\r\n")
             self.wfile.flush()
             time.sleep(30)  # hold: the QA's exit must not wait for this
             return

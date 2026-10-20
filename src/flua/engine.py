@@ -57,7 +57,7 @@ from .config import (
 from .devices import catalog_types
 from .environment import EnvChain
 from .hc3 import Hc3Remote
-from .http import http_call, open_http, read_sse_block
+from .http import abort_http_response, http_call, open_http, read_sse_block
 from .http_server import ApiServer
 from .loghtml import render_html as render_html_tags
 from .mqtt import MqttPool
@@ -1977,8 +1977,7 @@ class LuaEngine:
         except Exception as exc:
             result = messages.http_result(msg["id"], msg.get("qa"), error=str(exc))
         finally:
-            with contextlib.suppress(Exception):
-                response.close()
+            abort_http_response(response)
         logger.debug("http result id=%s %s", msg["id"], result.get("status", result.get("error")))
         self.enqueue_outbound(result)
 
@@ -2002,8 +2001,9 @@ class LuaEngine:
             self.enqueue_outbound(messages.http_result(request_id, qa, error=str(exc)))
             return
         finally:
-            with contextlib.suppress(Exception):
-                response.close()
+            # force-close: a draining close() would block the pump on a live
+            # chunked stream until the next event (the Hue bridge linger)
+            abort_http_response(response)
         self.enqueue_outbound(messages.http_end(request_id, qa))
 
     def _handle_clear_timeout(self, msg: dict[str, Any]) -> None:
