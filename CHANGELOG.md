@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.69] - 2026-10-20
+
+### Added
+- update migration documentation from plua to flua and enhance verification steps for .fqa packages
+
 ## [0.1.68] - 2026-10-20
 
 ### Added
