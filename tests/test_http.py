@@ -51,7 +51,7 @@ class _Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"data: one\n\n")
             self.wfile.flush()
-            time.sleep(120)
+            time.sleep(30)  # hold: the QA's exit must not wait for this
             return
         if self.path.startswith("/sse"):
             # text/event-stream: a few events, then close — the HC3's success
@@ -92,6 +92,7 @@ class _Handler(BaseHTTPRequestHandler):
 @pytest.fixture(scope="module")
 def http_server() -> str:
     server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+    server.daemon_threads = True  # a held /hold-sse stream must not block exit
     thread = threading.Thread(
         target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
     )
