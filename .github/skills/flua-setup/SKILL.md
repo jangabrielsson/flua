@@ -153,6 +153,30 @@ baking policy, and the import-vs-update semantics: `assets/fqa-format.md`.
 A typo'd directive warns at runtime (`unknown --%% directive`) and
 `flua --check` flags it with the file context.
 
+## Migrating from plua
+
+- **Emulator marker**: plua code checks `if fibaro.plua then` — flua does
+  NOT set `fibaro.plua` (it is nil). flua's marker is the global `_FLUA`:
+  `if _FLUA then ... end` (always set by flua, absent on the HC3).
+- **`--%%conceal:x=<v>` → `--%%clobber:x=<v>`** — and flua takes the value
+  RAW: plua evaluates it as Lua, flua bakes it verbatim. Write
+  `--%%clobber:key=placeholder` without quotes — a quoted
+  `"<placeholder>"` bakes the quote characters into the package.
+- **`--%%save:file` is a plua directive flua does not implement** (ignored).
+  State persistence across restarts is `--%%db:+file.json`.
+- **`--%%proxy:true` is the legacy alias for `--%%mode:proxy`** — it needs
+  online mode + HC3 credentials, and is not a casual flag.
+- **Packaging**: `--%%var:name=expr,"<pkg>"` declares the PACKAGE value
+  (baked by `flua export` / `--tool pack`; your own `uploadQA` gets the
+  evaluated value instead). Build and verify before committing:
+  `flua -t pack main.lua -o dist/MyQA.fqa -f` (`-f` overwrites) — then
+  check the .fqa per the verification recipe in
+  `assets/fqa-format.md`.
+- **Tools**: `flua --tool` lists all 13 (`catalog`, `createDB`, `downloadFQA`,
+  `downloadQA`, `newQA`, `pack`, `setup`, `ui`, `unpack`, `updateQA`,
+  `uploadFQA`, `uploadFile`, `uploadQA`) — `flua --tool <name> --help` for
+  each tool's own usage.
+
 ## The `--%%include` defaults directive
 
 A QA can pull its defaults from another file — explicit and per-QA, the

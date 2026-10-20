@@ -48,6 +48,10 @@ assertion is a no-op (flua-only `_FLUA` is absent: no printing, no
 counting, `finish()` returns 0). In flua the shipped copy is the full
 library. Global spelling: `fluaTest.new()`.
 
+`_FLUA` is flua's **emulator marker**: flua always sets it, the HC3 never
+does — the plua equivalent is `fibaro.plua`, which flua does NOT set.
+Migrate `if fibaro.plua then ... end` to `if _FLUA then ... end`.
+
 The hand-rolled equivalent (plain Lua, for QAs that must stay dependency-free):
 
 ```lua

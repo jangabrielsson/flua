@@ -53,3 +53,17 @@ file that the HC3 imports as a new device.
   hc3-rest-api skill, `assets/misc.md`).
 - `type` must match an existing device template or the import fails.
 - Stale packages are a classic "the fix did not work" — re-export after every code change.
+
+## Verify before committing
+
+`flua -t pack main.lua -o dist/MyQA.fqa -f` (`-f` overwrites an existing
+file), then:
+
+- parse the JSON and check `initialProperties.quickAppVariables` — PACKAGE
+  placeholders, not real values (the dist policy above);
+- grep the .fqa for secrets (passwords, tokens, keys) — a distribution
+  package must never carry them;
+- confirm it is a normal (non-proxy) build — proxy leftovers in the header
+  produce proxy packages that misbehave off the controller;
+- `flua unpack dist/MyQA.fqa -d /tmp/check/` — the reversed project should
+  be a clean flua project that re-packs.

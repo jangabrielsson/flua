@@ -57,15 +57,24 @@ To include a library file, use `--%%file:$fibaro.lib.libraryName,alias` (e.g. `-
 ## Development & Debug Headers
 
 ```lua
---%%debug:true        -- verbose debug logging
---%%desktop:true      -- auto-open QuickApp UI desktop window
---%%offline:true      -- run without HC3 connection
---%%breakonload:true  -- pause in debugger immediately on load
---%%save:state.json   -- persist state across restarts
---%%project:1001      -- associate with HC3 device ID for upload/sync
---%%proxy:true        -- enable proxy mode (sync with real HC3 QA)
---%%qacolor:lightblue -- background color of the QA desktop window
+--%%debug:refreshState=true,api=true,http=true  -- debug logging channels
+--%%offline:true      -- legacy alias for --%%mode:offline
+--%%mode:online|offline|proxy  -- runtime mode; proxy needs online + HC3 credentials
+--%%warn:true         -- extra runtime warnings (e.g. api error statuses)
+--%%db:file.json      -- seed data; --%%db:+file.json also persists state across restarts
+--%%location:latitude=N,longitude=N  -- pin the sim's location (sun times)
+--%%keep-alive:true   -- online: keep the run alive past idle
+--%%scene:true        -- run this QA as an HC3 Lua scene
+--%%uid:x / --%%description:x / --%%model:x / --%%build:x / --%%manufacturer:x
+                      -- device properties
+--%%clobber:name=value -- plua's --%%conceal: the PACKAGE value, taken RAW
+                      -- (no Lua evaluation — don't quote it)
 ```
+
+`--%%save`, `--%%desktop`, `--%%breakonload`, `--%%project` and `--%%qacolor`
+are **plua directives flua does not implement** (ignored/unknown) — remove
+them when migrating. `--%%proxy:true` is the legacy alias for
+`--%%mode:proxy`, not a casual flag.
 
 ---
 
