@@ -4,6 +4,17 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.70] - 2026-10-20
+
+### Added
+- enhance documentation and checks for plua migration, including warnings for plua-style directives and updates to run-for behavior
+
+### Changed
+- update AGENTS.md for clarity and additional directives
+
+### Fixed
+- reduce sleep duration in HTTP handler and set server threads to daemon
+
 ## [0.1.69] - 2026-10-20
 
 ### Added
