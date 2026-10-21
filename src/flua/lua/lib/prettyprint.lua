@@ -1,8 +1,8 @@
 local fmt = string.format
 local escTab = {
   ["\\"]="\\\\",['"']='\\"',
-  ["\n"]="\\n",["\r"]="\\r",["\t"]="\\t",  -- ✅ Added
-  ["\b"]="\\b",["\f"]="\\f"                -- ✅ Added
+  ["\n"]="\\n",["\r"]="\\r",["\t"]="\\t",  -- ✅ Added.
+  ["\b"]="\\b",["\f"]="\\f"                -- ✅ Added.
 }
 local sortKeys = {"type","device","deviceID","id","name","properties","value","oldValue","val","key","arg","event","events","msg","res"}
 local sortOrder = {}
