@@ -805,7 +805,7 @@ run in your QA, timers keep running while requests are in flight):
 - `net.TCPSocket({timeout=ms})` → `connect/send/write/read/readUntil/close` — `examples/tcp.lua`
   (`write` is the HC3-documented alias of `send`)
 - `net.UDPSocket({broadcast, timeout})` → `sendTo/receive` — `examples/udp.lua`
-- `net.WebSocketClient()/WebSocketClientTls()` → `addEventListener`, `connect`, `send`, `sendBinary` — `examples/websocket.lua` (`connect(url, headers)` takes a headers table, like the HC3; `sendBinary` sends binary frames, and `dataReceived(payload, isBinary)` receives them — the new HC3 binary mode)
+- `net.WebSocketClient()/WebSocketClientTls()` → `addEventListener`, `connect`, `send`, `sendBinary` — `examples/websocket.lua` (`connect(url, headers)` takes a headers table, like the HC3; `sendBinary` sends binary frames, and `dataReceived(payload, isBinary)` receives them — the new HC3 binary mode). Like the HC3, the TLS client does **not** verify certificates by default (embedded bridges ship self-signed certs — e.g. Dirigera); the flua extension `connect(url, headers, {checkCertificate = true})` opts back into verification.
 - `mqtt.Client.connect(uri, options)` → `subscribe/publish/unsubscribe/disconnect`, `mqtt.QoS` — `examples/mqtt.lua` (`mqtts://` or `options.tls` enables TLS: `useSNI` on by default like the HC3 ≥ 5.191, `tls.useSNI = false` switches SNI off; also `allowUnauthorized`, `certificateAuthority`, `clientCertificate`)
 
 TCP/UDP payloads are **binary-safe**: raw bytes (including NUL and values

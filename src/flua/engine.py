@@ -1825,6 +1825,7 @@ class LuaEngine:
             str(msg["url"]),
             float(msg.get("timeout") or 10.0),
             {str(k): str(v) for k, v in (msg.get("headers") or {}).items()},
+            bool(msg.get("checkCertificate", False)),  # HC3 default: no verification
         )
         if not ok:
             self._on_ws_event(conn, "error", err)

@@ -47,6 +47,7 @@ class WsClient:
         timeout: float,
         on_event: Callable[[str, Any], None],
         headers: dict[str, str] | None = None,
+        check_certificate: bool = False,
     ) -> None:
         parsed = urlparse(url)
         if parsed.scheme not in ("ws", "wss"):
@@ -57,6 +58,10 @@ class WsClient:
         if parsed.query:
             self._path += "?" + parsed.query
         self._tls = parsed.scheme == "wss"
+        # the HC3's WebSocketClientTls does NOT verify certificates by
+        # default (embedded bridges ship self-signed certs — e.g. Dirigera);
+        # flua mirrors that. check_certificate=True opts back in.
+        self._check_certificate = check_certificate
         self._timeout = timeout
         self._on_event = on_event
         self._headers = headers or {}
@@ -73,7 +78,11 @@ class WsClient:
         sock = socket.create_connection((self._host, self._port), timeout=self._timeout)
         try:
             if self._tls:
-                context = ssl.create_default_context()
+                context = (
+                    ssl.create_default_context()
+                    if self._check_certificate
+                    else ssl._create_unverified_context()
+                )
                 sock = context.wrap_socket(sock, server_hostname=self._host)
             key = base64.b64encode(os.urandom(16)).decode()
             extra = ""
@@ -309,7 +318,12 @@ class WebSocketPool:
         return entry["qa"] if entry else None
 
     def connect(
-        self, conn: int, url: str, timeout: float, headers: dict[str, str] | None = None
+        self,
+        conn: int,
+        url: str,
+        timeout: float,
+        headers: dict[str, str] | None = None,
+        check_certificate: bool = False,
     ) -> tuple[bool, str | None]:
         entry = self._entry(conn)
         if entry is None:
@@ -319,6 +333,7 @@ class WebSocketPool:
             timeout,
             lambda event, data, is_binary=False: self._emit(conn, event, data, is_binary),
             headers,
+            check_certificate,
         )
         try:
             client.connect()

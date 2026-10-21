@@ -5,6 +5,7 @@ import base64
 import hashlib
 import re
 import socket
+import ssl
 import struct
 import subprocess
 import sys
@@ -74,12 +75,16 @@ def _read_frame(conn: socket.socket) -> tuple[int, bytes] | None:
 class EchoWsServer:
     """Minimal RFC 6455 server: accepts, handshakes, echoes text frames."""
 
-    def __init__(self) -> None:
+    def __init__(self, tls_ctx: ssl.SSLContext | None = None) -> None:
         self.seen_requests: list[bytes] = []  # raw handshakes (for assertions)
         self.listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.listener.bind(("127.0.0.1", 0))
         self.listener.listen(4)
+        if tls_ctx is not None:
+            # wrap BEFORE the accept loop starts — a late wrap races the
+            # already-blocked accept() with a plain-TCP connection
+            self.listener = tls_ctx.wrap_socket(self.listener, server_side=True)
         self.port = self.listener.getsockname()[1]
         threading.Thread(target=self._serve, daemon=True).start()
 
@@ -87,6 +92,10 @@ class EchoWsServer:
         while True:
             try:
                 conn, _ = self.listener.accept()
+            except (ssl.SSLError, ConnectionResetError):
+                # a client aborted its TLS handshake (e.g. certificate
+                # verification failed) — keep serving the others
+                continue
             except OSError:
                 return
             threading.Thread(target=self._handle, args=(conn,), daemon=True).start()
@@ -261,3 +270,44 @@ def test_example_websocket_runs_cleanly() -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     assert "stack traceback" not in result.stdout
     assert ("echo:" in result.stdout) or ("ws error:" in result.stdout)
+
+
+@pytest.mark.asyncio
+async def test_wss_self_signed_default_skips_verification(capsys) -> None:
+    # the HC3's WebSocketClientTls does NOT verify certificates by default
+    # (embedded bridges ship self-signed certs — e.g. Dirigera); the flua
+    # extension {checkCertificate = true} opts back into verification
+    import ssl as _ssl
+
+    ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(
+        str(Path(__file__).parent / "certs" / "cert.pem"),
+        str(Path(__file__).parent / "certs" / "key.pem"),
+    )
+    server = EchoWsServer(tls_ctx=ctx)
+
+    out = await _run_qa(
+        "local gotEcho, gotStrict = false, false\n"
+        "local ok = net.WebSocketClientTls()\n"
+        "ok:addEventListener('connected', function() print('CONNECTED'); ok:send('hi') end)\n"
+        "ok:addEventListener('dataReceived', function(d) print('ECHO', d); gotEcho = true end)\n"
+        "ok:addEventListener('error', function(e) print('DEF_ERR', e) end)\n"
+        f"ok:connect('wss://127.0.0.1:{server.port}', nil)\n"
+        "local strict = net.WebSocketClientTls()\n"
+        "strict:addEventListener('error', function(e)\n"
+        "  print('STRICT_ERR', tostring(e):find('CERTIFICATE') ~= nil); gotStrict = true end)\n"
+        f"strict:connect('wss://127.0.0.1:{server.port}', nil, {{checkCertificate = true}})\n"
+        "local deadline = os.time() + 3\n"
+        "local function poll()\n"
+        "  if gotEcho and gotStrict then print('DONE') return end\n"
+        "  if os.time() > deadline then print('TIMEOUT', gotEcho, gotStrict) return end\n"
+        "  setTimeout(poll, 100)\n"
+        "end\n"
+        "setTimeout(poll, 100)\n",
+        capsys,
+        "DONE",
+    )
+    assert "CONNECTED" in out
+    assert "ECHO hi" in out
+    assert "DEF_ERR" not in out  # the default skipped verification
+    assert "STRICT_ERR true" in out  # opting in verifies (and fails here)

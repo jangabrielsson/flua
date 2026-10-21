@@ -1,15 +1,15 @@
 do
   local VERSION = "2.5.1"
 
-  print("QwikAppChild library v"..VERSION)
   local childID = 'ChildID'
   local classID = 'ClassName'
   local callbacksID = 'uiCallbacks'
-  
+
   function QuickApp:initChildDevices() end
   QuickApp.children = {}
   fibaro.debugFlags = fibaro.debugFlags or {}
-  fibaro.debugFlags.qwikchild = true
+  if fibaro.debugFlags.qwikchild == nil then fibaro.debugFlags.qwikchild = true end
+  fibaro.debug(__TAG, "QwikAppChild library v"..VERSION)
   local fmt = string.format
   local function ERRORF(f,...) fibaro.error(__TAG,fmt(f,...)) end
   local function DEBUGF(f,...)
@@ -183,7 +183,9 @@ do
     local uiCallbacks = props.initialProperties.uiCallbacks
     if uiCallbacks and next(uiCallbacks) == nil then props.initialProperties.uiCallbacks = nil end
     local device, res = api.post("/plugins/createChildDevice", props)
-    assert(res == 200, "Can't create child device " .. tostring(res) .. " - " .. json.encode(props))
+    if res ~= 200 then
+      error(fmt("Can't create child device (status %s): %s", tostring(res), tostring(device)), 2)
+    end
     setVar(device.id,childID,uid,true)
     setVar(device.id,classID,className,true)
     if uiCallbacks then setVar(device.id,"uiCallbacks",uiCallbacks,true) end
@@ -255,7 +257,11 @@ do
     cdft = type(childrenDefs)
     assert(cdft=='nil' or cdft=='table','childrenDefs must be a table or nil')
     self:setupUIhandler()
-    local cdevs,n,gerr = api.get("/devices?parentId="..self.id) or {},0,nil -- Pick up all my children
+    local cdevs, status = api.get("/devices?parentId="..self.id) -- Pick up all my children
+    if status ~= 200 or type(cdevs) ~= "table" then
+      return nil, fmt("cannot list children (status %s) — aborting, NOT creating over existing children", tostring(status))
+    end
+    local n, gerr = 0, nil
     for _,child in ipairs(cdevs) do
       local uid = getVar(child.id,childID)
       if uid then allChildren[uid] = child.id end
@@ -284,6 +290,7 @@ do
     quickApp = self
     local stat,err = pcall(loadExisting,self,childrenDefs)
     if not stat then ERRORF("loadExistingChildren: %s",err) end
+    return err
   end
 
   local function verifyChildDef(chd)
@@ -306,9 +313,20 @@ do
       local ok,err = verifyChildDef(data)
       if not ok then error(fmt("createMissingChildren: %s %s",err,json.encode(data))) end
       local m = uid:sub(1,1)=='i' and 100 or 0; k = k + 1
-      chs[#chs+1]={uid=uid,id=m+tonumber(uid:match("(%d+)$") or k),data=data}
+      local sid = tonumber(uid:match("(%d+)$"))
+      -- numeric suffix uids (i1, i2) order numerically; digit-less uids
+      -- (childA, childB) order by the uid string — never pairs() order
+      chs[#chs+1] = {
+        uid = uid,
+        id = m + (sid or 0),
+        key = sid and string.format("%08d", sid) or uid,
+        data = data,
+      }
     end
-    table.sort(chs,function(a,b) return a.id < b.id end)
+    table.sort(chs, function(a, b)
+      if a.key == b.key then return a.uid < b.uid end
+      return a.key < b.key
+    end)
 
     for _,ch in ipairs(chs) do
       if not self.children[ch.uid] then -- not loaded yet
@@ -341,6 +359,7 @@ do
         DEBUGF("Deleting undefined child ID:%s, UID:%s",id,uid)
         doChildRemovedHook(id)
         api.delete("/plugins/removeChildDevice/" .. id)
+        allChildren[uid] = nil
       end
     end
   end

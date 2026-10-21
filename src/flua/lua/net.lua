@@ -239,7 +239,7 @@ function WsBase:addEventListener(eventName, callback)
   list[#list + 1] = callback
 end
 
-function WsBase:connect(url, headers)
+function WsBase:connect(url, headers, options)
   local msg = {
     type = "wsConnect",
     qa = qaId,
@@ -247,9 +247,15 @@ function WsBase:connect(url, headers)
     url = tostring(url),
     timeout = self._timeout,
   }
-  -- the HC3 supports a headers table as the second argument
+  -- the HC3 supports a headers table as the second argument. The optional
+  -- third argument is a flua extension: {checkCertificate = true} opts back
+  -- into TLS verification (the HC3's WebSocketClientTls default is NO
+  -- verification — embedded bridges ship self-signed certificates).
   if type(headers) == "table" then
     msg.headers = headers
+  end
+  if type(options) == "table" and options.checkCertificate then
+    msg.checkCertificate = true
   end
   _PY.post(msg)
 end

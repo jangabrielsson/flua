@@ -240,6 +240,11 @@ integration without the controller). Mock the far end with `net.*Server`
   timeout is a transport failure → `error`. Real services send keepalives
   just inside typical read timeouts (Hue ≈ every 58s) — treat mid-stream
   timeouts as **transient**: catch and reconnect, don't fail the QA.
+- **WebSocketClientTls** verifies nothing by default — the HC3 offers no
+  way to supply a certificate for websockets (undocumented by Fibaro), so
+  self-signed bridge certs (Dirigera etc.) just work; flua matches that.
+  `connect(url, headers, {checkCertificate = true})` is the flua extension
+  that opts back into verification.
 - **exit()**: cancels the QA's in-flight requests — an open SSE stream dies
   with its QA.
 - Full semantics and the mock-server API: USAGE.md "Network clients" and
