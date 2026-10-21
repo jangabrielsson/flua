@@ -615,10 +615,15 @@ async function poll() {
       /* no embedded channel: keep whatever the last successful poll fetched */
     }
     const root = $("devices");
-    // ?qa=<id> — a filtered view (the detach button opens one per window)
-    const onlyQa = new URLSearchParams(location.search).get("qa");
+    // ?qa=<id> — only this QA; ?exclude=id[,id...] — hide these QAs (the
+    // detach button opens a ?qa= window; pair it with an ?exclude= main
+    // window so the detached QA appears once)
+    const params = new URLSearchParams(location.search);
+    const onlyQa = params.get("qa");
+    const exclude = new Set((params.get("exclude") || "").split(",").filter(Boolean));
     const qas = devices.filter((d) =>
       (!onlyQa || String(d.id) === onlyQa) &&
+      !exclude.has(String(d.id)) &&
       ((d.properties && (d.properties.uiView || d.properties.viewLayout)) ||
       embeddedState[String(d.id)])
     );
@@ -646,9 +651,13 @@ async function poll() {
     for (const panel of root.querySelectorAll(".device")) {
       if (!live.has(panel.dataset.key)) panel.remove();
     }
+    const filters = [
+      onlyQa ? "only " + onlyQa : "",
+      exclude.size ? "excluding " + [...exclude].join(",") : "",
+    ].filter(Boolean);
     setStatus(
       qas.length
-        ? qas.length + " QA(s)" + (onlyQa ? " (filtered to " + onlyQa + ")" : "")
+        ? qas.length + " QA(s)" + (filters.length ? " (" + filters.join(", ") + ")" : "")
         : "no QAs with UI",
       "ok"
     );
