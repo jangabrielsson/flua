@@ -4,6 +4,18 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.74] - 2026-10-21
+
+### Added
+- add detach button for filtered QA view and enhance poll status message
+
+### Changed
+- test: add tests for setup tool to verify vendor file refresh behavior
+
+### Fixed
+- correct wording in help message for setup tool
+- correct formatting comments in prettyprint.lua for escape sequences
+
 ## [0.1.73] - 2026-10-21
 
 ### Added
