@@ -512,7 +512,8 @@ function renderDevice(device) {
   detach.onclick = (e) => {
     e.stopPropagation();
     const url = new URL(location.href);
-    url.search = "qa=" + encodeURIComponent(device.id);
+    url.searchParams.set("qa", String(device.id));
+    url.searchParams.delete("exclude");
     window.open(url.toString(), "_blank", "width=460,height=760");
   };
   title.appendChild(detach);
@@ -664,6 +665,26 @@ async function poll() {
   } catch (err) {
     setStatus(err.message, "err");
   }
+}
+
+// ?bg=... and ?panel=... — page and panel background colors (any CSS
+// color value); per-window and bookmarkable, like the qa/exclude filters.
+// Without the params, the server's defaults apply: .flua.lua's
+// viewer = { bg = ..., panel = ... } (GET /flua/theme).
+const themeParams = new URLSearchParams(location.search);
+const pageBg = themeParams.get("bg");
+if (pageBg) document.documentElement.style.setProperty("--bg", pageBg);
+const panelBg = themeParams.get("panel");
+if (panelBg) document.documentElement.style.setProperty("--card", panelBg);
+if (!pageBg || !panelBg) {
+  const themeBase = ($("base").value || location.origin).replace(/\/+$/, "");
+  fetch(themeBase + "/flua/theme")
+    .then((r) => (r.ok ? r.json() : {}))
+    .then((theme) => {
+      if (!pageBg && theme.bg) document.documentElement.style.setProperty("--bg", theme.bg);
+      if (!panelBg && theme.panel) document.documentElement.style.setProperty("--card", theme.panel);
+    })
+    .catch(() => {});  // no theme channel (older flua / real HC3): keep defaults
 }
 
 function start() {

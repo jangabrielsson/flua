@@ -34,6 +34,7 @@ from .devices import (
     device_update,
     devices_list,
     flua_devices_list,
+    flua_theme,
     group_action,
 )
 from .plugins import (
@@ -120,6 +121,7 @@ ROUTES: list[tuple[str, str, Handler]] = [
     # -- devices -------------------------------------------------------------
     ("GET", "/devices", devices_list),
     ("GET", "/flua/devices", flua_devices_list),  # flua-only viewer channel
+    ("GET", "/flua/theme", flua_theme),  # the viewer's default colors (from .flua.lua)
     ("POST", "/devices", device_create),  # flua extension: base device from the type skeleton
     ("GET", "/devices/{id}", device_get),
     ("PUT", "/devices/{id}", device_update),

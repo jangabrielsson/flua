@@ -375,6 +375,13 @@ package (`src/flua/setup_templates/viewer/index.html` is the source);
 `--tool setup` does not copy it — the served page can also point at another
 machine running flua.
 
+Per-window URL parameters (bookmarkable): `?qa=<id>` shows only that QA,
+`?exclude=id[,id...]` hides those, `?bg=<color>` / `?panel=<color>` set the
+page/panel colors (any CSS color). A panel's "open in window" button opens
+a `?qa=` window carrying the current theme. Defaults for the colors come
+from the config file's `viewer = { bg = ..., panel = ... }` table
+(`.flua.lua`), served at `GET /flua/theme`.
+
 The viewer polls `GET /flua/devices` (the emulated devices only — in online
 mode the HC3's own QAs stay out of the list), renders `properties.uiView`
 (labels,

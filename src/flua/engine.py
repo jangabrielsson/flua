@@ -343,6 +343,19 @@ class LuaEngine:
         if lupa.lua_type(table) != "table":
             raise ValueError(f"Lua config {path} must return a table")
         self._lua.globals()["_FLUA"]["configFile"] = table
+        # the UI viewer's default theme: viewer = { bg = "#...", panel = "#..." }
+        # in .flua.lua — served at /flua/theme; ?bg=/ ?panel= URL params still
+        # win per window
+        viewer = table["viewer"]
+        if lupa.lua_type(viewer) == "table":
+            theme = {}
+            for key in ("bg", "panel"):
+                value = viewer[key]
+                # lupa converts Lua strings to Python str (lua_type is None
+                # for them) — isinstance is the right check
+                if isinstance(value, str):
+                    theme[key] = value
+            self.api.state.viewer_theme = theme
         location = table["location"]
         if lupa.lua_type(location) == "table":
             # .flua.lua configures the sim's controller location (device 1's

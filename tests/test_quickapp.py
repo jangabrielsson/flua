@@ -659,3 +659,19 @@ async def test_var_expression_nil_result_is_fine(tmp_path, capsys, monkeypatch) 
         assert engine.exit_code == 0
     finally:
         await engine.stop()
+
+
+def test_lua_config_sets_the_viewer_theme(tmp_path, monkeypatch) -> None:
+    # .flua.lua's viewer = { bg = ..., panel = ... } becomes the UI viewer's
+    # default colors, served at /flua/theme (?bg=/?panel= still win per window)
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    (tmp_path / ".flua.lua").write_text(
+        'return { viewer = { bg = "#1e1e2e", panel = "#28283a" } }\n'
+    )
+    monkeypatch.chdir(tmp_path)
+    from flua.engine import LuaEngine
+
+    engine = LuaEngine()
+    data, status = engine.api.dispatch("GET", "/flua/theme")
+    assert status == 200
+    assert data == {"bg": "#1e1e2e", "panel": "#28283a"}

@@ -103,6 +103,12 @@ def devices_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     return public(sorted(devices, key=lambda d: d["id"])), 200
 
 
+def flua_theme(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    """GET /flua/theme — the viewer's default colors from .flua.lua
+    (viewer = { bg = ..., panel = ... }); {} when not configured."""
+    return dict(getattr(state, "viewer_theme", {}) or {}), 200
+
+
 def flua_devices_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     """GET /flua/devices — the UI viewer's device list (flua-only channel).
 
