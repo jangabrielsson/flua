@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 
 import pytest
+from support import spawn_for_ctrl_c
 
 pytest.importorskip("lupa")
 
@@ -796,7 +797,7 @@ def test_stdio_ctrl_c_exits_cleanly(tmp_path) -> None:
 
     script = tmp_path / "sig.lua"
     script.write_text("print('sig')\n")
-    process = subprocess.Popen(
+    process = spawn_for_ctrl_c(
         [sys.executable, "-m", "flua.mcp.server"],
         cwd=REPO_ROOT,
         stdin=subprocess.PIPE,

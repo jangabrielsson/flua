@@ -17,6 +17,7 @@ import urllib.request
 from pathlib import Path
 
 import pytest
+from support import spawn_for_ctrl_c
 
 pytest.importorskip("lupa")
 
@@ -279,7 +280,7 @@ def test_cli_http_ctrl_c_exits_cleanly() -> None:
     # Ctrl-C on the HTTP transport: one stderr line, exit 130, no traceback
     import signal as _signal
 
-    process = subprocess.Popen(
+    process = spawn_for_ctrl_c(
         [sys.executable, "-m", "flua.mcp.server", "--http", "127.0.0.1:0"],
         cwd=REPO_ROOT,
         stdout=subprocess.PIPE,

@@ -21,6 +21,8 @@ import pytest
 
 pytest.importorskip("lupa")
 
+from support import spawn_for_ctrl_c
+
 from flua.engine import LuaEngine
 
 pytestmark = pytest.mark.slow  # real wall-clock waits (sleeps, settles, timeouts)
@@ -1068,7 +1070,7 @@ def test_ctrl_c_terminates_promptly_mid_long_poll(tmp_path, mock_hc3) -> None:
     home = tmp_path / "home"
     home.mkdir()
     _MockHc3.hold_refresh = 20.0
-    proc = subprocess.Popen(
+    proc = spawn_for_ctrl_c(
         [sys.executable, "-m", "flua", str(script)],
         env=_hc3_env(mock_hc3, str(home)),
         cwd=tmp_path,  # isolated from the developer's .directives
