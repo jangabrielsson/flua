@@ -4,6 +4,16 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.75] - 2026-10-21
+
+### Added
+- add shared helper function for subprocess handling with Ctrl-C support
+- Enhance HC3 API integration and loopback handling
+- implement viewer theme configuration and URL parameters for color customization
+
+### Fixed
+- enhance QA filtering logic in poll function and update status message
+
 ## [0.1.74] - 2026-10-21
 
 ### Added
