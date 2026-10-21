@@ -35,16 +35,29 @@ BIN_FALSE = "<center><font color='red'>FALSE</font></center>"
 BIN_TRUE = "<center><font color='green'>TRUE</font></center>"
 
 
-def _custom_bin(value: Any) -> str:
+def _custom_bin(value: Any, properties: dict[str, Any] | None = None) -> str:
     return BIN_TRUE if value else BIN_FALSE
 
 
-def _int_value(value: Any) -> str:
+def _int_value(value: Any, properties: dict[str, Any] | None = None) -> str:
     """A dimmer's value as an integer — the HC3 UI shows no decimals."""
     return str(int(float(value) + 0.5))
 
 
-def _color_value(value: Any) -> str:
+def _multisensor_value(value: Any, properties: dict[str, Any] | None = None) -> str:
+    """A multilevelSensor's value with its unit string appended (the HC3
+    carries the unit as a separate ``unit`` property)."""
+    try:
+        text = f"{value:.3f}"
+    except (TypeError, ValueError):
+        text = str(value)
+    unit = (properties or {}).get("unit")
+    if unit:
+        text = f"{text}{unit}"
+    return text
+
+
+def _color_value(value: Any, properties: dict[str, Any] | None = None) -> str:
     """The colorController's state label: colored ON/OFF from the value table."""
     if not isinstance(value, dict):
         return BIN_FALSE
@@ -151,7 +164,12 @@ EMBEDDED_WATCHES: dict[str, list[dict[str, Any]]] = {
         {"property": "value", "id": "__colorComponentValue", "prop": "text", "fmt": _color_value},
     ],
     "com.fibaro.multilevelSensor": [
-        {"property": "value", "id": "__multisensorValue", "prop": "text", "fmt": "%.3f"},
+        {
+            "property": "value",
+            "id": "__multisensorValue",
+            "prop": "text",
+            "fmt": _multisensor_value,
+        },
     ],
     "com.fibaro.doorSensor": [
         {"property": "value", "id": "__doorSensor", "prop": "text", "fmt": _custom_bin},
@@ -187,7 +205,7 @@ def embedded_view(device: dict[str, Any]) -> dict[str, Any] | None:
             continue
         fmt = rule["fmt"]
         if callable(fmt):
-            value: Any = fmt(raw)
+            value: Any = fmt(raw, properties)
         elif isinstance(raw, (int, float)) and not isinstance(raw, bool):
             if "%" not in fmt:
                 value = fmt

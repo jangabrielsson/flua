@@ -1326,6 +1326,17 @@ def test_embedded_ui_multilevel_switch(api: Api) -> None:
     assert slider["action"] == "setValue"
 
 
+def test_embedded_ui_multilevel_sensor_unit(api: Api) -> None:
+    # a multilevelSensor's unit property is appended to the rendered value
+    api.state.register_qa(5003, "meter", "com.fibaro.multilevelSensor", {"value": 5.65})
+    api.state.register_qa(
+        5004, "energy", "com.fibaro.multilevelSensor", {"value": 5.65, "unit": "kWh"}
+    )
+    data, _ = api.dispatch("GET", "/flua/embeddedUI")
+    assert data["5003"]["values"]["__multisensorValue"]["text"] == "5.650"
+    assert data["5004"]["values"]["__multisensorValue"]["text"] == "5.650kWh"
+
+
 def test_embedded_ui_only_plugin_devices(api: Api) -> None:
     # seed devices without a quickApp interface get no embedded view, even
     # when their type has one — the HC3 renders those itself
