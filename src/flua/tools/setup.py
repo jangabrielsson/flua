@@ -3,8 +3,20 @@
 pip users don't get the repo's developer experience (VS Code run/debug
 configs, Copilot skills/instructions, AGENTS.md). This tool writes those
 files from templates that ship inside the flua package, into a QA project
-directory. Idempotent: existing files are kept unless --force. (The UI
-viewer is NOT copied — ``flua --ui`` serves it from the package.)
+directory. (The UI viewer is NOT copied — ``flua --ui`` serves it from the
+package.)
+
+Files are classified, so re-running after a flua upgrade updates what it
+should and never clobbers what it shouldn't:
+
+- ``refresh``  — vendor-owned content (the skills, instructions, LuaLS type
+  stubs): always overwritten, like ``pip install --upgrade``.
+- ``managed``  — vendor content the user may edit (AGENTS.md): overwritten
+  while byte-identical to the shipped template, kept once locally modified
+  (with a notice).
+- ``if-absent`` — user-owned files (.vscode configs): never overwritten.
+
+``--force`` overrides everything.
 """
 
 from __future__ import annotations
@@ -15,24 +27,26 @@ import shutil
 from pathlib import Path
 
 NAME = "setup"
-HELP = "scaffold a QA project: .vscode configs + agent files"
+HELP = "scaffold a QA project: .vscode configs + agent files (per-file update policies; -f overwrites all)"
 
-# template path (inside the package) -> target path (relative to the project)
+# template path (inside the package) -> (target path, update policy)
 _TEMPLATES = {
-    "vscode/launch.json": ".vscode/launch.json",
-    "vscode/tasks.json": ".vscode/tasks.json",
-    "vscode/extensions.json": ".vscode/extensions.json",
-    "luals": ".luals",
-    ".luarc.json": ".luarc.json",
-    "AGENTS.md": "AGENTS.md",
-    "github/copilot-instructions.md": ".github/copilot-instructions.md",
+    "vscode/launch.json": (".vscode/launch.json", "if-absent"),
+    "vscode/tasks.json": (".vscode/tasks.json", "if-absent"),
+    "vscode/extensions.json": (".vscode/extensions.json", "if-absent"),
+    "luals": (".luals", "refresh"),
+    ".luarc.json": (".luarc.json", "refresh"),
+    "AGENTS.md": ("AGENTS.md", "managed"),
+    "github/copilot-instructions.md": (".github/copilot-instructions.md", "refresh"),
     "github/instructions/quickapp-dev.instructions.md": (
-        ".github/instructions/quickapp-dev.instructions.md"
+        ".github/instructions/quickapp-dev.instructions.md",
+        "refresh",
     ),
     "github/prompts/install-qa-skills.prompt.md": (
-        ".github/prompts/install-qa-skills.prompt.md"
+        ".github/prompts/install-qa-skills.prompt.md",
+        "if-absent",
     ),
-    "github/skills": ".github/skills",
+    "github/skills": (".github/skills", "refresh"),
 }
 
 
@@ -53,6 +67,36 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
 def _templates_dir() -> Path:
     return Path(__file__).resolve().parent.parent / "setup_templates"
+
+
+def _copy(src: Path, dst: Path) -> None:
+    if src.is_dir():
+        shutil.copytree(src, dst)
+    else:
+        shutil.copy2(src, dst)
+
+
+def _post_process(target: str, dst: Path) -> None:
+    """Absolute-path substitution for the files VS Code runs (macOS GUI apps
+    don't inherit the shell's PATH, so a bare `flua` is not found there)."""
+    if target == ".vscode/launch.json":
+        text = dst.read_text(encoding="utf-8")
+        dst.write_text(
+            text.replace(
+                '"interpreter": "flua"',
+                f'"interpreter": {json.dumps(_flua_interpreter())}',
+            ),
+            encoding="utf-8",
+        )
+    if target == ".vscode/tasks.json":
+        text = dst.read_text(encoding="utf-8")
+        dst.write_text(
+            text.replace(
+                '"command": "flua"',
+                f'"command": {json.dumps(_flua_interpreter())}',
+            ),
+            encoding="utf-8",
+        )
 
 
 def _flua_interpreter() -> str:
@@ -89,47 +133,52 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
             + ", ".join(missing)
             + " — reinstall fibaro-flua (or run from the source tree)"
         )
-    written, skipped = [], []
-    for template, target in _TEMPLATES.items():
+    written, updated, skipped, kept_modified = [], [], [], []
+    for template, (target, policy) in _TEMPLATES.items():
         src = _templates_dir() / template
         dst = root / target
         if dst.exists():
-            if not args.force:
+            if policy == "if-absent" and not args.force:
                 skipped.append(target)
+                continue
+            if policy == "managed" and not args.force:
+                # vendor content until the user edits it: refresh while it
+                # matches the shipped template byte for byte, keep + report
+                # once modified (never clobber a local edit)
+                try:
+                    same = dst.is_file() and dst.read_bytes() == src.read_bytes()
+                except OSError:
+                    same = False
+                if not same:
+                    kept_modified.append(target)
+                    continue
+                if dst.is_dir():
+                    shutil.rmtree(dst)
+                else:
+                    dst.unlink()
+                _copy(src, dst)
+                updated.append(target)
+                _post_process(target, dst)
                 continue
             if dst.is_dir():
                 shutil.rmtree(dst)
             else:
                 dst.unlink()
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        if src.is_dir():
-            shutil.copytree(src, dst)
+            if policy == "refresh":
+                updated.append(target)
+            else:
+                written.append(target)
         else:
-            shutil.copy2(src, dst)
-        if target == ".vscode/launch.json":
-            # resolve `flua` to its absolute path so VS Code (which doesn't
-            # inherit the shell's PATH on macOS) can launch it
-            text = dst.read_text(encoding="utf-8")
-            dst.write_text(
-                text.replace(
-                    '"interpreter": "flua"',
-                    f'"interpreter": {json.dumps(_flua_interpreter())}',
-                ),
-                encoding="utf-8",
-            )
-        if target == ".vscode/tasks.json":
-            # same PATH story as launch.json: the task runs flua directly
-            text = dst.read_text(encoding="utf-8")
-            dst.write_text(
-                text.replace(
-                    '"command": "flua"',
-                    f'"command": {json.dumps(_flua_interpreter())}',
-                ),
-                encoding="utf-8",
-            )
-        written.append(target)
+            written.append(target)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        _copy(src, dst)
+        _post_process(target, dst)
     for name in sorted(written):
         print(f"  wrote {name}")
+    for name in sorted(updated):
+        print(f"  updated {name} (flua content)")
+    for name in sorted(kept_modified):
+        print(f"  kept {name} (locally modified — flua's template may have changes)")
     for name in sorted(skipped):
         print(f"  kept {name} (exists — pass --force to overwrite)")
     print(

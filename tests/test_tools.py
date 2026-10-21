@@ -599,6 +599,38 @@ def test_setup_tool_scaffolds_a_qa_project(tmp_path, capsys) -> None:
     assert "flua" in (tmp_path / "AGENTS.md").read_text()
 
 
+def test_setup_refreshes_vendor_files(tmp_path, capsys) -> None:
+    # the skills, instructions and LuaLS stubs are flua's content: a re-run
+    # after an upgrade overwrites them, even when locally edited (the
+    # "pip install --upgrade" contract — user edits belong elsewhere)
+    module = tools._TOOLS["setup"]
+    parser = argparse.ArgumentParser()
+    module.add_arguments(parser)
+    assert module.run(parser, parser.parse_args([str(tmp_path)])) == 0
+    skill = tmp_path / ".github" / "skills" / "quickapp-api" / "SKILL.md"
+    luarc = tmp_path / ".luarc.json"
+    skill.write_text("local edits\n")
+    luarc.write_text("{}\n")
+    assert module.run(parser, parser.parse_args([str(tmp_path)])) == 0
+    out = capsys.readouterr().out
+    assert "updated .github/skills" in out
+    assert "updated .luarc.json" in out
+    assert "local edits" not in skill.read_text()  # restored to the shipped content
+
+
+def test_setup_refreshes_unmodified_agentes(tmp_path, capsys) -> None:
+    # AGENTS.md is managed: refreshed while it still matches the shipped
+    # template byte for byte, kept once the user has edited it
+    module = tools._TOOLS["setup"]
+    parser = argparse.ArgumentParser()
+    module.add_arguments(parser)
+    assert module.run(parser, parser.parse_args([str(tmp_path)])) == 0
+    assert module.run(parser, parser.parse_args([str(tmp_path)])) == 0
+    out = capsys.readouterr().out
+    assert "updated AGENTS.md" in out  # unchanged -> refreshed
+    assert "locally modified" not in out
+
+
 def test_setup_falls_back_to_bare_flua_when_not_on_path(tmp_path, capsys, monkeypatch) -> None:
     monkeypatch.setattr("shutil.which", lambda _name: None)
     module = tools._TOOLS["setup"]
