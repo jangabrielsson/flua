@@ -27,7 +27,7 @@ import shutil
 from pathlib import Path
 
 NAME = "setup"
-HELP = "scaffold a QA project: .vscode configs + agent files (per-file update policies; -f overwrites all)"
+HELP = "scaffold a QA project: .vscode configs + agent files (per-file policies; -f overrides)"
 
 # template path (inside the package) -> (target path, update policy)
 _TEMPLATES = {
