@@ -48,6 +48,15 @@ def _now(req: ApiRequest) -> float:
 
 def plugins_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     plugins = [d for d in state.devices.values() if state.is_plugin_device(d)]
+    if req.remote is not None:
+        # online: the emulated QAs (local resources) plus the controller's
+        # QuickApps; local plugins win on id clashes (a proxy QA and its
+        # HC3 twin count once)
+        remote_plugins, status = req.remote("GET", "/plugins", None)
+        if status == 200 and isinstance(remote_plugins, list):
+            merged = {int(p["id"]): p for p in remote_plugins}
+            merged.update({int(p["id"]): p for p in plugins})
+            plugins = list(merged.values())
     return public(sorted(plugins, key=lambda d: d["id"])), 200
 
 

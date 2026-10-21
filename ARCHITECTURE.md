@@ -152,6 +152,8 @@ One dispatcher, three outcomes:
   api.get(path) -> Api.dispatch
     |-- /quickApp/*      engine-backed QA file management (local only)
     |-- route table      pure handlers over SimState -> (data, status)
+    |       |-- resource reads (online) -> the HC3 answers; handlers merge
+    |       |      the emu's local resources (emulated QAs, scene QAs) in
     |       |-- matched 404 + online + entity id < 5000 -> forward to the HC3
     |       '-- matched 404 + flua id (>= 5000)          -> local 404, never forward
     '-- no route + online                                -> forward to the HC3
@@ -160,6 +162,17 @@ One dispatcher, three outcomes:
 - **Id namespaces**: 5000+ = flua QAs and runtime-created devices (always
   local); below 5000 = the HC3's namespace (forwarded online). This is what
   makes `fibaro.getValue(self.id, ...)` work in both modes.
+- **Online resource reads**: the controller is authoritative — rooms, scenes,
+  sections, globals, custom events, profiles, alarm partitions, panels,
+  users and the like come from the HC3 (the sim answers only when the
+  controller can't); emulated QAs and scene QAs are emu-created resources
+  and merge into the `/devices`, `/plugins` and `/scenes` lists. Writes stay
+  in the sim — they never mutate the controller.
+- **Base structs**: device 1, `/home`, `/settings/info` and
+  `/settings/location` are the controller's real structs merged into the
+  sim's view — fetched lazily once per run (`req.remote_cached`, cached on
+  first access) — with the virtual-clock fields (sun times, date/time,
+  timestamp) computed on top.
 - **`--%%offline:true`** on a QA pins its `api.*` calls to the sim (the
   calling QA's id travels with each request).
 - **`api.hc3.*`** forces the remote backend (bypasses hybrid routing;

@@ -19,6 +19,7 @@ Flow::
 """
 
 import asyncio
+import base64
 import contextlib
 import json
 import logging
@@ -29,6 +30,7 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.parse
 from collections import deque
 from collections.abc import Callable
 from datetime import datetime
@@ -491,8 +493,68 @@ class LuaEngine:
     def fetch_url(self, url: str) -> tuple[int | None, str, dict[str, str]]:
         """Server-side fetch for GET /proxy?url=... (the HC3's UI helper):
         one blocking HTTP GET through the engine's HTTP client. Transport
-        failures return status None (the route answers 502)."""
+        failures return status None (the route answers 502).
+
+        Embedded credentials work like the HC3's proxy: urllib does not
+        consume userinfo URLs itself, so the userinfo is stripped and sent
+        as a Basic Authorization header (user/pass percent-decoded — the
+        classic restricted-endpoint call, e.g. the zigbee API). The HC3's
+        loopback-only credential-free API (ports 11111/11112) is rewritten
+        to the controller's standard API with the configured credentials —
+        QAs use it to avoid embedding credentials in the code."""
         try:
+            parts = urllib.parse.urlsplit(url)
+            # QAs write HC3-relative URLs: 127.0.0.1/localhost means "the
+            # controller itself". In online mode that is the real HC3 — not
+            # the machine flua runs on — so rewrite the host to the HC3's.
+            loopback = parts.hostname in ("127.0.0.1", "localhost")
+            # ports 11111/11112 are the HC3's loopback-only, credential-free
+            # API (11112 is rumoured to be its TLS twin, but QAs write plain
+            # http anyway): QAs on the controller call them to avoid
+            # embedding credentials. flua runs on the dev machine, not the
+            # controller — substitute the standard API (scheme, host, port)
+            # and use the configured credentials below.
+            port_11111 = (
+                loopback and parts.port in (11111, 11112) and self.hc3 is not None
+            )
+            if loopback and self.hc3 is not None:
+                hc3_parts = urllib.parse.urlsplit(self.hc3.base_url)
+                new_host = hc3_parts.hostname or parts.hostname
+                if port_11111:
+                    new_port = hc3_parts.port
+                    scheme = hc3_parts.scheme or parts.scheme
+                else:
+                    new_port = parts.port if parts.port is not None else hc3_parts.port
+                    scheme = parts.scheme
+                hostport = f"[{new_host}]" if ":" in new_host else new_host
+                if new_port is not None:
+                    hostport += f":{new_port}"
+                # keep the userinfo — the auth is injected below (dropping it
+                # here silently skipped the Authorization header: 401s)
+                netloc = parts.netloc
+                if "@" in netloc:
+                    netloc = netloc.rsplit("@", 1)[0] + "@" + hostport
+                else:
+                    netloc = hostport
+                url = urllib.parse.urlunsplit(
+                    (scheme, netloc, parts.path, parts.query, parts.fragment)
+                )
+                parts = urllib.parse.urlsplit(url)
+            if parts.username is not None:
+                user = urllib.parse.unquote(parts.username)
+                password = urllib.parse.unquote(parts.password or "")
+                host = parts.hostname or ""
+                if parts.port is not None:
+                    host += f":{parts.port}"
+                url = urllib.parse.urlunsplit(
+                    (parts.scheme, host, parts.path, parts.query, parts.fragment)
+                )
+                token = base64.b64encode(f"{user}:{password}".encode()).decode()
+                return http_call("GET", url, {"Authorization": f"Basic {token}"})
+            if port_11111:
+                auth = self.hc3.auth_header
+                if auth is not None:
+                    return http_call("GET", url, {"Authorization": auth})
             return http_call("GET", url)
         except OSError:
             return None, "", {}
@@ -1636,8 +1698,52 @@ class LuaEngine:
                 },
             )
 
+    def _rewrite_loopback_api(
+        self, url: str, headers: dict[str, str]
+    ) -> tuple[str, dict[str, str]]:
+        """net.HTTPClient parity with the /proxy 11111/11112 hack: QAs on
+        the HC3 reach the loopback-only credential-free API without
+        credentials. flua runs on the dev machine — rewrite the URL to the
+        controller's standard API and add the configured credentials (an
+        explicit Authorization header or embedded userinfo wins)."""
+        if self.hc3 is None:
+            return url, headers
+        parts = urllib.parse.urlsplit(url)
+        if parts.hostname not in ("127.0.0.1", "localhost") or parts.port not in (
+            11111,
+            11112,
+        ):
+            return url, headers
+        hc3_parts = urllib.parse.urlsplit(self.hc3.base_url)
+        new_host = hc3_parts.hostname or parts.hostname
+        hostport = f"[{new_host}]" if ":" in new_host else new_host
+        if hc3_parts.port is not None:
+            hostport += f":{hc3_parts.port}"
+        netloc = parts.netloc
+        if "@" in netloc:
+            netloc = netloc.rsplit("@", 1)[0] + "@" + hostport
+        else:
+            netloc = hostport
+        url = urllib.parse.urlunsplit(
+            (hc3_parts.scheme or parts.scheme, netloc, parts.path, parts.query, parts.fragment)
+        )
+        auth = self.hc3.auth_header
+        if (
+            auth is not None
+            and "@" not in parts.netloc
+            and not any(str(k).lower() == "authorization" for k in headers)
+        ):
+            headers = dict(headers)
+            headers["Authorization"] = auth
+        return url, headers
+
     def _handle_http_request(self, msg: dict[str, Any]) -> None:
         """Run a net.HTTPClient request in a worker thread (never blocks the pump)."""
+        url = str(msg.get("url") or "")
+        headers = {str(k): str(v) for k, v in (msg.get("headers") or {}).items()}
+        url, headers = self._rewrite_loopback_api(url, headers)
+        msg["url"] = url
+        msg["headers"] = headers
         logger.debug("http request id=%s %s %s", msg["id"], msg.get("method"), msg["url"])
         if debug_flag(self.config, "http"):
             # user net.HTTPClient traffic only — api.* calls are the "api" flag

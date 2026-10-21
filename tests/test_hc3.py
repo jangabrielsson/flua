@@ -89,6 +89,71 @@ class _MockHc3(BaseHTTPRequestHandler):
 
     def do_GET(self):
         type(self).requests_seen.append(self.path)
+        if self.path == "/api/devices/1":
+            if not self._authed():
+                self._send_json({"error": "unauthorized"}, 401)
+                return
+            self._send_json(
+                {
+                    "id": 1,
+                    "name": "hc3-controller",
+                    "type": "com.fibaro.hc3",
+                    "properties": {"someReal": 7},
+                }
+            )
+            return
+        if self.path == "/api/home":
+            if not self._authed():
+                self._send_json({"error": "unauthorized"}, 401)
+                return
+            self._send_json({"currency": "SEK", "hcName": "hc3-home"})
+            return
+        if self.path == "/api/settings/location":
+            if not self._authed():
+                self._send_json({"error": "unauthorized"}, 401)
+                return
+            self._send_json({"latitude": 59.31, "longitude": 18.06})
+            return
+        if (
+            self.path == "/api/alarms/v1/partitions"
+            or self.path == "/api/alarms/v1/partitions/breached"
+        ):
+            if not self._authed():
+                self._send_json({"error": "unauthorized"}, 401)
+                return
+            if self.path.endswith("/breached"):
+                self._send_json([])
+                return
+            self._send_json(
+                [{"id": 1, "name": "Zone1", "breached": False, "armed": False}]
+            )
+            return
+        if self.path == "/api/rooms":
+            if not self._authed():
+                self._send_json({"error": "unauthorized"}, 401)
+                return
+            self._send_json([{"id": 1, "name": "hc3-room"}])
+            return
+        if self.path == "/api/globalVariables":
+            if not self._authed():
+                self._send_json({"error": "unauthorized"}, 401)
+                return
+            self._send_json([{"name": "hc3Global", "value": "42"}])
+            return
+        if self.path == "/api/scenes":
+            if not self._authed():
+                self._send_json({"error": "unauthorized"}, 401)
+                return
+            self._send_json([{"id": 5, "name": "hc3-scene", "running": False}])
+            return
+        if self.path == "/api/plugins":
+            if not self._authed():
+                self._send_json({"error": "unauthorized"}, 401)
+                return
+            self._send_json(
+                [{"id": 45, "name": "hc3-plugin", "type": "com.fibaro.binarySwitch"}]
+            )
+            return
         if self.path.startswith("/api/devices/45"):
             if not self._authed():
                 self._send_json({"error": "unauthorized"}, 401)
@@ -96,6 +161,36 @@ class _MockHc3(BaseHTTPRequestHandler):
             if type(self).device_delay:
                 time.sleep(type(self).device_delay)
             self._send_json({"id": 45, "name": "hc3-device", "type": "com.fibaro.binarySwitch"})
+            return
+        if self.path == "/api/profiles" or self.path.startswith("/api/profiles?"):
+            if not self._authed():
+                self._send_json({"error": "unauthorized"}, 401)
+                return
+            self._send_json(
+                {
+                    "activeProfile": 2,
+                    "profiles": [
+                        {
+                            "id": 1,
+                            "name": "Home",
+                            "iconId": 1,
+                            "devices": [],
+                            "scenes": [],
+                            "climateZones": [],
+                            "partitions": [],
+                        },
+                        {
+                            "id": 2,
+                            "name": "Away",
+                            "iconId": 2,
+                            "devices": [],
+                            "scenes": [],
+                            "climateZones": [],
+                            "partitions": [],
+                        },
+                    ],
+                }
+            )
             return
         if self.path == "/api/devices" or self.path.startswith("/api/devices?"):
             if not self._authed():
@@ -324,6 +419,230 @@ async def test_hybrid_routing_local_sim_and_remote_hc3(
         await engine.stop()
     assert "LOCAL 5000" in out  # served by the offline sim
     assert "REMOTE 200 hc3-device" in out  # served by the mock HC3
+
+
+@pytest.mark.asyncio
+async def test_profiles_served_from_hc3_online(tmp_path, capsys, mock_hc3, monkeypatch) -> None:
+    # online: GET /profiles comes from the controller (its real profiles),
+    # not the sim's single seeded "Home" — and the response carries the
+    # HC3 shape {profiles: [...], activeProfile: id}
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    script = tmp_path / "profiles.lua"
+    script.write_text(
+        "setTimeout(function()\n"
+        "  local data = api.get('/profiles')\n"
+        "  print('PROFILES', data.activeProfile, data.profiles[1].name,"
+        " data.profiles[2].name)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        out = await _wait_for_output(capsys, "PROFILES 2 Home Away")
+    finally:
+        await engine.stop()
+    assert "PROFILES 2 Home Away" in out
+
+
+@pytest.mark.asyncio
+async def test_partitions_served_from_hc3_online(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # online: GET /alarms/v1/partitions comes from the controller, not the
+    # sim's single seeded "Home" partition
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    script = tmp_path / "partitions.lua"
+    script.write_text(
+        "setTimeout(function()\n"
+        "  local parts = api.get('/alarms/v1/partitions')\n"
+        "  local breached = api.get('/alarms/v1/partitions/breached')\n"
+        "  print('PARTS', #parts, parts[1].name, #breached)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        out = await _wait_for_output(capsys, "PARTS 1 Zone1 0")
+    finally:
+        await engine.stop()
+    assert "PARTS 1 Zone1 0" in out
+
+
+@pytest.mark.asyncio
+async def test_resource_gets_served_from_hc3_online(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # online: room/global reads come from the controller — the HC3 is
+    # authoritative for its resources, the sim only fills in local ones
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    script = tmp_path / "resources.lua"
+    script.write_text(
+        "setTimeout(function()\n"
+        "  local rooms = api.get('/rooms')\n"
+        "  local globals = api.get('/globalVariables')\n"
+        "  print('RES', #rooms, rooms[1].name, #globals, globals[1].name)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        out = await _wait_for_output(capsys, "RES 1 hc3-room 1 hc3Global")
+    finally:
+        await engine.stop()
+    assert "RES 1 hc3-room 1 hc3Global" in out
+
+
+@pytest.mark.asyncio
+async def test_scenes_merge_online(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # online: a local scene QA (an emu-created resource) merges into the
+    # controller's scene list
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    script = tmp_path / "sceneqa.lua"
+    script.write_text(
+        "--%%scene:true\n"
+        "--%%name:myscene\n"
+        "COND = { type = 'device', id = 1, property = 'value', isTrigger = true }\n"
+        "local s = api.get('/scenes')\n"
+        "local names = {}\n"
+        "for i = 1, #s do names[#names + 1] = s[i].name end\n"
+        "print('SCENES', #s, json.encode(names))\n"
+        "-- ===== SCENE ACTIONS =====\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {"scene": True, "name": "myscene"}, str(script))
+        out = await _wait_for_output(capsys, 'SCENES 2 ["hc3-scene", "myscene"]')
+    finally:
+        await engine.stop()
+    assert 'SCENES 2 ["hc3-scene", "myscene"]' in out
+
+
+@pytest.mark.asyncio
+async def test_plugins_merge_online(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # online: the emulated QA (a local resource) merges into the controller's
+    # plugin list
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    script = tmp_path / "plugins.lua"
+    script.write_text(
+        "setTimeout(function()\n"
+        "  local p = api.get('/plugins')\n"
+        "  local names = {}\n"
+        "  for i = 1, #p do names[#names + 1] = p[i].name end\n"
+        "  print('PLUGINS', #p, json.encode(names))\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        out = await _wait_for_output(capsys, 'PLUGINS 2')
+    finally:
+        await engine.stop()
+    assert 'PLUGINS 2 ["hc3-plugin", "plugins"]' in out
+
+
+@pytest.mark.asyncio
+async def test_base_structs_merge_hc3_online(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # online: the sim's base structs (device 1, /home, /settings/info,
+    # /settings/location) merge in the controller's real values, fetched
+    # lazily once — the virtual-clock sun times stay computed on top
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    script = tmp_path / "base_structs.lua"
+    script.write_text(
+        "setTimeout(function()\n"
+        "  local d1 = api.get('/devices/1')\n"
+        "  local d2 = api.get('/devices/1')\n"
+        "  print('D1', d1.name, d1.properties.someReal,"
+        " d1.properties.sunriseHour ~= nil, d2.name)\n"
+        "  local list = api.get('/devices')\n"
+        "  local one = nil\n"
+        "  for i = 1, #list do if list[i].id == 1 then one = list[i] end end\n"
+        "  print('L1', one and one.name, one and (one.properties.sunriseHour ~= nil))\n"
+        "  local info = api.get('/settings/info')\n"
+        "  print('INFO', info.serialNumber, info.softVersion, info.sunriseHour ~= nil)\n"
+        "  local home = api.get('/home')\n"
+        "  print('HOME', home.currency, home.hcName)\n"
+        "  local loc = api.get('/settings/location')\n"
+        "  print('LOC', loc.latitude, loc.longitude)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        out = await _wait_for_output(capsys, "LOC 59.31 18.06")
+    finally:
+        await engine.stop()
+    assert "D1 hc3-controller 7 true hc3-controller" in out
+    assert "L1 hc3-controller true" in out
+    assert "INFO HC3-00000422 5.210.12 true" in out
+    assert "HOME SEK hc3-home" in out
+    # the lazy cache: three /devices/1 reads, exactly one controller fetch
+    assert _MockHc3.requests_seen.count("/api/devices/1") == 1
+
+
+@pytest.mark.asyncio
+async def test_net_http_loopback_11111_rewritten_online(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # net.HTTPClient parity: QAs call the HC3's loopback-only credential-free
+    # API (127.0.0.1:11111) directly — flua rewrites it to the controller's
+    # standard API with the configured credentials
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    script = tmp_path / "netloop.lua"
+    script.write_text(
+        "setTimeout(function()\n"
+        "  local client = net.HTTPClient({ timeout = 3000 })\n"
+        "  client:request('http://127.0.0.1:11111/api/rooms', {\n"
+        "    options = { method = 'GET' },\n"
+        "    success = function(resp)\n"
+        "      print('NET', resp.status, resp.data)\n"
+        "    end,\n"
+        "    error = function(msg) print('NETERR', msg) end,\n"
+        "  })\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        out = await _wait_for_output(capsys, 'NET 200 [{"id": 1, "name": "hc3-room"}]')
+    finally:
+        await engine.stop()
+    # the mock requires basic auth — the rewrite supplied the credentials
+    assert 'NET 200 [{"id": 1, "name": "hc3-room"}]' in out
+    assert "/api/rooms" in _MockHc3.requests_seen
 
 
 @pytest.mark.asyncio
@@ -1013,10 +1332,11 @@ async def test_devices_list_is_union_of_sim_and_hc3(
         out = await _wait_for_output(capsys, "B 3")
     finally:
         await engine.stop()
-    # QA a + QA b + the sim's device 1 (the HC3) + the two HC3 devices
+    # QA a + QA b + the controller's device 1 (merged struct) + the two
+    # HC3 devices
     assert "A 5" in out
     assert "hc3-device" in out and "hc3-other" in out
-    assert "HC3" in out
+    assert "hc3-controller" in out  # device 1 is the HC3's real struct
     assert "B 3" in out  # the offline-pinned QA sees the sim only (1 + a + b)
 
 

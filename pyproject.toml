@@ -25,7 +25,10 @@ classifiers = [
     "Topic :: Software Development :: Interpreters",
 ]
 dependencies = [
-    "lupa>=2.8",            # 2.7+ bundles Lua 5.5 (2.8 fixes the non-x86_64 sdist);
+    "lupa>=2.6,<2.7",      # 2.6 is the last release bundling Lua 5.4 — 2.7+ bundles
+    #                        Lua 5.5, whose const for-loop variables break HC3 QA
+    #                        code (loop vars are temps there). Wheels are sparse:
+    #                        platforms without one compile lupa from source.
     #                        flua develops/tests against Lua 5.5 — bump to 2.9
     #                        when it ships (GH#294: Lua 5.5 GC fix for Python
     #                        objects crossing into Lua)

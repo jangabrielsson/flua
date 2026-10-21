@@ -8,10 +8,11 @@ This module stays free of asyncio and lupa on purpose.
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import parse_qs, unquote
+from urllib.parse import parse_qs, unquote, urlencode
 
 
 @dataclass
@@ -37,6 +38,10 @@ class ApiRequest:
     # call to the real controller. Handlers use it (via forward_to_proxy)
     # for proxy-mode devices, which the HC3 owns.
     remote: Callable[[str, str, Any], tuple[Any, int]] | None = None
+    # Like ``remote``, but a run-lifetime-cached GET: base structs (device 1,
+    # /home, /settings/info) merge controller values into the sim's
+    # virtual-clock views — the first access fetches, later ones reuse.
+    remote_cached: Callable[[str], tuple[Any, int] | None] | None = None
     # Filled by Api.dispatch: handlers call this to hand an event to the
     # engine's outbound queue (device actions, custom events). None when a
     # handler is invoked outside dispatch.
@@ -62,6 +67,23 @@ def forward_to_proxy(req: ApiRequest, is_proxy: bool) -> None:
     proxy (the HC3 owns the device; the sim only shadows it)."""
     if is_proxy and req.remote is not None:
         req.remote(req.method, req.path, req.body)
+
+
+def remote_get(req: ApiRequest, path: str) -> tuple[Any, int] | None:
+    """Serve a resource GET from the real HC3 when the run is online.
+
+    The HC3 is authoritative for its resources; the sim only fills in the
+    ones the emu created locally (those handlers merge instead). Returns
+    None offline or when the controller can't answer, so callers fall back
+    to the sim."""
+    if req.remote is None:
+        return None
+    if req.query:
+        path = f"{path}?{urlencode(req.query)}"
+    data, status = req.remote("GET", path, None)
+    if status == 200:
+        return copy.deepcopy(data), status
+    return None
 
 
 def parse_url(url: str) -> tuple[list[str], dict[str, str]]:

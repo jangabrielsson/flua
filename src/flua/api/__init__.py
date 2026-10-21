@@ -66,6 +66,8 @@ class Api:
         # lock may be held across a remote HTTP call inside a handler's
         # forwarding path — the pump keeps delivering timers regardless.
         self._dispatch_lock = threading.RLock()
+        # run-lifetime cache for _remote_cached GETs (base-struct merges)
+        self._remote_cache: dict[str, tuple[Any, int]] = {}
 
     def _emit(self, msg: dict[str, Any]) -> None:
         """Hand a pump-delivered event to the engine (and record it)."""
@@ -94,6 +96,22 @@ class Api:
         segments, query = parse_url(path)
         remote_path = "/" + "/".join(segments)
         return self._remote.request(method, remote_path, query, body)
+
+    def _remote_cached(self, path: str) -> tuple[Any, int] | None:
+        """One lazy GET against the real HC3, cached for the run: base
+        structs (device 1, /home, /settings/info, /settings/location) merge
+        controller values into the sim's virtual-clock views. None offline
+        or when the controller can't answer."""
+        if self._remote is None:
+            return None
+        if path not in self._remote_cache:
+            segments, query = parse_url(path)
+            remote_path = "/" + "/".join(segments)
+            data, status = self._remote.request("GET", remote_path, query, None)
+            if status != 200:
+                return None
+            self._remote_cache[path] = (data, status)
+        return self._remote_cache[path]
 
     def _restart_qa(self, qa_id: int) -> bool:
         """Real QA restart for POST /plugins/restartDevice: the HC3 restarts
@@ -173,6 +191,7 @@ class Api:
                 qa_id=qa_id,
                 external=external,
                 remote=remote_hook,
+                remote_cached=self._remote_cached if remote_hook is not None else None,
                 restart_qa=self._restart_qa,
                 fetch=self._fetch,
             )

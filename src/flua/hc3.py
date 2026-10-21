@@ -45,6 +45,16 @@ class Hc3Remote:
         self._on_auth_error = on_auth_error
         self._timeout = timeout
 
+    @property
+    def base_url(self) -> str:
+        return self._base
+
+    @property
+    def auth_header(self) -> str | None:
+        """The Basic auth header for the configured credentials (None when
+        no user is set — the HC3 serves some endpoints anonymously)."""
+        return self._auth_header()
+
     def _auth_header(self) -> str | None:
         if not self._user:
             return None

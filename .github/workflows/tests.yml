@@ -16,17 +16,19 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-      # lupa has no cp315 binary wheels yet, so the 3.15 track compiles it
-      # from source — build once and cache the wheel (keyed on pyproject, so
-      # a lupa bump rebuilds). The other tracks install binary wheels and
-      # skip these entirely.
+      # flua pins lupa>=2.6,<2.7 (the last Lua 5.4-bundling release — 2.7+
+      # bundles Lua 5.5, whose const for-loop variables break HC3 QA code).
+      # 2.6 ships wheels for cp311-cp314 everywhere; only cp315 has none, so
+      # the 3.15 track compiles it from source — build once and cache the
+      # wheel (keyed on pyproject, so a lupa bump rebuilds). The other tracks
+      # install binary wheels and skip these entirely.
       #
       # restore-keys reuses the previous wheel when the exact key misses —
       # pyproject.toml changes with EVERY release (the version bump), so a
       # strict key would force a full lupa compile per release. A restored
-      # wheel still satisfies "lupa>=2.8"; if the constraint is ever raised,
-      # pip finds no matching wheel and compiles from source again — correct,
-      # just slower, exactly when it matters.
+      # wheel still satisfies the constraint; if it is ever raised, pip finds
+      # no matching wheel and compiles from source again — correct, just
+      # slower, exactly when it matters.
       - name: Cache built lupa wheel (3.15 only)
         if: matrix.python-version == '3.15'
         uses: actions/cache@v4

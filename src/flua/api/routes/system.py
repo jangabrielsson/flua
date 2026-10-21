@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import time
 from typing import Any
 
 from ... import messages
-from ..request import ApiRequest
+from ..request import ApiRequest, remote_get
 from ..state import SimState, public
 
 
@@ -26,7 +27,15 @@ def _date_time_parts(now: float) -> tuple[dict[str, int], dict[str, int]]:
 
 def location_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     # GET /settings/location — the controller's location (drives device 1's
-    # sunrise/sunset); date/time follow the virtual clock
+    # sunrise/sunset). Online, the HC3's real location is the base (lazily
+    # synced into the sim so the sun times follow the real house); date/time
+    # follow the virtual clock either way.
+    if req.remote_cached is not None:
+        cached = req.remote_cached("/settings/location")
+        if cached is not None and isinstance(cached[0], dict):
+            for key, value in cached[0].items():
+                if key not in ("date", "time") and not isinstance(value, (dict, list)):
+                    state.location[key] = value
     out = dict(state.location)
     date, clock = _date_time_parts(_now(req))
     out["date"] = date
@@ -47,11 +56,17 @@ def location_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def globals_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, "/globalVariables")
+    if remote is not None:
+        return remote
     variables = sorted(state.global_variables.values(), key=lambda v: v["name"])
     return public(variables), 200
 
 
 def global_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, f"/globalVariables/{req.path_params['name']}")
+    if remote is not None:
+        return remote
     var = state.global_variables.get(req.path_params["name"])
     return (public(var), 200) if var is not None else (None, 404)
 
@@ -115,11 +130,17 @@ def global_delete(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def rooms_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, "/rooms")
+    if remote is not None:
+        return remote
     rooms = sorted(state.rooms.values(), key=lambda r: r["id"])
     return public(rooms), 200
 
 
 def room_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, f"/rooms/{req.path_params['id']}")
+    if remote is not None:
+        return remote
     try:
         room = state.rooms.get(int(req.path_params["id"]))
     except (TypeError, ValueError):
@@ -127,14 +148,13 @@ def room_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     return (public(room), 200) if room is not None else (None, 404)
 
 
-def settings_info(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    # GET /settings/info — the controller's identity + the day's sun times
-    # (all virtual-clock-derived: online runs report the simulated time);
-    # PUT overrides merge on top
+def _info_base(state: SimState, req: ApiRequest) -> dict[str, Any]:
+    """The sim's /settings/info base: identity + the day's sun times, all
+    virtual-clock-derived."""
     now = _now(req)
     sun = state.sun_times(now)
     name = (state.devices.get(1) or {}).get("name", "HC3")
-    info = {
+    return {
         "serialNumber": "HC3-00000000",
         "platform": "HC3",
         "zwaveEngineVersion": "2.0",
@@ -175,6 +195,23 @@ def settings_info(state: SimState, req: ApiRequest) -> tuple[Any, int]:
         "hasFIDConnected": True,
         "oemId": "HC3",
     }
+
+
+def settings_info(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # GET /settings/info — the controller's identity + the day's sun times.
+    # Online, the HC3's real struct is the base (fetched lazily, cached);
+    # the virtual-clock fields stay computed either way. PUT overrides merge
+    # on top.
+    base = _info_base(state, req)
+    if req.remote_cached is not None:
+        cached = req.remote_cached("/settings/info")
+        if cached is not None and isinstance(cached[0], dict):
+            info = dict(cached[0])
+            for key in _INFO_COMPUTED:
+                info[key] = base[key]
+            info.update(state.info_overrides)
+            return public(info), 200
+    info = dict(base)
     info.update(state.info_overrides)
     return public(info), 200
 
@@ -198,11 +235,17 @@ def settings_info_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def sections_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, "/sections")
+    if remote is not None:
+        return remote
     sections = sorted(state.sections.values(), key=lambda s: s["id"])
     return public(sections), 200
 
 
 def section_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, f"/sections/{req.path_params['id']}")
+    if remote is not None:
+        return remote
     try:
         section = state.sections.get(int(req.path_params["id"]))
     except (TypeError, ValueError):
@@ -211,10 +254,16 @@ def section_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def custom_events_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, "/customEvents")
+    if remote is not None:
+        return remote
     return public(list(state.custom_events)), 200
 
 
 def custom_event_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, f"/customEvents/{req.path_params['name']}")
+    if remote is not None:
+        return remote
     name = req.path_params["name"]
     for event in state.custom_events:
         if event.get("name") == name:
@@ -223,10 +272,22 @@ def custom_event_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def ios_devices_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, "/iosDevices")
+    if remote is not None:
+        return remote
     return public([]), 200  # the sim has no iOS companions
 
 
 def home_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # GET /home — the home config. Online, the HC3's real struct is the
+    # base (fetched lazily, cached); the timestamp stays virtual.
+    if req.remote_cached is not None:
+        cached = req.remote_cached("/home")
+        if cached is not None and isinstance(cached[0], dict):
+            home = dict(cached[0])
+            home["timestamp"] = int(_now(req))
+            home.update(state.home_overrides)
+            return public(home), 200
     home = {
         "timestamp": int(_now(req)),
         "defaultSensors": {"temperature": 0, "humidity": 0, "light": 0},
@@ -372,10 +433,16 @@ def weather_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def alarm_devices_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, "/alarms/v1/devices")
+    if remote is not None:
+        return remote
     return public([]), 200  # no devices are armed into the alarm
 
 
 def notification_center_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, "/notificationCenter")
+    if remote is not None:
+        return remote
     return public([]), 200
 
 
@@ -387,27 +454,40 @@ def profile_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     if profile is None:
         return None, 404
     out = dict(profile)
+    out.setdefault("iconId", out["id"])
     for key in ("climateZones", "devices", "partitions", "scenes"):
         out.setdefault(key, [])
     return public(out), 200
 
 
 def icons_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, "/icons")
+    if remote is not None:
+        return remote
     return None, 200  # the HC3 response carries no body (per the reference)
 
 
 def users_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, "/users")
+    if remote is not None:
+        return remote
     # the controller always has at least the admin user
     return public([{"id": 1, "name": "admin", "type": "superuser"}]), 200
 
 
 def energy_devices_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, "/energy/devices")
+    if remote is not None:
+        return remote
     return public([]), 200
 
 
 def panels_location(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     # the location panels; the home panel's lat/long always follow the
     # configured location (like device 1's sun times follow the clock)
+    remote = remote_get(req, "/panels/location")
+    if remote is not None:
+        return remote
     latitude = state.location.get("latitude")
     longitude = state.location.get("longitude")
     panels = []
@@ -439,11 +519,17 @@ def panel_location_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def panels_climate(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, "/panels/climate")
+    if remote is not None:
+        return remote
     zones = sorted(state.climate_zones.values(), key=lambda z: z["id"])
     return public(zones), 200
 
 
 def panel_climate_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, f"/panels/climate/{req.path_params['id']}")
+    if remote is not None:
+        return remote
     try:
         zone = state.climate_zones.get(int(req.path_params["id"]))
     except (TypeError, ValueError):
@@ -452,31 +538,51 @@ def panel_climate_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def panels_notifications(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, "/panels/notifications")
+    if remote is not None:
+        return remote
     return public({"notifications": []}), 200
 
 
 def panels_family(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, "/panels/family")
+    if remote is not None:
+        return remote
     return public([]), 200
 
 
 def panels_sprinklers(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, "/panels/sprinklers")
+    if remote is not None:
+        return remote
     return public([]), 200
 
 
 def panels_humidity(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, "/panels/humidity")
+    if remote is not None:
+        return remote
     return public([]), 200
 
 
 def panels_favorite_colors(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, "/panels/favoriteColors")
+    if remote is not None:
+        return remote
     return public([]), 200
 
 
 def diagnostics_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, "/diagnostics")
+    if remote is not None:
+        return remote
     return public({"cpuLoad": 0, "memory": 0, "storage": 0}), 200
 
 
 def proxy_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    # GET /proxy?url=... — the HC3's UI helper fetches a URL server-side
+    # GET /proxy?url=... — the HC3's UI helper fetches a URL server-side.
+    # JSON bodies are decoded (like the HC3's api.get), anything else comes
+    # back as the raw string.
     url = req.query.get("url")
     if not url:
         return None, 400
@@ -485,6 +591,11 @@ def proxy_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     status, body, _headers = req.fetch(url)
     if status is None:
         return None, 502
+    if isinstance(body, str) and body:
+        try:
+            body = json.loads(body)
+        except ValueError:
+            pass  # not JSON — the raw string is the answer
     return body, status
 
 
@@ -518,8 +629,46 @@ def refresh_states(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def profiles_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    profiles = sorted(state.profiles.values(), key=lambda p: p["id"])
-    return public(profiles), 200
+    # online: serve the controller's profiles — the sim's single seeded
+    # "Home" profile would otherwise hide the HC3's real ones
+    remote = remote_get(req, "/profiles")
+    if remote is not None:
+        return remote
+    # the HC3 shape: {profiles: [...], activeProfile: id}; each entry carries
+    # its device/scene/zone membership. Like the HC3, a profile without an
+    # explicit device list owns every device except the controller (id 1).
+    entries = []
+    for profile in sorted(state.profiles.values(), key=lambda p: p["id"]):
+        devices = profile.get("devices")
+        if devices is None:
+            devices = [
+                {"id": dev["id"], "action": None}
+                for dev in state.devices.values()
+                if int(dev["id"]) != 1
+            ]
+        else:
+            devices = [
+                {"id": int(item["id"]), "action": item.get("action")}
+                if isinstance(item, dict)
+                else {"id": int(item), "action": None}
+                for item in devices
+            ]
+        devices.sort(key=lambda d: d["id"])
+        entries.append(
+            {
+                "id": profile["id"],
+                "name": profile["name"],
+                "iconId": profile.get("iconId", profile["id"]),
+                "devices": devices,
+                "scenes": profile.get("scenes", []),
+                "climateZones": profile.get("climateZones", []),
+                "partitions": profile.get("partitions", []),
+            }
+        )
+    active = next((p["id"] for p in state.profiles.values() if p.get("active")), None)
+    if active is None and entries:
+        active = entries[0]["id"]
+    return public({"profiles": entries, "activeProfile": active}), 200
 
 
 def profile_activate(state: SimState, req: ApiRequest) -> tuple[Any, int]:

@@ -922,7 +922,17 @@ def test_sim_world_default_shapes() -> None:
 
 
 class _ProxyHandler(BaseHTTPRequestHandler):
+    seen_auth: list[str | None] = []
+
     def do_GET(self):
+        _ProxyHandler.seen_auth.append(self.headers.get("Authorization"))
+        if self.path.endswith("/icons"):
+            payload = b'[{"id": 1, "name": "kawa"}]'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(payload)
+            return
         payload = b"hello-from-proxy"
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
@@ -945,6 +955,53 @@ def test_proxy_fetch() -> None:
         body, status = engine.api.dispatch("GET", f"/proxy?url={url}")
         assert status == 200 and body == "hello-from-proxy"
         assert engine.api.dispatch("GET", "/proxy") == (None, 400)  # url required
+        # embedded credentials: urllib does not consume userinfo URLs, so the
+        # proxy strips them and injects Basic auth (percent-decoded) — the
+        # HC3's restricted-endpoint workaround (zigbee API etc.)
+        _ProxyHandler.seen_auth.clear()
+        auth_url = (
+            f"http://admin:Wollmar8592%21@127.0.0.1:{server.server_port}/api/zigbee/devices"
+        )
+        body, status = engine.api.dispatch("GET", f"/proxy?url={auth_url}")
+        assert status == 200
+        import base64
+        expected = "Basic " + base64.b64encode(b"admin:Wollmar8592!").decode()
+        assert _ProxyHandler.seen_auth == [expected]
+        # HC3-relative URLs: 127.0.0.1 means "the controller itself" — in
+        # online mode the fetch rewrites it to the configured HC3 address
+        _ProxyHandler.seen_auth.clear()
+        class _StubHc3:
+            base_url = f"http://127.0.0.1:{server.server_port}"
+            auth_header = "Basic " + base64.b64encode(b"admin:secret").decode()
+        engine.hc3 = _StubHc3()
+        body, status = engine.api.dispatch(
+            "GET", "/proxy?url=http://admin:pass@127.0.0.1/api/zigbee/devices"
+        )
+        assert status == 200 and body == "hello-from-proxy"  # reached the stub HC3
+        # ... and the credentials survived the host rewrite (the 401 bug)
+        assert _ProxyHandler.seen_auth == [
+            "Basic " + base64.b64encode(b"admin:pass").decode()
+        ]
+        # the 11111 hack: a loopback-only credential-free URL (no userinfo)
+        # goes to the controller's standard API with the configured creds
+        _ProxyHandler.seen_auth.clear()
+        body, status = engine.api.dispatch(
+            "GET", "/proxy?url=http://127.0.0.1:11111/api/icons"
+        )
+        # ... and JSON bodies come back decoded, like the HC3's api.get
+        assert status == 200 and body == [{"id": 1, "name": "kawa"}]
+        assert _ProxyHandler.seen_auth == [
+            "Basic " + base64.b64encode(b"admin:secret").decode()
+        ]
+        # port 11112 (the rumoured TLS twin) gets the same treatment
+        _ProxyHandler.seen_auth.clear()
+        body, status = engine.api.dispatch(
+            "GET", "/proxy?url=http://127.0.0.1:11112/api/settings/network"
+        )
+        assert status == 200 and body == "hello-from-proxy"
+        assert _ProxyHandler.seen_auth == [
+            "Basic " + base64.b64encode(b"admin:secret").decode()
+        ]
     finally:
         server.shutdown()
 
@@ -1203,8 +1260,20 @@ def test_flua_system_log(api: Api) -> None:
 
 
 def test_profiles(api: Api) -> None:
+    # the HC3 shape: {profiles: [...], activeProfile: id}, entries carrying
+    # the device/scene/zone membership lists
     data, status = api.dispatch("GET", "/profiles")
-    assert status == 200 and data[0]["id"] == 1 and data[0]["active"] is True
+    assert status == 200 and data["activeProfile"] == 1
+    (profile,) = data["profiles"]
+    assert profile["id"] == 1 and profile["name"] == "Home"
+    for key in ("iconId", "devices", "scenes", "climateZones", "partitions"):
+        assert key in profile
+    # like the HC3: every device except the controller (id 1) is a member,
+    # each entry {id, action: null}
+    assert profile["devices"] == [
+        {"id": 10, "action": None},
+        {"id": 20, "action": None},
+    ]
     assert api.dispatch("POST", "/profiles/activeProfile/1") == (None, 202)
     assert api.dispatch("POST", "/profiles/activeProfile/99") == (None, 404)
 

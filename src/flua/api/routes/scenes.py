@@ -11,11 +11,21 @@ from __future__ import annotations
 from typing import Any
 
 from ... import messages
-from ..request import ApiRequest
+from ..request import ApiRequest, remote_get
 from ..state import SimState, public
 
 
 def scenes_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # online: the controller's scenes plus the emu's local ones (scene QAs
+    # register in the scene table); local scenes win on id clashes
+    remote = remote_get(req, "/scenes")
+    if remote is not None:
+        remote_scenes, _ = remote
+        if isinstance(remote_scenes, list):
+            merged = {int(scene["id"]): scene for scene in remote_scenes}
+            for scene in state.scenes.values():
+                merged[int(scene["id"])] = scene
+            return public(sorted(merged.values(), key=lambda s: s["id"])), 200
     scenes = sorted(state.scenes.values(), key=lambda s: s["id"])
     return public(scenes), 200
 

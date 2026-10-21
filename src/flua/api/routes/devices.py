@@ -57,6 +57,21 @@ def _matches(dev: dict[str, Any], query: dict[str, str]) -> bool:
     return True
 
 
+def _device1_merged(state: SimState, req: ApiRequest) -> dict | None:
+    """Online: device 1 IS the controller — the real HC3's struct with the
+    virtual-clock sun times on top (fetched lazily, cached for the run)."""
+    if req.remote_cached is None or req.clock is None:
+        return None
+    cached = req.remote_cached("/devices/1")
+    if cached is None or not isinstance(cached[0], dict):
+        return None
+    out = dict(cached[0])
+    props = dict(out.get("properties") or {})
+    props.update(state.sun_times(req.clock.time))
+    out["properties"] = props
+    return out
+
+
 def _with_sun(dev: dict, state: SimState, clock: Any) -> dict:
     """Device 1 is the HC3 itself: its sunrise/sunset follow the virtual
     clock's date, computed on read (also in online mode — the sim answers
@@ -89,15 +104,19 @@ def devices_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
         # online: the developer should feel at home on the HC3 — serve the
         # union of the emulated devices and the controller's (the same query
         # is forwarded). Emulated devices win on id clashes, so a proxy QA
-        # and its HC3 twin (same deviceID) count once — and the sim's device
-        # 1 (the HC3 itself) wins over the controller's, keeping sun times
-        # on the virtual clock.
+        # and its HC3 twin (same deviceID) count once — except device 1,
+        # the controller itself: its struct comes from the HC3 with the
+        # virtual-clock sun times on top.
         query_string = urllib.parse.urlencode(req.query)
         path = "/devices" + (f"?{query_string}" if query_string else "")
         remote_devices, status = req.remote("GET", path, None)
         if status == 200 and isinstance(remote_devices, list):
             merged = {int(device["id"]): device for device in remote_devices}
             merged.update({int(device["id"]): device for device in devices})
+            if 1 in merged and 1 in state.devices:
+                one = _device1_merged(state, req)
+                if one is not None:
+                    merged[1] = one
             devices = list(merged.values())
     devices = [_with_sun(d, state, req.clock) for d in devices]
     return public(sorted(devices, key=lambda d: d["id"])), 200
@@ -122,7 +141,15 @@ def flua_devices_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 def device_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     dev = state.device(req.path_params["id"])
-    return (public(_with_sun(dev, state, req.clock)), 200) if dev is not None else (None, 404)
+    if dev is not None:
+        if int(dev["id"]) == 1:
+            # device 1 is the controller: online, its struct comes from the
+            # HC3 with the virtual-clock sun times on top
+            merged = _device1_merged(state, req)
+            if merged is not None:
+                return public(merged), 200
+        return public(_with_sun(dev, state, req.clock)), 200
+    return None, 404
 
 
 def device_update(state: SimState, req: ApiRequest) -> tuple[Any, int]:

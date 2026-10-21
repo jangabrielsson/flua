@@ -10,16 +10,24 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..request import ApiRequest
+from ..request import ApiRequest, remote_get
 from ..state import SimState, public
 
 
 def partitions_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # online: serve the controller's partitions — the sim's single seeded
+    # "Home" would otherwise hide the HC3's real ones
+    remote = remote_get(req, "/alarms/v1/partitions")
+    if remote is not None:
+        return remote
     partitions = sorted(state.alarms.values(), key=lambda p: p["id"])
     return public(partitions), 200
 
 
 def partitions_breached(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    remote = remote_get(req, "/alarms/v1/partitions/breached")
+    if remote is not None:
+        return remote
     breached = sorted(
         (p for p in state.alarms.values() if p.get("breached")),
         key=lambda p: p["id"],

@@ -48,6 +48,21 @@ Full reference for Panels/UI (20), Data & Monitoring (13), and Miscellaneous (16
 ### Family Panel (1 endpoint)
 - `GET /api/panels/family` — Get family user tracking data (supports time range query params)
 
+### Proxy fetch (1 endpoint)
+- `GET /api/proxy?url=<url>` — the HC3's UI helper: a server-side GET that
+  returns `(body, status)`. Embedded basic auth works
+  (`?url=http://user:pass@127.0.0.1/api/...` — the classic restricted-endpoint
+  workaround). 400 without `url`, 502 on transport failure. In flua it is a
+  REAL HTTP fetch: offline it hits whatever URL you give it — the sim has no
+  zigbee routes, so `/api/zigbee/...` calls only resolve in online mode.
+  QAs on the HC3 also use the loopback-only credential-free API
+  (`http://127.0.0.1:11111/api/...` and its rumoured TLS twin on 11112 — no
+  credentials needed on the controller): flua detects both ports and
+  rewrites them to the controller's standard API with the configured HC3
+  credentials (in `api.get('/proxy?...')` AND in `net.HTTPClient` calls).
+  JSON bodies come back decoded (like the HC3's `api.get`); anything else
+  is the raw string.
+
 ### Favorite Colors (6 endpoints)
 
 Used for color picker presets in RGB/color devices.
