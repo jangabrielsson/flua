@@ -35,6 +35,12 @@
     max-width: 480px;
   }
   .device h2 { margin: 0 0 12px; font-size: 16px; font-weight: 600; }
+  .device h2 .detach {
+    float: right; font-size: 13px; font-weight: 400; color: var(--muted);
+    cursor: pointer; border: 1px solid var(--muted); border-radius: 6px;
+    padding: 1px 8px; background: none;
+  }
+  .device h2 .detach:hover { color: var(--accent); border-color: var(--accent); }
   .device h2 small { color: var(--muted); font-weight: 400; margin-left: 6px; }
   .row { display: flex; gap: 12px; align-items: center; margin: 10px 0; }
   .row > button.ctl { flex: 1 1 0; width: auto; }  /* side-by-side buttons share the row */
@@ -497,6 +503,19 @@ function renderDevice(device) {
   const small = document.createElement("small");
   small.textContent = "id " + device.id;
   title.appendChild(small);
+  // detach: the same viewer filtered to this QA, in its own window — handy
+  // when one QA (a server under test) should stay visible while others scroll
+  const detach = document.createElement("button");
+  detach.className = "detach";
+  detach.textContent = "open in window";
+  detach.title = "show only this QA in a separate window";
+  detach.onclick = (e) => {
+    e.stopPropagation();
+    const url = new URL(location.href);
+    url.search = "qa=" + encodeURIComponent(device.id);
+    window.open(url.toString(), "_blank", "width=460,height=760");
+  };
+  title.appendChild(detach);
   panel.appendChild(title);
 
   const props = device.properties || {};
@@ -596,9 +615,12 @@ async function poll() {
       /* no embedded channel: keep whatever the last successful poll fetched */
     }
     const root = $("devices");
+    // ?qa=<id> — a filtered view (the detach button opens one per window)
+    const onlyQa = new URLSearchParams(location.search).get("qa");
     const qas = devices.filter((d) =>
-      (d.properties && (d.properties.uiView || d.properties.viewLayout)) ||
-      embeddedState[String(d.id)]
+      (!onlyQa || String(d.id) === onlyQa) &&
+      ((d.properties && (d.properties.uiView || d.properties.viewLayout)) ||
+      embeddedState[String(d.id)])
     );
     for (const device of qas) {
       const key = device.id + ":" + structureKey(device);
@@ -624,7 +646,12 @@ async function poll() {
     for (const panel of root.querySelectorAll(".device")) {
       if (!live.has(panel.dataset.key)) panel.remove();
     }
-    setStatus(qas.length ? qas.length + " QA(s)" : "no QAs with UI", "ok");
+    setStatus(
+      qas.length
+        ? qas.length + " QA(s)" + (onlyQa ? " (filtered to " + onlyQa + ")" : "")
+        : "no QAs with UI",
+      "ok"
+    );
   } catch (err) {
     setStatus(err.message, "err");
   }
