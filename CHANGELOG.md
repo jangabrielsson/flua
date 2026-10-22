@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.76] - 2026-10-22
+
+### Added
+- add support for loading .fqa packages and directive injection in CLI
+- add QwikChildSensors example and enhance multilevelSensor value handling in UI
+
 ## [0.1.75] - 2026-10-21
 
 ### Added
