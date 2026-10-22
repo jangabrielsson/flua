@@ -14,6 +14,7 @@ Covers three contracts:
 """
 
 import re
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -173,7 +174,12 @@ def test_solaredge_mock_serves_client_and_buttons(tmp_path) -> None:
     # connection, holding register 40084 sent as PDU 40084-40001=83) polls
     # the example mock; the example driver presses the mock's buttons and
     # verifies the client's value follows. The client stops after 8 polls
-    # so the run ends when the driver is done.
+    # so the run ends when the driver is done. The mock's port is a QA
+    # variable: the test binds a free port first so a parallel dev session
+    # (e.g. a VS Code debug run holding 1502) never breaks it.
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
     client = tmp_path / "client.lua"
     client.write_text(
         "--%%name:SolarEdge Live\n"
@@ -212,7 +218,7 @@ def test_solaredge_mock_serves_client_and_buttons(tmp_path) -> None:
         "  if connected then\n"
         "    send()\n"
         "  else\n"
-        "    socket:connect('127.0.0.1', 1502, {\n"
+        "    socket:connect('127.0.0.1', " + str(port) + ", {\n"
         "      success = function() connected = true; send() end,\n"
         "      error = retrySoon,\n"
         "    })\n"
@@ -224,6 +230,8 @@ def test_solaredge_mock_serves_client_and_buttons(tmp_path) -> None:
         str(client),
         str(EXAMPLE_DIR / "solaredge_mock.lua"),
         str(EXAMPLE_DIR / "run_solaredge.lua"),
+        "-D",
+        f"var:port={port}",
         "--run-for",
         "45",
         "--speed",

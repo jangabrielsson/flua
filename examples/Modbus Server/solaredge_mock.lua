@@ -1,6 +1,7 @@
 --%%name:SolarEdge Mock
 --%%type:com.fibaro.binarySwitch
 --%%useUiView:false
+--%%var:port='1502'
 --%%property:userDescription=Modbus TCP mock inverter (SunSpec) — buttons change the values the SolarEdge Live QA reads
 --%%u:{label='label',text='label'}
 --%%u:{button='btnSunUp',text='Sun +500W',onReleased='btnSunUp'}
@@ -67,7 +68,9 @@ local function render(label)
 end
 
 function QuickApp:onInit()
-  mock = server.serve(MAP, { port = 1502, base = 40000 })
+  -- the listen port is a QA variable (default 1502, the SolarEdge Live QA's
+  -- default) — override with -D var:port=N (0 = any free port)
+  mock = server.serve(MAP, { port = tonumber(self:getVariable("port")) or 1502, base = 40000 })
   print("SolarEdge mock listening on 127.0.0.1:" .. mock.srv.port)
   self:updateView("label", "text", render(""))
 end

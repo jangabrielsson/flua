@@ -40,6 +40,9 @@ Expected output: the QA reads 2500 W on its first poll, the driver presses
 With `--ui 8090` you can press the mock's buttons in the viewer
 (http://127.0.0.1:8090/) instead of using the driver — the SolarEdge Live
 QA's own buttons (Inverter/Meter/Power blocks) also work against the mock.
+The mock's listen port is a QuickApp variable (default 1502, the QA's
+default) — override it with `-D var:port=N` (`0` = any free port; the mock
+prints the bound port).
 
 ## Address conventions (the part that usually bites)
 
