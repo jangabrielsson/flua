@@ -100,6 +100,7 @@ function QuickApp:updateChildren(data)
   end
 end
 
+MyChildA = {}
 class 'MyChildA'(QwikAppChild)
 function MyChildA:__init(dev)
   QwikAppChild.__init(self, dev)
@@ -111,6 +112,7 @@ function MyChildA:update(data)
   self:updateView('value', "text", fmt("value: %s", data.A.value))
 end
 
+MyChildB = {}
 class 'MyChildB'(QwikAppChild)
 function MyChildB:__init(dev)
   QwikAppChild.__init(self, dev)

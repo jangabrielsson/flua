@@ -62,6 +62,10 @@
   .element-label table { border-collapse: collapse; margin: 2px auto; }
   .element-label { color: var(--ink); flex: 1 1 auto; text-align: center; }
 
+  /* the QA's "log" property: a centered status line at the panel bottom,
+     like the HC3 renders it */
+  .qa-log { text-align: center; color: var(--muted); font-size: 13px; margin-top: 8px; }
+
   /* button: the HC3's blue rounded rect */
   button.ctl {
     display: block; width: 100%; background: var(--blue); border: none; color: #fff;
@@ -308,7 +312,7 @@ function setComponentValue(device, component, value) {
 function renderComponent(device, component, row) {
   const name = document.createElement("span");
   name.className = "component-label";
-  name.textContent = component.text || component.name;
+  name.textContent = component.text ?? component.name;
   row.appendChild(name);
 
   const live = liveState(device, component);
@@ -328,13 +332,13 @@ function renderComponent(device, component, row) {
     // no side label: the text IS the element, like the HC3 — and labels may
     // carry HTML (<table>, <font color=...>, ...), which renders as-is
     name.className = "component-label element-label";
-    name.innerHTML = text || component.name;
+    name.innerHTML = text ?? component.name;
   } else if (t === "button") {
     // no side label: the button carries its own text, like the HC3
     row.removeChild(name);
     const btn = document.createElement("button");
     btn.className = "ctl";
-    btn.textContent = text || component.name;
+    btn.textContent = text ?? component.name;
     btn.onclick = () => {
       if (action) deviceAction(device.id, action);
       else if (event) uiEvent(device.id, component.name, event);
@@ -543,6 +547,13 @@ function renderDevice(device) {
   };
   for (const uiRow of embedded ? embedded.uiView : []) appendRow(uiRow);
   for (const uiRow of props.uiView || []) appendRow(uiRow);
+  // the "log" property: a centered status line at the bottom of the panel
+  if (typeof props.log === "string" && props.log.length) {
+    const log = document.createElement("div");
+    log.className = "qa-log";
+    log.textContent = props.log;
+    panel.appendChild(log);
+  }
   return panel;
 }
 
@@ -571,16 +582,20 @@ function structureKey(device) {
 // only rebuilds when THIS changes; if nothing changed, the DOM is left
 // alone.
 function valueKey(device) {
-  return JSON.stringify(allRows(device).flatMap((row) =>
-    (row.components || []).map((c) => {
-      const live = liveState(device, c);
-      return [
-        c.name,
-        componentValue(device, c),
-        live.text !== undefined ? live.text : c.text,
-      ];
-    })
-  ));
+  const props = device.properties || {};
+  return JSON.stringify([
+    props.log || "",
+    allRows(device).flatMap((row) =>
+      (row.components || []).map((c) => {
+        const live = liveState(device, c);
+        return [
+          c.name,
+          componentValue(device, c),
+          live.text !== undefined ? live.text : c.text,
+        ];
+      })
+    ),
+  ]);
 }
 
 // render + stamp the panel with its device id, structure key and value key —

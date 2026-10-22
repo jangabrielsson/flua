@@ -68,6 +68,8 @@ class Api:
         self._dispatch_lock = threading.RLock()
         # run-lifetime cache for _remote_cached GETs (base-struct merges)
         self._remote_cache: dict[str, tuple[Any, int]] = {}
+        # paths whose lazy fetch already failed this run (one warning each)
+        self._remote_failed: set[str] = set()
 
     def _emit(self, msg: dict[str, Any]) -> None:
         """Hand a pump-delivered event to the engine (and record it)."""
@@ -109,6 +111,14 @@ class Api:
             remote_path = "/" + "/".join(segments)
             data, status = self._remote.request("GET", remote_path, query, None)
             if status != 200:
+                if path not in self._remote_failed:
+                    self._remote_failed.add(path)
+                    logger.warning(
+                        "flua: HC3 fetch for %s failed (HTTP %s) — "
+                        "serving the sim's struct",
+                        remote_path,
+                        status,
+                    )
                 return None
             self._remote_cache[path] = (data, status)
         return self._remote_cache[path]

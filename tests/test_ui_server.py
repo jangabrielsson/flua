@@ -83,6 +83,15 @@ async def test_viewer_page_served_at_root(server) -> None:
     assert "text/html" in headers["Content-Type"]
     assert "flua UI viewer" in page
     assert "Access-Control-Allow-Origin" in headers
+    # an explicitly empty label/button text stays empty — the nullish
+    # fallback (?? component.name) only kicks in when the text is missing
+    # (a label with text="" must not render its name)
+    assert "component.text ?? component.name" in page
+    assert "text ?? component.name" in page
+    # the QA's "log" property renders as a centered status line at the
+    # panel bottom, and its changes feed the value key (live refresh)
+    assert "qa-log" in page
+    assert "props.log || \"\"" in page
     # the viewer polls its own emulated-only device list, and the API still
     # answers on the same server
     status, _, devices = await asyncio.to_thread(_http, f"{base}/flua/devices")

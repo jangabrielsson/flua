@@ -1,6 +1,7 @@
 --%%name:UI test
 --%%type:com.fibaro.binarySwitch
 
+--%%u:{label="myLabel",text=""}
 --%%u:{label="l1",text="<font color='red'>Label text</font>"}
 --%%u:{label="l2",text="<table><tr><td>Cell 1</td><td>Cell 2</td></tr></table>"}
 --%%u:{button="B1",text="Press me",onReleased="fopp"}

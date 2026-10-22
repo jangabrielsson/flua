@@ -59,9 +59,10 @@ def test_unknown_tags_stripped_content_kept() -> None:
 
 def test_nbsp_renders_as_space() -> None:
     # the HC3 console renders the common HTML entities as characters —
-    # colors on and off alike
+    # colors on and off alike, semicolon optional (QAs write &nbsp too)
     assert render_html("a&nbsp;b", True) == "a b"
     assert render_html("a&nbsp;b", False) == "a b"
+    assert render_html("a&nbsp b", False) == "a  b"  # no semicolon (entity + literal space)
     assert render_html("a&NBSP;b&nbsp;c", False) == "a b c"
 
 
@@ -72,6 +73,22 @@ def test_html_entities_render_as_characters() -> None:
     assert render_html("&lt;b&gt;hi&lt;/b&gt;", True) == "<b>hi</b>"
     # one pass: an escaped entity stays literal, never double-decoded
     assert render_html("&amp;lt; &amp;amp;", False) == "&lt; &amp;"
+
+
+def test_style_blocks_dropped_whole() -> None:
+    # CSS/JS content is not log text — the console doesn't render it either
+    out = render_html("<style>.blink{animation:x}</style> hi", True)
+    assert out == " hi"
+    out = render_html("a<script>var x=1;</script>b", False)
+    assert out == "ab"
+
+
+def test_numeric_entities_render_as_characters() -> None:
+    assert render_html("&#128308; x", False) == "\U0001F534 x"  # red circle
+    # unterminated refs parse too (the console's leniency)
+    assert render_html("&#128308&#128996", False) == "\U0001F534\U0001F7E4"
+    # out-of-range codes stay literal
+    assert render_html("&#99999999;", False) == "&#99999999;"
 
 
 def test_console_renders_and_color_never_strips(tmp_path) -> None:

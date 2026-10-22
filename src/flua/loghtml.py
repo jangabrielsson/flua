@@ -44,7 +44,13 @@ _HTML_ENTITIES = {
     "quot": '"',
     "apos": "'",
 }
-_ENTITY_RE = re.compile(r"&(nbsp|lt|gt|amp|quot|apos);", re.I)
+_ENTITY_RE = re.compile(r"&(nbsp|lt|gt|amp|quot|apos);?", re.I)
+# numeric character references (&#128308; — the emojis the HC3 console
+# renders); the semicolon is optional, digits end at a non-digit
+_NUMERIC_ENTITY_RE = re.compile(r"&#(\d+);?(?=\D|$)", re.I)
+# <style>/<script> blocks: the console treats their content as CSS/JS, not
+# text — drop it whole (rendering the CSS as log text is just noise)
+_STYLE_RE = re.compile(r"<(style|script)[^>]*>.*?</\1>", re.I | re.S)
 
 
 def _color_code(spec: str) -> str | None:
@@ -143,13 +149,32 @@ _TABLE_RE = re.compile(r"<table[^>]*>.*?</table>", re.I | re.S)
 _LIST_RE = re.compile(r"<(ul|ol)[^>]*>.*?</\1>", re.I | re.S)
 
 
+def _decode_numeric(match: re.Match[str]) -> str:
+    """&#NNN; -> the character (unterminated refs parse too, like the HC3
+    console's lenient entity handling)."""
+    try:
+        code = int(match.group(1))
+        if 0xD800 <= code <= 0xDFFF:  # surrogates are not characters
+            return match.group(0)
+        return chr(code)
+    except (ValueError, OverflowError):
+        return match.group(0)
+
+
 def render_html(text: str, use_color: bool) -> str:
     """Render one log message: blocks first (tables, lists), then inline
     formatting; anything unrecognized is reduced to plain text. The common
     HTML entities (&nbsp;, &lt;, &gt;, &amp;, &quot;, &apos;) render as
-    their characters — decoded after tag parsing, so an escaped bracket
-    (``&lt;b&gt;``) stays literal text instead of becoming a real tag."""
+    their characters — the semicolon is optional, like the HC3 console's
+    lenient parsing (&nbsp; is not strictly legal HTML, but the console
+    renders it as a space and QAs rely on it) — decoded after tag parsing,
+    so an escaped bracket (``&lt;b&gt;``) stays literal text instead of
+    becoming a real tag. Numeric references (``&#128308;``) render as their
+    characters too, and ``<style>``/``<script>`` blocks are dropped whole
+    (their content is CSS/JS, not log text)."""
+    text = _STYLE_RE.sub("", text)
     text = _TABLE_RE.sub(lambda m: _table(m.group(0), use_color), text)
     text = _LIST_RE.sub(lambda m: _list(m.group(0), use_color), text)
     text = _inline(text, use_color)
-    return _ENTITY_RE.sub(lambda m: _HTML_ENTITIES[m.group(1).lower()], text)
+    text = _ENTITY_RE.sub(lambda m: _HTML_ENTITIES[m.group(1).lower()], text)
+    return _NUMERIC_ENTITY_RE.sub(_decode_numeric, text)
