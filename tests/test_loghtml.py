@@ -57,6 +57,23 @@ def test_unknown_tags_stripped_content_kept() -> None:
     assert out == "hi plain"
 
 
+def test_nbsp_renders_as_space() -> None:
+    # the HC3 console renders the common HTML entities as characters —
+    # colors on and off alike
+    assert render_html("a&nbsp;b", True) == "a b"
+    assert render_html("a&nbsp;b", False) == "a b"
+    assert render_html("a&NBSP;b&nbsp;c", False) == "a b c"
+
+
+def test_html_entities_render_as_characters() -> None:
+    text = "&lt;tag&gt; &amp; &quot;quoted&quot; &apos;s&apos;"
+    assert render_html(text, True) == "<tag> & \"quoted\" 's'"
+    # decoded after tag parsing: an escaped tag stays literal text
+    assert render_html("&lt;b&gt;hi&lt;/b&gt;", True) == "<b>hi</b>"
+    # one pass: an escaped entity stays literal, never double-decoded
+    assert render_html("&amp;lt; &amp;amp;", False) == "&lt; &amp;"
+
+
 def test_console_renders_and_color_never_strips(tmp_path) -> None:
     script = tmp_path / "h.lua"
     script.write_text(

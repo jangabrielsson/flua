@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from typing import Any
 
@@ -576,7 +577,20 @@ def diagnostics_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     remote = remote_get(req, "/diagnostics")
     if remote is not None:
         return remote
-    return public({"cpuLoad": 0, "memory": 0, "storage": 0}), 200
+    # the HC3 shape: per-CPU jiffy counters (strings), a memory summary in
+    # percent, and storage usage — the sim reports the host's cpu count
+    # with idle counters, no real load
+    cpu_load = [
+        {"name": f"cpu{index}", "user": "0", "nice": "0", "system": "0", "idle": "0"}
+        for index in range(os.cpu_count() or 1)
+    ]
+    return public(
+        {
+            "memory": {"free": 0, "cache": 0, "buffers": 0, "used": 0},
+            "storage": {"internal": [{"name": "system", "used": 0.0}]},
+            "cpuLoad": cpu_load,
+        }
+    ), 200
 
 
 def proxy_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:

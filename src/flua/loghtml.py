@@ -33,6 +33,18 @@ _NAMED_COLORS = {
 # <name ...> opening/closing tags (the subset above plus the ones we strip)
 _TAG_RE = re.compile(r"<(/)?\s*([a-zA-Z][a-zA-Z0-9]*)([^>]*)>", re.S)
 _BR_RE = re.compile(r"<br\s*/?>", re.I)
+# the HTML entities the HC3 console honors in log messages: QAs escape
+# brackets and pad their UI text with &nbsp; and expect the console to
+# render the characters (one pass, so &amp;lt; stays the literal "&lt;")
+_HTML_ENTITIES = {
+    "nbsp": " ",
+    "lt": "<",
+    "gt": ">",
+    "amp": "&",
+    "quot": '"',
+    "apos": "'",
+}
+_ENTITY_RE = re.compile(r"&(nbsp|lt|gt|amp|quot|apos);", re.I)
 
 
 def _color_code(spec: str) -> str | None:
@@ -133,7 +145,11 @@ _LIST_RE = re.compile(r"<(ul|ol)[^>]*>.*?</\1>", re.I | re.S)
 
 def render_html(text: str, use_color: bool) -> str:
     """Render one log message: blocks first (tables, lists), then inline
-    formatting; anything unrecognized is reduced to plain text."""
+    formatting; anything unrecognized is reduced to plain text. The common
+    HTML entities (&nbsp;, &lt;, &gt;, &amp;, &quot;, &apos;) render as
+    their characters — decoded after tag parsing, so an escaped bracket
+    (``&lt;b&gt;``) stays literal text instead of becoming a real tag."""
     text = _TABLE_RE.sub(lambda m: _table(m.group(0), use_color), text)
     text = _LIST_RE.sub(lambda m: _list(m.group(0), use_color), text)
-    return _inline(text, use_color)
+    text = _inline(text, use_color)
+    return _ENTITY_RE.sub(lambda m: _HTML_ENTITIES[m.group(1).lower()], text)

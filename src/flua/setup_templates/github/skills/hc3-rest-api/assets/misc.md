@@ -96,7 +96,10 @@ Used for color picker presets in RGB/color devices.
 - `GET /api/debugMessages/tags` — Available debug tags
 
 ### Diagnostics (2 endpoints)
-- `GET /api/diagnostics` — System diagnostic information
+- `GET /api/diagnostics` — System diagnostic information:
+  `{cpuLoad: [{name, user, nice, system, idle}, …per cpu] (string jiffy
+  counters), memory: {free, cache, buffers, used} (percent),
+  storage: {internal: [{name, used}]}}`
 - `GET /api/apps/com.fibaro.zwave/diagnostics/transmissions` — Z-Wave transmission diagnostics
 
 ### Refresh States (1 endpoint)

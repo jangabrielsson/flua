@@ -1281,6 +1281,19 @@ def test_profiles(api: Api) -> None:
 # -- flua embedded (default) view ---------------------------------------------
 
 
+def test_diagnostics_shape(api: Api) -> None:
+    # the HC3 shape: per-CPU jiffy counters, a memory summary in percent,
+    # and storage usage — not the old flat cpuLoad/memory/storage scalars
+    data, status = api.dispatch("GET", "/diagnostics")
+    assert status == 200
+    assert isinstance(data["cpuLoad"], list) and data["cpuLoad"]
+    assert data["cpuLoad"][0]["name"] == "cpu0"
+    for key in ("user", "nice", "system", "idle"):
+        assert isinstance(data["cpuLoad"][0][key], str)
+    assert set(data["memory"]) == {"free", "cache", "buffers", "used"}
+    assert data["storage"]["internal"][0]["name"] == "system"
+
+
 def test_flua_devices_serves_emulated_devices_only(api: Api) -> None:
     # the viewer's channel: the sim's devices, never the online union
     data, status = api.dispatch("GET", "/flua/devices")
