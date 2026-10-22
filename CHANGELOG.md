@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.78] - 2026-10-22
+
+### Added
+- Enhance UI and functionality for Modbus Server and QuickApps
+- enhance UI with log property and improved rendering
+
 ## [0.1.77] - 2026-10-22
 
 ### Added
