@@ -383,10 +383,11 @@ machine running flua.
 Per-window URL parameters (bookmarkable): `?qa=<id>` shows only that QA,
 `?exclude=id[,id...]` hides those, `?bg=<color>` / `?panel=<color>` set the
 page/panel colors (any CSS color), and `?view=condensed` starts in the
-condensed device list (below). A panel's "open in window" button opens
-a `?qa=` window carrying the current theme. Defaults for the colors come
-from the config file's `viewer = { bg = ..., panel = ... }` table
-(`.flua.lua`), served at `GET /flua/theme`.
+condensed device list (below). The **View** toggle's choice is remembered
+in the browser, so your normal flow keeps the last mode. A panel's "open in
+window" button opens a `?qa=` window carrying the current theme. Defaults
+for the colors come from the config file's `viewer = { bg = ..., panel = ... }`
+table (`.flua.lua`), served at `GET /flua/theme`.
 
 The **View** toggle switches between the full panel view and the condensed
 device list (the HC3's compact style): every device as a small status card

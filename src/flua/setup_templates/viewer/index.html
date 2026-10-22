@@ -82,19 +82,29 @@
   button.ctl.ghost:hover { background: var(--blue-pale); }
 
   /* condensed mode: every device as a small status card in wrapping rows
-     (the HC3's device-list style) — value on top, bold name, log below */
+     (the HC3's device-list style — unit label above the value, bold name,
+     log; colors measured from a real HC3 card) */
   #devices.condensed { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
   .smallqa {
-    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-    padding: 10px 14px; box-shadow: 0 1px 3px rgba(0,0,0,.08); width: 172px;
-    cursor: pointer;
+    --qa-blue: #3a5493; --qa-navy: #111b30; --qa-bluegray: #58749e;
+    --qa-card: #fbfafd;
+    background: var(--qa-card); border-radius: 12px;
+    padding: 14px 18px 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    width: 200px; cursor: pointer;
   }
-  .smallqa:hover { border-color: var(--blue); }
-  .smallqa-value { font-size: 17px; font-weight: 600; line-height: 1.25; }
-  .smallqa-name { font-weight: 700; font-size: 13px; margin-top: 3px; }
+  .smallqa:hover { box-shadow: 0 2px 6px rgba(0,0,0,.14); }
+  .smallqa-value {
+    color: var(--qa-blue); font-size: 20px; font-weight: 600;
+    line-height: 1.2; text-align: center;
+  }
+  .smallqa-unit-inline { font-size: 13px; font-weight: 400; }
+  .smallqa-name {
+    color: var(--qa-navy); font-weight: 700; font-size: 12px;
+    text-align: center; margin-top: 8px;
+  }
   .smallqa-log {
-    color: var(--muted); font-size: 12px; margin-top: 2px;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--qa-bluegray); font-size: 11px; margin-top: 2px;
+    text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
 
   /* slider: gray track with a blue fill and a round white knob */
@@ -210,15 +220,24 @@
   via <code>GET /plugins/callUIEvent</code> or device actions — the same
   contract the real HC3 UI uses. The <b>View</b> button toggles the condensed
   device list (every device as a small status card — value, name, log),
-  handy with many child devices. The <b>API</b> field can point at another
+  handy with many child devices; the choice is remembered (and
+  <code>?view=condensed</code> pins it per URL). The <b>API</b> field can point at another
   machine running flua (leave user/pass empty; they exist for a real HC3).
 </p>
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
 let timer = null;
-// condensed device-list mode: ?view=condensed (bookmarkable, like ?qa=)
-let condensed = new URLSearchParams(location.search).get("view") === "condensed";
+// condensed device-list mode: ?view=condensed|panels (bookmarkable, like
+// ?qa=) wins over the remembered choice; the toggle stores the last mode
+// in localStorage so the normal flow (open the viewer URL) keeps it
+const viewParam = new URLSearchParams(location.search).get("view");
+let condensed = viewParam === "condensed" ||
+  (viewParam === null && localStorage.getItem("flua-view") === "condensed");
+
+function rememberView() {
+  localStorage.setItem("flua-view", condensed ? "condensed" : "panels");
+}
 
 function paintViewToggle() {
   $("viewtoggle").textContent = condensed ? "View: panels" : "View: condensed";
@@ -643,44 +662,60 @@ function freshPanel(device, key, vkey) {
 // style) — value on top, bold name below, then the log field. Clicking a
 // card opens that device's full panel.
 
-function condensedValue(device) {
-  // the embedded default view's first live label (e.g. "50A", "45°", "FALSE")
+function condensedParts(device) {
+  // the card's top block: value + unit on one line ("2500 W"). Numeric
+  // values come from properties (value + unit); non-numeric ones fall back
+  // to the embedded default view's label (which may carry HTML — the
+  // binary state label does).
+  const props = device.properties || {};
+  const v = props.value;
+  if (v !== undefined && v !== null && v !== "" && typeof v !== "boolean") {
+    if (typeof v === "number" || (typeof v === "string" && v.trim() && !isNaN(Number(v)))) {
+      return {
+        unit: typeof props.unit === "string" ? props.unit : "",
+        valueHtml: String(Number(v)),
+      };
+    }
+    return { unit: "", valueHtml: String(v) };
+  }
   const embedded = embeddedView(device);
   if (embedded) {
     for (const row of embedded.uiView) {
       for (const c of row.components || []) {
         const live = embedded.values && embedded.values[c.name];
         if (c.type === "label" && live && live.text !== undefined) {
-          return String(live.text);
+          return { unit: "", valueHtml: String(live.text) };
         }
       }
     }
   }
-  const props = device.properties || {};
-  const v = props.value;
-  if (v !== undefined && v !== null && v !== "") {
-    if (typeof v === "number" || (typeof v === "string" && v.trim() && !isNaN(Number(v)))) {
-      return String(Number(v)) + (typeof props.unit === "string" ? props.unit : "");
-    }
-    return String(v);
-  }
-  return "\u2014";
+  if (typeof v === "boolean") return { unit: "", valueHtml: v ? "TRUE" : "FALSE" };
+  return { unit: "", valueHtml: "\u2014" };
 }
 
 function condensedValueKey(device) {
   const props = device.properties || {};
-  return JSON.stringify([condensedValue(device), device.name, props.log || ""]);
+  const parts = condensedParts(device);
+  return JSON.stringify([parts.unit, parts.valueHtml, device.name, props.log || ""]);
 }
 
 function renderCondensed(device) {
   const card = document.createElement("div");
   card.className = "smallqa";
   card.title = "id " + device.id + " \u2014 click to open the full panel";
+  const parts = condensedParts(device);
   const value = document.createElement("div");
   value.className = "smallqa-value";
   // embedded label texts may carry HTML (the binary state label does) —
-  // render it like the panel labels do
-  value.innerHTML = condensedValue(device);
+  // render it like the panel labels do; the unit is appended inline
+  value.innerHTML = parts.valueHtml;
+  if (parts.unit) {
+    value.appendChild(document.createTextNode(" "));
+    const unit = document.createElement("span");
+    unit.className = "smallqa-unit-inline";
+    unit.textContent = parts.unit;
+    value.appendChild(unit);
+  }
   const name = document.createElement("div");
   name.className = "smallqa-name";
   name.textContent = device.name || ("Device " + device.id);
@@ -693,6 +728,7 @@ function renderCondensed(device) {
   card.appendChild(log);
   card.onclick = () => {
     condensed = false;
+    rememberView();
     paintViewToggle();
     const url = new URL(location.href);
     url.searchParams.delete("view");
@@ -839,6 +875,7 @@ function start() {
 $("connect").onclick = start;
 $("viewtoggle").onclick = () => {
   condensed = !condensed;
+  rememberView();
   paintViewToggle();
   const url = new URL(location.href);
   if (condensed) url.searchParams.set("view", "condensed");
