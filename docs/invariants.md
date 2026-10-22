@@ -88,6 +88,18 @@ model) and ARCHITECTURE.md (components).
   after it.
   *Pinned by:* `tests/test_sleep.py` (the whole file)
 
+## QA boot
+
+- **`--%%var` values are served as `quickAppVariables` on the QA's device
+  before `onInit` runs** — like the HC3 creating the device with its
+  `initialProperties` first. `api.get("/devices/<id>")` inside `onInit`
+  already shows them, so QAs that build child devices from variable names
+  (the SolarEdge Live pattern) work.
+  *Pinned by:* `tests/test_modbus_mock.py::test_var_directives_seed_quick_app_variables`
+- **HC3 string extensions exist**: `string.split`, `string.starts`,
+  `string.ends` behave like the HC3's.
+  *Pinned by:* `tests/test_modbus_mock.py::test_string_starts_and_ends`
+
 ## Restart & state survival
 
 - **`plugin.restart` re-runs the QA's code** (onInit again) while the device

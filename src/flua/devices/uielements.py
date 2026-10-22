@@ -44,17 +44,41 @@ def _int_value(value: Any, properties: dict[str, Any] | None = None) -> str:
     return str(int(float(value) + 0.5))
 
 
+def _strip_zeros(text: str) -> str:
+    """Drop insignificant trailing zeros (and the separator once bare):
+    50.000 -> 50, 348.400 -> 348.4 — the HC3's compact panel style."""
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text
+
+
 def _multisensor_value(value: Any, properties: dict[str, Any] | None = None) -> str:
     """A multilevelSensor's value with its unit string appended (the HC3
     carries the unit as a separate ``unit`` property)."""
     try:
-        text = f"{value:.3f}"
+        text = _strip_zeros(f"{value:.3f}")
     except (TypeError, ValueError):
         text = str(value)
     unit = (properties or {}).get("unit")
     if unit:
         text = f"{text}{unit}"
     return text
+
+
+def _temp_value(value: Any, properties: dict[str, Any] | None = None) -> str:
+    try:
+        text = _strip_zeros(f"{value:.2f}")
+    except (TypeError, ValueError):
+        text = str(value)
+    return text + "°"
+
+
+def _humidity_value(value: Any, properties: dict[str, Any] | None = None) -> str:
+    try:
+        text = _strip_zeros(f"{value:.2f}")
+    except (TypeError, ValueError):
+        text = str(value)
+    return text + "%"
 
 
 def _color_value(value: Any, properties: dict[str, Any] | None = None) -> str:
@@ -130,6 +154,16 @@ EMBEDDED_UI: dict[str, list[list[dict[str, Any]]]] = {
     "com.fibaro.multilevelSensor": [
         [{"type": "label", "name": "__multisensorValue", "text": "0"}],
     ],
+    # electricMeter/powerMeter use the multilevelSensor dynamic plugin in the
+    # HC3 device catalog (their ``view`` lists it), so they get the same
+    # default value label — QAs update ``properties.value`` + ``unit`` on
+    # their children (the SolarEdge Live pattern) and the viewer shows it.
+    "com.fibaro.electricMeter": [
+        [{"type": "label", "name": "__multisensorValue", "text": "0"}],
+    ],
+    "com.fibaro.powerMeter": [
+        [{"type": "label", "name": "__multisensorValue", "text": "0"}],
+    ],
     "com.fibaro.binarySensor": [
         [{"type": "label", "name": "__binarysensorValue", "text": BIN_FALSE}],
     ],
@@ -171,6 +205,22 @@ EMBEDDED_WATCHES: dict[str, list[dict[str, Any]]] = {
             "fmt": _multisensor_value,
         },
     ],
+    "com.fibaro.electricMeter": [
+        {
+            "property": "value",
+            "id": "__multisensorValue",
+            "prop": "text",
+            "fmt": _multisensor_value,
+        },
+    ],
+    "com.fibaro.powerMeter": [
+        {
+            "property": "value",
+            "id": "__multisensorValue",
+            "prop": "text",
+            "fmt": _multisensor_value,
+        },
+    ],
     "com.fibaro.doorSensor": [
         {"property": "value", "id": "__doorSensor", "prop": "text", "fmt": _custom_bin},
     ],
@@ -178,10 +228,10 @@ EMBEDDED_WATCHES: dict[str, list[dict[str, Any]]] = {
         {"property": "value", "id": "__windowSensor", "prop": "text", "fmt": _custom_bin},
     ],
     "com.fibaro.temperatureSensor": [
-        {"property": "value", "id": "__temperatureSensor", "prop": "text", "fmt": "%.2f°"},
+        {"property": "value", "id": "__temperatureSensor", "prop": "text", "fmt": _temp_value},
     ],
     "com.fibaro.humiditySensor": [
-        {"property": "value", "id": "__humiditySensor", "prop": "text", "fmt": "%.2f%%"},
+        {"property": "value", "id": "__humiditySensor", "prop": "text", "fmt": _humidity_value},
     ],
 }
 

@@ -1346,8 +1346,22 @@ def test_embedded_ui_multilevel_sensor_unit(api: Api) -> None:
         5004, "energy", "com.fibaro.multilevelSensor", {"value": 5.65, "unit": "kWh"}
     )
     data, _ = api.dispatch("GET", "/flua/embeddedUI")
-    assert data["5003"]["values"]["__multisensorValue"]["text"] == "5.650"
-    assert data["5004"]["values"]["__multisensorValue"]["text"] == "5.650kWh"
+    # trailing zeros are stripped (the HC3's compact panel style)
+    assert data["5003"]["values"]["__multisensorValue"]["text"] == "5.65"
+    assert data["5004"]["values"]["__multisensorValue"]["text"] == "5.65kWh"
+
+
+def test_embedded_ui_strips_insignificant_zeros(api: Api) -> None:
+    # the HC3 panel style: 45.00 -> 45, 62.50 -> 62.5, 348.400 -> 348.4
+    api.state.register_qa(5005, "temp", "com.fibaro.temperatureSensor", {"value": 45.0})
+    api.state.register_qa(5006, "hum", "com.fibaro.humiditySensor", {"value": 62.5})
+    api.state.register_qa(
+        5007, "voltage", "com.fibaro.multilevelSensor", {"value": 348.4, "unit": "V"}
+    )
+    data, _ = api.dispatch("GET", "/flua/embeddedUI")
+    assert data["5005"]["values"]["__temperatureSensor"]["text"] == "45°"
+    assert data["5006"]["values"]["__humiditySensor"]["text"] == "62.5%"
+    assert data["5007"]["values"]["__multisensorValue"]["text"] == "348.4V"
 
 
 def test_embedded_ui_only_plugin_devices(api: Api) -> None:

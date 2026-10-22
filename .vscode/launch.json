@@ -67,6 +67,28 @@
         "${relativeFile}"
       ],
       "listenPublicly": true
+    },
+        {
+      "name": "Flua: Debug with Modbus (UI+mobdebug)",
+      "type": "luaMobDebug",
+      "request": "launch",
+      "workingDirectory": "${workspaceFolder}",
+      "sourceBasePath": "${workspaceFolder}",
+      "listenPort": 8172,
+      "stopOnEntry": false,
+      "sourceEncoding": "UTF-8",
+      "interpreter": ".venv/bin/flua",
+      "windows": {
+        "interpreter": "${workspaceFolder}\\.venv\\Scripts\\flua.exe"
+      },
+      "arguments": [
+        "--ui", "8090",
+        "-D", "var:host=\"127.0.0.1\"",
+        "-D", "var:debugLevel=\"4\"",
+        "${relativeFile}",
+        "examples/Modbus Server/solaredge_mock.lua"
+      ],
+      "listenPublicly": true
     }
   ]
 }

@@ -92,6 +92,11 @@ async def test_viewer_page_served_at_root(server) -> None:
     # panel bottom, and its changes feed the value key (live refresh)
     assert "qa-log" in page
     assert "props.log || \"\"" in page
+    # the condensed device-list mode: a toggle + one small status card per
+    # device (value / bold name / log) for runs with many children
+    assert 'id="viewtoggle"' in page
+    assert "View: condensed" in page
+    assert "smallqa" in page
     # the viewer polls its own emulated-only device list, and the API still
     # answers on the same server
     status, _, devices = await asyncio.to_thread(_http, f"{base}/flua/devices")
@@ -163,6 +168,44 @@ async def test_embedded_ui_over_http(server, tmp_path) -> None:
     await asyncio.sleep(0.3)
     _, _, views = await asyncio.to_thread(_http, f"{base}/flua/embeddedUI")
     assert "TRUE" in views["5000"]["values"]["__binarysensorValue"]["text"]
+
+
+@pytest.mark.asyncio
+async def test_embedded_ui_meter_children_show_values(server, tmp_path) -> None:
+    # electricMeter/powerMeter children (the SolarEdge Live QA pattern) use
+    # the multilevelSensor dynamic plugin on the HC3 — the embedded channel
+    # must give them the same default value label, fed from properties.value
+    engine, _, base = server
+    em = tmp_path / "em.lua"
+    em.write_text(
+        "--%%name:EMQA\n"
+        "--%%type:com.fibaro.electricMeter\n"
+        "function QuickApp:onInit()\n"
+        "  self:updateProperty('value', 50.0)\n"
+        "  self:updateProperty('unit', 'A')\n"
+        "end\n",
+    )
+    pm = tmp_path / "pm.lua"
+    pm.write_text(
+        "--%%name:PMQA\n"
+        "--%%type:com.fibaro.powerMeter\n"
+        "function QuickApp:onInit()\n"
+        "  self:updateProperty('value', 2300.0)\n"
+        "  self:updateProperty('unit', 'W')\n"
+        "end\n",
+    )
+    engine.load_qa_file(str(em))
+    engine.load_qa_file(str(pm))
+    await asyncio.sleep(0.4)
+    status, _, views = await asyncio.to_thread(_http, f"{base}/flua/embeddedUI")
+    assert status == 200
+    meter_types = ("com.fibaro.electricMeter", "com.fibaro.powerMeter")
+    meter_views = [v for v in views.values() if v["type"] in meter_types]
+    assert len(meter_views) == 2, (
+        f"expected both meter QAs in the embedded channel, got {list(views)}"
+    )
+    texts = sorted(v["values"]["__multisensorValue"]["text"] for v in meter_views)
+    assert texts == ["2300W", "50A"]  # trailing zeros stripped, unit appended
 
 
 @pytest.mark.asyncio

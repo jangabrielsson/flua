@@ -382,10 +382,18 @@ machine running flua.
 
 Per-window URL parameters (bookmarkable): `?qa=<id>` shows only that QA,
 `?exclude=id[,id...]` hides those, `?bg=<color>` / `?panel=<color>` set the
-page/panel colors (any CSS color). A panel's "open in window" button opens
+page/panel colors (any CSS color), and `?view=condensed` starts in the
+condensed device list (below). A panel's "open in window" button opens
 a `?qa=` window carrying the current theme. Defaults for the colors come
 from the config file's `viewer = { bg = ..., panel = ... }` table
 (`.flua.lua`), served at `GET /flua/theme`.
+
+The **View** toggle switches between the full panel view and the condensed
+device list (the HC3's compact style): every device as a small status card
+in wrapping rows — the value on top (sensor value + unit), the device name
+in bold, the `log` property below. Handy for runs where a QA fans out many
+child devices (e.g. the SolarEdge Live QA's registers); click a card to
+open that device's full panel.
 
 The viewer polls `GET /flua/devices` (the emulated devices only — in online
 mode the HC3's own QAs stay out of the list), renders `properties.uiView`
@@ -777,7 +785,9 @@ everything works between them:
   variables, globals, scenes, alarms, profiles, refreshStates, …)
 - `fibaro.call(id, 'turnOn')` — calls another QA's QuickApp method
 - `fibaro.emitCustomEvent(name)` → `QuickApp:onCustomEvent(name)` handlers
-- `self:setVariable/getVariable` — persistent, survives restarts
+- `self:setVariable/getVariable` — persistent, survives restarts; `--%%var`
+  values are visible through `api.get('/devices/<id>').properties.quickAppVariables`
+  already during `onInit` (the HC3's `initialProperties` behavior)
 - `plugin.restart(id)` — re-runs the QA's code (onInit runs again, like the
   HC3 restarting the plugin); timers are cancelled and deferred messages
   dropped
@@ -880,6 +890,13 @@ if require then require("mocklib") end  -- flua only; no-op on the HC3
 
 See `examples/mockServer.lua` — a QA that hosts all four and verifies its
 own clients against them.
+
+For Modbus TCP devices, `examples/Modbus Server` is a ready-made pattern:
+`modbus_server.lua` serves any register table over FC3/FC6/FC16 (pick the
+address base to match the QA's wire convention), `solaredge.lua` fills the
+SunSpec map for a SolarEdge inverter, and `solaredge_mock.lua` wraps it in a
+QA with buttons that change the values — run it next to the user QA and
+press a button to watch the readings follow. See `examples/Modbus Server/README.md`.
 
 ## Deploying to the HC3
 

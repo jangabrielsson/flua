@@ -266,9 +266,12 @@ end
 -- and rules as QA bootstrap: {config, os} in scope, config = the .flua.lua
 -- config file (with _FLUA as fallback), os.getenv reads the .env chain.
 -- A faulty expression raises; nil results are left out (variable unset).
-function _FLUA.evalVars(varExprs)
+function _FLUA.evalVars(varExprs, baseConfig)
   local config = setmetatable({}, { __index = _FLUA })
   for k, v in pairs(_FLUA.configFile or {}) do config[k] = v end
+  -- baseConfig (e.g. a QA's own directives) wins over the config file,
+  -- mirroring bootstrapQa's merge order.
+  for k, v in pairs(baseConfig or {}) do config[k] = v end
   local out = {}
   for name, expr in pairs(varExprs or {}) do
     local ok, value = pcall(load("return " .. tostring(expr), nil, "t", { config = config, os = os }))
@@ -1359,6 +1362,15 @@ function string.split(inputstr, sep)
   local t={}
   for str in string.gmatch(inputstr, "([^"..(sep or "%s").."]+)") do t[#t+1] = str end
   return t
+end
+
+-- HC3 string extensions (the real runtime predefines these; QAs use them).
+function string.starts(str, start)
+  return string.sub(str, 1, #start) == start
+end
+
+function string.ends(str, ending)
+  return ending == "" or string.sub(str, -#ending) == ending
 end
 
 ---@diagnostic disable-next-line: lowercase-global

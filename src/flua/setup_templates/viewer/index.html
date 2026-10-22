@@ -75,6 +75,27 @@
   }
   button.ctl:hover { background: var(--blue-dark); }
   button.ctl:active { background: #1565c0; transform: translateY(1px); }
+  button.ctl.ghost {
+    background: #fff; color: var(--blue); border: 1px solid var(--blue);
+    box-shadow: none; padding: 6px 10px; font-size: 13px;
+  }
+  button.ctl.ghost:hover { background: var(--blue-pale); }
+
+  /* condensed mode: every device as a small status card in wrapping rows
+     (the HC3's device-list style) — value on top, bold name, log below */
+  #devices.condensed { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+  .smallqa {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 14px; box-shadow: 0 1px 3px rgba(0,0,0,.08); width: 172px;
+    cursor: pointer;
+  }
+  .smallqa:hover { border-color: var(--blue); }
+  .smallqa-value { font-size: 17px; font-weight: 600; line-height: 1.25; }
+  .smallqa-name { font-weight: 700; font-size: 13px; margin-top: 3px; }
+  .smallqa-log {
+    color: var(--muted); font-size: 12px; margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
 
   /* slider: gray track with a blue fill and a round white knob */
   input[type=range] {
@@ -175,6 +196,7 @@
   <label>poll</label>
   <input id="poll" type="number" min="0.2" step="0.1" value="1" size="4"> s
   <button class="ctl" id="connect">Connect</button>
+  <button class="ctl ghost" id="viewtoggle" title="toggle the condensed device list">View: condensed</button>
   <span id="status"></span>
 </header>
 <div id="devices"></div>
@@ -186,13 +208,21 @@
   prepends the device type's default view (On/Off buttons, state label,
   dimmer — from <code>GET /flua/embeddedUI</code>), and injects interactions
   via <code>GET /plugins/callUIEvent</code> or device actions — the same
-  contract the real HC3 UI uses. The <b>API</b> field can point at another
+  contract the real HC3 UI uses. The <b>View</b> button toggles the condensed
+  device list (every device as a small status card — value, name, log),
+  handy with many child devices. The <b>API</b> field can point at another
   machine running flua (leave user/pass empty; they exist for a real HC3).
 </p>
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
 let timer = null;
+// condensed device-list mode: ?view=condensed (bookmarkable, like ?qa=)
+let condensed = new URLSearchParams(location.search).get("view") === "condensed";
+
+function paintViewToggle() {
+  $("viewtoggle").textContent = condensed ? "View: panels" : "View: condensed";
+}
 
 // served by flua, the page's own origin is the API — default to it, so a
 // port fallback (8090 busy -> 8091) needs no editing. Opened from file://
@@ -609,6 +639,75 @@ function freshPanel(device, key, vkey) {
   return panel;
 }
 
+// ---- condensed mode: one small status card per device (the HC3 device-list
+// style) — value on top, bold name below, then the log field. Clicking a
+// card opens that device's full panel.
+
+function condensedValue(device) {
+  // the embedded default view's first live label (e.g. "50A", "45°", "FALSE")
+  const embedded = embeddedView(device);
+  if (embedded) {
+    for (const row of embedded.uiView) {
+      for (const c of row.components || []) {
+        const live = embedded.values && embedded.values[c.name];
+        if (c.type === "label" && live && live.text !== undefined) {
+          return String(live.text);
+        }
+      }
+    }
+  }
+  const props = device.properties || {};
+  const v = props.value;
+  if (v !== undefined && v !== null && v !== "") {
+    if (typeof v === "number" || (typeof v === "string" && v.trim() && !isNaN(Number(v)))) {
+      return String(Number(v)) + (typeof props.unit === "string" ? props.unit : "");
+    }
+    return String(v);
+  }
+  return "\u2014";
+}
+
+function condensedValueKey(device) {
+  const props = device.properties || {};
+  return JSON.stringify([condensedValue(device), device.name, props.log || ""]);
+}
+
+function renderCondensed(device) {
+  const card = document.createElement("div");
+  card.className = "smallqa";
+  card.title = "id " + device.id + " \u2014 click to open the full panel";
+  const value = document.createElement("div");
+  value.className = "smallqa-value";
+  // embedded label texts may carry HTML (the binary state label does) —
+  // render it like the panel labels do
+  value.innerHTML = condensedValue(device);
+  const name = document.createElement("div");
+  name.className = "smallqa-name";
+  name.textContent = device.name || ("Device " + device.id);
+  const props = device.properties || {};
+  const log = document.createElement("div");
+  log.className = "smallqa-log";
+  log.textContent = typeof props.log === "string" ? props.log : "";
+  card.appendChild(value);
+  card.appendChild(name);
+  card.appendChild(log);
+  card.onclick = () => {
+    condensed = false;
+    paintViewToggle();
+    const url = new URL(location.href);
+    url.searchParams.delete("view");
+    history.replaceState(null, "", url.toString());
+    poll();
+    setTimeout(() => {
+      const panel = document.querySelector(
+        '.device[data-key="' + CSS.escape(String(device.id)) + '"]'
+      );
+      if (panel) panel.scrollIntoView({ block: "start", behavior: "smooth" });
+    }, 120);
+  };
+  return card;
+}
+
 async function poll() {
   try {
     const base = $("base").value.replace(/\/+$/, "");
@@ -643,37 +742,65 @@ async function poll() {
       ((d.properties && (d.properties.uiView || d.properties.viewLayout)) ||
       embeddedState[String(d.id)])
     );
-    for (const device of qas) {
-      const key = device.id + ":" + structureKey(device);
-      const vkey = valueKey(device);
-      let panel = root.querySelector('[data-key="' + CSS.escape(String(device.id)) + '"]');
-      if (!panel || panel.dataset.struct !== key) {
-        // new or structurally changed: rebuild
-        const fresh = freshPanel(device, key, vkey);
-        if (panel) panel.replaceWith(fresh);
-        else root.appendChild(fresh);
-      } else if (
-        panel.dataset.values !== vkey &&
-        !panel.contains(document.activeElement) &&
-        !panel.dataset.open
-      ) {
-        // values changed and the user isn't interacting: refresh
-        panel.replaceWith(freshPanel(device, key, vkey));
+    // condensed mode lists EVERY device (QAs and children, with or without
+    // UI) except the controller itself; panel mode keeps the current filter
+    // (devices that render a UI)
+    const visible = condensed
+      ? devices.filter((d) =>
+          String(d.id) !== "1" &&
+          (!onlyQa || String(d.id) === onlyQa) &&
+          !exclude.has(String(d.id)))
+      : qas;
+    root.className = condensed ? "condensed" : "";
+    if (condensed) {
+      for (const device of visible) {
+        const vkey = condensedValueKey(device);
+        let card = root.querySelector(
+          '.smallqa[data-key="' + CSS.escape(String(device.id)) + '"]'
+        );
+        if (!card || card.dataset.values !== vkey) {
+          const fresh = renderCondensed(device);
+          fresh.dataset.key = device.id;
+          fresh.dataset.values = vkey;
+          if (card) card.replaceWith(fresh);
+          else root.appendChild(fresh);
+        }
       }
-      // otherwise the panel already shows the current state — leave it alone
+    } else {
+      for (const device of visible) {
+        const key = device.id + ":" + structureKey(device);
+        const vkey = valueKey(device);
+        let panel = root.querySelector('[data-key="' + CSS.escape(String(device.id)) + '"]');
+        if (!panel || panel.dataset.struct !== key) {
+          // new or structurally changed: rebuild
+          const fresh = freshPanel(device, key, vkey);
+          if (panel) panel.replaceWith(fresh);
+          else root.appendChild(fresh);
+        } else if (
+          panel.dataset.values !== vkey &&
+          !panel.contains(document.activeElement) &&
+          !panel.dataset.open
+        ) {
+          // values changed and the user isn't interacting: refresh
+          panel.replaceWith(freshPanel(device, key, vkey));
+        }
+        // otherwise the panel already shows the current state — leave it alone
+      }
     }
-    // drop panels for devices that are gone
-    const live = new Set(qas.map((d) => String(d.id)));
-    for (const panel of root.querySelectorAll(".device")) {
-      if (!live.has(panel.dataset.key)) panel.remove();
+    // drop cards/panels for devices that are gone (or belong to the other mode)
+    const live = new Set(visible.map((d) => String(d.id)));
+    for (const el of root.querySelectorAll("[data-key]")) {
+      const isCard = el.classList.contains("smallqa");
+      if (!live.has(el.dataset.key) || isCard !== condensed) el.remove();
     }
     const filters = [
       onlyQa ? "only " + onlyQa : "",
       exclude.size ? "excluding " + [...exclude].join(",") : "",
     ].filter(Boolean);
     setStatus(
-      qas.length
-        ? qas.length + " QA(s)" + (filters.length ? " (" + filters.join(", ") + ")" : "")
+      visible.length
+        ? visible.length + (condensed ? " device(s)" : " QA(s)") +
+          (filters.length ? " (" + filters.join(", ") + ")" : "")
         : "no QAs with UI",
       "ok"
     );
@@ -704,11 +831,21 @@ if (!pageBg || !panelBg) {
 
 function start() {
   if (timer) clearInterval(timer);
+  paintViewToggle();
   poll();
   timer = setInterval(poll, Math.max(0.2, parseFloat($("poll").value) || 1) * 1000);
 }
 
 $("connect").onclick = start;
+$("viewtoggle").onclick = () => {
+  condensed = !condensed;
+  paintViewToggle();
+  const url = new URL(location.href);
+  if (condensed) url.searchParams.set("view", "condensed");
+  else url.searchParams.delete("view");
+  history.replaceState(null, "", url.toString());
+  poll();
+};
 start();
 </script>
 </body>
