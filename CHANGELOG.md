@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.77] - 2026-10-22
+
+### Added
+- enhance diagnostics endpoint to return detailed CPU, memory, and storage information feat: add tests for diagnostics response shape and HTML entity rendering in logs
+
 ## [0.1.76] - 2026-10-22
 
 ### Added
