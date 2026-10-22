@@ -95,6 +95,11 @@ makes flua exit; QAs with timers or open connections keep running.
                                         # an open SSE stream or keep-alive QA can't
                                         # keep the run alive past it)
 .venv/bin/flua --run-for -3 script.lua # exactly 3 virtual s
+.venv/bin/flua -D mode:online -D var:x=42 script.lua
+                                        # inject directives as if appended to
+                                        # the QA's header — test foreign code
+                                        # without editing it (repeatable; the
+                                        # injected lines win over the file's)
 ```
 
 Virtual time — great for testing long-running logic (`--run-for` counts
@@ -1129,6 +1134,9 @@ live on `_FLUA` so your code stays portable:
 - `_FLUA.exit(code)` — stop the engine (vs `exit(code)` / `os.exit()` in a QA, which stop only that QA — `os.exit()` is the name real HC3 QAs use)
 - `_FLUA.qa(id)` — another QA's QuickApp instance (lupa proxy)
 - `_FLUA.loadQAfromFile(path, directives?)` / `_FLUA.loadQAfromString(code, directives?)` — dynamic QA loading; `directives` is an optional table of directive strings added to the loaded QA's config
+- `_FLUA.loadFQAfromFile(path, directives?)` — like `loadQAfromFile` for a
+  `.fqa` package: unpacks it to a temp dir first (the CLI's pipeline),
+  name/type/UI come from the package header
 - `_FLUA.async.run(fn)` / `_FLUA.async.await(worker)` / `_FLUA.async.wait(ms)` — coroutine awaits
 - `_FLUA.millitime()` — virtual time in whole milliseconds (sub-second timing; `os.time()` is whole seconds, `os.clock()` is real CPU time)
 - `_FLUA.postRefreshEvent(event)` — inject a fake refreshStates event

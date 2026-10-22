@@ -243,6 +243,12 @@ def install_bindings(engine: "LuaEngine") -> None:
         qa_id, err = engine.load_qa_file(path, extra)
         return qa_id, err
 
+    # .fqa packages: unpack to a temp dir, then the file pipeline above
+    def load_fqa_file(path: str, directives: object = None) -> tuple[object, object]:
+        extra = None if directives is None else lua_to_python(directives)
+        qa_id, err = engine.load_fqa_file(path, extra)
+        return qa_id, err
+
     def qa_temp_file(code: str) -> str:
         return engine.qa_temp_file(code)
 
@@ -261,6 +267,7 @@ def install_bindings(engine: "LuaEngine") -> None:
     py["api_hc3"] = api_hc3
     py["device_for"] = device_for
     py["load_qa_file"] = load_qa_file
+    py["load_fqa_file"] = load_fqa_file
     py["qa_temp_file"] = qa_temp_file
     py["udp_open"] = udp_open
     py["udp_close"] = engine.qa_udp.close

@@ -1038,6 +1038,10 @@ function _FLUA.loadQAfromFile(path, directives)
   return _PY.load_qa_file(path, directives)
 end
 
+function _FLUA.loadFQAfromFile(path, directives)
+  return _PY.load_fqa_file(path, directives)
+end
+
 function _FLUA.loadQAfromString(code, directives)
   local path = _PY.qa_temp_file(code)
   return _FLUA.loadQAfromFile(path, directives)

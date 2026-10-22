@@ -926,6 +926,32 @@ class LuaEngine:
         self.enqueue_outbound(messages.start_qa_msg(qa_id, path, resolved, path))
         return qa_id, None
 
+    def load_fqa_file(
+        self, path: str, directives: list[str] | None = None
+    ) -> tuple[int | None, str | None]:
+        """Unpack a .fqa package to a temp dir and run its main file — the
+        _FLUA.loadFQAfromFile convenience (the same pipeline `flua x.fqa`
+        uses on the CLI). Returns (qa_id, None) or (None, error)."""
+        path = str(Path(path))
+        try:
+            raw = Path(path).read_text(encoding="utf-8")
+            body = json.loads(raw)
+        except (OSError, ValueError) as exc:
+            return None, f"cannot open {path}: {exc}"
+        fqa = Api._parse_fqa_body(body)
+        if fqa is None or not isinstance(fqa.get("files"), list):
+            return None, f"cannot open {path}: not a .fqa package (no files list)"
+        base = os.path.join(tempfile.gettempdir(), f"flua-qa-files-{os.getpid()}")
+        os.makedirs(base, exist_ok=True)
+        directory = tempfile.mkdtemp(prefix="fqa-", dir=base)
+        main_path, err = LuaEngine.fqa_to_files(fqa, directory)
+        if err is not None or main_path is None:
+            with contextlib.suppress(OSError):
+                shutil.rmtree(directory, ignore_errors=True)
+            return None, f"cannot open {path}: {err or 'package has no main file'}"
+        self.track_temp_dir(base)
+        return self.load_qa_file(main_path, directives)
+
     def qa_temp_file(self, code: str) -> str:
         """Write inline QA code to a temp file (deleted once the QA loads)."""
         directory = tempfile.mkdtemp(prefix="flua-qa-")

@@ -32,6 +32,7 @@ from .api import Api
 from .clock import parse_start_time
 from .config import (
     expand_includes,
+    merge_annotations,
     parse_annotations,
     split_annotations,
 )
@@ -49,6 +50,16 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Minimal Lua engine on lupa + asyncio with cooperative timers.",
     )
     parser.add_argument("scripts", nargs="*", help="Lua QuickApp files to run (each isolated)")
+    parser.add_argument(
+        "-D",
+        "--directive",
+        action="append",
+        default=[],
+        metavar="DIRECTIVE",
+        help="inject a --%% directive, as if appended to every QA's header "
+        "(repeatable; e.g. -D mode:online -D var:x=42) — handy when testing "
+        "foreign code without editing it",
+    )
     parser.add_argument(
         "-e",
         "--execute",
@@ -248,8 +259,19 @@ def _load_qas(
     global_config: dict[str, Any] = {}
     specs: list[tuple[str | None, str | None, dict[str, Any]]] = []
     _FQA_UNPACK_DIRS.clear()
+    # -D/--directive: injected as if appended to every QA's header (the
+    # injected directives win over the file's own)
+    injected: dict[str, Any] | None = None
+    for entry in args.directive:
+        if not isinstance(entry, str) or not entry.strip():
+            parser.error("-D needs a directive string, e.g. -D mode:online")
+        annotations = parse_annotations("--%%" + entry)
+        injected = annotations if injected is None else merge_annotations(injected, annotations)
     if args.code is not None:
-        global_params, local_params = split_annotations(parse_annotations(args.code))
+        annotations = parse_annotations(args.code)
+        if injected is not None:
+            annotations = merge_annotations(annotations, injected)
+        global_params, local_params = split_annotations(annotations)
         global_config.update(global_params)
         specs.append((None, args.code, local_params))
     for script in args.scripts:
@@ -265,6 +287,8 @@ def _load_qas(
             annotations = expand_includes(parse_annotations(source), path.parent)
         except ValueError as exc:
             parser.error(f"error in {script}: {exc}")
+        if injected is not None:
+            annotations = merge_annotations(annotations, injected)
         global_params, local_params = split_annotations(annotations)
         if fqa_meta is not None:
             interfaces = fqa_meta.get("initialInterfaces")

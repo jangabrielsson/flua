@@ -430,6 +430,141 @@ async def test_dynamic_load_from_file(tmp_path, capsys) -> None:
 
 
 @pytest.mark.asyncio
+async def test_dynamic_load_fqa_from_file(tmp_path, capsys) -> None:
+    # _FLUA.loadFQAfromFile: unpack a .fqa package to a temp dir, then the
+    # loadQAfromFile pipeline (name/type come from the package header)
+    pack = tmp_path / "pack.fqa"
+    pack.write_text(
+        json.dumps(
+            {
+                "name": "packed-qa",
+                "type": "com.fibaro.binarySwitch",
+                "files": [
+                    {
+                        "name": "main",
+                        "isMain": True,
+                        "content": "function QuickApp:turnOn() print('PACKED ON', self.id) end\n",
+                    }
+                ],
+            }
+        )
+    )
+    loader = tmp_path / "loader.lua"
+    loader.write_text(
+        "setTimeout(function()\n"
+        "  local id, err = _FLUA.loadFQAfromFile('" + str(pack) + "')\n"
+        "  print('GOT', id, err)\n"
+        "  if id then\n"
+        "    fibaro.call(id, 'turnOn')\n"
+        "    local dev = api.get('/devices/'..id)\n"
+        "    print('DEV', dev.name, dev.type)\n"
+        "  end\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(loader), None, {}, str(loader))
+        await wait_until(lambda: not engine.has_pending_work())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "GOT 5001" in out
+    assert "PACKED ON 5001" in out
+    assert "DEV packed-qa com.fibaro.binarySwitch" in out
+
+
+@pytest.mark.asyncio
+async def test_dynamic_load_fqa_rejects_non_package(tmp_path, capsys) -> None:
+    # a non-.fqa file is rejected with the CLI's error, not loaded as a QA
+    plain = tmp_path / "plain.lua"
+    plain.write_text("print('x')\n")
+    loader = tmp_path / "loader.lua"
+    loader.write_text(
+        "setTimeout(function()\n"
+        "  local id, err = _FLUA.loadFQAfromFile('" + str(plain) + "')\n"
+        "  print('BAD', id, err)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(loader), None, {}, str(loader))
+        await wait_until(lambda: not engine.has_pending_work())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "BAD nil" in out
+    assert "cannot open" in out
+
+
+def test_cli_directive_injection(tmp_path) -> None:
+    # -D/--directive injects --%% lines as if appended to every QA's header —
+    # testing foreign code without editing it
+    script = tmp_path / "app.lua"
+    script.write_text(
+        "--%%name:original\n"
+        "print('OK')\n"
+        "setTimeout(function()\n"
+        "  local dev = api.get('/devices/'.._FLUA.qaId)\n"
+        "  local qv = dev.properties.quickAppVariables[1]\n"
+        "  print('X', qv and qv.name, qv and qv.value)\n"
+        "  exit(0)\n"
+        "end, 10)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "-D", "name:injected", "-D", "var:x=42", str(script)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "[injected5000]: OK" in result.stdout  # the injected name wins
+    assert "[injected5000]: X x 42" in result.stdout  # and the injected var exists
+    # an empty -D is rejected up front
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "-D", "", str(script)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode != 0 and "-D needs a directive" in result.stderr
+
+
+@pytest.mark.asyncio
+async def test_load_qa_from_string_directives_spawn_variants(tmp_path, capsys) -> None:
+    # the directives array on loadQAfromString lets one code string spawn
+    # several QAs under different names
+    loader = tmp_path / "loader.lua"
+    loader.write_text(
+        "local code = [[--%%name:base\nfunction QuickApp:turnOn() print('HI', self.id) end]]\n"
+        "setTimeout(function()\n"
+        "  local a, ea = _FLUA.loadQAfromString(code, {[[name:alpha]]})\n"
+        "  local b, eb = _FLUA.loadQAfromString(code, {[[name:beta]]})\n"
+        "  print('IDS', a, ea, b, eb)\n"
+        "  if a and b then\n"
+        "    fibaro.call(a, 'turnOn')\n"
+        "    fibaro.call(b, 'turnOn')\n"
+        "    print('NAMES', api.get('/devices/'..a).name, api.get('/devices/'..b).name)\n"
+        "  end\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(loader), None, {}, str(loader))
+        await wait_until(lambda: not engine.has_pending_work())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "IDS 5001 nil 5002 nil" in out
+    assert "HI 5001" in out and "HI 5002" in out
+    assert "NAMES alpha beta" in out
+
+
+@pytest.mark.asyncio
 async def test_device_created_and_removed_events_reach_subscribers(tmp_path, capsys) -> None:
     # a RefreshStateSubscriber sees DeviceCreatedEvent when another QA is
     # loaded and DeviceRemovedEvent when a device is deleted through the API
