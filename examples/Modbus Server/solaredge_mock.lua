@@ -69,8 +69,15 @@ end
 
 function QuickApp:onInit()
   -- the listen port is a QA variable (default 1502, the SolarEdge Live QA's
-  -- default) — override with -D var:port=N (0 = any free port)
-  mock = server.serve(MAP, { port = tonumber(self:getVariable("port")) or 1502, base = 40000 })
+  -- default) — override with -D var:port=N (0 = any free port). The map is
+  -- served at BOTH wire bases — base 40000 (the QA's register - 40001
+  -- convention) and altBase 0 (SunSpec base-0 addresses, e.g. 40083) —
+  -- mirroring the real inverter, which answers both (verified on device).
+  mock = server.serve(MAP, {
+    port = tonumber(self:getVariable("port")) or 1502,
+    base = 40000,
+    altBase = 0,
+  })
   print("SolarEdge mock listening on 127.0.0.1:" .. mock.srv.port)
   self:updateView("label", "text", render(""))
 end

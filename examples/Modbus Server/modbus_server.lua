@@ -49,6 +49,8 @@ function ModbusServer.new(map, opts)
   return setmetatable({
     map = map or {},
     base = opts.base or 40001,
+    altBase = opts.altBase,  -- optional second base: real SE devices serve
+                            -- the map at BOTH the legacy and SunSpec bases
     port = opts.port or 1502,
     zeroFill = opts.zeroFill ~= false,
     onRead = opts.onRead,
@@ -60,6 +62,17 @@ function ModbusServer.new(map, opts)
 end
 
 function ModbusServer:get(key) return self.map[key] or 0 end
+
+function ModbusServer:lookup(pdu)
+  -- resolve a wire address to a map value; with altBase set, an address
+  -- that misses at the primary base is tried at the alternate one (the
+  -- SolarEdge mock serves both the legacy low addresses and SunSpec 40000+)
+  local v = self.map[self.base + pdu]
+  if v == nil and self.altBase ~= nil then
+    v = self.map[self.altBase + pdu]
+  end
+  return v
+end
 
 function ModbusServer:set(key, value)
   if self.onWrite then self.onWrite(key, u16(value)) end
@@ -90,11 +103,11 @@ function ModbusServer:handle(data, conn)
     end
     local words = {}
     for i = 0, count - 1 do
-      local key = self.base + addr + i
-      if not self.zeroFill and self.map[key] == nil then
+      local v = self:lookup(addr + i)
+      if not self.zeroFill and v == nil then
         return exception(txid, unit, func, 2)  -- illegal data address
       end
-      words[#words + 1] = self:get(key)
+      words[#words + 1] = v or 0
     end
     if self.onRead then self.onRead(addr, count) end
     local payload = packWords(words)

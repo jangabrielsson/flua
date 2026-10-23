@@ -1,4 +1,4 @@
-"""The os.getenv chain: local .env > ~/.env > process environment."""
+"""The os.getenv chain: process env > local .env > ~/.env."""
 
 import os
 
@@ -25,7 +25,7 @@ def test_parse_formats(tmp_path) -> None:
     assert "BROKENLINE" not in values
 
 
-def test_precedence_local_then_home_then_process(tmp_path, monkeypatch) -> None:
+def test_precedence_process_then_local_then_home(tmp_path, monkeypatch) -> None:
     (tmp_path / ".env").write_text("KEY=local\nONLY_LOCAL=yes\n")
     home = tmp_path / "home"
     home.mkdir()
@@ -35,11 +35,19 @@ def test_precedence_local_then_home_then_process(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("ONLY_PROCESS", "env")
 
     chain = EnvChain(directory=str(tmp_path))
-    assert chain.get("KEY") == "local"  # local wins over home and process
-    assert chain.get("ONLY_LOCAL") == "yes"
-    assert chain.get("ONLY_HOME") == "yes"  # home beats process
-    assert chain.get("ONLY_PROCESS") == "env"  # process is the fallback
+    assert chain.get("KEY") == "process"  # per-invocation settings win
+    assert chain.get("ONLY_PROCESS") == "env"
+    assert chain.get("ONLY_LOCAL") == "yes"  # the project file beats ~/.env
+    assert chain.get("ONLY_HOME") == "yes"  # ~/.env is the fallback
     assert chain.get("MISSING") is None
+
+
+def test_empty_process_env_counts_as_set(tmp_path, monkeypatch) -> None:
+    # an explicitly empty process value is a deliberate setting, not a miss
+    (tmp_path / ".env").write_text("KEY=local\n")
+    monkeypatch.setenv("KEY", "")
+    chain = EnvChain(directory=str(tmp_path))
+    assert chain.get("KEY") == ""
 
 
 def test_mtime_reload(tmp_path) -> None:

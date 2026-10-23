@@ -407,6 +407,36 @@ def test_qa_run_returns_exit_logs_and_verdict(tmp_path) -> None:
         isinstance(line, dict) and line.get("msg") == "hello agent" for line in result["logs"]
     )
     assert result["verdict"] == []
+    assert "trace" not in result  # no trace requested
+
+
+def test_qa_run_trace_returns_structured_traces(tmp_path) -> None:
+    # trace: the api/ui/net/timer event stream lands in the result as a
+    # `trace` field — the same --trace/--syslog lines, no files involved
+    script = tmp_path / "traced.lua"
+    script.write_text(
+        "--%%name:Traced\n"
+        "--%%type:com.fibaro.binarySwitch\n"
+        "function QuickApp:onInit()\n"
+        "  api.get('/devices')\n"
+        "  fibaro.call(self.id, 'turnOn')\n"
+        "  exit(0)\n"
+        "end\n",
+    )
+    result = _tool("qa_run", {"files": [str(script)], "trace": "api,ui"})
+    assert result["exitCode"] == 0
+    entries = result["trace"]
+    categories = {e["data"]["category"] for e in entries}
+    assert categories == {"api", "ui"}
+    assert any(
+        e["data"]["category"] == "ui" and e["data"]["url"].endswith("/action/turnOn")
+        for e in entries
+    )
+
+
+def test_qa_run_bad_trace() -> None:
+    result = _tool("qa_run", {"files": ["x.lua"], "trace": ""})
+    assert result["isError"] is True
 
 
 def test_qa_run_failing_qa_sets_exit_code(tmp_path) -> None:
@@ -681,6 +711,30 @@ def test_session_probe_includes_the_refreshstates_feed(tmp_path) -> None:
         # cursor delta: the second probe sees nothing new
         assert probe2["refreshStates"]["last"] >= feed["last"]
         assert not probe2["refreshStates"].get("events")
+    finally:
+        _tool("qa_stop", {"sessionId": session_id})
+
+
+def test_session_trace_flows_into_probe_system_events(tmp_path) -> None:
+    # trace enabled at qa_start: the probe's systemEvents feed carries the
+    # {'event': 'trace'} entries (the in-process engine's systemLog buffer)
+    script = tmp_path / "traced_sess.lua"
+    script.write_text(
+        "--%%name:TracedSess\n"
+        "--%%type:com.fibaro.binarySwitch\n"
+        "function QuickApp:onInit()\n"
+        "  api.get('/devices')\n"
+        "  fibaro.call(self.id, 'turnOn')\n"
+        "end\n",
+    )
+    started = _tool("qa_start", {"files": [str(script)], "trace": "api,ui"})
+    session_id = started["sessionId"]
+    try:
+        probe = _tool("qa_probe", {"sessionId": session_id})
+        traces = [e for e in probe["systemEvents"] if e.get("event") == "trace"]
+        assert traces, "no trace entries in the probe's systemEvents"
+        categories = {e["data"]["category"] for e in traces}
+        assert categories == {"api", "ui"}
     finally:
         _tool("qa_stop", {"sessionId": session_id})
 

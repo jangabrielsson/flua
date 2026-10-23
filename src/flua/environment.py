@@ -1,4 +1,4 @@
-"""Environment lookup for ``os.getenv`` (Lua): local .env > ~/.env > process env.
+"""Environment lookup for ``os.getenv`` (Lua): process env > local .env > ~/.env.
 
 The two .env files are plain ``KEY=value`` lines (blank lines and ``#``
 comments ignored, optional quotes). Values are cached per file and re-read
@@ -13,7 +13,9 @@ from pathlib import Path
 
 
 class EnvChain:
-    """Resolution order: <directory>/.env, ~/.env, then the process environment."""
+    """Resolution order: the process environment first (per-invocation settings
+    like CLI flags win), then <directory>/.env (the project file), then ~/.env
+    (the user-global defaults)."""
 
     def __init__(self, directory: str | None = None) -> None:
         self._directory = Path(directory) if directory else Path.cwd()
@@ -51,8 +53,11 @@ class EnvChain:
 
     def get(self, name: str) -> str | None:
         """Look up one variable through the chain. None if not set anywhere."""
+        value = os.environ.get(name)
+        if value is not None:
+            return value
         for path in (self._directory / ".env", Path.home() / ".env"):
             values = self._values(path)
             if name in values:
                 return values[name]
-        return os.environ.get(name)
+        return None

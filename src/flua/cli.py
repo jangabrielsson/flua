@@ -168,6 +168,15 @@ def _build_parser() -> argparse.ArgumentParser:
         "(the complete history; /flua/systemLog is the bounded in-memory buffer)",
     )
     parser.add_argument(
+        "--trace",
+        metavar="LIST",
+        default="",
+        help="extra structured run traces for agents, as 'event: trace' lines in "
+        "the same channel as --syslog: comma list of api, ui, net, timer "
+        "(or 'all') — api.* calls with status+bodies, incoming actions and "
+        "UI events, net requests/results, and timer starts/expiries",
+    )
+    parser.add_argument(
         "--examples",
         action="store_true",
         help="print the installed examples directory and exit",
@@ -467,6 +476,7 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             db_path=db_path,
             db_persist=db_persist,
             location=location,
+            trace=args.trace,
         )
         engine.set_log_mode(args.log, args.logfile)
         if args.syslog:

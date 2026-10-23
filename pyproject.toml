@@ -53,13 +53,20 @@ dev = [
 
 [tool.setuptools]
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
-
-[tool.setuptools.packages.find]
-# flua.examples maps onto the repo's examples/ directory (package-dir), so
-# the wheel ships the QuickApp examples without duplicating them — pip users
-# find them through `flua --examples`.
-where = ["src", "examples"]
-include = ["flua*"]
+# Explicit package list: packages.find cannot discover flua.examples — the
+# finder names a package after its directory, and examples/ lives OUTSIDE
+# src/ (package-dir maps it: "flua.examples" = "examples"). Adding a new
+# subpackage under src/flua means adding it here.
+packages = [
+    "flua",
+    "flua.api",
+    "flua.api.routes",
+    "flua.devices",
+    "flua.examples",
+    "flua.mcp",
+    "flua.setup_templates.github.skills.skill-creator.scripts",
+    "flua.tools",
+]
 
 [tool.setuptools.package-dir]
 "" = "src"
@@ -74,7 +81,7 @@ flua = [
     # globs don't match dotfiles — .luarc.json would be dropped from the wheel
     "setup_templates/.luarc.json",
 ]
-"flua.examples" = ["*.lua", "house.json", "multifile/*.lua"]
+"flua.examples" = ["*.lua", "house.json", "multifile/*.lua", "Modbus Server/*"]
 
 [tool.ruff]
 line-length = 100

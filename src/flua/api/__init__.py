@@ -52,6 +52,16 @@ def _compile_routes() -> list[tuple[str, re.Pattern[str], dict[str, int], Handle
 _COMPILED = _compile_routes()
 
 
+def _trace_body(body: Any) -> str:
+    """A JSON-safe, truncated rendering of an api request body for the
+    --trace api/ui events (bodies may carry secrets or be huge)."""
+    try:
+        text = json.dumps(body, ensure_ascii=False, default=str)
+    except (TypeError, ValueError):
+        text = repr(body)
+    return text if len(text) <= 1000 else text[:1000] + "..."
+
+
 class Api:
     """Dispatch facade owned by the engine. Offline: everything is local."""
 
@@ -160,7 +170,9 @@ class Api:
         from worker threads while the pump mutates the sim in between.
         """
         with self._dispatch_lock:
-            return self._dispatch(method, url, body, qa_id, external)
+            data, status = self._dispatch(method, url, body, qa_id, external)
+        self._trace_api(method, url, body, status, qa_id)
+        return data, status
 
     def _dispatch(
         self,
@@ -235,7 +247,36 @@ class Api:
         used by fibaro.callhc3 and test code that wants ground-truth data.
         Without a remote backend (local mode) the sim stands in."""
         with self._dispatch_lock:
-            return self._dispatch_hc3(method, url, body)
+            data, status = self._dispatch_hc3(method, url, body)
+        self._trace_api(method, url, body, status, None, hc3=True)
+        return data, status
+
+    # -- run tracing (--trace api|ui): one structured event per dispatched
+    # call, so agents can follow every api.* the QA makes (URL, status, and
+    # the request body — the arguments that usually go wrong)
+    _UI_TRACE_RE = re.compile(r"/plugins/callUIEvent|/devices/\d+/action/|/devices/groupAction/")
+
+    def _trace_api(
+        self,
+        method: str,
+        url: str,
+        body: Any,
+        status: int,
+        qa_id: int | None,
+        hc3: bool = False,
+    ) -> None:
+        engine = self._engine
+        if engine is None:
+            return
+        if qa_id is None and not hc3:
+            return  # engine-internal traffic (seeding, restores) stays quiet
+        category = "ui" if self._UI_TRACE_RE.search(url) else "api"
+        data: dict[str, Any] = {"method": method, "url": url, "status": status}
+        if body is not None:
+            data["body"] = _trace_body(body)
+        if hc3:
+            data["hc3"] = True
+        engine.trace_event(category, qa_id, data)
 
     def _dispatch_hc3(self, method: str, url: str, body: Any = None) -> tuple[Any, int]:
         if self._remote is None:

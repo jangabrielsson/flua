@@ -58,6 +58,7 @@ class SessionManager:
         speed: float | None,
         start: float | None,
         ttl: float,
+        trace: str | None = None,
     ) -> dict[str, Any]:
         """Boot a session: one engine, N QAs, on a dedicated loop/thread.
         Blocks until the QAs are loaded. Returns {sessionId, qaIds}."""
@@ -70,6 +71,7 @@ class SessionManager:
                 speed=float("inf") if instant else (speed if speed is not None else 1.0),
                 start=start,
                 log_stream=sys.stderr,  # stdout stays pure JSON-RPC on the stdio transport
+                trace=trace or "",
             )
         except ValueError as exc:
             loop.close()

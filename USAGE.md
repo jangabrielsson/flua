@@ -524,11 +524,12 @@ address/home). The virtual-clock fields (sun times, `date`, `timestamp`,
 extension (the HC3's weather is provider-owned): it overrides any weather
 field, so scene logic can react to a fixed forecast.
 
-`os.getenv(name)` reads through flua's environment chain: the local `.env`
-in the directory you run from, then `~/.env`, then the shell environment.
-Files are plain `KEY=value` lines (comments and quotes supported) and are
-re-read when they change — handy for API tokens and per-machine settings
-that don't belong in the QA code.
+`os.getenv(name)` reads through flua's environment chain: the shell
+environment first (so explicit per-run settings like CLI flags win), then
+the local `.env` in the directory you run from, then `~/.env` as the
+global fallback. Files are plain `KEY=value` lines (comments and quotes
+supported) and are re-read when they change — handy for API tokens and
+per-machine settings that don't belong in the QA code.
 
 ### The `--%%include` defaults directive
 
@@ -1070,6 +1071,16 @@ appends every structured system/crash event as one JSON line — the
 complete history, where `GET /flua/systemLog` is the bounded in-memory
 buffer.
 
+`--trace LIST` adds opt-in run traces to the same channel (comma list of
+`api`, `ui`, `net`, `timer`, or `all`) — one `{"event": "trace",
+"data": {"category": …}}` line per: `api` — every `api.*` call a QA makes
+(method, URL, status, and the request body — the arguments that usually go
+wrong); `ui` — incoming device actions and `callUIEvent` interactions;
+`net` — HTTP/TCP/UDP/WS/MQTT operations and results (sizes, not payloads);
+`timer` — timer starts and expiries. It is the same history an agent reads
+with `--syslog`, so a single file gives both the lifecycle and the QA's
+behavior. Bodies are truncated at 1000 chars (they may carry secrets).
+
 ### MCP server (`flua-mcp`)
 
 The same surface is available as an MCP server for hosts that prefer one
@@ -1086,7 +1097,11 @@ dump), and `devices` (run to completion, then the final device list from
 the REST feeds) — plus the session tier for live probing: `qa_start`
 keeps a running engine, `qa_probe` reads devices + new log/refreshState
 lines (cursor-based deltas), `qa_action` dispatches device actions into
-it, `qa_stop`/`qa_sessions` manage it. Resources: the docs ship in the wheel and are served as
+it, `qa_stop`/`qa_sessions` manage it. Both `qa_run` and `qa_start` take
+a `trace` parameter (`api`/`ui`/`net`/`timer`, `all`): `qa_run` returns
+the trace lines in its `trace` field, and a traced session feeds them
+through `qa_probe`'s `systemEvents` (the same `--trace` stream).
+Resources: the docs ship in the wheel and are served as
 `flua://docs/*` (e.g. `flua://docs/USAGE.md`, `flua://docs/tutorial/…`) via
 `resources/list`/`resources/read`, with `docs_list`/`docs_read` tools for
 hosts without resource support — an agent host can read the flua docs

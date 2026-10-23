@@ -491,11 +491,13 @@ class SimState:
         detail: str,
         timestamp: float,
         code: int = 0,
+        data: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Append one structured lifecycle/crash entry to /flua/systemLog.
-        Called from the pump and worker threads — pure deque append, never
-        Lua. Event names: run_start, run_stop, qa_load, qa_restart, qa_exit,
-        qa_error, crash, error. Returns the recorded entry."""
+        """Append one structured lifecycle/crash/trace entry to
+        /flua/systemLog. Called from the pump and worker threads — pure
+        deque append, never Lua. Event names: run_start, run_stop, qa_load,
+        qa_restart, qa_exit, qa_error, crash, error, trace (with ``data``).
+        Returns the recorded entry."""
         self._sys_seq += 1
         try:
             when = datetime.fromtimestamp(timestamp).isoformat(timespec="seconds")
@@ -512,6 +514,8 @@ class SimState:
             "code": code,
             "detail": detail,
         }
+        if data is not None:
+            entry["data"] = data
         self.system_events.append(entry)
         return entry
 

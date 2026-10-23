@@ -15,8 +15,10 @@ Covers three contracts:
 
 import re
 import socket
+import struct
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -144,6 +146,49 @@ def test_modbus_server_write_functions_round_trip(tmp_path) -> None:
     assert "PASS: oversized read capped at 125 (125)" in result.stdout
     assert "PASS: capped read starts at the requested address" in result.stdout
     assert "failures: 0" in result.stdout
+
+
+def test_solaredge_mock_serves_both_wire_bases(tmp_path) -> None:
+    # the real inverter answers AC power at BOTH the legacy address (83, the
+    # QA author verified on device) and the SunSpec base-0 address (40083) —
+    # the mock mirrors that (base 40000 + altBase 0), so a spec-correct
+    # client and the SolarEdge Live convention both work
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    proc = subprocess.Popen(
+        [*FLUA, str(EXAMPLE_DIR / "solaredge_mock.lua"), "-D", f"var:port={port}",
+         "--run-for", "30", "--speed", "60"],
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    try:
+        # wait for the mock's listener
+        deadline = time.time() + 10
+        while True:
+            try:
+                with socket.create_connection(("127.0.0.1", port), timeout=1):
+                    break
+            except OSError:
+                if time.time() > deadline:
+                    out = proc.stdout.read() if proc.stdout else "no listener"
+                    raise AssertionError(out) from None
+                time.sleep(0.1)
+
+        def read_register(addr: int) -> int:
+            with socket.create_connection(("127.0.0.1", port), timeout=2) as s:
+                s.sendall(struct.pack(">HHHBBHH", 1, 0, 6, 1, 3, addr, 2))
+                reply = s.recv(64)
+            assert len(reply) == 13 and reply[7] == 3 and reply[8] == 4, reply.hex()
+            return struct.unpack(">H", reply[9:11])[0]
+
+        assert read_register(83) == 2500      # the QA's register - 40001
+        assert read_register(40083) == 2500   # SunSpec base-0
+    finally:
+        proc.terminate()
+        proc.wait(timeout=10)
 
 
 def test_var_directives_seed_quick_app_variables(tmp_path) -> None:

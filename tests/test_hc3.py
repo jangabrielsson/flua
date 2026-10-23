@@ -451,6 +451,54 @@ async def test_profiles_served_from_hc3_online(tmp_path, capsys, mock_hc3, monke
 
 
 @pytest.mark.asyncio
+async def test_device_action_during_suspended_boot(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # online mode suspends onInit on every api.* call, so a fibaro.call the
+    # QA fires at its own child during boot can be delivered while only the
+    # boot stub exists — flua must defer the action until the boot finishes
+    # (the HC3 Diagnostics V2.0 QA hit this: "deviceAction for unknown device").
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    script = tmp_path / "remote_child.lua"
+    script.write_text(
+        "--%%name:RemoteChild\n"
+        "--%%type:com.fibaro.binarySwitch\n"
+        "class 'TestChild'(QuickAppChild)\n"
+        "function TestChild:__init(dev) QuickAppChild.__init(self, dev) end\n"
+        "function TestChild:value(v)\n"
+        "  self:updateProperty('value', v)\n"
+        "end\n"
+        "function QuickApp:onInit()\n"
+        "  local child = self:createChildDevice(\n"
+        "    {name = 'kid', type = 'com.fibaro.multilevelSensor'}, TestChild)\n"
+        "  api.get('/profiles')  -- remote: suspends the boot mid-onInit\n"
+        "  fibaro.call(child.id, 'value', 42)  -- arrives while only the stub exists\n"
+        "  print('BOOTED', child.id)\n"
+        "end\n",
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        out = await _wait_for_output(capsys, "BOOTED 900001")
+        assert "deviceAction for unknown device" not in out
+        # the deferred action runs once the boot completes
+        deadline = time.monotonic() + 3
+        while True:
+            data, status = engine.api.dispatch("GET", "/devices/900001")
+            if status == 200 and data.get("properties", {}).get("value") == 42:
+                break
+            if time.monotonic() > deadline:
+                raise AssertionError(f"child never updated: {data}")
+            await asyncio.sleep(0.05)
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
 async def test_partitions_served_from_hc3_online(
     tmp_path, capsys, mock_hc3, monkeypatch
 ) -> None:

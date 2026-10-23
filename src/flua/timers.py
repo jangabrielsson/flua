@@ -72,6 +72,11 @@ class TimerManager:
         """Active timers attributed to a QA."""
         return sum(1 for t in self._timer_qa.values() if t == qa_id)
 
+    def timer_qa(self, timer_id: int) -> int | None:
+        """The QA a timer is attributed to (readable from the fire callback
+        — the attribution is removed right after it)."""
+        return self._timer_qa.get(timer_id)
+
     def cancel_qa(self, qa_id: int) -> int:
         """Cancel all timers attributed to a QA. Returns the number cancelled."""
         ids = [t for t, q in self._timer_qa.items() if q == qa_id]
@@ -98,13 +103,15 @@ class TimerManager:
                 break  # realtime/speed modes: only fire what is due
             heapq.heappop(self._heap)
             del self._deadlines[timer_id]
-            self._timer_qa.pop(timer_id, None)
             if self._clock.time < deadline:
                 self._clock.time = deadline  # instant mode: add the wait to V
             try:
                 self._on_fire(timer_id)
             except Exception:
                 logger.exception("on_fire failed for timer %d", timer_id)
+            # the qa attribution stays around until after the callback, so
+            # fire-time hooks (the --trace timer events) can read it
+            self._timer_qa.pop(timer_id, None)
             fired += 1
         return fired
 

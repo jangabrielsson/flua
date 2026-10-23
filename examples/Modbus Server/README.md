@@ -63,9 +63,10 @@ wire address, so SunSpec sits at 40000+. A QA that subtracts 40001 instead
 addresses the **legacy SE protocol** layout (same model, same numbers, low
 wire addresses). A live read from the QA author's inverter confirmed real
 devices serve AC power at BOTH bases (PDU 40083 and PDU 83) — the
-SolarEdge Live QA is fine on real hardware, and the mock's `base = 40000`
-serves the SunSpec map at its addresses (equivalent for the inverter
-block; the legacy map's meter coverage is unverified).
+SolarEdge Live QA is fine on real hardware, and the mock mirrors the
+device: `base = 40000` serves the QA's addresses, `altBase = 0` serves
+spec-correct SunSpec base-0 addresses too, so either client convention
+works against it.
 
 Unknown addresses reply 0 (a real device answers the whole span); set
 `zeroFill = false` to answer illegal-data-address exceptions instead.

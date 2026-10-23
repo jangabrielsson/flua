@@ -117,7 +117,7 @@ src/flua/
   sync_socket.py   blocking LuaSocket-compatible TCP/UDP (the debugger's sockets)
   devices/         the HC3 device catalog (176 real captures) + skeleton builder
   config.py        --%% annotation parsing, EOH, the offline peek, env helpers
-  environment.py   the os.getenv chain: local .env > ~/.env > process env
+  environment.py   the os.getenv chain: process env > local .env > ~/.env
   timers.py        TimerManager on the virtual clock (per-QA attribution)
   clock.py         VirtualClock: realtime / accelerated / instant, start time
   messages.py      message type constants + builders
@@ -252,7 +252,7 @@ receive).
   --%%mode:...      ->  mode decision: --api flag > main QA's mode > online
   per-QA config     <-  CLI flags + globals + locals + .flua.lua base
   --%%var:name=expr    ->  evaluated in Lua with {config, os} in scope
-  os.getenv(name)      ->  EnvChain: local .env > ~/.env > process env
+  os.getenv(name)      ->  EnvChain: process env > local .env > ~/.env
 ```
 
 The `.fqa` export/import round-trip reuses the pipeline: unpacked files

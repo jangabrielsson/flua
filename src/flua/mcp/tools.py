@@ -10,10 +10,13 @@ content blocks.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
+import os
 import re
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from typing import Any
@@ -77,6 +80,17 @@ def _qa_ui(args: dict[str, Any]) -> dict[str, Any]:
         raise JsonRpcError(INVALID_PARAMS, str(exc)) from None
 
 
+def _validate_trace(args: dict[str, Any]) -> str | None:
+    trace = args.get("trace")
+    if trace is None:
+        return None
+    if not isinstance(trace, str) or not trace.strip():
+        raise JsonRpcError(
+            INVALID_PARAMS, "trace must be a comma list of api, ui, net, timer (or 'all')"
+        )
+    return trace
+
+
 def _qa_start(args: dict[str, Any]) -> dict[str, Any]:
     """Start a session: a running engine with the given QAs. Returns
     {sessionId, qaIds}; the id is an explicit argument on every later
@@ -87,6 +101,7 @@ def _qa_start(args: dict[str, Any]) -> dict[str, Any]:
     ttl = args.get("ttl", DEFAULT_TTL)
     if not isinstance(ttl, (int, float)) or ttl <= 0:
         raise JsonRpcError(INVALID_PARAMS, "ttl must be a positive number of seconds")
+    trace = _validate_trace(args)
     try:
         return _SESSIONS.start(
             _file_list(args),
@@ -95,6 +110,7 @@ def _qa_start(args: dict[str, Any]) -> dict[str, Any]:
             args.get("speed"),
             _parse_start(args.get("start")),
             float(ttl),
+            trace,
         )
     except (ValueError, RuntimeError) as exc:
         raise JsonRpcError(INTERNAL_ERROR, str(exc)) from None
@@ -265,6 +281,14 @@ def _qa_run(args: dict[str, Any]) -> dict[str, Any]:
         command += ["--start", str(args["start"])]
     if max_hours is not None:
         command += ["--max-hours", str(max_hours)]
+    trace = _validate_trace(args)
+    trace_file = None
+    if trace is not None:
+        command += ["--trace", trace]
+        handle = tempfile.NamedTemporaryFile(mode="w+", suffix=".json", delete=False)
+        trace_file = handle.name
+        handle.close()
+        command += ["--syslog", trace_file]
     command += _file_list(args)
     _acquire_run_slot()
     try:
@@ -293,12 +317,31 @@ def _qa_run(args: dict[str, Any]) -> dict[str, Any]:
     filt = args.get("filter")
     if filt is not None:
         logs = _filter_logs(logs, filt)
-    return {
+    trace_entries: list[Any] = []
+    if trace_file is not None:
+        try:
+            with open(trace_file, encoding="utf-8") as handle:
+                for line in handle:
+                    if not line.strip():
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except ValueError:
+                        continue
+                    if entry.get("event") == "trace":
+                        trace_entries.append(entry)
+        finally:
+            with contextlib.suppress(OSError):
+                os.unlink(trace_file)
+    result: dict[str, Any] = {
         "exitCode": result.returncode,
         "logs": logs,
         "verdict": [line for line in result.stderr.splitlines() if line.strip()],
         "summary": summary,
     }
+    if trace is not None:
+        result["trace"] = trace_entries
+    return result
 
 
 def _summarize(logs: list[Any]) -> dict[str, Any]:
@@ -387,8 +430,11 @@ TOOLS: dict[str, Tool] = {
             "Returns {exitCode, logs, verdict, summary}: logs are the QA's "
             "--log json lines, verdict the stderr notices, summary the "
             "level counts and flua-test PASS/FAIL tallies (no jq needed). "
-            "`filter` narrows the returned logs server-side. One-shot — the run "
-            "ends when the QAs drain; interactive probing is the session tools."
+            "`trace` adds the structured run traces (api/ui/net/timer events) "
+            "as a `trace` field — the same --trace/--syslog stream, without "
+            "the agent touching files. `filter` narrows the returned logs "
+            "server-side. One-shot — the run ends when the QAs drain; "
+            "interactive probing is the session tools."
         ),
         "inputSchema": {
             "type": "object",
@@ -423,6 +469,13 @@ TOOLS: dict[str, Tool] = {
                 "timeout": {
                     "type": "number",
                     "description": "wall-clock seconds before the run is killed (default 120)",
+                },
+                "trace": {
+                    "type": "string",
+                    "description": (
+                        "structured run traces to return in the `trace` field: "
+                        "comma list of api, ui, net, timer (or 'all')"
+                    ),
                 },
                 "filter": {
                     "type": "object",
@@ -533,6 +586,14 @@ TOOLS: dict[str, Tool] = {
                     "type": "number",
                     "description": "idle seconds before auto-stop (default 600)",
                 },
+                "trace": {
+                    "type": "string",
+                    "description": (
+                        "structured run traces (api, ui, net, timer or 'all'): "
+                        "the session's qa_probe systemEvents feed then carries "
+                        "{'event': 'trace'} entries for them"
+                    ),
+                },
             },
             "required": ["files"],
         },
@@ -544,7 +605,9 @@ TOOLS: dict[str, Tool] = {
             "refreshStates} — the three feeds are deltas since the previous "
             "probe (cursor-based), so repeated probes only show what is new. "
             "refreshStates carries the HC3 polling shape "
-            "{status, last, changes, events}."
+            "{status, last, changes, events}. With `trace` enabled at "
+            "qa_start, systemEvents includes {'event': 'trace'} entries "
+            "(api/ui/net/timer)."
         ),
         "inputSchema": {
             "type": "object",

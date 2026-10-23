@@ -108,6 +108,17 @@ _EXPORT_PROPERTIES = frozenset(
 # queue and the running flag. Upper bound on timer delivery latency.
 _PUMP_POLL = 0.01
 
+# Structured run traces (--trace / LuaEngine(trace=...)): opt-in extra
+# events agents can read from the syslog file to follow what a QA does.
+TRACE_CATEGORIES = ("api", "ui", "net", "timer")
+
+
+def _parse_trace(trace: str) -> set[str]:
+    categories = {part.strip() for part in trace.split(",") if part.strip()}
+    if "all" in categories:
+        return set(TRACE_CATEGORIES)
+    return {c for c in categories if c in TRACE_CATEGORIES}
+
 # Seconds the client waits on the HC3's refreshStates long poll: the HC3
 # answers immediately with events and holds the request ~30s when idle.
 # The request runs on a dedicated daemon thread (see _poll_once), never the
@@ -138,11 +149,16 @@ class LuaEngine:
         db_persist: bool = False,
         location: dict[str, Any] | None = None,
         log_stream: Any = None,
+        trace: str = "",
     ) -> None:
         # QA log lines print here: the injected stream when the embedder
         # sets one (the MCP server uses stderr), else late-bound sys.stdout
         # so test capture (capsys) and monkeypatching keep working.
         self._log_stream = log_stream
+        # --trace LIST: extra structured run traces for agents (api, ui,
+        # net, timer; "all"). Off by default — every trace lands in the
+        # syslog file / systemLog buffer as an "event: trace" entry.
+        self._trace = _parse_trace(trace)
         self._lua = lupa.LuaRuntime(unpack_returned_tuples=True, encoding="UTF-8")
         self._inbound: deque[dict[str, Any]] = deque()
         self._outbound: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
@@ -400,6 +416,36 @@ class LuaEngine:
                 tag = f"{info['name']}{qa}"
         entry = self.api.state.record_system_event(
             event, None if qa is None else int(qa), tag, detail, self.clock.time, code=code
+        )
+        if self._syslog is not None:
+            try:
+                self._syslog.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                self._syslog.flush()
+            except OSError:
+                pass
+
+    def trace_event(self, category: str, qa: int | None, data: dict[str, Any]) -> None:
+        """Record one opt-in structured trace (--trace): an "event: trace"
+        entry with a ``category`` and a ``data`` dict — the same channel as
+        system events (syslog file + /flua/systemLog). Silent unless the
+        category was enabled; thread-safe like _system_event."""
+        if category not in self._trace:
+            return
+        detail = ", ".join(f"{key}={value}" for key, value in data.items())
+        if len(detail) > 200:
+            detail = detail[:200] + "..."
+        tag = None
+        if qa is not None:
+            info = self.qa_info(int(qa))
+            if info is not None:
+                tag = f"{info['name']}{qa}"
+        entry = self.api.state.record_system_event(
+            "trace",
+            None if qa is None else int(qa),
+            tag,
+            detail,
+            self.clock.time,
+            data={"category": category, **data},
         )
         if self._syslog is not None:
             try:
@@ -1718,6 +1764,11 @@ class LuaEngine:
                 # a message, not a scheduled timer)
                 return
         self._timers.set_timeout(int(msg["id"]), int(msg["delay"]), qa)
+        self.trace_event(
+            "timer",
+            int(qa) if qa is not None else None,
+            {"kind": "start", "id": int(msg["id"]), "delay": int(msg["delay"])},
+        )
 
     def _handle_qa_vars(self, msg: dict[str, Any]) -> None:
         """Merge evaluated --%%var values into the QA device's variables."""
@@ -1795,6 +1846,11 @@ class LuaEngine:
         msg["url"] = url
         msg["headers"] = headers
         logger.debug("http request id=%s %s %s", msg["id"], msg.get("method"), msg["url"])
+        self.trace_event(
+            "net",
+            int(msg["qa"]) if msg.get("qa") is not None else None,
+            {"kind": "httpRequest", "method": msg.get("method") or "GET", "url": msg["url"]},
+        )
         if debug_flag(self.config, "http"):
             # user net.HTTPClient traffic only — api.* calls are the "api" flag
             self.debug_log(f"http {msg.get('method') or 'GET'} {msg.get('url')}")
@@ -1931,11 +1987,28 @@ class LuaEngine:
             out = messages.tcp_result(
                 msg["id"], msg.get("qa"), ok, conn=value if ok else None, err=None if ok else value
             )
+            self.trace_event(
+                "net",
+                int(msg["qa"]) if msg.get("qa") is not None else None,
+                {"kind": "tcpConnect", "ok": ok, "error": None if ok else value},
+            )
         elif kind == "send":
             out = messages.tcp_result(msg["id"], msg.get("qa"), ok, err=None if ok else value)
+            self.trace_event(
+                "net",
+                int(msg["qa"]) if msg.get("qa") is not None else None,
+                {"kind": "tcpSend", "ok": ok, "bytes": value if ok else None,
+                 "error": None if ok else value},
+            )
         else:
             out = messages.tcp_result(
                 msg["id"], msg.get("qa"), ok, data=value if ok else None, err=None if ok else value
+            )
+            self.trace_event(
+                "net",
+                int(msg["qa"]) if msg.get("qa") is not None else None,
+                {"kind": "tcpRead", "ok": ok, "bytes": len(value) if ok else None,
+                 "error": None if ok else value},
             )
         self.enqueue_outbound(out)
 
@@ -1976,6 +2049,13 @@ class LuaEngine:
         out = messages.udp_result(
             msg["id"], msg.get("qa"), ok, data=value if ok else None, err=None if ok else value
         )
+        self.trace_event(
+            "net",
+            int(msg["qa"]) if msg.get("qa") is not None else None,
+            {"kind": "udp", "ok": ok,
+             "bytes": len(value) if isinstance(value, (str, bytes)) else value,
+             "error": None if ok else value},
+        )
         self.enqueue_outbound(out)
 
     # -- net.WebSocketClient (RFC 6455 client in worker threads) ---------------
@@ -1997,8 +2077,18 @@ class LuaEngine:
             bool(msg.get("checkCertificate", False)),  # HC3 default: no verification
         )
         if not ok:
+            self.trace_event(
+                "net",
+                int(msg["qa"]) if msg.get("qa") is not None else None,
+                {"kind": "wsConnect", "url": str(msg["url"]), "ok": False, "error": err},
+            )
             self._on_ws_event(conn, "error", err)
             return
+        self.trace_event(
+            "net",
+            int(msg["qa"]) if msg.get("qa") is not None else None,
+            {"kind": "wsConnect", "url": str(msg["url"]), "ok": True},
+        )
         self._on_ws_event(conn, "connected", None)
         self.qa_websockets.start_receiver(conn)
 
@@ -2027,6 +2117,16 @@ class LuaEngine:
         qa = self.qa_websockets.qa_of(conn)
         if qa is None:
             return
+        self.trace_event(
+            "net",
+            qa,
+            {
+                "kind": "wsEvent",
+                "event": event,
+                "binary": is_binary,
+                "bytes": len(data) if isinstance(data, (str, bytes)) else None,
+            },
+        )
         out = messages.ws_event(qa, conn, event, data, is_binary)
         self._post_from_worker(out, self._loop)
 
@@ -2111,6 +2211,10 @@ class LuaEngine:
         qa = self.qa_mqtt.qa_of(conn)
         if qa is None:
             return
+        extra: dict[str, Any] = {}
+        if isinstance(data, dict) and data.get("topic"):
+            extra["topic"] = data["topic"]
+        self.trace_event("net", qa, {"kind": "mqtt", "event": event, **extra})
         out = messages.mqtt_event(qa, conn, event, data)
         self._post_from_worker(out, self._loop)
 
@@ -2126,6 +2230,11 @@ class LuaEngine:
                 open_http, method, url, headers, payload, timeout, check
             )
         except Exception as exc:
+            self.trace_event(
+                "net",
+                int(msg["qa"]) if msg.get("qa") is not None else None,
+                {"kind": "httpResult", "method": method, "url": url, "error": str(exc)},
+            )
             self.enqueue_outbound(messages.http_result(msg["id"], msg.get("qa"), error=str(exc)))
             return
         content_type = ""
@@ -2149,6 +2258,18 @@ class LuaEngine:
         finally:
             abort_http_response(response)
         logger.debug("http result id=%s %s", msg["id"], result.get("status", result.get("error")))
+        self.trace_event(
+            "net",
+            int(msg["qa"]) if msg.get("qa") is not None else None,
+            {
+                "kind": "httpResult",
+                "method": method,
+                "url": url,
+                "status": result.get("status"),
+                "error": result.get("error"),
+                "bytes": len(result.get("data") or ""),
+            },
+        )
         self.enqueue_outbound(result)
 
     async def _run_http_stream(
@@ -2336,6 +2457,9 @@ class LuaEngine:
 
     def _on_timer_fired(self, timer_id: int) -> None:
         self.enqueue_outbound(messages.timer_expired(timer_id))
+        self.trace_event(
+            "timer", self._timers.timer_qa(timer_id), {"kind": "expire", "id": timer_id}
+        )
 
     def note_debugger_pause(self) -> None:
         """Freeze virtual time while the debugger waits (mobdebug yield hook)."""

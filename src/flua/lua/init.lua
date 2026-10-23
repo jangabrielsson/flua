@@ -947,13 +947,16 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
   -- Register the QA identity before its files execute: fibaro.sleep only
   -- needs the QA resolvable (deviceId -> qaId) so messages can queue while
   -- the code runs — at top level, before the QuickApp instance exists.
-  -- bootstrapQa replaces this stub with the real instance.
-  qaInstances[qaId] = { id = qaId, name = tostring(config.name) }
+  -- bootstrapQa replaces this stub with the real instance; the booting
+  -- flag marks the window between (online mode's api.* calls suspend
+  -- onInit, so pump messages can arrive while only the stub exists).
+  qaInstances[qaId] = { id = qaId, name = tostring(config.name), booting = true }
   installQaLibs(env)  -- class/quickapp/fibaro into this QA, before its code
   local chunk, err = loader()
   if not chunk then
     print("Error loading " .. tostring(sourceName) .. ": " .. tostring(err))
     _PY.system_event("qa_error", qaId, "boot failed: " .. tostring(err))
+    qaInstances[qaId] = nil
     _FLUA.exit(1)
     return
   end
@@ -962,6 +965,7 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
     print("Error:", err2)
     print(debug.traceback(nil, 2))
     _PY.system_event("qa_error", qaId, "boot failed: " .. tostring(err2))
+    qaInstances[qaId] = nil
     _FLUA.exit(1)
     return
   end
@@ -974,10 +978,15 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
       print("Error in bootstrap:", berr)
       print(debug.traceback(nil, 2))
       _PY.system_event("qa_error", qaId, "bootstrap failed: " .. tostring(berr))
+      qaInstances[qaId] = nil
       _FLUA.exit(1)
       return
     end
   end
+  -- boot finished: scene QAs keep the stub (no instance), so clear the
+  -- booting marker here; the non-scene path replaced the stub entirely
+  local stub = qaInstances[qaId]
+  if stub and stub.booting then stub.booting = nil end
   _PY.post{ type = "qaLoaded", id = qaId }
 end
 
@@ -1114,6 +1123,20 @@ handlers.deviceAction = function(msg)
       qa:callAction(msg.action, table.unpack(msg.args or {}))
     end)
   elseif qa == nil then
+    -- Online mode suspends onInit on every api.* call, so actions a QA
+    -- fires at its own children during boot (fibaro.call from onInit)
+    -- can be delivered while only the boot stub exists. Wait for the boot
+    -- to finish — bounded, so a genuinely unknown device still warns.
+    for _, main in pairs(qaInstances) do
+      if main.booting then
+        msg._tries = (msg._tries or 0) + 1
+        if msg._tries <= 600 then  -- ~30 s at 50 ms
+          setTimeout(function() handlers.deviceAction(msg) end, 50)
+          return
+        end
+        break
+      end
+    end
     _PY.flua_log("warning", nil, "deviceAction for unknown device " .. tostring(msg.id))
   end
 end
