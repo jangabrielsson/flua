@@ -533,6 +533,114 @@ def test_cli_directive_injection(tmp_path) -> None:
     assert result.returncode != 0 and "-D needs a directive" in result.stderr
 
 
+def test_cli_directory_override_file(tmp_path) -> None:
+    # .flua-directives next to the main file overrides the QA's own header
+    # (tester wins), and -D wins over the file — the zero-config way to test
+    # foreign QAs from VS Code (no QA edits, no launch.json edits)
+    script = tmp_path / "app.lua"
+    script.write_text(
+        "--%%name:original\n"
+        "--%%var:host='old'\n"
+        "print('OK')\n"
+        "setTimeout(function()\n"
+        "  local dev = api.get('/devices/'.._FLUA.qaId)\n"
+        "  local qv = dev.properties.quickAppVariables[1]\n"
+        "  print('X', dev.name, qv and qv.name, qv and qv.value)\n"
+        "  exit(0)\n"
+        "end, 10)\n"
+    )
+    (tmp_path / ".flua-directives").write_text(
+        "--%%name:overridden\n--%%var:host='new'\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", str(script)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "[overridden5000]: OK" in result.stdout  # the file wins over the header
+    assert "[overridden5000]: X overridden host new" in result.stdout
+    # -D wins over the override file (explicit beats implicit)
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "-D", "name:cli", str(script)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "[cli5000]: OK" in result.stdout
+    assert "[cli5000]: X cli host new" in result.stdout  # the var override still applies
+
+
+def test_cli_override_file_is_directory_scoped(tmp_path) -> None:
+    # discovery keys on each main file's own directory: a run with two QAs
+    # in two directories applies only the first directory's override file
+    dir_a, dir_b = tmp_path / "a", tmp_path / "b"
+    dir_a.mkdir()
+    dir_b.mkdir()
+    (dir_a / "app.lua").write_text(
+        "--%%name:a-orig\nprint('OK')\n"
+        "setTimeout(function() print('A', _FLUA.config.name); exit(0) end, 10)\n"
+    )
+    (dir_b / "app.lua").write_text(
+        "--%%name:b-orig\nprint('OK')\n"
+        "setTimeout(function() print('B', _FLUA.config.name); exit(0) end, 10)\n"
+    )
+    (dir_a / ".flua-directives").write_text("--%%name:a-over\n")
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", str(dir_a / "app.lua"), str(dir_b / "app.lua")],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "A a-over" in result.stdout
+    assert "B b-orig" in result.stdout
+
+
+def test_cli_override_file_next_to_fqa_applies_inside_does_not(tmp_path) -> None:
+    # for a .fqa script the override file is discovered next to the package,
+    # not inside it — a bundled .flua-directives is the author's file, not
+    # the tester's override
+    pack = tmp_path / "pack.fqa"
+    pack.write_text(
+        json.dumps(
+            {
+                "name": "packed-qa",
+                "type": "com.fibaro.binarySwitch",
+                "files": [
+                    {
+                        "name": "main",
+                        "isMain": True,
+                        "content": "print('OK')\n"
+                        "setTimeout(function() print('N', _FLUA.config.name); exit(0) end, 10)\n",
+                    },
+                    {
+                        "name": ".flua-directives",
+                        "isMain": False,
+                        "content": "--%%name:inside\n",
+                    },
+                ],
+            }
+        )
+    )
+    (tmp_path / ".flua-directives").write_text("--%%name:outside\n")
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", str(pack)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "N outside" in result.stdout  # the file next to the .fqa applied
+    assert "inside" not in result.stdout  # the bundled file never auto-applies
+
+
 @pytest.mark.asyncio
 async def test_load_qa_from_string_directives_spawn_variants(tmp_path, capsys) -> None:
     # the directives array on loadQAfromString lets one code string spawn

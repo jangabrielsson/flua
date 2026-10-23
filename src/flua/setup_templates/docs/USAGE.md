@@ -102,6 +102,12 @@ makes flua exit; QAs with timers or open connections keep running.
                                         # injected lines win over the file's)
 ```
 
+`.flua-directives`, a file in the main QA's directory, is the file-based
+spelling of `-D` — same `--%%` syntax, discovered automatically (see
+[below](#the-flua-directives-override-file)), so a VS Code F5 run picks it
+up with no launch.json edits. Precedence: the QA's header < its
+`--%%include` defaults < `.flua-directives` < `-D` flags.
+
 Virtual time — great for testing long-running logic (`--run-for` counts
 virtual seconds: `--instant --run-for -5` runs five simulated seconds, and
 an interval firing once per simulated second fires exactly five times):
@@ -556,6 +562,33 @@ loud error. This replaces the old `.directives` working-directory defaults
 (the file was ambiguous when QAs lived in different subdirectories — each
 QA now declares its own defaults explicitly).
 
+### The `.flua-directives` override file
+
+Testing someone else's QA usually needs one or two overridden values — a
+password, an IP — without editing the QA (or VS Code's launch.json).
+`.flua-directives`, next to the QA's **main file**, is that file: the same
+`--%%` syntax as a QA header, applied as if its lines came after the QA's
+own — the tester wins:
+
+```lua
+-- .flua-directives — next to main.lua; the QA's own --%%var:pwd/--%%var:host lose
+--%%var:pwd=os.getenv("HC3_PASSWORD")   -- expressions work: the .env chain included
+--%%var:host="192.168.1.99"
+--%%mode:offline                        # or any directive, including globals
+```
+
+Discovery keys on the **directory of the path given on the CLI**: the main
+file's directory, and for a `.fqa` the package's own directory (a
+`.flua-directives` *inside* a package is the author's file and never
+auto-applies). Every QA listed on the command line checks its own
+directory, so QAs in different directories each get their own overrides; a
+missing file is simply skipped. The file wins over the QA's header and its
+`--%%include` defaults; explicit `-D` flags win over the file. Global
+directives (`--%%time`, `--%%db`, ...) work too — they land in the run's
+shared config, like `-D` does. The file often holds secrets: gitignore it,
+or keep it expression-only (`os.getenv(...)`), reading values from the
+`.env` chain.
+
 ## Multi-file QAs
 
 On the HC3 a QA is a set of named Lua files — one is `main`. flua keeps your
@@ -591,8 +624,9 @@ packaged.
 
 ### Online mode — the real HC3
 
-The backend is picked from the **main QA's directives — its header over
-any `--%%include`'d defaults** (see below), before the engine starts:
+The backend is picked from the **main QA's directives — `-D` flags and
+`.flua-directives` over its header over any `--%%include`'d defaults**
+(see below), before the engine starts:
 
 1. an explicit `--api local|remote` always wins;
 2. otherwise, `--%%mode:online`/`--%%mode:proxy` in the **main** QA's
@@ -704,8 +738,9 @@ and your firewall must let the controller reach that port.
 ### Mode comparison
 
 flua picks one of three modes per run: an explicit `--api local|remote` wins,
-then the main QA's directives (`--%%mode:...`, over any `--%%include`'d
-defaults), then the default — `offline` (the simulated HC3).
+then the main QA's directives (`--%%mode:...` — `-D` flags and
+`.flua-directives` over its header over any `--%%include`'d defaults), then
+the default — `offline` (the simulated HC3).
 
 | Aspect | `offline` | `online` | `proxy` |
 |---|---|---|---|

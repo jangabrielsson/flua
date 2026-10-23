@@ -17,3 +17,4 @@ decision changes.
 | [0009](0009-real-logs-over-rest.md) | the sim serves real logs over REST (debugMessages + systemLog) | active |
 | [0010](0010-mcp-ships-in-the-wheel.md) | the MCP server ships in the fibaro-flua wheel as a second entry point | active |
 | [0011](0011-streamable-http-transport.md) | flua-mcp serves Streamable HTTP in stateless mode, opt-in, loopback + token-guarded | active |
+| [0012](0012-interfaces-stored-not-emulated.md) | device interfaces are stored, not emulated — no properties, actions, or UI effects | active |

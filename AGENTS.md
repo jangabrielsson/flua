@@ -105,8 +105,9 @@ Python 3.11+. `lupa` is the only runtime dependency.
 - `src/flua/tools/` — the `--tool` commands (downloadQA/uploadQA/updateQA):
   one module per tool, auto-discovered by the package registry; shared
   helpers live in `tools/common.py`.
-- `src/flua/config.py` — `--%%` directive parsing, `.directives` defaults,
-  mode normalization (`--%%mode:online|offline|proxy`).
+- `src/flua/config.py` — `--%%` directive parsing, `--%%include` defaults,
+  `.flua-directives` overrides, mode normalization
+  (`--%%mode:online|offline|proxy`).
 - `src/flua/proxy.py` — proxy mode: proxy QA deployment on the HC3, state
   mirroring, callback server.
 

@@ -31,6 +31,7 @@ from . import __version__, messages
 from .api import Api
 from .clock import parse_start_time
 from .config import (
+    OVERRIDES_FILE,
     expand_includes,
     merge_annotations,
     parse_annotations,
@@ -263,7 +264,10 @@ def _load_qas(
     script. Global params from every QA are copied up in file order — the
     last file wins. A ``*.fqa`` script argument is unpacked first (a temp
     dir, cleaned at engine stop) and its generated main runs like a normal
-    project — so downloaded/packed fqas are directly runnable.
+    project — so downloaded/packed fqas are directly runnable. A
+    ``.flua-directives`` file next to each CLI path (for a .fqa, next to
+    the package itself) is merged the same way as -D: it wins over the
+    QA's own directives, -D wins over it.
     """
     global_config: dict[str, Any] = {}
     specs: list[tuple[str | None, str | None, dict[str, Any]]] = []
@@ -287,6 +291,10 @@ def _load_qas(
         path = Path(script)
         if not path.exists():
             parser.error(f"cannot open {script}: no such file")
+        # the override file is discovered next to the path given on the CLI —
+        # for a .fqa, the package's own directory (never inside it), not the
+        # unpack temp dir
+        override_dir = path.parent
         fqa_meta: dict[str, Any] | None = None
         if path.suffix.lower() == ".fqa":
             main_path, fqa_meta = _unpack_fqa_script(parser, path)
@@ -296,6 +304,18 @@ def _load_qas(
             annotations = expand_includes(parse_annotations(source), path.parent)
         except ValueError as exc:
             parser.error(f"error in {script}: {exc}")
+        # .flua-directives, next to the main file: the same directive syntax
+        # as a QA header, applied like -D (the file wins over the QA's own
+        # directives and its --%%include defaults; -D still wins over the
+        # file). Zero-config testing of foreign QAs from VS Code — no QA
+        # edits, no launch.json edits.
+        override_path = override_dir / OVERRIDES_FILE
+        if override_path.is_file():
+            try:
+                override_source = override_path.read_text(encoding="utf-8")
+            except OSError as exc:
+                parser.error(f"cannot read overrides file {override_path}: {exc}")
+            annotations = merge_annotations(annotations, parse_annotations(override_source))
         if injected is not None:
             annotations = merge_annotations(annotations, injected)
         global_params, local_params = split_annotations(annotations)

@@ -49,6 +49,15 @@ _MODE_KEYS = ("mode", "offline", "proxy")
 # path resolves relative to the file that carries the include line.
 INCLUDE_DIRECTIVE = "include"
 
+# .flua-directives — a per-directory override file discovered next to the
+# main QA file (the directory of the path given on the CLI; for a .fqa, the
+# package's own directory — never inside it). Same --%% syntax as a QA
+# header; the file wins over the QA's own directives and its --%%include
+# defaults, and -D flags win over the file. Missing file: silent. This is
+# the zero-config way to test foreign QAs from VS Code (no QA edits, no
+# launch.json edits).
+OVERRIDES_FILE = ".flua-directives"
+
 
 def _merge_defaults(merged: dict[str, Any], incoming: dict[str, Any]) -> None:
     """Merge ``incoming`` directives over the accumulated defaults.

@@ -1,0 +1,7 @@
+1. Implement directives for
+--%%symlog=<file>
+--%%trace=x,y,z
+so it can be started from .flua-directives
+
+------------------------
+
