@@ -114,6 +114,18 @@ class SessionManager:
                     return
                 assert qa_id is not None
                 qa_ids.append(qa_id)
+            # the QA boots on the pump (onInit, then the qaLoaded message) —
+            # wait for it, so a probe right after start sees booted QAs and
+            # their events. Slow CI runners race the probe past the boot
+            # otherwise (the session trace test hit this: empty systemEvents).
+            deadline = time.monotonic() + 30.0
+            while time.monotonic() < deadline:
+                if all((session.engine.qa_info(q).get("loaded")) for q in qa_ids):
+                    break
+                await asyncio.sleep(0.01)
+            else:
+                ready["error"] = "QA boot did not complete in time"
+                return
             ready.update(ok=True, qa_ids=qa_ids)
         except Exception as exc:
             ready["error"] = str(exc)
