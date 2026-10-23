@@ -1,2 +1,0 @@
-{"id": 1, "time": "2026-10-23T12:43:27", "event": "run_start", "qa": null, "tag": null, "code": 0, "detail": ""}
-{"id": 2, "time": "2026-10-23T12:43:28", "event": "qa_load", "qa": 5000, "tag": "HC3 Diagnostics V2.05000", "code": 0, "detail": ""}

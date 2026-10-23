@@ -64,7 +64,6 @@
       },
       "arguments": [
         "--ui", "8090",
-        "--syslog","log.json",
         "${relativeFile}"
       ],
       "listenPublicly": true
