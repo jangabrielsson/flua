@@ -4,6 +4,15 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.81] - 2026-10-23
+
+### Fixed
+- qa_start waits for the QAs to finish booting before returning, so a probe
+  right after start sees booted QAs and their events (was a race on slow
+  runners)
+- the Ctrl-C exit test nudges SIGINT twice and reports the child's stderr
+  when it wedges
+
 ## [0.1.80] - 2026-10-23
 
 ### Added
