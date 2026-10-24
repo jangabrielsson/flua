@@ -496,11 +496,15 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             db_path=db_path,
             db_persist=db_persist,
             location=location,
-            trace=args.trace,
+            # --%%trace (global directive) is the declarative form of
+            # --trace; the CLI flag wins
+            trace=args.trace or str(global_config.get("trace") or ""),
         )
         engine.set_log_mode(args.log, args.logfile)
-        if args.syslog:
-            engine.set_syslog(args.syslog)
+        # --%%syslog (global directive) is the declarative form of
+        # --syslog; the CLI flag wins
+        if args.syslog or global_config.get("syslog"):
+            engine.set_syslog(args.syslog or global_config.get("syslog"))
         for directory in _FQA_UNPACK_DIRS:
             # CLI-unpacked .fqa packages die with the engine
             engine.track_temp_dir(directory)

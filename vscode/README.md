@@ -29,6 +29,13 @@ packages without unpacking them by hand.
   errors, unknown `--%%` directives, plua-style directive typos, and
   deprecated REST endpoints appear in the Problems panel (findings for
   `--%%file` includes land on those files).
+- **Onboarding nudge**: a workspace with Lua files but no HC3 completion
+  config (`.luarc.json`/`.luals`) gets a one-time offer to run Setup
+  workspace (`flua.setupNudge` turns it off).
+- **MCP registration**: "Flua: Register flua-mcp with Copilot" writes the
+  flua-mcp stdio server into the workspace's `.vscode/mcp.json` — the venv
+  python interpreter with `-m flua.mcp.server`, exactly as `docs/mcp.md`
+  documents — leaving other servers untouched; "Unregister" removes it.
 - **`.fqa` packages open in the flua QA editor**: the package summary
   (name, type, interfaces) plus the packed metadata — properties like
   `manufacturer`/`userDescription`, `quickAppVariables` one per line, and

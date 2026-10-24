@@ -97,3 +97,31 @@ async def test_trace_all_covers_net(tmp_path) -> None:
     entries = _trace_entries(syslog)
     kinds = {e["data"].get("kind") for e in entries if e["data"]["category"] == "net"}
     assert "httpRequest" in kinds and "httpResult" in kinds
+
+
+def test_trace_and_syslog_directives(tmp_path) -> None:
+    # --%%trace/--%%syslog are the declarative forms of --trace/--syslog:
+    # settable from the QA header (here) or .flua-directives — the same
+    # global-param pipeline as --%%time — and the CLI flags win over them
+    import subprocess
+    import sys
+
+    syslog = tmp_path / "run.json"
+    script = tmp_path / "app.lua"
+    script.write_text(
+        f"--%%trace:api\n--%%syslog:{syslog}\n"
+        "print('OK')\n"
+        "setTimeout(function() api.get('/devices'); exit(0) end, 10)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", str(script)],
+        cwd=str(tmp_path.parent.parent),  # the repo root
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "unknown --%% directive" not in result.stderr  # both are known now
+    entries = _trace_entries(syslog)
+    assert entries, "the --%%syslog file carries trace events"
+    assert all(e["data"]["category"] == "api" for e in entries)

@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { checkDocument, registerCheckDiagnostics } from "./check";
 import { execFlua, fluaExecutable, runFluaTool } from "./flua";
 import { FqaEditorProvider } from "./fqaEditor";
+import { registerMcp, unregisterMcp } from "./mcp";
 
 export function activate(context: vscode.ExtensionContext) {
   registerCheckDiagnostics(context);
@@ -12,6 +13,7 @@ export function activate(context: vscode.ExtensionContext) {
       new FqaEditorProvider()
     )
   );
+  void maybeNudgeSetup();
 
   context.subscriptions.push(
     vscode.commands.registerCommand("flua.setup", async () => {
@@ -80,11 +82,66 @@ export function activate(context: vscode.ExtensionContext) {
         args.push(name);
       }
       runFluaTool(args, folder);
-    })
+    }),
+
+    vscode.commands.registerCommand("flua.mcpRegister", () => void registerMcp()),
+
+    vscode.commands.registerCommand("flua.mcpUnregister", () => void unregisterMcp())
   );
 }
 
 export function deactivate() {}
+
+/** One-time onboarding nudge: a workspace with Lua files but no
+ * .luarc.json/.luals has no HC3 autocomplete — offer to run Setup
+ * workspace. Off by default after "Don't ask again" (the flua.setupNudge
+ * setting) or once setup has been run (the files exist). */
+async function maybeNudgeSetup(): Promise<void> {
+  if (!vscode.workspace.getConfiguration("flua").get<boolean>("setupNudge", true)) {
+    return;
+  }
+  let target: vscode.WorkspaceFolder | undefined;
+  for (const folder of vscode.workspace.workspaceFolders ?? []) {
+    const luaFiles = await vscode.workspace.findFiles(
+      new vscode.RelativePattern(folder, "**/*.lua"),
+      null,
+      20
+    );
+    if (!luaFiles.length) {
+      continue;
+    }
+    let configured = false;
+    for (const marker of [".luarc.json", ".luals"]) {
+      try {
+        await vscode.workspace.fs.stat(vscode.Uri.joinPath(folder.uri, marker));
+        configured = true;
+        break;
+      } catch {
+        // marker absent — keep looking
+      }
+    }
+    if (!configured) {
+      target = folder;
+      break;
+    }
+  }
+  if (!target) {
+    return;
+  }
+  const action = await vscode.window.showInformationMessage(
+    "flua: this workspace has Lua files but no HC3 completion config " +
+      "(.luarc.json/.luals). Run Setup workspace?",
+    "Run setup",
+    "Don't ask again"
+  );
+  if (action === "Run setup") {
+    runFluaTool(["--tool", "setup", target.uri.fsPath]);
+  } else if (action === "Don't ask again") {
+    await vscode.workspace
+      .getConfiguration("flua")
+      .update("setupNudge", false, vscode.ConfigurationTarget.Global);
+  }
+}
 
 async function askQaId(prompt: string): Promise<string | undefined> {
   return vscode.window.showInputBox({

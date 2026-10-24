@@ -194,8 +194,11 @@ credential prompts work. Install it from the VS Code marketplace as
 publish it automatically: the **Publish VS Code Extension** workflow fires
 on every GitHub release and publishes with an organization-scoped
 marketplace PAT from the `VSCE_PAT` repo secret (global PATs retire in
-January 2027; the Entra ID credential flow is the planned successor). Build
-it from source with `npm install && npm run compile` in `vscode/`.
+January 2027; the Entra ID credential flow is the planned successor). The
+extension also registers the **flua-mcp** server with Copilot on demand
+(the workspace's `.vscode/mcp.json`, venv interpreter — the same entry
+`docs/mcp.md` documents). Build it from source with `npm install && npm run
+compile` in `vscode/`.
 
 The fastest loop for tinkering:
 
@@ -271,6 +274,8 @@ Parsing stops at the end-of-header marker:
 | `--%%debug:true` | shorthand for all three debug channels (`:false` disables them) |
 | `--%%loglength:120` | debug line length cap (default 120) |
 | `--%%warn:true` | extra runtime warnings for things the HC3 stays silent about (global) |
+| `--%%trace:api,ui` | the `--trace` categories (api, ui, net, timer, `all`) as a directive (global) |
+| `--%%syslog:run.json` | the `--syslog` file — one JSON line per system/trace event (global) |
 | `--%%db:house.json` | seed the simulated HC3 from a JSON file (devices, rooms, scenes, globalVariables, alarms, profiles) |
 | `--%%db:+house.json` | seed **and** persist emulator state back to the file (see below) |
 | `--%%location:latitude=59.33,longitude=18.07` | pin the sim's location (device 1's sunrise/sunset) — deterministic sun times without touching `.flua.lua` |
@@ -1159,6 +1164,9 @@ wrong); `ui` — incoming device actions and `callUIEvent` interactions;
 `timer` — timer starts and expiries. It is the same history an agent reads
 with `--syslog`, so a single file gives both the lifecycle and the QA's
 behavior. Bodies are truncated at 1000 chars (they may carry secrets).
+Both have `--%%` directive forms — `--%%trace:api,ui` and
+`--%%syslog:run.json` — so a run's tracing can live in the QA header, an
+`--%%include` file, or `.flua-directives` (the CLI flags win over them).
 
 ### MCP server (`flua-mcp`)
 

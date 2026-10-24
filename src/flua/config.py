@@ -536,7 +536,9 @@ def _apply_mode(config: dict[str, Any]) -> dict[str, Any]:
 # Parameter names that belong to the global (shared) config. When a QA file
 # sets one of these, it is copied up to the global config — the last file
 # that sets it wins. Everything else stays local to the QA's config copy.
-GLOBAL_PARAMS = frozenset({"speed", "instant", "maxhours", "time", "debug", "loglength", "warn"})
+GLOBAL_PARAMS = frozenset(
+    {"speed", "instant", "maxhours", "time", "debug", "loglength", "warn", "trace", "syslog"}
+)
 
 # Downloaded-file metadata directives (--tool downloadQA writes them, --tool
 # uploadFile reads them): the HC3 device id and QA file name a project file

@@ -42,6 +42,11 @@
           "type": "boolean",
           "default": true,
           "description": "Run flua --tool commands in the integrated terminal (visible output, interactive credential prompts). When false, output goes to the flua output channel."
+        },
+        "flua.setupNudge": {
+          "type": "boolean",
+          "default": true,
+          "description": "Offer to run Setup workspace when the workspace has Lua files but no HC3 completion config (.luarc.json/.luals). 'Don't ask again' turns this off."
         }
       }
     },
@@ -102,6 +107,14 @@
         "title": "Flua: New QA from template"
       },
       {
+        "command": "flua.mcpRegister",
+        "title": "Flua: Register flua-mcp with Copilot"
+      },
+      {
+        "command": "flua.mcpUnregister",
+        "title": "Flua: Unregister flua-mcp from Copilot"
+      },
+      {
         "command": "flua.downloadQa",
         "title": "Flua: Download QA from HC3"
       }
@@ -152,6 +165,10 @@
         {
           "command": "flua.newQa",
           "group": "3_create@1"
+        },
+        {
+          "command": "flua.mcpRegister",
+          "group": "3_create@3"
         },
         {
           "command": "flua.setup",
