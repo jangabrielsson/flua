@@ -29,6 +29,8 @@ from typing import Any
 
 from . import __version__, messages
 from .api import Api
+from .audit import add_arguments as _audit_add_arguments
+from .audit import run as _audit_run
 from .clock import parse_start_time
 from .config import (
     OVERRIDES_FILE,
@@ -37,8 +39,14 @@ from .config import (
     parse_annotations,
     split_annotations,
 )
+from .doctor import add_arguments as _doctor_add_arguments
+from .doctor import run as _doctor_run
 from .engine import LuaEngine
 from .http_server import ApiServer
+from .record_cli import add_arguments as _record_add_arguments
+from .record_cli import run as _record_run
+from .test_cli import add_arguments as _test_add_arguments
+from .test_cli import run as _test_run
 from .tools import run_tool
 from .tools.common import build_fqa, default_fqa_output
 
@@ -49,6 +57,19 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="flua",
         description="Minimal Lua engine on lupa + asyncio with cooperative timers.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "commands:\n"
+            "  flua export script.lua -o out.fqa   package a QA project as a .fqa\n"
+            "  flua unpack package.fqa -d dir/    unpack a .fqa into a flua project\n"
+            "  flua test [paths] --timeout N       run self-asserting test QAs (*_test.lua)\n"
+            "  flua doctor [--no-network] [--json] health-check this workspace\n"
+            "  flua record -o house.json       capture the real HC3's state + "
+            "refreshState events\n"
+            "  flua audit [--json]              coverage: HC3 routes and device catalog\n"
+            "  flua --tool NAME ...                HC3 file tools (uploadQA, downloadQA,"
+            " pack, unpack, setup, newQA, ...; a bare --tool lists them)"
+        ),
     )
     parser.add_argument("scripts", nargs="*", help="Lua QuickApp files to run (each isolated)")
     parser.add_argument(
@@ -132,6 +153,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "--seed",
         metavar="FILE",
         help="JSON file seeding the simulated HC3: devices, rooms, scenes, globalVariables",
+    )
+    parser.add_argument(
+        "--replay",
+        metavar="FILE",
+        help="replay a recorded house session (flua record): seed the sim with "
+        "its devices and fire its refreshState events on the virtual timeline",
     )
     parser.add_argument(
         "--tool",
@@ -450,6 +477,7 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
     # directive wins over the --seed flag.
     db_path: str | None = None
     db_persist = False
+    replay_path: str | None = None
     location: dict[str, Any] | None = None
     for main_path, _main_code, main_params in qa_specs:
         if main_path is None:
@@ -459,11 +487,17 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             db_path = str(Path(db_cfg["path"]).resolve())
             db_persist = bool(db_cfg.get("persist"))
             seed = None
+        replay_cfg = main_params.get("replay")
+        if isinstance(replay_cfg, str) and replay_cfg:
+            replay_path = str(Path(replay_cfg).resolve())
         loc_cfg = main_params.get("location")
         if isinstance(loc_cfg, dict):
             # --%%location:latitude=N,longitude=N pins the sim's location
             location = loc_cfg
         break
+    if args.replay:
+        # the CLI flag wins over a --%%replay directive
+        replay_path = str(Path(args.replay).resolve())
     try:
         # The engine mode follows the MAIN QA's directives (its header over
         # any --%%include'd defaults) — --%%mode:offline selects the sim,
@@ -495,6 +529,7 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             seed=seed,
             db_path=db_path,
             db_persist=db_persist,
+            replay_path=replay_path,
             location=location,
             # --%%trace (global directive) is the declarative form of
             # --trace; the CLI flag wins
@@ -770,7 +805,7 @@ def main(argv: list[str] | None = None) -> int:
     tool, rest = _find_tool(raw)
     if tool is not None:
         return _hc3_tool_main(tool, rest)
-    if raw and raw[0] in ("export", "unpack"):
+    if raw and raw[0] in ("export", "unpack", "test", "doctor", "record", "audit"):
         return _tool_main(raw)
     parser = _build_parser()
     args = parser.parse_args(_normalize_debugger_argv(raw))
@@ -814,6 +849,39 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _tool_parser(command: str) -> argparse.ArgumentParser:
+    if command == "audit":
+        parser = argparse.ArgumentParser(
+            prog="flua audit",
+            description="Coverage of the HC3 surface the sim implements: "
+            "REST routes and the device catalog.",
+        )
+        _audit_add_arguments(parser)
+        return parser
+    if command == "record":
+        parser = argparse.ArgumentParser(
+            prog="flua record",
+            description="Record a real house session: snapshot the HC3's devices "
+            "and capture its refreshState events into a replayable JSON file.",
+        )
+        _record_add_arguments(parser)
+        return parser
+    if command == "doctor":
+        parser = argparse.ArgumentParser(
+            prog="flua doctor",
+            description="Health-check a flua workspace: runtime, virtualenv, "
+            "HC3 credentials/reachability, LuaLS and VS Code setup, the "
+            "marketplace extension, and flua-mcp.",
+        )
+        _doctor_add_arguments(parser)
+        return parser
+    if command == "test":
+        parser = argparse.ArgumentParser(
+            prog="flua test",
+            description="Run self-asserting test QAs (*_test.lua, the "
+            "quickapp-test pattern) and report PASS/FAIL/TIMEOUT.",
+        )
+        _test_add_arguments(parser)
+        return parser
     if command == "export":
         parser = argparse.ArgumentParser(
             prog="flua export", description="Export a QA file as a .fqa package."
@@ -846,6 +914,14 @@ def _tool_main(raw: list[str]) -> int:
     args = tool.parse_args(rest)
     if command == "export":
         return _export_cli(tool, args)
+    if command == "test":
+        return _test_run(tool, args)
+    if command == "doctor":
+        return _doctor_run(tool, args)
+    if command == "record":
+        return _record_run(tool, args)
+    if command == "audit":
+        return _audit_run(tool, args)
     return _unpack_cli(tool, args)
 
 

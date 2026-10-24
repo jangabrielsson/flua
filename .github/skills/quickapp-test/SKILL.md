@@ -16,6 +16,10 @@ non-zero, so no code path silently passes.
 flua --check qa.lua              # 1. static: syntax, --%% directives, deprecated APIs
 flua --api local qa.lua          # 2. run offline; the QA must exit itself
 echo $?                          # 3. exit code: 0 = pass, non-zero = fail
+flua test                        # or: the whole suite — every *_test.lua under
+                                 # the cwd, one flua process per file, a per-file
+                                 # timeout, and a PASS/FAIL/TIME report (exit 0
+                                 # only when everything passes)
 ```
 
 - The run lasts until the QA calls `exit(0)` / `os.exit(0)` (HC3 names) — a

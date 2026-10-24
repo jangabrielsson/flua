@@ -1,7 +1,7 @@
 """newQA: scaffold a QuickApp from a standard device type template.
 
 The templates are the quickapp-types skill's ``templates/`` directory (one
-file per device type, 41 types, each with the type's canonical actions and
+file per device type, 30 types, each with the type's canonical actions and
 property conventions) — they ship in the wheel, so the tool works for pip
 installations too. Types are matched on the template's ``--%%type`` header,
 not on file names.
@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 NAME = "newQA"
-HELP = "scaffold a QA from a standard device type template (41 types)"
+HELP = "scaffold a QA from a standard device type template (30 types)"
 
 _TEMPLATES_DIR = (
     Path(__file__).resolve().parent.parent

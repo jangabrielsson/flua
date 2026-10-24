@@ -60,14 +60,17 @@ def _type_error(device_type: str) -> ValueError:
 
 
 def _device_skeleton(device_id: int, name: str, device_type: str | None) -> dict[str, Any]:
-    # No --%%type defaults to com.fibaro.binarySwitch; a type that is not in
-    # the catalog is an error (the HC3 would not have it either).
+    # No --%%type defaults to com.fibaro.binarySwitch. A type the catalog
+    # does not know falls back to its nearest hierarchy ancestor's skeleton
+    # (devices/skeleton_for); only types the hierarchy never heard of are an
+    # error (the HC3 would not have them either).
     resolved = device_type or DEFAULT_DEVICE_TYPE
     base = skeleton_for(resolved)
     if base is None:
         raise _type_error(resolved)
     base["id"] = device_id
     base["name"] = name
+    base["type"] = resolved  # the device keeps the requested type
     return base
 
 

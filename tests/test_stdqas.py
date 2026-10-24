@@ -35,22 +35,6 @@ TEMPLATES = (
     / "templates"
 )
 
-# Device types the sim's catalog lacks — real HC3 types, sim-gap only.
-CATALOG_GAPS = {
-    "com.fibaro.hvacSystemHeatCool",
-    "com.fibaro.thermostat",
-    "com.fibaro.thermostatCool",
-    "com.fibaro.thermostatHeat",
-    "com.fibaro.thermostatHeatCool",
-    "com.fibaro.thermostatSetpoint",
-    "com.fibaro.thermostatSetpointCool",
-    "com.fibaro.thermostatSetpointHeat",
-    "com.fibaro.thermostatSetpointHeatCool",
-    "com.fibaro.waterLeakSensor",
-    "com.fibaro.windowCovering",
-}
-
-
 def _type_of(source: str) -> str:
     match = re.search(r"--%%type:(\S+)", source)
     assert match, "template without a --%%type header"
@@ -93,25 +77,19 @@ async def _wait_until(predicate, timeout: float = 5.0) -> None:
 
 
 @pytest.mark.asyncio
-async def test_templates_boot_clean_or_are_catalog_gaps() -> None:
+async def test_templates_boot_clean() -> None:
+    # every template's --%%type must resolve to a skeleton (the audit pins
+    # this too) — a template that cannot boot is a broken scaffold
     engine = LuaEngine()
     await engine.start()
-    booted, gapped = 0, 0
+    booted = 0
     try:
         for path in sorted(TEMPLATES.glob("*.lua")):
             source = path.read_text(encoding="utf-8")
-            device_type = _type_of(source)
             config = parse_annotations(source)  # like the CLI: the type comes from the header
-            if device_type in CATALOG_GAPS:
-                # sim gap: the boot attempt must fail with exactly this error
-                with pytest.raises(ValueError, match="unknown device type"):
-                    engine.start_qa(str(path), None, config, str(path))
-                gapped += 1
-                continue
             engine.start_qa(str(path), None, config, str(path))
             await _wait_until(lambda: not engine.has_pending_work())
             booted += 1
     finally:
         await engine.stop()
-    assert booted + gapped == len(list(TEMPLATES.glob("*.lua")))
-    assert booted > 0 and gapped == len(CATALOG_GAPS)
+    assert booted == len(list(TEMPLATES.glob("*.lua")))

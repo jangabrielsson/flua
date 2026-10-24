@@ -566,6 +566,7 @@ KNOWN_DIRECTIVES = frozenset(
         "loglength",  # --%%loglength:120 — debug line length
         "warn",  # --%%warn:true — extra runtime warnings
         "db",  # --%%db:file.json — seed data; +file.json also persists
+        "replay",  # --%%replay:file.json — replay a recorded house session
         "location",  # --%%location:latitude=N,longitude=N — pin the sim's location
         "uid",
         "description",

@@ -52,6 +52,20 @@ def _compile_routes() -> list[tuple[str, re.Pattern[str], dict[str, int], Handle
 _COMPILED = _compile_routes()
 
 
+def route_match(method: str, path: str) -> bool:
+    """Whether the sim implements (method, path) — the coverage audit's
+    classifier (``flua audit``). ``path`` may use ``{param}`` placeholders
+    (a placeholder matches any non-slash segment); query strings are not
+    part of the route."""
+    path = path.split("?", 1)[0]
+    if "{" in path:
+        path = re.sub(r"\{[^/{}]*\}", "x", path)
+    for route_method, pattern, _params, _handler in _COMPILED:
+        if route_method == method.upper() and pattern.match(path):
+            return True
+    return False
+
+
 def _trace_body(body: Any) -> str:
     """A JSON-safe, truncated rendering of an api request body for the
     --trace api/ui events (bodies may carry secrets or be huge)."""

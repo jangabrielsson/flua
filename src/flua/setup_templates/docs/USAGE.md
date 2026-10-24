@@ -171,7 +171,7 @@ explorer drives flua without touching launch.json:
 
 - Right-click a file → **flua**: pack a QA into a `.fqa`, unpack a `.fqa`
   into a project, upload a file / a new QA / an updated QA to the HC3,
-  download a QA, scaffold a QA from the 41 type templates, or run
+  download a QA, scaffold a QA from the 30 type templates, or run
   `--tool setup`.
 - **Check on save**: saving a `.lua` file runs `flua --check --json`;
   syntax errors, unknown `--%%` directives, plua-style directive typos,
@@ -248,7 +248,7 @@ Parsing stops at the end-of-header marker:
 | Directive | Meaning |
 |---|---|
 | `--%%name:x` | the device/QA name (`_FLUA.config.name`) |
-| `--%%type:com.fibaro.binarySwitch` | device type (defaults to binarySwitch; unknown types are an error) |
+| `--%%type:com.fibaro.binarySwitch` | device type (defaults to binarySwitch; a type the catalog does not know falls back to its nearest hierarchy ancestor — `devices/hierarchy.json`, distilled from the HC3; only types the hierarchy never heard of are an error) |
 | `--%%properties:value=false` | default device properties (plural form) |
 | `--%%property:value=true` | raw property, scalar values; repeatable, merges |
 | `--%%var:name=expr` | initializes a **QuickApp variable**; `expr` is a Lua expression — `'text'`, `42`, `{a=1}`, `config.color`, `os.getenv("X")` (one per line). An optional quoted string after a top-level comma is the **package value** distribution packages get: `--%%var:name=expr,"<placeholder>"` |
@@ -277,6 +277,7 @@ Parsing stops at the end-of-header marker:
 | `--%%trace:api,ui` | the `--trace` categories (api, ui, net, timer, `all`) as a directive (global) |
 | `--%%syslog:run.json` | the `--syslog` file — one JSON line per system/trace event (global) |
 | `--%%db:house.json` | seed the simulated HC3 from a JSON file (devices, rooms, scenes, globalVariables, alarms, profiles) |
+| `--%%replay:house.json` | replay a recorded house session (`flua record`): seeds the sim with its devices and fires its refreshState events on the virtual timeline |
 | `--%%db:+house.json` | seed **and** persist emulator state back to the file (see below) |
 | `--%%location:latitude=59.33,longitude=18.07` | pin the sim's location (device 1's sunrise/sunset) — deterministic sun times without touching `.flua.lua` |
 
@@ -322,6 +323,51 @@ Names: `--%%name:value` for scalars,
 `--%%name:sub1=val1,sub2=val2` for subparameters. A typo'd directive is
 reported at runtime (a `unknown --%% directive` warning) and `flua --check`
 flags it too.
+
+### Record & replay the real house
+
+`flua record` captures a real house session — the HC3's device snapshot
+plus its refreshStates feed — into one JSON file; `--replay` plays it back
+into the offline sim, so a QA is regression-tested against what actually
+happened at home:
+
+```bash
+.venv/bin/flua record -o house.json --duration 60   # capture (needs HC3 credentials)
+.venv/bin/flua --replay house.json qa.lua           # or --%%replay:house.json in the header
+```
+
+The recording seeds the sim with the captured devices and fires each
+recorded `DevicePropertyUpdatedEvent` on the virtual timeline — QAs
+subscribed with `RefreshStateSubscriber` react exactly as they would have
+live, and `--speed`/`--instant` fast-forward the whole session. Recording
+polls `/refreshStates` every `--interval` seconds (default 1) and stores
+relative timestamps, so the replay is deterministic; events for devices the
+replay run did not seed are skipped silently. The recording doubles as a
+seed file: `--seed house.json` loads the devices without the events.
+
+### `flua audit`
+
+How much of the HC3 surface does the sim cover? One command answers:
+
+```bash
+.venv/bin/flua audit            # routes + device catalog, human-readable
+.venv/bin/flua audit --json     # the same numbers for agents/CI
+```
+
+It classifies every endpoint in `docs/specs/hc3-api.json` (the distilled
+swagger) as simulated or forwarded-online, and reports which catalog types
+the sim gives light-like behavior to — including the gap list: types that
+declare light actions but lack the `light` interface, so the sim never
+emulates them. It also reports the offline type hierarchy
+(`devices/hierarchy.json`, distilled from the HC3's undocumented
+`/api/devices/hierarchy`): how many types it knows and how many resolve to
+a cataloged ancestor — the fallback that keeps device types newer than the
+catalog capture running offline. It also checks the QA templates
+(`quickapp-types`): every template's `--%%type` must resolve, or
+`--tool newQA`/running the QA fails — the report lists the unresolvable
+ones for remapping to a parent type. The coverage floors are pinned by a
+test: routes, device models, the hierarchy, and the templates can only go
+up.
 
 ### Debug logging
 
@@ -1022,7 +1068,7 @@ format (individual `.lua` files) and only the HC3 sees `.fqa`:
 # scaffold a QA project: .vscode configs + agent skills/instructions
 .venv/bin/flua --tool setup [project-dir]
 
-# scaffold a QA from a standard device type template (41 types)
+# scaffold a QA from a standard device type template (30 types)
 .venv/bin/flua --tool newQA binarySwitch "Hall lamp"   # lists all types with no argument
 
 # package / unpack QA projects as .fqa files (tool forms of flua export/unpack)
@@ -1146,6 +1192,40 @@ never finishes. A failing QA in a multi-QA run fails the process (the last
 failing QA's code wins), and flua prints a verdict line on stderr —
 `flua: QA <name> (<id>) exited with code N` — so agents can attribute the
 exit code.
+
+`flua test` runs a whole suite of self-asserting test QAs at once:
+
+```bash
+.venv/bin/flua test                       # every *_test.lua under the cwd
+.venv/bin/flua test tests/                # a directory (recursive)
+.venv/bin/flua test qa_test.lua           # explicit files, any name
+.venv/bin/flua test --list                # show what would run
+.venv/bin/flua test --timeout 10 -v       # 10s per file; verbose failures
+```
+
+Each file runs in its own flua process — a test that never exits hits the
+per-file wall-clock timeout (reported as TIME, with the hint to end tests
+with `t:finish()`/`exit(...)`) instead of blocking the rest. The runner
+reports one PASS/FAIL/TIME line per file plus a summary and exits 0 only
+when everything passes: `FAIL bad_test.lua (failures: 1)`, `1 passed,
+1 failed, 0 timed out`.
+
+### `flua doctor`
+
+One command answers "why doesn't it work":
+
+```bash
+.venv/bin/flua doctor               # runtime, venv, HC3 credentials +
+                                    # reachability, LuaLS/.vscode setup,
+                                    # extension, flua-mcp, project files
+.venv/bin/flua doctor --no-network  # skip the HC3 ping
+.venv/bin/flua doctor --json        # machine-readable checks for agents
+```
+
+It reports one ✓/✗ line per check and exits non-zero when any check fails
+— paste the block into a support question instead of describing the setup.
+Secrets never appear: credentials are reported as set/unset with their
+source file, never as values.
 
 For machine-readable runs (agents parsing the log), `--log json` emits one
 JSON object per line — `{time, level, tag, qaid, msg}` — with stdout kept

@@ -215,3 +215,49 @@ def test_qwikchild_example_self_tests() -> None:
     ):
         assert f"PASS: {line}" in result.stdout
     assert "failures: 0" in result.stdout
+
+
+def test_skeleton_falls_back_to_hierarchy_ancestor() -> None:
+    # com.fibaro.FGD223 is not in the catalog, but the offline hierarchy
+    # (devices/hierarchy.json, distilled from the HC3) links it to
+    # com.fibaro.device — its skeleton serves the unknown type
+    skeleton = skeleton_for("com.fibaro.FGD223")
+    assert skeleton is not None
+    assert skeleton["type"] == "com.fibaro.device"
+    # a type the hierarchy never heard of is still unknown
+    assert skeleton_for("com.fibaro.notARealType") is None
+    assert skeleton_for(None) is None
+
+
+def test_qa_with_hierarchy_known_type_runs(tmp_path, capsys) -> None:
+    # a QA declaring a type newer than the catalog capture resolves to its
+    # hierarchy ancestor and keeps its own type on the device
+    script = tmp_path / "qa.lua"
+    script.write_text(
+        "--%%type:com.fibaro.FGD223\n"
+        "print('TYPE', api.get('/devices/'.._FLUA.qaId).type)\n"
+        "exit(0)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", str(script)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "TYPE com.fibaro.FGD223" in result.stdout
+
+
+def test_qa_with_unknown_type_still_errors(tmp_path) -> None:
+    script = tmp_path / "qa.lua"
+    script.write_text("--%%type:com.fibaro.notARealType\nexit(0)\n")
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", str(script)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode != 0
+    assert "unknown device type" in result.stderr

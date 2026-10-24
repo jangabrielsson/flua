@@ -154,6 +154,7 @@ class LuaEngine:
         seed: dict[str, Any] | None = None,
         db_path: str | None = None,
         db_persist: bool = False,
+        replay_path: str | None = None,
         location: dict[str, Any] | None = None,
         log_stream: Any = None,
         trace: str = "",
@@ -189,6 +190,29 @@ class LuaEngine:
                 raise ValueError("--%%db file must contain a JSON object")
             self._db_qa_state = raw.get("qaState") or {}
             seed = {k: v for k, v in raw.items() if k not in ("qaState", "version")}
+        # --%%replay: a recorded house session (flua record): the recording
+        # seeds the sim with the captured devices and fires its refreshState
+        # events on the virtual timeline (scheduled below, after the timers).
+        self._replay_events: dict[int, dict[str, Any]] = {}
+        if replay_path is not None:
+            try:
+                raw = json.loads(Path(replay_path).read_text(encoding="utf-8"))
+            except OSError as exc:
+                raise ValueError(f"cannot read --%%replay file: {exc}") from exc
+            except ValueError as exc:
+                raise ValueError(f"invalid --%%replay JSON: {exc}") from exc
+            if not isinstance(raw, dict):
+                raise ValueError("--%%replay file must contain a JSON object")
+            events = raw.get("events")
+            if not isinstance(events, list):
+                raise ValueError("--%%replay file has no events list (is it a flua record output?)")
+            replay_seed = {
+                key: value
+                for key, value in raw.items()
+                if key not in ("events", "meta", "qaState", "version")
+            }
+            seed = {**(seed or {}), **replay_seed}
+            self._replay_queue: list[dict[str, Any]] = list(events)
         # Virtual time: 1 = realtime, N = accelerated, inf = instant (timers
         # fire immediately and virtual time jumps to their deadlines).
         self.clock = VirtualClock(speed)
@@ -199,6 +223,18 @@ class LuaEngine:
         # ANSI coloring for QA log lines: auto (tty only), always, never
         self._color = color
         self._timers = TimerManager(self.clock, self._on_timer_fired)
+        # schedule the recorded house events on the virtual clock: timer ids
+        # in the negative namespace can never collide with QA timers, and
+        # they count as pending work, so the run stays alive until the whole
+        # recording has replayed (or the horizon caps it)
+        for index, event in enumerate(getattr(self, "_replay_queue", [])):
+            timer_id = -1 - index
+            when = float(event.get("t") or 0) if isinstance(event, dict) else 0.0
+            # the recording's t is relative to its own start — schedule it at
+            # that offset on the virtual clock (elapsed, not epoch time)
+            delay_ms = max(0, int(round((when - self.clock.elapsed()) * 1000)))
+            self._timers.set_timeout(timer_id, delay_ms)
+            self._replay_events[timer_id] = event
         # Blocking LuaSocket-compatible sockets for mobdebug (main-thread,
         # loop-freezing by design — see sync_socket.py).
         self.sync_sockets = SyncTCPSockets()
@@ -208,6 +244,12 @@ class LuaEngine:
         self._logfile: Any = None  # --logfile FILE: log copy (ANSI stripped)
         self._syslog: Any = None  # --syslog FILE: system events, one JSON line each
         self._pump_task: asyncio.Task[None] | None = None
+        # replay bookkeeping: whether the first outbound batch has reached
+        # Lua, and the events that fired before it (the QA's boot is
+        # timer-wrapped — they are buffered and flushed after the next
+        # fire_due pass, so the boot timer always beats them)
+        self._replay_delivered = False
+        self._replay_pending: list[dict[str, Any]] = []
         self.env = EnvChain()  # os.getenv chain: local .env > ~/.env > process env
         # HC3 REST API: the offline sim with api_mode="local" (the explicit
         # constructor default), the real HC3 otherwise — and with None (no
@@ -1727,6 +1769,10 @@ class LuaEngine:
             self.clock.tick(time.monotonic())
             self._timers.fire_due()
             await self._drain_inbound()
+            if self._replay_delivered and self._replay_pending:
+                pending, self._replay_pending = self._replay_pending, []
+                for event in pending:
+                    self._apply_replay_event(event)
             # Poll the outbound queue without a cancellable get(): on
             # Python <= 3.12, ``asyncio.wait_for(queue.get(), timeout)``
             # could cancel the getter at the very moment an item arrived —
@@ -1744,6 +1790,7 @@ class LuaEngine:
             while not self._outbound.empty():
                 batch.append(self._outbound.get_nowait())
             self._deliver_to_lua(batch)
+            self._replay_delivered = True
 
     async def _drain_inbound(self) -> None:
         while self._inbound:
@@ -2474,10 +2521,45 @@ class LuaEngine:
     # -- timer bridge ---------------------------------------------------------------
 
     def _on_timer_fired(self, timer_id: int) -> None:
+        event = self._replay_events.pop(timer_id, None)
+        if event is not None:
+            self._apply_replay_event(event)
+            return
         self.enqueue_outbound(messages.timer_expired(timer_id))
         self.trace_event(
             "timer", self._timers.timer_qa(timer_id), {"kind": "expire", "id": timer_id}
         )
+
+    def _apply_replay_event(self, event: dict[str, Any]) -> None:
+        """One recorded house event: update the simulated device and emit the
+        same refresh event a live change would, so subscribed QAs react on
+        the recorded timeline (the exact path the online mirror uses)."""
+        if not self._replay_delivered:
+            # instant mode fires the whole recording in the pump's first
+            # pass, before the QA's (timer-wrapped) boot has run — no
+            # subscriber exists yet. Buffer and flush on the next pump
+            # pass (after fire_due), where the boot timer has fired first.
+            self._replay_pending.append(event)
+            return
+        try:
+            device_id = int(event.get("deviceId"))
+            property_name = str(event.get("property") or "")
+        except (TypeError, ValueError):
+            return
+        if not property_name:
+            return
+        device = self.api.state.devices.get(device_id)
+        if device is None:
+            return  # recorded a device the replay run did not seed — skip silently
+        properties = device.setdefault("properties", {})
+        new_value = event.get("newValue")
+        old_value = properties.get(property_name)
+        properties[property_name] = new_value
+        entry = self.api.state.record_property_event(
+            device_id, property_name, new_value, old_value, self.clock.time
+        )
+        if entry is not None:
+            self.enqueue_outbound(messages.refresh_state_event(entry))
 
     def note_debugger_pause(self) -> None:
         """Freeze virtual time while the debugger waits (mobdebug yield hook)."""

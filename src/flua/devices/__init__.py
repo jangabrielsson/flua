@@ -49,11 +49,39 @@ def _catalog() -> dict[str, dict[str, Any]]:
     return catalog
 
 
+@functools.lru_cache(maxsize=1)
+def _hierarchy() -> dict[str, str]:
+    """The offline type hierarchy (child -> parent), distilled from the
+    HC3's /api/devices/hierarchy by scripts/extract_hierarchy.py."""
+    path = Path(__file__).parent / "hierarchy.json"
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    parents = raw.get("parents")
+    return dict(parents) if isinstance(parents, dict) else {}
+
+
 def skeleton_for(device_type: str | None) -> dict[str, Any] | None:
-    """Scrubbed deep copy of the type's skeleton, or None for unknown types."""
+    """Scrubbed deep copy of the type's skeleton, or None for unknown types.
+
+    A type the catalog does not carry still resolves when the offline
+    hierarchy knows it: the nearest cataloged ancestor's skeleton is used,
+    so a device type newer than the catalog capture behaves like its base
+    instead of erroring."""
     if not device_type:
         return None
     source = _catalog().get(device_type)
+    if source is None:
+        parents = _hierarchy()
+        seen: set[str] = set()
+        current = device_type
+        while current in parents and current not in seen:
+            seen.add(current)
+            current = parents[current]
+            source = _catalog().get(current)
+            if source is not None:
+                break
     if source is None:
         return None
     skeleton = copy.deepcopy(source)
