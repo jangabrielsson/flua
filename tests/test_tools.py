@@ -389,6 +389,35 @@ def test_pack_default_output_names(tmp_path, capsys, monkeypatch) -> None:
     assert (tmp_path / "MyQA.fqa").exists()  # no --%%name: the neutral default
 
 
+def test_pack_carries_identity_properties(tmp_path, capsys, monkeypatch) -> None:
+    # the identity properties a QA declares travel in the package —
+    # --%%manufacturer/--%%model/--%%build/--%%uid/--%%properties:deviceRole —
+    # while dynamic properties (value, log, ...) still stay out
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "app.lua").write_text(
+        "--%%name:idprops\n"
+        "--%%manufacturer:FooBar\n"
+        "--%%model:Widget-2000\n"
+        "--%%build:7\n"
+        "--%%uid:9f8e7d6c-0000-4000-8000-000000000000\n"
+        "--%%properties:deviceRole=Fan\n"
+        "print('x')\n"
+    )
+    pack = tools._TOOLS["pack"]
+    parser = argparse.ArgumentParser()
+    pack.add_arguments(parser)
+    assert pack.run(parser, parser.parse_args(["app.lua"])) == 0
+    capsys.readouterr()
+    fqa = json.loads((tmp_path / "idprops.fqa").read_text())
+    props = fqa["initialProperties"]
+    assert props["manufacturer"] == "FooBar"
+    assert props["model"] == "Widget-2000"
+    assert props["buildNumber"] == 7
+    assert props["deviceRole"] == "Fan"  # the binarySwitch skeleton's "Light" stays out
+    assert props["quickAppUuid"] == "9f8e7d6c-0000-4000-8000-000000000000"
+    assert "value" not in props  # dynamic properties still do not travel
+
+
 def test_upload_and_download_fqa_tools(tmp_path, monkeypatch, capsys) -> None:
     _MockHc3.fqas = {}
     _MockHc3.next_id = 100
@@ -426,6 +455,71 @@ def test_upload_and_download_fqa_tools(tmp_path, monkeypatch, capsys) -> None:
         server.server_close()
 
 
+def test_download_restores_identity_properties(tmp_path, monkeypatch) -> None:
+    # the HC3's export omits manufacturer/model/... — both download tools
+    # merge them back from /devices/{id} (only the identity keys, only
+    # non-empty values)
+    _MockHc3.fqas = {
+        100: {
+            "name": "ident",
+            "type": "com.fibaro.binarySwitch",
+            "initialProperties": {"quickAppVariables": []},
+            "files": [{"name": "main", "isMain": True, "content": "print('x')\n"}],
+        }
+    }
+    _MockHc3.devices = {
+        100: {
+            "id": 100,
+            "name": "ident",
+            "type": "com.fibaro.binarySwitch",
+            "properties": {
+                "manufacturer": "FooBar",
+                "model": "Widget",
+                "buildNumber": 9,
+                "deviceRole": "Fan",
+                "quickAppUuid": "u-u-i-d",
+                "log": "",
+            },
+        }
+    }
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _MockHc3)
+    threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
+    try:
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("HC3_URL", f"http://127.0.0.1:{server.server_port}")
+        monkeypatch.setenv("HC3_USER", "admin")
+        monkeypatch.setenv("HC3_PASSWORD", "secret")
+        monkeypatch.chdir(tmp_path)
+        # downloadFQA: the saved package carries the identity properties
+        module = tools._TOOLS["downloadFQA"]
+        parser = argparse.ArgumentParser()
+        module.add_arguments(parser)
+        assert module.run(parser, parser.parse_args(["100"])) == 0
+        fqa = json.loads((tmp_path / "ident.fqa").read_text())
+        props = fqa["initialProperties"]
+        assert props["manufacturer"] == "FooBar"
+        assert props["model"] == "Widget"
+        assert props["buildNumber"] == 9
+        assert props["deviceRole"] == "Fan"
+        assert props["quickAppUuid"] == "u-u-i-d"
+        assert "log" not in props  # only the identity keys are merged
+        # downloadQA: the unpacked main regenerates them as --%%property lines
+        module = tools._TOOLS["downloadQA"]
+        parser = argparse.ArgumentParser()
+        module.add_arguments(parser)
+        assert module.run(parser, parser.parse_args(["100"])) == 0
+        main = (tmp_path / "ident" / "ident_main_100.lua").read_text()
+        assert "--%%property:manufacturer=FooBar" in main
+        assert "--%%property:model=Widget" in main
+        assert "--%%property:buildNumber=9" in main
+        assert "--%%property:deviceRole=Fan" in main
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
 def test_update_qa_syncs_files_name_properties_and_interfaces(
     tmp_path, monkeypatch, capsys
 ) -> None:
@@ -456,6 +550,8 @@ def test_update_qa_syncs_files_name_properties_and_interfaces(
         main.write_text(
             "--%%name:newname\n"
             "--%%type:com.fibaro.binarySwitch\n"
+            "--%%manufacturer:FooBar\n"
+            "--%%build:5\n"
             '--%%u:{label="lbl",text="Hi"}\n'
             "--%%description:Updated description\n"
             "function QuickApp:onInit() end\n"
@@ -473,7 +569,10 @@ def test_update_qa_syncs_files_name_properties_and_interfaces(
             r for r in _MockHc3.requests if r[0] == "POST" and r[1] == "/api/plugins/updateProperty"
         ]
         names = {r[2]["propertyName"] for r in props}
-        assert {"viewLayout", "uiView", "uiCallbacks", "useUiView", "userDescription"} <= names
+        assert {
+            "viewLayout", "uiView", "uiCallbacks", "useUiView", "userDescription",
+            "manufacturer", "buildNumber",  # the declared identity properties sync too
+        } <= names
         iface = [
             r for r in _MockHc3.requests if r[0] == "POST" and r[1] == "/api/plugins/interfaces"
         ]

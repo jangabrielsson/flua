@@ -73,3 +73,31 @@ export function runInTerminal(flua: string, args: string[], cwd?: string) {
   terminal.show();
   terminal.sendText([flua, ...args].map(shellQuote).join(" "));
 }
+
+let outputChannel: vscode.OutputChannel | undefined;
+
+/** Run a flua command: in the shared terminal by default (visible output,
+ * interactive prompts), or captured into the output channel. The single
+ * entry point every command (and the .fqa editor) uses. */
+export function runFluaTool(args: string[], cwd?: string) {
+  const flua = fluaExecutable();
+  const inTerminal = vscode.workspace
+    .getConfiguration("flua")
+    .get<boolean>("runToolsInTerminal", true);
+  if (inTerminal) {
+    runInTerminal(flua, args, cwd);
+    return;
+  }
+  void (async () => {
+    const result = await execFlua(flua, args, cwd);
+    outputChannel ??= vscode.window.createOutputChannel("flua");
+    outputChannel.appendLine(`$ ${flua} ${args.join(" ")}`);
+    if (result.stdout) {
+      outputChannel.append(result.stdout);
+    }
+    if (result.stderr) {
+      outputChannel.append(result.stderr);
+    }
+    outputChannel.show();
+  })();
+}

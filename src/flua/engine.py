@@ -56,7 +56,7 @@ from .config import (
     parse_annotations,
     split_annotations,
 )
-from .devices import catalog_types
+from .devices import catalog_types, skeleton_for
 from .environment import EnvChain
 from .hc3 import Hc3Remote
 from .http import abort_http_response, http_call, open_http, read_sse_block
@@ -89,9 +89,16 @@ _PROPERTY_DIRECTIVES = {
     "manufacturer": "manufacturer",
 }
 
-# .fqa export whitelist: the EXACT property set a real HC3 5.21x exports in
-# a package (verified against a live export). Everything else is dynamic and
-# must not travel.
+# The identity properties a QA declares (--%%manufacturer/--%%model/
+# --%%build/--%%uid/--%%properties:deviceRole): they travel in .fqa packages
+# only when DECLARED (see qa_export), downloadQA/downloadFQA merge them back
+# from the device (the HC3's own export omits them), and updateQA syncs them
+# to an existing QA.
+IDENTITY_PROPERTIES = ("manufacturer", "model", "buildNumber", "deviceRole", "quickAppUuid")
+
+# .fqa export whitelist: the property set a real HC3 5.21x exports in a
+# package (verified against a live export), plus the identity properties
+# above. Everything else is dynamic and must not travel.
 _EXPORT_PROPERTIES = frozenset(
     {
         "viewLayout",
@@ -102,7 +109,7 @@ _EXPORT_PROPERTIES = frozenset(
         "typeTemplateInitialized",
         "userDescription",
     }
-)
+) | frozenset(IDENTITY_PROPERTIES)
 
 # Seconds the pump waits on the outbound queue before re-checking the inbound
 # queue and the running flag. Upper bound on timer delivery latency.
@@ -1373,11 +1380,21 @@ class LuaEngine:
         if info is None:
             return None
         device = self.api.state.devices.get(int(qa_id)) or {}
-        properties = {
-            key: value
-            for key, value in (device.get("properties") or {}).items()
-            if key in _EXPORT_PROPERTIES
-        }
+        skeleton_properties = (skeleton_for(device.get("type")) or {}).get("properties") or {}
+        properties: dict[str, Any] = {}
+        for key, value in (device.get("properties") or {}).items():
+            if key not in _EXPORT_PROPERTIES:
+                continue
+            if key in IDENTITY_PROPERTIES:
+                # identity properties travel only when declared: empty
+                # values and the type skeleton's defaults stay out, so a
+                # project that never declared them cannot clobber a
+                # device's live values when updateQA syncs the package
+                if value in (None, ""):
+                    continue
+                if skeleton_properties.get(key) == value:
+                    continue
+            properties[key] = value
         # private (__-prefixed) UI callbacks never travel
         callbacks = [
             c

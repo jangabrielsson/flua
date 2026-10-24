@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 
 from ..engine import sanitize_filename
-from .common import hc3_engine
+from .common import hc3_engine, merge_identity_properties
 
 NAME = "downloadFQA"
 HELP = "download a QA from the HC3 as a .fqa file"
@@ -38,6 +38,12 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     fqa, status = engine.api.dispatch_hc3("POST", f"/quickApp/{args.id}/export", None)
     if status != 200 or not isinstance(fqa, dict):
         parser.error(f"cannot export QA {args.id} (HTTP {status})")
+    # the HC3's export omits the identity properties (manufacturer, model,
+    # ...) — restore them from the live device so the saved package keeps
+    # them (this is what the viewer shows)
+    device, device_status = engine.api.dispatch_hc3("GET", f"/devices/{args.id}")
+    if device_status == 200 and isinstance(device, dict):
+        merge_identity_properties(fqa, device)
     output = (
         Path(args.output)
         if args.output

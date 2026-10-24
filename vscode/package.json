@@ -55,6 +55,18 @@
         "url": "./fqa.schema.json"
       }
     ],
+    "customEditors": [
+      {
+        "viewType": "flua.fqaViewer",
+        "displayName": "flua QA package",
+        "selector": [
+          {
+            "filenamePattern": "*.fqa"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
     "commands": [
       {
         "command": "flua.setup",

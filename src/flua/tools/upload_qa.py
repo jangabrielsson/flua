@@ -19,7 +19,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from ..engine import sanitize_filename
+from ..engine import IDENTITY_PROPERTIES, sanitize_filename
 from .common import build_fqa, fqa_files, hc3_engine
 
 NAME = "uploadQA"
@@ -31,9 +31,19 @@ HELP = (
 _MAIN_RE = re.compile(r"^(.*)_main_(\d+)\.lua$")
 
 # The standard properties updateQA syncs from the package to the device:
-# the UI structures and the description. quickAppVariables deliberately stay
-# out — they are initializers, the user's runtime values win.
-_UPDATE_PROPERTIES = ("viewLayout", "uiView", "uiCallbacks", "useUiView", "userDescription")
+# the UI structures, the description, and the identity properties
+# (manufacturer, model, ...). quickAppVariables deliberately stay out — they
+# are initializers, the user's runtime values win. The identity properties
+# only appear in the package when the project declares them (qa_export), so
+# this sync cannot clobber a device's live values with skeleton defaults.
+_UPDATE_PROPERTIES = (
+    "viewLayout",
+    "uiView",
+    "uiCallbacks",
+    "useUiView",
+    "userDescription",
+    *IDENTITY_PROPERTIES,
+)
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:

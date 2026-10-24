@@ -166,7 +166,11 @@ async def test_quickapp_export(tmp_path, capsys) -> None:
         props = exported["initialProperties"]
         assert "value" not in props and "deviceControlType" not in props
         assert "userDescription" in props  # the real export's field set
-        assert "model" not in props  # dynamic fields never travel
+        # the identity properties travel only when declared: the catalog
+        # skeleton's defaults (empty model/manufacturer, buildNumber 1, the
+        # type's deviceRole) stay out of the package
+        assert "model" not in props and "manufacturer" not in props
+        assert "buildNumber" not in props and "deviceRole" not in props
         assert isinstance(props["quickAppVariables"], list)
         files = exported["files"]
         assert [f["name"] for f in files] == ["main", "lib"]

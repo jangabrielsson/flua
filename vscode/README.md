@@ -29,8 +29,12 @@ packages without unpacking them by hand.
   errors, unknown `--%%` directives, plua-style directive typos, and
   deprecated REST endpoints appear in the Problems panel (findings for
   `--%%file` includes land on those files).
-- **`.fqa` packages open as structured JSON**, validated against flua's
-  package schema (`files[].name/isMain/content`, `type`, `initialInterfaces`).
+- **`.fqa` packages open in the flua QA editor**: the package summary
+  (name, type, interfaces) plus the packed metadata — properties like
+  `manufacturer`/`userDescription`, `quickAppVariables` one per line, and
+  a collapsed UI summary — with a syntax-highlighted Lua preview per file
+  and Unpack / Upload buttons. The raw JSON stays available via "Reopen
+  Editor With… Text Editor", validated against flua's package schema.
 
 Tool commands run in the shared **flua terminal** (`flua.runToolsInTerminal`
 switches to the output channel) so interactive HC3 credential prompts work.

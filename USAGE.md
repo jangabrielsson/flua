@@ -177,8 +177,12 @@ explorer drives flua without touching launch.json:
   syntax errors, unknown `--%%` directives, plua-style directive typos,
   and deprecated REST endpoints appear in the Problems panel (findings
   for `--%%file` includes land on those files).
-- `.fqa` packages open as structured JSON, validated against flua's
-  package schema.
+- `.fqa` packages open in the **flua QA editor**: the package summary
+  (name, type, interfaces) plus the packed metadata (properties like
+  `manufacturer`/`userDescription`, `quickAppVariables` one per line, and
+  a collapsed UI summary) and a Lua preview per file with Unpack/Upload
+  buttons; the raw JSON stays available via "Reopen Editor With… Text
+  Editor" (validated against flua's package schema).
 
 The extension only shells out to the `flua` executable — auto-detected
 from a workspace `.venv`, else `flua` on PATH, else the `flua.executable`
@@ -966,7 +970,9 @@ press a button to watch the readings follow. See `examples/Modbus Server/README.
 
 Upload `myqa.fqa` through the HC3 web UI (Create QuickApp → import). The
 package follows the HC3's schema — only the properties the HC3 accepts
-travel; dynamic properties are left out.
+travel: the UI structures, `userDescription`, the variables, and the
+identity properties a QA declares (`manufacturer`, `model`, `buildNumber`,
+`deviceRole`, `quickAppUuid`). Dynamic properties are left out.
 
 An `.fqa` file is also directly runnable — handy for testing a package you
 just downloaded from the HC3 (or built with `--tool pack`):
@@ -1042,6 +1048,13 @@ existed still work: the `<QA-name>_<file>_<id>.lua` file name is the
 fallback. Updating the main file restarts the QA on the HC3; the tool warns
 when the target QA's name no longer matches the file name (a file copied
 out of another QA's project).
+
+The HC3's export omits the identity properties (`manufacturer`, `model`,
+`buildNumber`, `deviceRole`, `quickAppUuid`), so `downloadQA`/`downloadFQA`
+restore them from the live device — the downloaded project/package keeps
+them. They only travel in a flua package when the project declares them
+(never the catalog skeleton's defaults), and `updateQA` syncs them to the
+HC3 like the other standard properties.
 
 The tools need HC3 credentials (the `.env` chain, like online mode).
 `uploadQA` prints the new device id; `updateQA` puts all files at once;

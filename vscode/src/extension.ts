@@ -1,14 +1,17 @@
 import * as path from "path";
 import * as vscode from "vscode";
 import { checkDocument, registerCheckDiagnostics } from "./check";
-import { execFlua, fluaExecutable, runInTerminal } from "./flua";
-
-let output: vscode.OutputChannel | undefined;
+import { execFlua, fluaExecutable, runFluaTool } from "./flua";
+import { FqaEditorProvider } from "./fqaEditor";
 
 export function activate(context: vscode.ExtensionContext) {
   registerCheckDiagnostics(context);
-  output = vscode.window.createOutputChannel("flua");
-  context.subscriptions.push(output);
+  context.subscriptions.push(
+    vscode.window.registerCustomEditorProvider(
+      FqaEditorProvider.viewType,
+      new FqaEditorProvider()
+    )
+  );
 
   context.subscriptions.push(
     vscode.commands.registerCommand("flua.setup", async () => {
@@ -16,7 +19,7 @@ export function activate(context: vscode.ExtensionContext) {
       if (dir === undefined) {
         return;
       }
-      runTool(["--tool", "setup", dir]);
+      runFluaTool(["--tool", "setup", dir]);
     }),
 
     vscode.commands.registerCommand("flua.check", async (uri?: vscode.Uri) => {
@@ -29,19 +32,19 @@ export function activate(context: vscode.ExtensionContext) {
     }),
 
     vscode.commands.registerCommand("flua.pack", (uri: vscode.Uri) =>
-      runTool(["--tool", "pack", uri.fsPath])
+      runFluaTool(["--tool", "pack", uri.fsPath])
     ),
 
     vscode.commands.registerCommand("flua.unpack", (uri: vscode.Uri) =>
-      runTool(["--tool", "unpack", uri.fsPath])
+      runFluaTool(["--tool", "unpack", uri.fsPath])
     ),
 
     vscode.commands.registerCommand("flua.uploadFile", (uri: vscode.Uri) =>
-      runTool(["--tool", "uploadFile", uri.fsPath])
+      runFluaTool(["--tool", "uploadFile", uri.fsPath])
     ),
 
     vscode.commands.registerCommand("flua.uploadFqa", (uri: vscode.Uri) =>
-      runTool(["--tool", "uploadFQA", uri.fsPath])
+      runFluaTool(["--tool", "uploadFQA", uri.fsPath])
     ),
 
     vscode.commands.registerCommand("flua.updateQa", async (uri: vscode.Uri) => {
@@ -49,7 +52,7 @@ export function activate(context: vscode.ExtensionContext) {
       if (!id) {
         return;
       }
-      runTool(["--tool", "updateQA", id, uri.fsPath]);
+      runFluaTool(["--tool", "updateQA", id, uri.fsPath]);
     }),
 
     vscode.commands.registerCommand("flua.downloadQa", async () => {
@@ -57,7 +60,7 @@ export function activate(context: vscode.ExtensionContext) {
       if (!id) {
         return;
       }
-      runTool(["--tool", "downloadQA", id]);
+      runFluaTool(["--tool", "downloadQA", id]);
     }),
 
     vscode.commands.registerCommand("flua.newQa", async (uri?: vscode.Uri) => {
@@ -76,38 +79,12 @@ export function activate(context: vscode.ExtensionContext) {
       if (name) {
         args.push(name);
       }
-      runTool(args, folder);
+      runFluaTool(args, folder);
     })
   );
 }
 
 export function deactivate() {}
-
-/** Run a flua command: in the shared terminal by default (visible output,
- * interactive prompts), or captured into the output channel. */
-function runTool(args: string[], cwd?: string) {
-  const flua = fluaExecutable();
-  const inTerminal = vscode.workspace
-    .getConfiguration("flua")
-    .get<boolean>("runToolsInTerminal", true);
-  if (inTerminal) {
-    runInTerminal(flua, args, cwd);
-    return;
-  }
-  void (async () => {
-    const result = await execFlua(flua, args, cwd);
-    if (output) {
-      output.appendLine(`$ ${flua} ${args.join(" ")}`);
-      if (result.stdout) {
-        output.append(result.stdout);
-      }
-      if (result.stderr) {
-        output.append(result.stderr);
-      }
-      output.show();
-    }
-  })();
-}
 
 async function askQaId(prompt: string): Promise<string | undefined> {
   return vscode.window.showInputBox({

@@ -8,8 +8,26 @@ from pathlib import Path
 from typing import Any
 
 from ..config import _is_eoh, expand_includes, parse_annotations, split_annotations
-from ..engine import LuaEngine, sanitize_filename
+from ..engine import IDENTITY_PROPERTIES, LuaEngine, sanitize_filename
 from ..ui import lua_literal
+
+
+def merge_identity_properties(fqa: dict[str, Any], device: dict[str, Any]) -> None:
+    """Copy the identity properties from the live device into the package's
+    initialProperties. The HC3's own export omits them, so a downloaded QA
+    loses manufacturer/model/... — downloadQA/downloadFQA restore them from
+    the device. Only non-empty values are merged (the device's empty
+    defaults stay out); the device wins over the export."""
+    properties = device.get("properties") or {}
+    if not isinstance(properties, dict):
+        return
+    initial = fqa.setdefault("initialProperties", {})
+    if not isinstance(initial, dict):
+        return
+    for key in IDENTITY_PROPERTIES:
+        value = properties.get(key)
+        if value not in (None, ""):
+            initial[key] = value
 
 
 def default_fqa_output(script: str | Path, annotations: dict[str, Any]) -> Path:
