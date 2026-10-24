@@ -4,6 +4,18 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.82] - 2026-10-24
+
+### Added
+- update unpacked file naming convention to include QA name
+- implement .flua-directives for directory-scoped overrides and update documentation
+
+### Changed
+- remove obsolete db.json and log.json files
+
+### Fixed
+- sync __init__ version with the released 0.1.81
+
 ## [0.1.81] - 2026-10-23
 
 ### Fixed
