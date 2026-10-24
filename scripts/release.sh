@@ -63,8 +63,17 @@ sed -i.bak "s/__version__ = \"$CURRENT\"/__version__ = \"$NEW\"/" "$VERSION_FILE
 rm -f "$VERSION_FILE.bak"
 sed -i.bak "s/^version = \"$CURRENT\"/version = \"$NEW\"/" pyproject.toml
 rm -f pyproject.toml.bak
+# the VS Code extension tracks the same version (published separately, see
+# vscode/README.md)
+grep -q "\"version\": \"$CURRENT\"" vscode/package.json || {
+    echo "vscode/package.json is not at $CURRENT — sync it first" >&2
+    exit 1
+}
+sed -i.bak "s/\"version\": \"$CURRENT\"/\"version\": \"$NEW\"/" vscode/package.json
+rm -f vscode/package.json.bak
 grep "__version__" "$VERSION_FILE"
 grep "^version" pyproject.toml
+grep '"version"' vscode/package.json
 
 # 4. changelog: generate the [NEW] section from the commits since v$CURRENT
 #    (conventional-commit subjects, grouped Added/Changed/Fixed). Runs before
@@ -116,7 +125,7 @@ print(f"wrote {path} section for {new}")
 PYEOF
 
 # 5. commit + tag
-git add pyproject.toml "$VERSION_FILE" CHANGELOG.md
+git add pyproject.toml "$VERSION_FILE" CHANGELOG.md vscode/package.json
 git commit -m "chore: release $NEW"
 git tag "v$NEW"
 

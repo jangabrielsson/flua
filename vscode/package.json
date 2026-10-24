@@ -2,7 +2,8 @@
   "name": "flua",
   "displayName": "flua",
   "description": "HC3 QuickApp support for VS Code: run flua tools from the explorer, check QA files on save, and read .fqa packages.",
-  "version": "0.1.0",
+  "icon": "icon.png",
+  "version": "0.1.82",
   "publisher": "GsonSoft-development",
   "license": "MIT",
   "repository": {
@@ -165,6 +166,7 @@
     }
   },
   "scripts": {
+    "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -w -p ./",
     "package": "vsce package",

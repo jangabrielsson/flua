@@ -702,9 +702,10 @@ def test_setup_tool_scaffolds_a_qa_project(tmp_path, capsys) -> None:
         i.endswith(("flua", "flua.exe")) and i != "flua" for i in interpreters
     )
     # the mermaid extension recommendation renders docs/tutorial diagrams in
-    # VS Code's markdown preview
+    # VS Code's markdown preview; the flua extension drives the explorer tools
     extensions = (tmp_path / ".vscode/extensions.json").read_text()
     assert "bierner.markdown-mermaid" in extensions
+    assert "GsonSoft-development.flua" in extensions
     # idempotent: a second run keeps the existing files
     (tmp_path / "AGENTS.md").write_text("custom\n")
     assert module.run(parser, parser.parse_args([str(tmp_path)])) == 0

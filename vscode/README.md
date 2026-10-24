@@ -53,11 +53,22 @@ Debug with F5 inside this folder (launch config `Extension` — add one via
 
 ## Publishing
 
-1. Set your marketplace publisher id in `package.json` (`"publisher"`).
-2. `npm run publish` (or `npx @vscode/vsce package` for a local `.vsix`).
+The extension is published as `GsonSoft-development.flua` — install it from
+the VS Code marketplace. Its version tracks the flua release (`release.sh`
+bumps `package.json` alongside the Python version, and refuses to run when
+they drift); publishing is a manual step per release:
 
-The extension is versioned with the flua repo and has no runtime
-dependencies — it shells out to the `flua` executable.
+```bash
+cd vscode && npx @vscode/vsce publish
+```
+
+Requires a marketplace login (`npx @vscode/vsce login GsonSoft-development`).
+Note: global Azure DevOps PATs retire 2026-12-01 — the Entra ID credential
+flow (`vsce publish --azure-credential`) is the successor for secretless
+publishing.
+
+The extension has no runtime dependencies — it shells out to the `flua`
+executable.
 
 ## Settings
 
