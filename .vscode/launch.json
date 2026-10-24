@@ -89,6 +89,13 @@
         "examples/Modbus Server/solaredge_mock.lua"
       ],
       "listenPublicly": true
+    },
+    {
+      "name": "Flua: Debug VS Code Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}/vscode"],
+      "outFiles": ["${workspaceFolder}/vscode/out/**/*.js"]
     }
   ]
 }

@@ -8,8 +8,15 @@ from pathlib import Path
 from typing import Any
 
 from ..config import _is_eoh, expand_includes, parse_annotations, split_annotations
-from ..engine import LuaEngine
+from ..engine import LuaEngine, sanitize_filename
 from ..ui import lua_literal
+
+
+def default_fqa_output(script: str | Path, annotations: dict[str, Any]) -> Path:
+    """The .fqa output path next to the main file: ``<QA name>.fqa`` — the
+    QA's --%%name directive, or MyQA.fqa when it declares none."""
+    name = sanitize_filename(str(annotations.get("name") or "MyQA"))
+    return Path(script).parent / f"{name}.fqa"
 
 
 def build_fqa(script: str, *, dist: bool = False) -> tuple[dict[str, Any], None]:

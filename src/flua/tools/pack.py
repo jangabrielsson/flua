@@ -10,7 +10,8 @@ import argparse
 import json
 from pathlib import Path
 
-from .common import build_fqa
+from ..config import expand_includes, parse_annotations
+from .common import build_fqa, default_fqa_output
 
 NAME = "pack"
 HELP = "package a QA project (main file + --%%file extras) into a .fqa file on disk"
@@ -21,7 +22,8 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "-o",
         "--output",
-        help="the .fqa output path (default: <script>.fqa next to the main file)",
+        help="the .fqa output path (default: <QA name>.fqa — the --%%name, "
+        "or MyQA.fqa without one — next to the main file)",
     )
     parser.add_argument(
         "-f",
@@ -32,11 +34,21 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
+    script = Path(args.script)
+    try:
+        source = script.read_text(encoding="utf-8")
+        annotations = expand_includes(
+            parse_annotations(source, warn_unknown=False), script.parent
+        )
+    except OSError as exc:
+        parser.error(f"cannot open {args.script}: {exc}")
+    except ValueError as exc:
+        parser.error(f"error in {args.script}: {exc}")
     try:
         fqa, _ = build_fqa(args.script, dist=True)
     except (FileNotFoundError, ValueError) as exc:
         parser.error(str(exc))
-    output = Path(args.output) if args.output else Path(args.script).with_suffix(".fqa")
+    output = Path(args.output) if args.output else default_fqa_output(script, annotations)
     if output.exists() and not args.force:
         parser.error(f"{output} exists — pass --force to overwrite")
     output.write_text(json.dumps(fqa, indent=2), encoding="utf-8")

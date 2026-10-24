@@ -1,0 +1,166 @@
+{
+  "name": "flua",
+  "displayName": "flua",
+  "description": "HC3 QuickApp support for VS Code: run flua tools from the explorer, check QA files on save, and read .fqa packages.",
+  "version": "0.1.0",
+  "publisher": "GsonSoft-development",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jangabrielsson/flua"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other",
+    "Linters"
+  ],
+  "keywords": [
+    "fibaro",
+    "hc3",
+    "quickapp",
+    "lua",
+    "home-center"
+  ],
+  "activationEvents": [
+    "onLanguage:lua",
+    "onLanguage:json"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "flua",
+      "properties": {
+        "flua.executable": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the flua executable. Empty = auto-detect (a .venv/bin/flua up the workspace tree, then `flua` on PATH)."
+        },
+        "flua.runToolsInTerminal": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run flua --tool commands in the integrated terminal (visible output, interactive credential prompts). When false, output goes to the flua output channel."
+        }
+      }
+    },
+    "configurationDefaults": {
+      "files.associations": {
+        "*.fqa": "json"
+      }
+    },
+    "jsonValidation": [
+      {
+        "fileMatch": "*.fqa",
+        "url": "./fqa.schema.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "flua.setup",
+        "title": "Flua: Setup workspace (.vscode, .luarc.json, .luals)"
+      },
+      {
+        "command": "flua.check",
+        "title": "Flua: Check QA file"
+      },
+      {
+        "command": "flua.pack",
+        "title": "Flua: Pack QA into .fqa"
+      },
+      {
+        "command": "flua.unpack",
+        "title": "Flua: Unpack .fqa into project"
+      },
+      {
+        "command": "flua.uploadFile",
+        "title": "Flua: Upload file to HC3 QA"
+      },
+      {
+        "command": "flua.uploadFqa",
+        "title": "Flua: Upload .fqa as new QA"
+      },
+      {
+        "command": "flua.updateQa",
+        "title": "Flua: Update QA on HC3"
+      },
+      {
+        "command": "flua.newQa",
+        "title": "Flua: New QA from template"
+      },
+      {
+        "command": "flua.downloadQa",
+        "title": "Flua: Download QA from HC3"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "flua.explorer",
+        "label": "flua"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "submenu": "flua.explorer",
+          "group": "2_workspace@10"
+        }
+      ],
+      "flua.explorer": [
+        {
+          "command": "flua.pack",
+          "when": "resourceExtname == .lua",
+          "group": "1_package@1"
+        },
+        {
+          "command": "flua.unpack",
+          "when": "resourceExtname == .fqa",
+          "group": "1_package@2"
+        },
+        {
+          "command": "flua.uploadFile",
+          "when": "resourceExtname == .lua",
+          "group": "2_hc3@1"
+        },
+        {
+          "command": "flua.uploadFqa",
+          "when": "resourceExtname == .fqa",
+          "group": "2_hc3@2"
+        },
+        {
+          "command": "flua.updateQa",
+          "when": "resourceExtname == .lua",
+          "group": "2_hc3@3"
+        },
+        {
+          "command": "flua.downloadQa",
+          "group": "2_hc3@4"
+        },
+        {
+          "command": "flua.newQa",
+          "group": "3_create@1"
+        },
+        {
+          "command": "flua.setup",
+          "group": "3_create@2"
+        },
+        {
+          "command": "flua.check",
+          "when": "resourceExtname == .lua",
+          "group": "4_check@1"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -w -p ./",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.6.0"
+  }
+}

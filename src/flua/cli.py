@@ -40,7 +40,7 @@ from .config import (
 from .engine import LuaEngine
 from .http_server import ApiServer
 from .tools import run_tool
-from .tools.common import build_fqa
+from .tools.common import build_fqa, default_fqa_output
 
 logger = logging.getLogger(__name__)
 
@@ -671,10 +671,19 @@ def _export_cli(parser: argparse.ArgumentParser, args: argparse.Namespace) -> in
     """flua export script.lua -o out.fqa — the deploy artifact, without running."""
     path = Path(args.script)
     try:
+        source = path.read_text(encoding="utf-8")
+        annotations = expand_includes(
+            parse_annotations(source, warn_unknown=False), path.parent
+        )
+    except OSError as exc:
+        parser.error(f"cannot open {args.script}: {exc}")
+    except ValueError as exc:
+        parser.error(f"error in {args.script}: {exc}")
+    try:
         fqa, _ = build_fqa(args.script, dist=True)
     except (FileNotFoundError, ValueError) as exc:
         parser.error(str(exc))
-    output = Path(args.output) if args.output else path.with_suffix(".fqa")
+    output = Path(args.output) if args.output else default_fqa_output(path, annotations)
     output.write_text(json.dumps(fqa, indent=2) + "\n", encoding="utf-8")
     print(f"exported {len(fqa['files'])} files to {output}")
     return 0
@@ -810,7 +819,8 @@ def _tool_parser(command: str) -> argparse.ArgumentParser:
             "-o",
             "--output",
             metavar="FILE",
-            help="output .fqa path (default: <name>.fqa next to the script)",
+            help="output .fqa path (default: <QA name>.fqa — the --%%name, "
+            "or MyQA.fqa without one — next to the script)",
         )
         return parser
     parser = argparse.ArgumentParser(

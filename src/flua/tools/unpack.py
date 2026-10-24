@@ -14,7 +14,7 @@ from pathlib import Path
 from ..engine import LuaEngine
 
 NAME = "unpack"
-HELP = "unpack a .fqa file into a flua project (main.lua + one file per QA file)"
+HELP = "unpack a .fqa file into a flua project (<QA-name>_main.lua + one file per QA file)"
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:

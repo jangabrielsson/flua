@@ -1494,8 +1494,9 @@ class LuaEngine:
         ``--%%deviceId``/``--%%qaFile`` header lines (in the generated main
         header, or atop each extra file) — the metadata --tool uploadFile
         reads to push a single file back to its QA. Without it (plain
-        unpack), the extras get a .lua extension and the main stays
-        ``main.lua``.
+        unpack), every file is ``<sanitized-QA-name>_<file>.lua`` — the same
+        pattern without the id, so an unpacked project and a downloaded one
+        line up (several unpacked QAs can share a directory too).
 
         ``strip_header`` drops a leading --%% header from the main's content
         before the regenerated one is prepended (downloaded QAs may carry
@@ -1540,7 +1541,7 @@ class LuaEngine:
             if device_id is not None:
                 disk_name = f"{prefix}_{name}_{device_id}.lua"
             else:
-                disk_name = f"{name}.lua"
+                disk_name = f"{prefix}_{name}.lua"
             path = os.path.join(directory, disk_name)
             content = str(entry.get("content") or "")
             if device_id is not None:
@@ -1563,7 +1564,7 @@ class LuaEngine:
         if device_id is not None:
             main_name = f"{prefix}_main_{device_id}.lua"
         else:
-            main_name = "main.lua"
+            main_name = f"{prefix}_main.lua"
         main_path = os.path.join(directory, main_name)
         with open(main_path, "w", encoding="utf-8") as handle:
             handle.write("\n".join(header) + "\n" + content)

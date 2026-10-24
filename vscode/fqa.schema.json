@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "flua QA package (.fqa)",
+  "description": "An HC3 QuickApp package — the flua .fqa format (a local HC3 export, or the output of flua --tool pack).",
+  "type": "object",
+  "required": ["files"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The QA's device name."
+    },
+    "type": {
+      "type": "string",
+      "description": "The device type, e.g. com.fibaro.binarySwitch."
+    },
+    "initialInterfaces": {
+      "type": "array",
+      "description": "Device interfaces the package declares.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "files": {
+      "type": "array",
+      "description": "The QA's Lua files.",
+      "items": {
+        "type": "object",
+        "required": ["name", "content"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "File name inside the QA ('main' is the main file)."
+          },
+          "type": {
+            "type": "string",
+            "description": "File type ('lua')."
+          },
+          "isMain": {
+            "type": "boolean",
+            "description": "True for the QA's main file."
+          },
+          "content": {
+            "type": "string",
+            "description": "The Lua source."
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

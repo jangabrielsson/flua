@@ -109,7 +109,7 @@ flua unpack myqa.fqa -d myqa-project/
 ```
 
 ```text
-unpacked to myqa-project/ (main: myqa-project/main.lua)
+unpacked to myqa-project/ (main: myqa-project/<QA-name>_main.lua)
 ```
 
 ```bash

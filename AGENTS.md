@@ -48,6 +48,7 @@ Python 3.11+. `lupa` is the only runtime dependency.
 |---|---|---|
 | `src/flua/engine.py` | Lua VM, queues, and message pump | Engine and scheduling behavior |
 | `src/flua/mcp/` | The MCP server (`flua-mcp`): stdio + Streamable HTTP transports, tool registry, resources, prompts | New tools, protocol surface |
+| `vscode/` | VS Code extension: explorer tool menus, check-on-save diagnostics, `.fqa` schema | Extension features |
 | `src/flua/api/` | Simulated and hybrid HC3 REST API | API routes and simulated state |
 | `src/flua/api/routes/` | Pure REST route handlers | New or changed endpoints |
 | `src/flua/lua/` | HC3-compatible Lua runtime | QuickApp, fibaro, timer, and network behavior |

@@ -197,16 +197,16 @@ def test_export_and_unpack_roundtrip(tmp_path) -> None:
     target = tmp_path / "project"
     result = _run("unpack", str(package), "-d", str(target))
     assert result.returncode == 0, result.stdout + result.stderr
-    assert (target / "main.lua").exists()
-    assert (target / "lib.lua").exists()  # extras get .lua for editability
-    header = (target / "main.lua").read_text()
+    assert (target / "packaged_main.lua").exists()  # <QA-name>_main.lua
+    assert (target / "packaged_lib.lua").exists()  # extras: <QA-name>_<file>.lua
+    header = (target / "packaged_main.lua").read_text()
     assert "--%%name:packaged" in header
-    assert "--%%file:lib.lua,lib" in header
+    assert "--%%file:packaged_lib.lua,lib" in header
     assert "EOH" in header
     assert "print('RUNS', LIB)" in header  # main content follows the header
 
     # the unpacked project runs as a normal flua project
-    result = _run("--api", "local", str(target / "main.lua"))
+    result = _run("--api", "local", str(target / "packaged_main.lua"))
     assert result.returncode == 0, result.stdout + result.stderr
     assert "RUNS ok" in result.stdout
 

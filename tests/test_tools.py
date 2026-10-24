@@ -361,15 +361,32 @@ def test_pack_unpack_tools_roundtrip(tmp_path, capsys, monkeypatch) -> None:
     pack.add_arguments(parser)
     assert pack.run(parser, parser.parse_args(["main.lua"])) == 0
     assert "packed packed (2 files)" in capsys.readouterr().out
-    fqa = json.loads((tmp_path / "main.fqa").read_text())
+    fqa = json.loads((tmp_path / "packed.fqa").read_text())  # <QA name>.fqa default
     assert fqa["name"] == "packed" and len(fqa["files"]) == 2
-    # and back out as a project
+    # and back out as a project: <QA-name>_<file>.lua (the downloadQA pattern
+    # without the id)
     unpack = tools._TOOLS["unpack"]
     parser = argparse.ArgumentParser()
     unpack.add_arguments(parser)
-    assert unpack.run(parser, parser.parse_args(["main.fqa", "-d", "proj"])) == 0
+    assert unpack.run(parser, parser.parse_args(["packed.fqa", "-d", "proj"])) == 0
     assert "unpacked to proj/" in capsys.readouterr().out
-    assert "--%%name:packed" in (tmp_path / "proj" / "main.lua").read_text()
+    assert "--%%name:packed" in (tmp_path / "proj" / "packed_main.lua").read_text()
+
+
+def test_pack_default_output_names(tmp_path, capsys, monkeypatch) -> None:
+    # the default .fqa output is <QA name>.fqa — the --%%name — or MyQA.fqa
+    # when the QA declares no name (never the file's own name like main.fqa)
+    monkeypatch.chdir(tmp_path)
+    pack = tools._TOOLS["pack"]
+    parser = argparse.ArgumentParser()
+    pack.add_arguments(parser)
+    (tmp_path / "app.lua").write_text("--%%name:Lamp Hall\nprint('x')\n")
+    assert pack.run(parser, parser.parse_args(["app.lua"])) == 0
+    assert "packed Lamp Hall (1 files) to " in capsys.readouterr().out
+    assert (tmp_path / "Lamp_Hall.fqa").exists()  # sanitized for the file system
+    (tmp_path / "plain.lua").write_text("print('x')\n")
+    assert pack.run(parser, parser.parse_args(["plain.lua"])) == 0
+    assert (tmp_path / "MyQA.fqa").exists()  # no --%%name: the neutral default
 
 
 def test_upload_and_download_fqa_tools(tmp_path, monkeypatch, capsys) -> None:
@@ -391,7 +408,7 @@ def test_upload_and_download_fqa_tools(tmp_path, monkeypatch, capsys) -> None:
         pack = tools._TOOLS["pack"]
         parser = argparse.ArgumentParser()
         pack.add_arguments(parser)
-        assert pack.run(parser, parser.parse_args(["qa.lua"])) == 0
+        assert pack.run(parser, parser.parse_args(["qa.lua", "-o", "qa.fqa"])) == 0
         upload = tools._TOOLS["uploadFQA"]
         parser = argparse.ArgumentParser()
         upload.add_arguments(parser)

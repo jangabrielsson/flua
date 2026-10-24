@@ -164,6 +164,29 @@ repo gets autocomplete and parameter hints. `flua --tool setup` ships the
 same configuration (and the type library) into scaffolded projects for pip
 users; the two copies are kept byte-identical by a test.
 
+### The flua VS Code extension
+
+The repo also ships the **flua VS Code extension** (`vscode/`) — the
+explorer drives flua without touching launch.json:
+
+- Right-click a file → **flua**: pack a QA into a `.fqa`, unpack a `.fqa`
+  into a project, upload a file / a new QA / an updated QA to the HC3,
+  download a QA, scaffold a QA from the 41 type templates, or run
+  `--tool setup`.
+- **Check on save**: saving a `.lua` file runs `flua --check --json`;
+  syntax errors, unknown `--%%` directives, plua-style directive typos,
+  and deprecated REST endpoints appear in the Problems panel (findings
+  for `--%%file` includes land on those files).
+- `.fqa` packages open as structured JSON, validated against flua's
+  package schema.
+
+The extension only shells out to the `flua` executable — auto-detected
+from a workspace `.venv`, else `flua` on PATH, else the `flua.executable`
+setting. Tools run in the shared flua terminal so interactive HC3
+credential prompts work. Build it with `npm install && npm run compile`
+in `vscode/`; `npm run package` builds the `.vsix`, and `npm run publish`
+publishes under the marketplace id in `package.json`.
+
 The fastest loop for tinkering:
 
 ```bash
@@ -986,7 +1009,7 @@ format (individual `.lua` files) and only the HC3 sees `.fqa`:
 .venv/bin/flua --tool newQA binarySwitch "Hall lamp"   # lists all types with no argument
 
 # package / unpack QA projects as .fqa files (tool forms of flua export/unpack)
-.venv/bin/flua --tool pack main.lua -o myqa.fqa
+.venv/bin/flua --tool pack main.lua          # output: <QA name>.fqa (the --%%name), else MyQA.fqa
 .venv/bin/flua --tool unpack myqa.fqa -d project/
 
 # deploy a ready-made package as a NEW QA, or download one from the HC3
@@ -1007,7 +1030,7 @@ rows (translated from `uiView`/`viewLayout`/`uiCallbacks`), variables as
 dropped, since they may be outdated. `uploadQA` then takes either the QA
 name (it finds the project in the current directory) or the fully qualified
 `<QA-name>_main_<id>.lua` and updates that QA on the HC3; a plain
-`main.lua` uploads as a new QA.
+`<QA-name>_main.lua` (from `unpack`) uploads as a new QA.
 
 `downloadQA` also stamps every unpacked file with two metadata directives —
 `--%%deviceId:123` (the HC3 device id) and `--%%qaFile:lib` (the QA file
@@ -1022,8 +1045,8 @@ out of another QA's project).
 
 The tools need HC3 credentials (the `.env` chain, like online mode).
 `uploadQA` prints the new device id; `updateQA` puts all files at once;
-`downloadQA` writes a `main.lua` with the QA's directives plus the extra
-files — a normal flua project.
+`downloadQA` writes a `<QA-name>_main_<id>.lua` main with the QA's
+directives plus the extra files — a normal flua project.
 
 ## Bringing an HC3 QA home
 
@@ -1033,8 +1056,10 @@ Export the QA from the HC3 UI (`.fqa`), then:
 .venv/bin/flua unpack myqa.fqa -d myqa-project/
 ```
 
-You get a runnable flua project: `main.lua` with generated `--%%` directives
-and one file per QA file, ready for editing and debugging.
+You get a runnable flua project: `<QA-name>_main.lua` (the QA name comes
+from the package) with generated `--%%` directives and one file per QA file
+— the same `<QA-name>_<file>.lua` pattern `downloadQA` uses, minus the id.
+Ready for editing and debugging.
 
 ## Static checks
 
