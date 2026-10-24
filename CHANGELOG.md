@@ -4,6 +4,13 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.83] - 2026-10-24
+
+### Added
+- automate VS Code extension publishing with GitHub workflow
+- update VS Code extension details, add license, and include icon
+- enhance .fqa package handling and identity property management
+
 ## [0.1.82] - 2026-10-24
 
 ### Added
