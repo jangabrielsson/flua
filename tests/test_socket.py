@@ -444,6 +444,129 @@ def test_debugger_vscode_protocol_breakpoint_stop(tmp_path) -> None:
     assert top_frame.get("line") == 2, top_frame
 
 
+def test_debugger_step_into_skips_internal_wrappers(tmp_path) -> None:
+    """Step-into on a call to flua's patched type() behaves like a C call:
+    the next stop is the caller's next line, never inside init.lua's wrapper
+    (registered in _FLUA.debug_skip)."""
+    script = tmp_path / "step.lua"
+    script.write_text(
+        'print("VSC_START")\n'
+        "local x = {}\n"  # line 2 — breakpoint
+        "local t = type(x)\n"  # line 3 — step INTO this
+        'print("VSC_TYPE", t)\n'  # line 4 — expected stop
+        "exit(0)\n"
+    )
+    base = str(tmp_path.resolve())
+    script_path = str(script.resolve())
+
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(1)
+    port = listener.getsockname()[1]
+
+    events: list[str] = []
+    stopped_lines: list[int] = []
+
+    def fake_ide() -> None:
+        listener.settimeout(20)
+        try:
+            conn, _ = listener.accept()
+        except TimeoutError:
+            return
+        events.append("connected")
+        seq = 0
+        try:
+            conn.sendall(
+                _vsc_frame(
+                    {
+                        "command": "welcome",
+                        "arguments": {
+                            "sourceBasePath": base,
+                            "stopOnEntry": False,
+                            "directorySeperator": "/",
+                            "pathMap": [],
+                        },
+                    }
+                )
+            )
+            time.sleep(0.3)
+            for command, arguments in [
+                (
+                    "setBreakpoints",
+                    {"source": {"path": script_path}, "breakpoints": [{"line": 2}]},
+                ),
+                ("configurationDone", {}),
+            ]:
+                seq += 1
+                conn.sendall(
+                    _vsc_frame(
+                        {"seq": seq, "type": "request", "command": command, "arguments": arguments}
+                    )
+                )
+                _vsc_response(conn, seq)
+            conn.settimeout(10.0)
+            # first stop: the breakpoint at line 2
+            while True:
+                msg = _vsc_read(conn)
+                if msg is None:
+                    return
+                if msg.get("type") == "event" and msg.get("event") == "stopped":
+                    events.append(f"stopped:{msg['body'].get('reason')}")
+                    break
+            # step 1: onto line 3 (the type(x) statement, not yet executed)
+            for _ in range(2):
+                seq += 1
+                conn.sendall(
+                    _vsc_frame({"seq": seq, "type": "request", "command": "stepIn"})
+                )
+                _vsc_response(conn, seq)
+                while True:
+                    msg = _vsc_read(conn)
+                    if msg is None:
+                        return
+                    if msg.get("type") == "event" and msg.get("event") == "stopped":
+                        events.append(f"stopped:{msg['body'].get('reason')}")
+                        break
+            # after the second step-into: line 4 in the script, never init.lua
+            seq += 1
+            conn.sendall(
+                _vsc_frame(
+                    {
+                        "seq": seq,
+                        "type": "request",
+                        "command": "stackTrace",
+                        "arguments": {"threadId": 0, "startFrame": 0, "levels": 2},
+                    }
+                )
+            )
+            resp = _vsc_response(conn, seq)
+            frames = ((resp or {}).get("body") or {}).get("stackFrames") or []
+            stopped_lines.extend(int(frame["line"]) for frame in frames)
+            seq += 1
+            conn.sendall(
+                _vsc_frame({"seq": seq, "type": "request", "command": "continue"})
+            )
+            _vsc_response(conn, seq)
+        finally:
+            conn.close()
+            listener.close()
+
+    thread = threading.Thread(target=fake_ide, daemon=True)
+    thread.start()
+    result = _run_flua("--debugger", str(port), str(script))
+    thread.join(timeout=25)
+
+    assert result.returncode == 0, result.stdout + "\n" + result.stderr
+    assert events and events[0] == "connected", f"debuggee never connected: {events}"
+    assert len([e for e in events if e.startswith("stopped")]) == 3, events
+    assert "VSC_TYPE table" in result.stdout, result.stdout
+    assert stopped_lines and stopped_lines[0] == 4, (
+        f"step-into stopped at line {stopped_lines}, expected the caller's next line 4\n"
+        f"--- debuggee stdout ---\n{result.stdout}"
+    )
+
+
 def test_lua_cli_compat_flags(tmp_path) -> None:
     # the VS Code mobdebug extension launches interpreters with
     # `-l package -e "<debugger bootstrap>" script.lua`; flua must accept -l

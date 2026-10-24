@@ -15,6 +15,7 @@ build/
 fibaro_api_docs/
 claude-skills-fibaro-hc3/
 dev/
+testQAs/
 tmp/
 .directives
 forum\ posts/

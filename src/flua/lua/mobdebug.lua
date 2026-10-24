@@ -963,6 +963,23 @@ local function in_debugger()
   return false
 end
 
+-- flua patch: internal wrappers (the patched type() in init.lua, ...) must
+-- behave like C calls under step-into — a line event inside one of them
+-- never stops the step, so the next stop is the caller's next line.
+-- init.lua registers them in _FLUA.debug_skip (weak keys, no extra refs).
+local function skipped_current_func()
+  local flua = rawget(_G, "_FLUA")
+  local skip = flua and rawget(flua, "debug_skip")
+  if not skip then
+    return false
+  end
+  -- from this helper's frame: 1 = helper, 2 = debug_hook, 3 = the function
+  -- whose line event is being processed
+  local info = debug.getinfo(3, "f")
+  local func = info and info.func
+  return func ~= nil and skip[func] == true
+end
+
 -- flua patch: pending-I/O poll batching (see the header)
 local pending_poll = 100
 local done  -- flua patch: forward declaration; the hook calls done() to
@@ -1130,7 +1147,7 @@ debug_hook = function(event, line)
     -- need to get into the "regular" debug handler, but only if there was
     -- no watch that was fired. If there was a watch, handle its result.
     local getin = (status == nil) and (
-        state.step_into
+        (state.step_into and not skipped_current_func())
       -- when coroutine.running() return `nil` (main thread in Lua 5.1),
       -- step_over will equal 'main', so need to check for that explicitly.
       or (state.step_over and state.step_over == (coroutine.running() or 'main') and state.stack_level <= state.step_level)

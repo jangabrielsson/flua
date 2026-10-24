@@ -183,6 +183,12 @@ type = function(value)
   end
   return real_type(value)
 end
+-- flua patch (debugger): functions registered in _FLUA.debug_skip behave
+-- like C calls under step-into — mobdebug.lua skips their line events, so
+-- stepping into type(x) lands on the caller's next line, not inside this
+-- wrapper. Weak keys: the registry holds no extra references.
+_FLUA.debug_skip = _FLUA.debug_skip or setmetatable({}, {__mode = "k"})
+_FLUA.debug_skip[type] = true
 
 -- _FLUA.millitime(): virtual time in whole milliseconds (flua extension) —
 -- os.time() is integer seconds and os.clock() is the real runtime clock,
