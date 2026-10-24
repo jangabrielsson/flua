@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Release flua: bump the version, tag, push, and publish a GitHub Release.
 # Publishing the release fires .github/workflows/publish-to-pypi.yml, which
-# builds and uploads to PyPI using the PYPI_API_TOKEN repository secret.
+# builds and uploads to PyPI using the PYPI_API_TOKEN repository secret, and
+# .github/workflows/publish-vscode.yml, which publishes the VS Code extension
+# (vscode/package.json rides the same version bump) using the VSCE_PAT
+# org-scoped marketplace PAT.
 #
 # Usage:
 #   ./scripts/release.sh            # bump the patch version (0.1.0 -> 0.1.1)

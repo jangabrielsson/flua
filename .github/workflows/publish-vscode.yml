@@ -1,0 +1,37 @@
+name: Publish VS Code Extension
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch: # manual test run (publishes the current package.json version)
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      # The release tag's version was synced into vscode/package.json by
+      # release.sh, so the marketplace release always matches the flua
+      # release.
+      #
+      # Auth: VSCE_PAT — an ORGANIZATION-SCOPED marketplace PAT (scoped to
+      # one Azure DevOps organization, scope "Marketplace -> Manage"), NOT a
+      # global PAT ("All accessible organizations"), which retire in January
+      # 2027. The planned successor is the Entra ID credential flow
+      # (vsce publish --azure-credential), which needs an Azure subscription
+      # for the managed identity.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build and publish extension
+        working-directory: vscode
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          npm ci
+          npx --yes @vscode/vsce publish

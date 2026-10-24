@@ -56,16 +56,28 @@ Debug with F5 inside this folder (launch config `Extension` — add one via
 The extension is published as `GsonSoft-development.flua` — install it from
 the VS Code marketplace. Its version tracks the flua release (`release.sh`
 bumps `package.json` alongside the Python version, and refuses to run when
-they drift); publishing is a manual step per release:
+they drift).
+
+Publishing is automated: the **Publish VS Code Extension** GitHub workflow
+fires on every GitHub release (and manually via `workflow_dispatch`) and
+runs `vsce publish` with the `VSCE_PAT` repository secret. The secret must
+be an **organization-scoped** marketplace PAT — created in
+`dev.azure.com/<org>` → user settings → Personal access tokens, scope
+`Marketplace → Manage`, organization set to your own (NOT "All accessible
+organizations"): *global* PATs retire in January 2027 (postponed from the
+original December 1, 2026 date), while org-scoped PATs remain supported.
+
+Manual publish from a dev machine works the same way:
 
 ```bash
-cd vscode && npx @vscode/vsce publish
+cd vscode && VSCE_PAT=<org-scoped-pat> npx @vscode/vsce publish
+# or once: npx @vscode/vsce login GsonSoft-development  (stores the PAT)
 ```
 
-Requires a marketplace login (`npx @vscode/vsce login GsonSoft-development`).
-Note: global Azure DevOps PATs retire 2026-12-01 — the Entra ID credential
-flow (`vsce publish --azure-credential`) is the successor for secretless
-publishing.
+The planned successor is secretless publishing via the Entra ID credential
+flow (`vsce publish --azure-credential` with workload identity federation) —
+it needs an Azure subscription for the managed identity, so it is on hold
+until one exists.
 
 The extension has no runtime dependencies — it shells out to the `flua`
 executable.

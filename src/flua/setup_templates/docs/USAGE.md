@@ -190,10 +190,12 @@ setting. Tools run in the shared flua terminal so interactive HC3
 credential prompts work. Install it from the VS Code marketplace as
 **`GsonSoft-development.flua`** (its version tracks the flua release —
 `release.sh` bumps `package.json` alongside the Python version, and
-`--tool setup` recommends it in the generated `extensions.json`). Build it
-from source with `npm install && npm run compile` in `vscode/`;
-`npm run package` builds the `.vsix`, and `npm run publish` publishes under
-the marketplace id in `package.json`.
+`--tool setup` recommends it in the generated `extensions.json`). Releases
+publish it automatically: the **Publish VS Code Extension** workflow fires
+on every GitHub release and publishes with an organization-scoped
+marketplace PAT from the `VSCE_PAT` repo secret (global PATs retire in
+January 2027; the Entra ID credential flow is the planned successor). Build
+it from source with `npm install && npm run compile` in `vscode/`.
 
 The fastest loop for tinkering:
 
