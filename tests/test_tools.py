@@ -1022,3 +1022,68 @@ def test_packaged_var_errors_are_loud(tmp_path, monkeypatch) -> None:
     )
     with pytest.raises(ValueError, match="--%%var:boom"):
         common.build_fqa("main.lua", dist=True)
+
+
+def test_packaged_timeline_serves_from_the_package() -> None:
+    # the timeline page ships with the viewer; --ui serves it at /timeline
+    repo = Path(__file__).resolve().parent.parent
+    packaged = repo / "src" / "flua" / "setup_templates" / "viewer" / "timeline.html"
+    assert packaged.is_file()
+
+
+def test_timeline_page_and_trace_feed_end_to_end(tmp_path) -> None:
+    # --ui serves /timeline, which polls /flua/systemLog — the trace entries
+    # (--%%trace:api) carry the category data the timeline colors by
+    import socket
+    import subprocess
+    import time
+    import urllib.request
+
+    script = tmp_path / "qa.lua"
+    script.write_text(
+        "--%%trace:api\n"
+        "print('RUN')\n"
+        "setTimeout(function() api.get('/devices/'.._FLUA.qaId) end, 100)\n"
+        "setTimeout(function() exit(0) end, 400)\n"
+    )
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    process = subprocess.Popen(
+        [sys.executable, "-m", "flua", "--ui", str(port), "--run-for", "8", str(script)],
+        cwd=tmp_path,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        deadline = time.monotonic() + 15
+        page = None
+        while time.monotonic() < deadline:
+            try:
+                page = urllib.request.urlopen(f"http://127.0.0.1:{port}/timeline", timeout=2)
+                break
+            except OSError:
+                time.sleep(0.2)
+        assert page is not None, "the --ui server never came up"
+        body = page.read().decode("utf-8")
+        assert page.status == 200 and "flua timeline" in body
+        # the feed the timeline polls: trace entries with their category
+        deadline = time.monotonic() + 10
+        entries = []
+        while time.monotonic() < deadline and not entries:
+            feed = urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/flua/systemLog?last=0", timeout=2
+            ).read()
+            entries = json.loads(feed).get("entries") or []
+            if not any(e.get("data", {}).get("category") == "api" for e in entries):
+                entries = []
+                time.sleep(0.2)
+        assert any(e.get("data", {}).get("category") == "api" for e in entries), entries
+    finally:
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()

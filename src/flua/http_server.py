@@ -51,6 +51,15 @@ def _viewer_html() -> bytes:
     return b"<html><body>viewer/index.html missing from the flua package</body></html>"
 
 
+_TIMELINE_PATH = Path(__file__).parent / "setup_templates" / "viewer" / "timeline.html"
+
+
+def _timeline_html() -> bytes:
+    if _TIMELINE_PATH.exists():
+        return _TIMELINE_PATH.read_bytes()
+    return b"<html><body>viewer/timeline.html missing from the flua package</body></html>"
+
+
 class ApiServer:
     """Serve an :class:`~flua.api.Api` over HTTP (loopback by default)."""
 
@@ -108,6 +117,10 @@ class ApiServer:
             if method == "GET" and path in ("/", "/index.html", "/viewer", "/viewer/"):
                 # the UI viewer page itself (same origin as the API it polls)
                 _respond_html(writer, _viewer_html(), extra=_CORS)
+                return
+            if method == "GET" and path in ("/timeline", "/timeline/"):
+                # the run timeline (virtual time x QA rows; polls /flua/systemLog)
+                _respond_html(writer, _timeline_html(), extra=_CORS)
                 return
             if path.startswith("/api/"):
                 # the HC3 REST prefix — proxy devices on the HC3 post their

@@ -470,6 +470,16 @@ package (`src/flua/setup_templates/viewer/index.html` is the source);
 `--tool setup` does not copy it — the served page can also point at another
 machine running flua.
 
+**The run timeline** lives at `http://127.0.0.1:PORT/timeline` (linked
+from the viewer header): one row per QA, virtual time on the x-axis, one
+mark per event from the structured feed — blue `api` calls, green `ui`
+events, orange `net` operations, purple `timer` starts/expiries, gray
+lifecycle. Hover a mark for its time, QA, detail, and full data. Enable the
+marks with `--%%trace:api,ui,net,timer` (or `--trace all`); the page polls
+`/flua/systemLog` live, so a run under `--speed`/`--instant` draws its
+whole story as it happens. The buffer keeps the recent 2000 events — add
+`--%%syslog:run.json` for the complete history of a run.
+
 Per-window URL parameters (bookmarkable): `?qa=<id>` shows only that QA,
 `?exclude=id[,id...]` hides those, `?bg=<color>` / `?panel=<color>` set the
 page/panel colors (any CSS color), and `?view=condensed` starts in the
