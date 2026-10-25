@@ -4,6 +4,14 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.87] - 2026-10-25
+
+### Changed
+- add detailed documentation for 'updateView' lost reference bug and reproduction steps
+
+### Fixed
+- resolve 'lost reference' issue by ensuring independent copies in updateView
+
 ## [0.1.86] - 2026-10-25
 
 ### Added
