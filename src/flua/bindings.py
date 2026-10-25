@@ -12,11 +12,18 @@ the timer globals, the ``print`` override, and ``_PY.dispatch``.
 """
 
 import json
+import logging
+import os
+import pickle
+import tempfile
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from . import __version__
 from .config import debug_flag
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from .engine import LuaEngine
@@ -61,6 +68,58 @@ def _fresh_copy(data: object) -> object:
     every occurrence becomes a fresh table. The data is JSON-shaped already;
     the cost is one serialize/parse per api result."""
     return json.loads(json.dumps(data, default=str))
+
+
+def dump_bridge_failure(data: object) -> Path:
+    """Dump a payload that failed Lua conversion for offline diagnosis.
+
+    JSON when possible (identity-sharing survives — json ignores it), with a
+    pickle fallback for cycles and non-plain objects. Deterministic
+    location: <tmp>/flua-bridge-fail-<ts>-<pid>.<json|pkl>."""
+    path = Path(tempfile.gettempdir()) / (
+        f"flua-bridge-fail-{int(time.time())}-{os.getpid()}.json"
+    )
+    try:
+        path.write_text(json.dumps(data, default=str, indent=1), encoding="utf-8")
+        return path
+    except (TypeError, ValueError):
+        pkl = path.with_suffix(".pkl")
+        with open(pkl, "wb") as handle:
+            pickle.dump(data, handle)
+        return pkl
+
+
+def to_lua_table(
+    lua: object,
+    engine: "LuaEngine",
+    data: object,
+    context: str,
+    qa_id: int | None = None,
+) -> object:
+    """table_from with bridge-error telemetry (--%%debug:bridge=true).
+
+    On failure the full Python traceback is logged, the payload is dumped
+    to a deterministic file (dump_bridge_failure), and a structured
+    bridge_error event lands in /flua/systemLog — one run yields everything
+    an agent needs to root-cause a conversion bug. The exception still
+    propagates into Lua (the QA sees the same error)."""
+    try:
+        return lua.table_from(_fresh_copy(data), recursive=True)
+    except Exception as exc:
+        if debug_flag(engine.config, "bridge"):
+            dump = dump_bridge_failure(data)
+            engine._system_event(
+                "bridge_error",
+                qa_id,
+                f"type={type(exc).__name__} context={context} dump={dump}",
+            )
+            engine.flua_log(
+                "error",
+                qa_id,
+                f"bridge error: {exc} @ {context} — payload dumped to {dump}",
+            )
+            logger.exception("bridge conversion failed for %s", context)
+        raise
 
 
 def lua_to_python(value: object, lua: object | None = None) -> object:
@@ -245,7 +304,7 @@ def install_bindings(engine: "LuaEngine") -> None:
             return None, status
         if not isinstance(data, (dict, list, tuple)):
             return data, status  # scalars cross the bridge natively
-        return lua.table_from(_fresh_copy(data), recursive=True), status
+        return to_lua_table(lua, engine, data, f"{method.upper()} {url}", qa_id), status
 
     # api.hc3.*: the real HC3 directly (no hybrid dispatch) — callhc3 and
     # test code; falls back to the local sim without a remote backend.
@@ -258,7 +317,7 @@ def install_bindings(engine: "LuaEngine") -> None:
             return None, status
         if not isinstance(data, (dict, list, tuple)):
             return data, status
-        return lua.table_from(_fresh_copy(data), recursive=True), status
+        return to_lua_table(lua, engine, data, f"{method.upper()} {url}"), status
 
     # Enriched device for a QA (type skeleton + config, registered by the
     # engine at start_qa). The Lua bootstrap builds the QuickApp instance
@@ -267,7 +326,7 @@ def install_bindings(engine: "LuaEngine") -> None:
         device = engine.api.state.devices.get(int(qa_id))
         if device is None:
             return None
-        return lua.table_from(device, recursive=True)
+        return to_lua_table(lua, engine, device, f"device_for {qa_id}", int(qa_id))
 
     # Dynamic QA loading (dev/test convenience): install and run another QA
     # from a file (its --%% annotations are parsed) or from inline code.

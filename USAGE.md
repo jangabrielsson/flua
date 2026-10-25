@@ -271,6 +271,7 @@ Parsing stops at the end-of-header marker:
 | `--%%mode:proxy` | proxy mode: mirror this QA onto the HC3 (online only, see below) |
 | `--%%mode:proxy,noUI` | proxy mode, but leave the proxy's UI untouched (you edit it in the HC3's UI editor) |
 | `--%%debug:refreshState=true,api=true,http=true` | debug logging: refreshStates events / `api.*` calls / `net.HTTPClient` requests (global) |
+| `--%%debug:ws=true` | debug logging: byte-level `net.WebSocketClient` traffic — handshake leftovers, per-frame rx/tx with masked previews, close codes (global) |
 | `--%%debug:true` | shorthand for all three debug channels (`:false` disables them) |
 | `--%%loglength:120` | debug line length cap (default 120) |
 | `--%%warn:true` | extra runtime warnings for things the HC3 stays silent about (global) |
@@ -369,19 +370,81 @@ ones for remapping to a parent type. The coverage floors are pinned by a
 test: routes, device models, the hierarchy, and the templates can only go
 up.
 
+### Inspecting simulator state (`flua --tool state`)
+
+Agents (and humans) debugging flua itself sometimes need to look at the
+sim's raw state — and to answer "where did this object get stored twice?"
+(the shape of the updateView aliasing bug):
+
+```bash
+.venv/bin/flua --tool state --db house.json            # compact dump: devices + plugin variables
+.venv/bin/flua --tool state --db house.json --aliases  # every object reachable from 2+ paths
+.venv/bin/flua --tool state --db house.json --verify-tree
+# exit 0 = the state is a clean JSON tree (no shared references, no cycles)
+```
+
+`--db` accepts any seed-shaped JSON — a `--tool createDB` output, a
+recording, a `--%%db` file. A JSON file cannot express aliasing, so the
+scanner's real home is a *live* state; the same functions are importable:
+
+```python
+from flua.tools.state_tool import scan_tree
+print(scan_tree(engine.api.state))   # {"aliases": [{"paths": [...]}], "cycles": [...]}
+```
+
+And a route can be replayed in isolation — the handlers are pure functions
+over `SimState`:
+
+```python
+from flua.api.state import SimState
+from flua.api.request import ApiRequest
+from flua.api.routes.plugins import plugin_update_view
+
+state = SimState({"devices": [...]})
+req = ApiRequest(segments=[], query={}, body={
+    "deviceId": 10, "componentName": "btn", "propertyName": "text",
+    "newValue": "on",
+})
+print(plugin_update_view(state, req))   # (None, 204)
+```
+
+### Bridge errors
+
+When a Python↔Lua conversion fails inside the API bridge (a `lost
+reference` and friends), the QA sees one opaque line. `--%%debug:bridge=true`
+turns it into a diagnosis kit: the full Python traceback in the log, the
+offending payload dumped to `/tmp/flua-bridge-fail-<ts>-<pid>.json` (a
+`.pkl` fallback for cycles/non-plain data — the log names the file), and a
+structured `bridge_error` event in `/flua/systemLog` (the agent feed: the
+timeline and flua-mcp read it). The exception still propagates, so QA
+behavior is unchanged.
+
+| lupa error | likely cause | flua invariant |
+|---|---|---|
+| `lost reference` | a payload that shared one object across two paths (aliasing), a cycle, or a lapsed lupa object crossed the bridge | engine state and bridge data are JSON trees; no lupa proxies in engine data (`_fresh_copy` + `_plain_key`/`_plain_value` in `bindings.py`) |
+| `cannot mix objects from different Lua runtimes` | an object passed between runtimes | one runtime per QA |
+| `TypeError: cannot convert …` | a non-plain type reached `table_from` | `lua_to_python` output is plain JSON types (unconvertible values become nil, Lua-object keys are dropped) |
+
 ### Debug logging
 
 `--%%debug:refreshState=true,api=true,http=true` turns on per-category debug
 logging (any subset; it is a global directive, so an `--%%include`'d file
 can carry
-it). `--%%debug:true` is shorthand for all three channels on:
+it). `--%%debug:true` is shorthand for all channels on:
 
 - `refreshState=true` logs every refreshStates event flua sees in a short
   form — the event type plus the `id`/`deviceId`/`name`/`property`/`value`/
   `newValue` data fields that are present;
 - `api=true` logs the QA's `api.*` and `api.hc3.*` calls as
   `api GET /devices/...`;
-- `http=true` logs user `net.HTTPClient` requests — not the `api.*` calls.
+- `http=true` logs user `net.HTTPClient` requests — not the `api.*` calls;
+- `ws=true` logs user `net.WebSocketClient` traffic at the byte level: the
+  handshake outcome with any frame bytes buffered from the connect response
+  (`buffered N bytes after connect` — the signal for servers that send
+  their first frame with the 101), one `rx`/`tx` line per frame (opcode,
+  size, a short preview), close codes and reasons, and disconnects.
+  Credential-ish values (`auth`, `token`, `password`, ...) are masked in the
+  previews.
 
 `--%%loglength:120` caps the debug line length (default 120; a cut line ends
 with `...`).

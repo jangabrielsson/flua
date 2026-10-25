@@ -346,3 +346,50 @@ async def test_wss_self_signed_default_skips_verification(capsys) -> None:
     assert "ECHO hi" in out
     assert "DEF_ERR" not in out  # the default skipped verification
     assert "STRICT_ERR true" in out  # opting in verifies (and fails here)
+
+
+@pytest.mark.asyncio
+async def test_websocket_debug_trace_logs_frames(capsys) -> None:
+    # --%%debug:ws=true: the byte-level story — the "buffered N bytes after
+    # connect" line (the signal that exposed the 0.1.86 handshake bug),
+    # rx/tx frame lines with secret-masked previews, and the close reason
+    server = EchoWsServer(
+        initial_frame=_server_frame(0x1, b'{"type":"auth_required","token":"s3cret"}')
+    )
+    engine = LuaEngine()
+    engine.config = {"debug": {"ws": True}}
+    await engine.start()
+    try:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            path = f"{d}/qa.lua"
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(
+                    "setTimeout(function()\n"
+                    "  local ws = net.WebSocketClient({timeout = 2000})\n"
+                    "  ws:addEventListener('dataReceived', function(data)\n"
+                    "    print('DATA', data)\n"
+                    "    ws:close()\n"
+                    "  end)\n"
+                    f"  ws:connect('ws://127.0.0.1:{server.port}/')\n"
+                    "end, 20)\n"
+                )
+            engine.start_qa(path, None, {}, path)
+            seen = ""
+            deadline = time.monotonic() + 5
+            while "DATA" not in seen:
+                if time.monotonic() > deadline:
+                    raise AssertionError(f"'DATA' not seen; output so far:\n{seen}")
+                await asyncio.sleep(0.01)
+                seen += capsys.readouterr().out
+    finally:
+        await engine.stop()
+    assert "buffered" in seen and "bytes after connect" in seen
+    assert "rx text" in seen  # the frame that rode the handshake segment
+    # the trace preview masks credential-ish values (the QA's own dataReceived
+    # event still gets the real payload — masking is a trace concern only)
+    ws_lines = [line for line in seen.splitlines() if line.startswith("ws ")]
+    assert any('"token":"***"' in line for line in ws_lines)
+    assert not any("s3cret" in line for line in ws_lines)
+    assert "tx close" in seen  # the QA's close handshake

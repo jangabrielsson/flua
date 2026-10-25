@@ -320,7 +320,7 @@ class LuaEngine:
         # debugger's sockets stay single-threaded on the main thread)
         self.qa_sockets = SyncTCPSockets()
         self.qa_udp = SyncUDPSockets()
-        self.qa_websockets = WebSocketPool(self._on_ws_event)
+        self.qa_websockets = WebSocketPool(self._on_ws_event, trace=self._ws_trace)
         self.server_host = ServerHost(self)  # net.*Server hosts (mock servers)
         self._loop: asyncio.AbstractEventLoop | None = None
         self.qa_mqtt = MqttPool(self._on_mqtt_event)
@@ -2176,6 +2176,12 @@ class LuaEngine:
         ok, err = await asyncio.to_thread(self.qa_websockets.send, conn, data, binary)
         if not ok:
             self._on_ws_event(conn, "error", err)
+
+    def _ws_trace(self, text: str) -> None:
+        """Byte-level websocket client trace (--%%debug:ws=true): handshake
+        leftovers, per-frame rx/tx lines with masked previews, close codes."""
+        if debug_flag(self.config, "ws"):
+            self.debug_log(f"ws {text}")
 
     def _on_ws_event(self, conn: int, event: str, data: Any, is_binary: bool = False) -> None:
         """Event sink for WsClient receiver threads (any thread)."""

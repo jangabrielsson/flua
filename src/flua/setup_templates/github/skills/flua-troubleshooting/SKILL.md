@@ -1,6 +1,6 @@
 ---
 name: flua-troubleshooting
-description: Common flua runtime errors and how to fix them: "online mode requires HC3_URL", HC3 authentication lockout, proxy callbacks not reaching the emulator, busy ports, unknown --%% directive warnings, unknown device types (and the catalog), virtual-time and keep-alive surprises, debugger notes, and the machine-readable log surface (--log json, --syslog, /flua/systemLog, /debugMessages, flua-mcp). USE FOR: diagnosing flua startup errors, HC3 connection failures, proxy mode issues, Lua runtime errors, cross-platform remedies for macOS and Windows.
+description: Common flua runtime errors and how to fix them: "online mode requires HC3_URL", HC3 authentication lockout, proxy callbacks not reaching the emulator, busy ports, unknown --%% directive warnings, unknown device types (and the catalog), virtual-time and keep-alive surprises, debugger notes, bridge errors ("lost reference" and friends, with --%%debug:bridge payload dumps), and the machine-readable log surface (--log json, --syslog, /flua/systemLog, /debugMessages, flua-mcp). USE FOR: diagnosing flua startup errors, HC3 connection failures, proxy mode issues, Lua runtime errors, cross-platform remedies for macOS and Windows.
 ---
 
 # flua Troubleshooting
@@ -146,9 +146,41 @@ plain.
 
 ## Still stuck?
 
-`--%%debug:refreshState=true,api=true,http=true` (with `--%%loglength`)
+`--%%debug:refreshState=true,api=true,http=true,ws=true` (with `--%%loglength`)
 logs events and calls in a short form — usually the fastest way to see
-what the emulator sees. Then: `flua --check` (or `--check --json`) for
+what the emulator sees (ws adds byte-level websocket traffic). Then: `flua --check` (or `--check --json`) for
 static issues, the QA's own `self:debug(...)` lines, `--log json` for a
 structured log, and `/flua/systemLog` + `/debugMessages` for the engine's
 side of the story.
+
+## Bridge errors: "lost reference" and friends
+
+Opaque single-line errors in the QA log can come from the Python↔Lua
+bridge (lupa's `table_from`). The lupa message is cryptic — the table maps
+it to the invariant flua violated:
+
+| lupa error | likely cause | flua invariant |
+|---|---|---|
+| `lost reference` | payload shared one object across two paths (aliasing), a cycle, or a lapsed lupa object crossed the bridge | engine state and bridge data are JSON trees; no lupa proxies in engine data (`_fresh_copy` + `_plain_key`/`_plain_value` in `bindings.py`) |
+| `cannot mix objects from different Lua runtimes` | object passed between runtimes | one runtime per QA |
+| `TypeError: cannot convert …` | non-plain type reached `table_from` | `lua_to_python` output is plain JSON types (unconvertible values become nil, Lua-object keys dropped) |
+
+**The loop (no manual instrumentation):**
+
+1. Re-run with `--%%debug:bridge=true` (or `flua -D debug:bridge=true`).
+   You get the full Python traceback, a human line naming the endpoint, and
+   a dump: `/tmp/flua-bridge-fail-<ts>-<pid>.json` (`.pkl` for
+   cycles/non-plain data). A `bridge_error` event also lands in
+   `/flua/systemLog`.
+2. Load the dump in a fresh `LuaRuntime` and minimize it (ddmin-style) to
+   the smallest structure that still raises in `table_from(recursive=True)`
+   — that structure is the root cause's shape.
+3. Compare against the table → identify the violated invariant.
+4. Locate the state write or route that created it, fix it (independent
+   copies at the write site), add a regression test. If the fix is in
+   flua itself, follow the repo's conventions (pinning tests).
+
+**Hygiene after instrumenting an installed flua:** find the live copy with
+`pip show flua`, and reset it with `pip install --force-reinstall
+fibaro-flua==<version>` — site-packages edits outlive the session and
+poison later runs.

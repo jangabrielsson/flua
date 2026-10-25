@@ -18,6 +18,7 @@ import base64
 import hashlib
 import logging
 import os
+import re
 import socket
 import ssl
 import struct
@@ -37,6 +38,26 @@ class WsError(Exception):
     pass
 
 
+_OP_NAMES = {0x0: "cont", 0x1: "text", 0x2: "binary", 0x8: "close", 0x9: "ping", 0xA: "pong"}
+
+# debug-trace masking: never leak credential-ish values into the ws trace
+_MASK_RE = re.compile(r'("(?:auth|token|access_token|password|Authorization)"\s*:\s*")[^"]*(")')
+
+
+def _mask_secrets(text: str) -> str:
+    return _MASK_RE.sub(r"\1***\2", text)
+
+
+def _trace_preview(opcode: int, payload: bytes) -> str:
+    """A short, secret-masked preview for --%%debug:ws frame lines."""
+    if opcode == 0x2:  # binary: hex, no secrets to mask
+        return payload[:32].hex() + ("..." if len(payload) > 32 else "")
+    text = _mask_secrets(payload.decode("utf-8", errors="replace"))
+    if len(text) > 64:
+        text = text[:64] + "..."
+    return repr(text)
+
+
 class WsClient:
     """One client connection. connect() performs TCP/TLS + the upgrade
     handshake; run() is the blocking receive loop (worker thread)."""
@@ -48,6 +69,7 @@ class WsClient:
         on_event: Callable[[str, Any], None],
         headers: dict[str, str] | None = None,
         check_certificate: bool = False,
+        trace: Callable[[str], None] | None = None,
     ) -> None:
         parsed = urlparse(url)
         if parsed.scheme not in ("ws", "wss"):
@@ -64,6 +86,7 @@ class WsClient:
         self._check_certificate = check_certificate
         self._timeout = timeout
         self._on_event = on_event
+        self._trace = trace
         self._headers = headers or {}
         self._sock: socket.socket | None = None
         self._stop = threading.Event()
@@ -73,6 +96,10 @@ class WsClient:
         self._message: list[bytes] = []
 
     # -- connect / handshake ---------------------------------------------------
+
+    def _trace_line(self, text: str) -> None:
+        if self._trace is not None:
+            self._trace(text)
 
     def connect(self) -> None:
         sock = socket.create_connection((self._host, self._port), timeout=self._timeout)
@@ -113,6 +140,10 @@ class WsClient:
             self._buffer = rest  # may already contain frame bytes
             self._sock = sock
             self._open = True
+            self._trace_line(
+                "connect handshake ok"
+                + (f", buffered {len(rest)} bytes after connect" if rest else "")
+            )
         except Exception:
             try:
                 sock.close()
@@ -180,6 +211,10 @@ class WsClient:
             if frame is None:
                 return
             opcode, fin, payload = frame
+            self._trace_line(
+                f"rx {_OP_NAMES.get(opcode, opcode)} {len(payload)}b "
+                f"{_trace_preview(opcode, payload)}"
+            )
             if opcode == _OP_PING:
                 try:
                     self._send_frame(_OP_PONG, payload)
@@ -188,6 +223,9 @@ class WsClient:
             elif opcode == _OP_PONG:
                 pass
             elif opcode == _OP_CLOSE:
+                code = struct.unpack(">H", payload[:2])[0] if len(payload) >= 2 else None
+                reason = payload[2:].decode("utf-8", errors="replace") if len(payload) > 2 else ""
+                self._trace_line(f"rx close code={code} reason={reason!r}")
                 try:
                     self._send_frame(_OP_CLOSE, payload)
                 except OSError:
@@ -248,6 +286,10 @@ class WsClient:
         sock = sock or self._sock
         if sock is None:
             raise WsError("not connected")
+        self._trace_line(
+            f"tx {_OP_NAMES.get(opcode, opcode)} {len(payload)}b "
+            f"{_trace_preview(opcode, payload)}"
+        )
         header = bytearray([0x80 | opcode])
         length = len(payload)
         if length < 126:
@@ -298,6 +340,7 @@ class WsClient:
         return self._open and not self._stop.is_set()
 
     def _emit_disconnected(self, detail: Any) -> None:
+        self._trace_line(f"disconnected: {detail}")
         if not self._disconnected_emitted:
             self._disconnected_emitted = True
             self._on_event("disconnected", detail)
@@ -306,8 +349,13 @@ class WsClient:
 class WebSocketPool:
     """Registry of WsClient connections keyed by connection id."""
 
-    def __init__(self, emit: Callable[[int, str, Any], None]) -> None:
+    def __init__(
+        self,
+        emit: Callable[[int, str, Any], None],
+        trace: Callable[[str], None] | None = None,
+    ) -> None:
         self._emit = emit
+        self._trace = trace
         self._lock = threading.Lock()
         self._entries: dict[int, dict[str, Any]] = {}  # conn -> {client, qa}
         self._counter = 0
@@ -343,6 +391,7 @@ class WebSocketPool:
             lambda event, data, is_binary=False: self._emit(conn, event, data, is_binary),
             headers,
             check_certificate,
+            self._trace,
         )
         try:
             client.connect()
