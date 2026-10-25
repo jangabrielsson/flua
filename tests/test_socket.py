@@ -127,6 +127,31 @@ def test_debugger_flag_with_script_uses_default_port() -> None:
         "-e",
         "print(1)",
     ]
+    # --ui has the same optional-port trap: the script must not be eaten
+    assert _normalize_debugger_argv(["--ui", "qa.lua"]) == ["qa.lua", "--ui"]
+    assert _normalize_debugger_argv(["--ui", "8091", "qa.lua"]) == [
+        "--ui",
+        "8091",
+        "qa.lua",
+    ]
+    assert _normalize_debugger_argv(["--ui", "a.lua", "--debugger", "b.lua"]) == [
+        "a.lua",
+        "b.lua",
+        "--ui",
+        "--debugger",
+    ]
+
+
+def test_ui_flag_with_script_end_to_end(tmp_path) -> None:
+    # `flua --ui script.lua` (the natural spelling): the optional port must
+    # not eat the script — the viewer comes up on the default port and the
+    # run ends with --run-for
+    script = tmp_path / "qa.lua"
+    script.write_text("print('UI_RUN')\n")
+    result = _run_flua("--ui", "--run-for", "2", str(script))
+    assert result.returncode == 0, result.stdout + "\n" + result.stderr
+    assert "UI viewer on http://127.0.0.1:" in result.stdout
+    assert "UI_RUN" in result.stdout
 
 
 def test_debugger_flag_with_script_end_to_end(tmp_path) -> None:

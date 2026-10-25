@@ -750,15 +750,17 @@ def _unpack_cli(parser: argparse.ArgumentParser, args: argparse.Namespace) -> in
 
 
 def _normalize_debugger_argv(argv: list[str]) -> list[str]:
-    """Let ``--debugger script.lua`` mean the default port (8172).
+    """Let ``--debugger script.lua`` / ``--ui script.lua`` mean the
+    default ports (8172 / 8090).
 
-    ``--debugger`` takes an optional port, but argparse's optional-value
+    Both flags take an optional port, but argparse's optional-value
     arguments only use their default when the next token looks like an
-    option — so ``flua --debugger script.lua`` would parse the script as the
-    port and fail with "invalid int value". When ``--debugger`` is followed
-    by a non-option, non-integer token, move the bare flag to the end so the
-    script stays a positional and the flag takes its const. An explicit
-    ``--debugger PORT script.lua`` (or ``--debugger=PORT``) is untouched.
+    option — so ``flua --debugger script.lua`` would parse the script as
+    the port and fail with "invalid int value" (same for --ui). When either
+    flag is followed by a non-option, non-integer token, move the bare flag
+    to the end so the script stays a positional and the flag takes its
+    const. An explicit ``--debugger PORT script.lua`` (or ``--debugger=PORT``)
+    is untouched.
     """
     out: list[str] = []
     moved: list[str] = []
@@ -766,7 +768,7 @@ def _normalize_debugger_argv(argv: list[str]) -> list[str]:
     while i < len(argv):
         nxt = argv[i + 1] if i + 1 < len(argv) else None
         if (
-            argv[i] == "--debugger"
+            argv[i] in ("--debugger", "--ui")
             and nxt is not None
             and not nxt.startswith("-")
             and not nxt.isdigit()
