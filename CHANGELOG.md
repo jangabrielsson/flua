@@ -4,6 +4,16 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.84] - 2026-10-25
+
+### Added
+- add timeline feature to UI, including new timeline page and integration with system log
+- add support for stepping into internal wrappers in debugger, enhancing debugging experience
+- implement flua-mcp registration and unregistration with Copilot, enhance directive handling in CLI and documentation
+
+### Changed
+- Remove deprecated thermostat and sensor templates; introduce flua test runner and audit tests
+
 ## [0.1.83] - 2026-10-24
 
 ### Added
