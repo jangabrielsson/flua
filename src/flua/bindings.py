@@ -31,6 +31,25 @@ def _is_lua_table(obj: object) -> bool:
     return hasattr(obj, "items") and not isinstance(obj, dict)
 
 
+def _plain_key(key: object) -> str | int | float | bool | None:
+    """A JSON-compatible dict key, or None when the key is a Lua object
+    (table/function keys have no JSON equivalent — the entry is dropped)."""
+    if isinstance(key, bytes):
+        return key.decode("utf-8")
+    if isinstance(key, (str, int, float, bool)):
+        return key
+    return None
+
+
+def _plain_value(value: object) -> object:
+    """A JSON-compatible scalar, or None for Lua objects (functions,
+    userdata, proxies). The engine must only ever see plain data — a leaked
+    lupa proxy breaks copy.deepcopy and table_from later ('lost reference')."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    return None
+
+
 def lua_to_python(value: object, lua: object | None = None) -> object:
     """Convert a lupa value to plain JSON-compatible Python data.
 
@@ -61,12 +80,14 @@ def lua_to_python(value: object, lua: object | None = None) -> object:
             return [lua_to_python(val, lua) for _, val in sorted(items)]
         result = {}
         for key, val in items:
-            python_key = key.decode("utf-8") if isinstance(key, bytes) else key
+            python_key = _plain_key(key)
+            if python_key is None:
+                continue  # a Lua-object key cannot survive the bridge
             result[python_key] = lua_to_python(val, lua)
         return result
     if isinstance(value, (list, tuple)):
         return [lua_to_python(item, lua) for item in value]
-    return value
+    return _plain_value(value)
 
 
 def _json_to_python(value: object, lua: object) -> object:
@@ -97,12 +118,14 @@ def _json_to_python(value: object, lua: object) -> object:
             return [_json_to_python(val, lua) for _, val in sorted(items)]
         result = {}
         for key, val in items:
-            python_key = key.decode("utf-8") if isinstance(key, bytes) else key
+            python_key = _plain_key(key)
+            if python_key is None:
+                continue  # a Lua-object key cannot survive the bridge
             result[python_key] = _json_to_python(val, lua)
         return result
     if isinstance(value, (list, tuple)):
         return [_json_to_python(item, lua) for item in value]
-    return value
+    return _plain_value(value)
 
 
 def install_bindings(engine: "LuaEngine") -> None:

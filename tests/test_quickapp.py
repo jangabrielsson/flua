@@ -679,3 +679,39 @@ def test_lua_config_sets_the_viewer_theme(tmp_path, monkeypatch) -> None:
     data, status = engine.api.dispatch("GET", "/flua/theme")
     assert status == 200
     assert data == {"bg": "#1e1e2e", "panel": "#28283a"}
+
+
+@pytest.mark.asyncio
+async def test_child_device_with_lua_objects_in_options(capsys) -> None:
+    # initialProperties containing Lua functions or Lua-object keys must not
+    # leak lupa proxies into the sim state (they broke copy.deepcopy and
+    # table_from with "lost reference"): creation succeeds, the function
+    # slot becomes nil, the exotic-keyed entry is dropped, and the device
+    # list stays answerable afterwards
+    out = await _run_qas(
+        {
+            "qa.lua": (
+                "--%%name:childrepro\n"
+                "function QuickApp:onInit()\n"
+                "  local child = self:createChildDevice({\n"
+                "    name = 'child1', type = 'com.fibaro.binarySwitch',\n"
+                "    initialProperties = { value = true, cb = function() end,\n"
+                "      weird = { [{}] = true } },\n"
+                "  })\n"
+                "  print('CHILD', type(child))\n"
+                "  setTimeout(function()\n"
+                "    local list = api.get('/devices?parentId='.._FLUA.qaId)\n"
+                "    local c = list[1]\n"
+                "    print('LIST', type(list), c and c.properties.value,\n"
+                "      tostring(c and c.properties.cb))\n"
+                "    exit(0)\n"
+                "  end, 50)\n"
+                "end\n"
+            ),
+        },
+        sleep=0.8,
+        capsys=capsys,
+    )
+    assert "CHILD userdata" in out
+    assert "LIST table true nil" in out
+    assert "lost reference" not in out

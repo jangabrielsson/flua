@@ -75,8 +75,13 @@ def _read_frame(conn: socket.socket) -> tuple[int, bytes] | None:
 class EchoWsServer:
     """Minimal RFC 6455 server: accepts, handshakes, echoes text frames."""
 
-    def __init__(self, tls_ctx: ssl.SSLContext | None = None) -> None:
+    def __init__(
+        self,
+        tls_ctx: ssl.SSLContext | None = None,
+        initial_frame: bytes | None = None,
+    ) -> None:
         self.seen_requests: list[bytes] = []  # raw handshakes (for assertions)
+        self.initial_frame = initial_frame  # sent with the 101 response (one segment)
         self.listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.listener.bind(("127.0.0.1", 0))
@@ -115,14 +120,17 @@ class EchoWsServer:
             accept = base64.b64encode(
                 hashlib.sha1(match.group(1).strip() + _GUID).digest()
             ).decode()
-            conn.sendall(
-                (
-                    "HTTP/1.1 101 Switching Protocols\r\n"
-                    "Upgrade: websocket\r\n"
-                    "Connection: Upgrade\r\n"
-                    f"Sec-WebSocket-Accept: {accept}\r\n\r\n"
-                ).encode()
-            )
+            response = (
+                "HTTP/1.1 101 Switching Protocols\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                f"Sec-WebSocket-Accept: {accept}\r\n\r\n"
+            ).encode()
+            if self.initial_frame is not None:
+                # same segment as the handshake — Home Assistant sends its
+                # auth_required frame this way
+                response += self.initial_frame
+            conn.sendall(response)
             while True:
                 frame = _read_frame(conn)
                 if frame is None:
@@ -237,6 +245,33 @@ async def test_websocket_echo_roundtrip(capsys) -> None:
     assert "CONNECTED true" in out
     assert "DATA ping from flua" in out
     assert "CLOSED false" in out
+    assert "ERROR" not in out
+
+
+@pytest.mark.asyncio
+async def test_websocket_frame_with_handshake_delivered_promptly(capsys) -> None:
+    # Regression: a frame arriving in the same segment as the 101 response
+    # (Home Assistant's auth_required) used to sit in the handshake buffer
+    # until the next recv returned — so it surfaced only when the server
+    # closed the socket 10s later. It must be delivered immediately, with no
+    # further server traffic.
+    server = EchoWsServer(initial_frame=_server_frame(0x1, b'{"type":"auth_required"}'))
+    out = await _run_qa(
+        "setTimeout(function()\n"
+        "  local ws = net.WebSocketClient({timeout = 2000})\n"
+        "  ws:addEventListener('dataReceived', function(data)\n"
+        "    print('DATA', data)\n"
+        "    ws:close()\n"
+        "  end)\n"
+        "  ws:addEventListener('connected', function() print('CONNECTED') end)\n"
+        "  ws:addEventListener('error', function(err) print('ERROR', err) end)\n"
+        f"  ws:connect('ws://127.0.0.1:{server.port}/')\n"
+        "end, 20)\n",
+        capsys=capsys,
+        needle="DATA",
+        timeout=3.0,
+    )
+    assert 'DATA {"type":"auth_required"}' in out
     assert "ERROR" not in out
 
 

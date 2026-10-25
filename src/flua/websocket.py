@@ -147,6 +147,15 @@ class WsClient:
     def run(self) -> None:
         try:
             while not self._stop.is_set() and self._sock is not None:
+                # Frames may already sit in the buffer from the handshake read
+                # (a server can send data in the same segment as its 101
+                # response — Home Assistant does this with auth_required).
+                # Parse them before blocking on recv, or they stay stuck until
+                # the next chunk arrives.
+                if self._buffer:
+                    self._parse_buffer()
+                    if self._stop.is_set() or self._sock is None:
+                        break
                 self._sock.settimeout(0.5)
                 try:
                     chunk = self._sock.recv(4096)
