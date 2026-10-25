@@ -280,6 +280,43 @@ def test_update_view(api: Api) -> None:
     assert data["view"]["btn"]["text"] == "on"
 
 
+def test_update_view_never_aliases_one_object_into_two_state_paths(api: Api) -> None:
+    # the updateView payload's newValue once landed as the SAME Python object
+    # in both device.view and properties.uiView — lupa's table_from dedup
+    # broke on that alias ('lost reference', flua-bug-updateView-alias.md)
+    api.register_qa(
+        5000,
+        "qa",
+        None,
+        {
+            "uiView": [
+                {
+                    "label": "row",
+                    "components": [
+                        {"select": "sel", "name": "sel", "options": [{"text": "a"}]}
+                    ],
+                }
+            ]
+        },
+    )
+    new_value = [{"text": "x"}, {"text": "y"}]
+    assert api.dispatch(
+        "POST",
+        "/plugins/updateView",
+        {
+            "deviceId": 5000,
+            "componentName": "sel",
+            "propertyName": "options",
+            "newValue": new_value,
+        },
+    ) == (None, 204)
+    device = api.state.devices[5000]
+    view_options = device["view"]["sel"]["options"]
+    ui_options = device["properties"]["uiView"][0]["components"][0]["options"]
+    assert view_options == new_value and ui_options == new_value
+    assert view_options is not ui_options  # independent copies, no alias
+
+
 def test_get_view_returns_layout_with_live_values(api: Api) -> None:
     # GET /plugins/getView?id=... — the legacy $jason layout with the
     # updateView state merged in, like the HC3 UI serves it (user code parses

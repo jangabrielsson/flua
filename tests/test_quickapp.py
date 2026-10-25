@@ -715,3 +715,40 @@ async def test_child_device_with_lua_objects_in_options(capsys) -> None:
     assert "CHILD userdata" in out
     assert "LIST table true nil" in out
     assert "lost reference" not in out
+
+
+@pytest.mark.asyncio
+async def test_update_view_alias_regression(capsys) -> None:
+    # the full flua-bug-updateView-alias.md repro: updateView once aliased
+    # its newValue into view AND properties.uiView, and lupa's table_from
+    # dedup raised 'lost reference' on the next /devices?parentId read
+    out = await _run_qas(
+        {
+            "qa.lua": (
+                "--%%name:upv-repro\n"
+                "--%%type:com.fibaro.binarySwitch\n"
+                "function QuickApp:onInit()\n"
+                "  local child = api.post('/plugins/createChildDevice', {\n"
+                "    parentId = self.id, name = 'child', type = 'com.fibaro.binarySwitch',\n"
+                "    initialProperties = {uiView = {\n"
+                "      {label='row', components={\n"
+                "        {select='presetSelector', name='presetSelector', text='Preset',\n"
+                "         options={{text='a'},{text='b'}}, values={}, onToggled='cb'}\n"
+                "      }}\n"
+                "    }}, initialInterfaces = {},\n"
+                "  })\n"
+                "  api.post('/plugins/updateView', {\n"
+                "    deviceId = child.id, componentName = 'presetSelector',\n"
+                "    propertyName = 'options', newValue = {{text='x'},{text='y'}},\n"
+                "  })\n"
+                "  local list = api.get('/devices?parentId=' .. self.id)\n"
+                "  print('LIST', type(list), #list)\n"
+                "  exit(0)\n"
+                "end\n"
+            ),
+        },
+        sleep=0.8,
+        capsys=capsys,
+    )
+    assert "LIST table 1" in out
+    assert "lost reference" not in out

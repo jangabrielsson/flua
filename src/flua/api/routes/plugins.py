@@ -7,6 +7,7 @@ POSTs to create it), PUT on an existing one returns 204.
 
 from __future__ import annotations
 
+import copy
 import logging
 import time
 from typing import Any
@@ -276,7 +277,10 @@ def plugin_update_view(state: SimState, req: ApiRequest) -> tuple[Any, int]:
         for row in ui_view:
             for comp in row.get("components") or []:
                 if comp.get("name") == component_name:
-                    comp[property_name] = new_value
+                    # store an independent copy: the same object must never
+                    # live in two state paths — lupa's table_from dedup
+                    # breaks on such aliases ('lost reference')
+                    comp[property_name] = copy.deepcopy(new_value)
                     break
     forward_to_proxy(req, state.is_proxy(dev["id"]))
     return None, 204

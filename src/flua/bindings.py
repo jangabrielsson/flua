@@ -50,6 +50,19 @@ def _plain_value(value: object) -> object:
     return None
 
 
+def _fresh_copy(data: object) -> object:
+    """Break shared-reference aliasing before the data reaches Lua.
+
+    lupa's table_from deduplicates by identity (id(obj) -> stack slot); a
+    list reachable at two different depths makes the second hit land on a
+    stale slot -> 'lost reference' (the updateView route once aliased one
+    options list into view AND properties.uiView — see
+    flua-bug-updateView-alias.md). A JSON round-trip loses identity, so
+    every occurrence becomes a fresh table. The data is JSON-shaped already;
+    the cost is one serialize/parse per api result."""
+    return json.loads(json.dumps(data, default=str))
+
+
 def lua_to_python(value: object, lua: object | None = None) -> object:
     """Convert a lupa value to plain JSON-compatible Python data.
 
@@ -232,7 +245,7 @@ def install_bindings(engine: "LuaEngine") -> None:
             return None, status
         if not isinstance(data, (dict, list, tuple)):
             return data, status  # scalars cross the bridge natively
-        return lua.table_from(data, recursive=True), status
+        return lua.table_from(_fresh_copy(data), recursive=True), status
 
     # api.hc3.*: the real HC3 directly (no hybrid dispatch) — callhc3 and
     # test code; falls back to the local sim without a remote backend.
@@ -245,7 +258,7 @@ def install_bindings(engine: "LuaEngine") -> None:
             return None, status
         if not isinstance(data, (dict, list, tuple)):
             return data, status
-        return lua.table_from(data, recursive=True), status
+        return lua.table_from(_fresh_copy(data), recursive=True), status
 
     # Enriched device for a QA (type skeleton + config, registered by the
     # engine at start_qa). The Lua bootstrap builds the QuickApp instance
