@@ -4,6 +4,15 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.85] - 2026-10-25
+
+### Added
+- add self-testing capabilities for QuickApps with `flua test` and enhance documentation
+- enhance CLI argument handling for --debugger and --ui flags to support optional ports
+
+### Fixed
+- update test for packaged documentation to handle timestamped PDFs
+
 ## [0.1.84] - 2026-10-25
 
 ### Added
