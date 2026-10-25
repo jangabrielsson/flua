@@ -16,7 +16,9 @@ that turns a light on when the sun goes down. Along the way you will:
 2. run your first QuickApp on your own computer,
 3. learn what a QuickApp *is* — and click its buttons in a browser,
 4. teach the lamp when the sun sets,
-5. and finally move it onto your real HC3.
+5. move it onto your real HC3,
+6. and teach the lamp to check itself, so future changes can't break it
+   silently.
 
 Each chapter ends with a working result. If a chapter feels like it takes
 forever, skip to the next one — you can always come back.
@@ -33,6 +35,7 @@ forever, skip to the next one — you can always come back.
 - **[08 · Proxy mode](08-proxy-mode.md)** — the real HC3 UI driving your code: mirror your QA onto the controller (and leave its HC3-edited UI alone with `noUI`).
 - **[09 · Multi-file QAs](09-multi-file-qas.md)** — your own libraries with `--%%file`, packed and deployed as one device.
 - **[10 · Debugging multi-QA runs](10-multi-qa-debugging.md)** — several QAs talking to each other, and how to keep the ensemble legible.
+- **[11 · Let your QuickApp test itself](11-let-your-qa-test-itself.md)** — `flua-test` + `flua test`: the lamp checks its own behavior, and the suite says pass or fail in one line.
 
 ## How to read this tutorial
 

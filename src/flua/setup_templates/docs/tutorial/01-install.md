@@ -80,7 +80,38 @@ use from now on: write, run, look, adjust.
 
 > ✅ **You should see** `Hello HC3!` in your terminal.
 
-## Step 5 — a project folder with everything set up
+## Step 5 — the checkup: `flua doctor`
+
+flua can check its own health — and yours. One command tells you whether
+Python, flua, your project folder, and the editor setup are all right:
+
+```bash
+flua doctor
+```
+
+```text
+flua doctor
+  ✓ flua              0.1.84 (Lua 5.5, Python 3.14.3)
+  ✓ virtualenv        virtualenv at ~/sunset-lamp/.venv
+  ✓ HC3 credentials   not configured — offline sim only
+  ✓ HC3 connection    skipped — no HC3_URL
+  ✗ LuaLS setup       no .luarc.json/.luals — run `flua --tool setup` for HC3 autocomplete
+  ✓ VS Code run/debug .vscode/launch.json present
+  ✓ VS Code extension installed (version 0.1.84)
+  ✓ flua-mcp          flua-mcp on PATH
+  ✓ project files     1 QA file(s)
+flua doctor: 8 ok, 1 problem(s)
+```
+
+Every ✓ is something that works; every ✗ names the fix right there. (The
+two ✗ above disappear after the next step.) When something breaks later —
+and it will — this is the first command to run, and the block to paste when
+you ask for help.
+
+> ✅ **You should see** `flua doctor` with mostly ✓ marks. The ✗ ones are
+> fine for now; the next step fixes them.
+
+## Step 6 — a project folder with everything set up
 
 flua can prepare a project folder with all the VS Code settings you need
 (run buttons, a debugger setup, language help):
@@ -108,8 +139,7 @@ The two links at the end open in the browser with a cmd/ctrl-click — the
 
 Now open the folder in VS Code — **File → Open Folder… → `my-first-qa`**.
 A popup asks you to install the recommended extensions (**Python**,
-**Lua MobDebug**, **Lua Language Server**) — accept. They give you syntax
-coloring, error squiggles, and later a debugger. The setup also installed a
+**Lua MobDebug**, **Lua Language Server**, and **flua**) — accept. They give you syntax coloring, error squiggles, and later a debugger. The setup also installed a
 **type library** (the hidden `.luals/` folder): the language server now
 knows what `QuickApp`, `fibaro` and `api` look like, so from chapter 02 on
 you'll get autocomplete and parameter hints as you type QA code.
@@ -118,7 +148,7 @@ The setup also installed **launch configurations** — small scripts that run
 your QuickApps when you press `F5`. From the next chapter on, F5 is how you
 run things; no terminal needed.
 
-## Step 6 (optional but smart) — your HC3's address
+## Step 7 (optional but smart) — your HC3's address
 
 In a later chapter you will upload the lamp to your real HC3. flua finds it
 through a small settings file, and setting it up now takes one minute.

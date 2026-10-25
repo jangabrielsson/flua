@@ -108,6 +108,21 @@ Three things keep a multi-QA run legible:
   command line or add the second file to the launch configuration's
   arguments.)
 
+- **The run timeline.** With tracing on, `--ui` draws the whole run as a
+  picture: one lane per QA, virtual time on the x-axis, every api call,
+  UI event, and timer a colored mark.
+
+  ```bash
+  flua --ui 8091 --trace all examples/trigger_sensor.lua examples/trigger_lamp.lua
+  # open http://127.0.0.1:8091/timeline
+  ```
+
+  Hover a mark for its time, its QA, and the full details — events stacked
+  at the same instant list together, timers get their own lane so they
+  don't drown the calls, and a **clear** button drops the history without
+  squeezing the rest. It is the ensemble, legible — especially under
+  `--instant`, where the whole run draws itself at once.
+
 - **Shrink the cast.** When the ensemble misbehaves, chapter 07's rule
   applies doubly: run the suspect QA *alone*, then add the others back one
   at a time. Most "multi-QA bugs" are single-QA bugs with a chatty
@@ -120,6 +135,5 @@ your terminal. You can write QuickApps, run and test them offline, debug
 them, give them real UIs, grow them into libraries, mirror them onto the
 HC3, and — from chapter 06 — deploy them for keeps.
 
-The rest is practice, the flua thread on the Fibaro forum, and the manual
-(`USAGE.md`) for the questions this tutorial deliberately skipped. Happy
-automating — and mind the sunset.
+One chapter remains: making sure the lamp *stays* right, long after this
+tutorial ends.

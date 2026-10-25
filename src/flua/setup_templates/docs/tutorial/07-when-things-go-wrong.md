@@ -159,6 +159,18 @@ it's still wrong — ask. Two places work well:
 - **The Fibaro forum.** flua has a thread there, and the community of HC3
   owners has seen most of it before.
 
+Whatever you ask and wherever — run this first and paste the block:
+
+```bash
+flua doctor
+```
+
+It prints your setup as one ready-made block (which flua, which Python,
+whether your HC3 credentials are found and reachable, which editor pieces
+are in place). It never prints your passwords — only *where* it found
+things. "Here is my flua doctor" beats three paragraphs of setup prose,
+and often the ✗ lines in it *are* the answer.
+
 A question that gets answered — by a human *or* an agent — includes three
 things:
 
