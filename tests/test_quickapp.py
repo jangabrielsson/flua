@@ -752,3 +752,46 @@ async def test_update_view_alias_regression(capsys) -> None:
     )
     assert "LIST table 1" in out
     assert "lost reference" not in out
+
+
+@pytest.mark.asyncio
+async def test_set_color_components_structured_arg_chain(capsys) -> None:
+    # the viewer sends args [{"red": 59}] for the argKey color sliders —
+    # the full chain (HTTP route -> pump -> callAction) must deliver the
+    # TABLE, not a bare value (the string-arg regression that broke
+    # pairs() in the ColorController example)
+    import time
+
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        code = (
+            "print('BOOT')\n"
+            "function QuickApp:setColorComponents(colorComponents)\n"
+            "  local total = 0\n"
+            "  for k, v in pairs(colorComponents) do total = total + v end\n"
+            "  print('CC', type(colorComponents), total)\n"
+            "end\n"
+        )
+        qa_id = engine.start_qa(None, code, {"name": "ccqa"}, "<code>")
+        seen = ""
+        deadline = time.monotonic() + 5
+        while "BOOT" not in seen:
+            if time.monotonic() > deadline:
+                raise AssertionError(f"QA did not boot; output:\n{seen}")
+            await asyncio.sleep(0.01)
+            seen += capsys.readouterr().out
+        # now the QA is booted: deliver the viewer-shaped action body
+        engine.api.dispatch(
+            "POST",
+            f"/devices/{qa_id}/action/setColorComponents",
+            {"args": [{"red": 59}]},
+        )
+        while "CC" not in seen:
+            if time.monotonic() > deadline:
+                raise AssertionError(f"setColorComponents not called; output:\n{seen}")
+            await asyncio.sleep(0.01)
+            seen += capsys.readouterr().out
+    finally:
+        await engine.stop()
+    assert "CC table 59" in seen

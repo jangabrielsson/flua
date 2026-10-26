@@ -586,7 +586,17 @@ On top of the QA's own UI, the viewer renders the device type's **default
 view** (the elements the HC3 adds itself): a binarySwitch gets a colored
 TRUE/FALSE state label and Turn On/Turn Off buttons, a multilevelSwitch
 adds a dimmer slider, sensors get a live value label, and so on — even when
-the QA defines no `--%%u` directives at all. The viewer fetches them from
+the QA defines no `--%%u` directives at all. A `com.fibaro.hvacSystemAuto`
+gets a thermostat panel: setpoint steppers and a slider (both resolved per
+mode — Auto moves each deadband side by the device's `hysteresis` property,
+Heat/Cool drive the active side in `setpointStep` increments, Off disables
+them), the displayed target (the heat/cool average in Auto), and
+Auto/Off/Heat/Cool buttons calling `setThermostatMode`.
+`com.fibaro.hvacSystemCool`/`com.fibaro.hvacSystemHeat` share the same
+panel with only their side: Off/Cool or Off/Heat mode buttons, steppers and
+slider driving `setCoolingThermostatSetpoint`/`setHeatingThermostatSetpoint`.
+The viewer fetches
+them from
 `GET /flua/embeddedUI` (a flua-only channel) and prepends them above the
 custom UI; the elements are never stored in the device's `viewLayout`/
 `uiView` properties, so they cannot leak into a .fqa export. Their controls

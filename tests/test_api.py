@@ -1442,3 +1442,268 @@ async def test_qa_actions_and_events_offline(tmp_path, capsys) -> None:
     assert "B SET true" in out
     assert "CE wakeup" in out
     assert "RS true" in out
+
+
+def test_embedded_ui_base_shutter(api: Api) -> None:
+    # the shutter family's default row: glyph buttons for open / stop / close,
+    # plus a position slider on the two positioned types
+    positioned = ("com.fibaro.rollerShutter", "com.fibaro.remoteRollerShutter")
+    for device_type in (
+        "com.fibaro.baseShutter",
+        "com.fibaro.rollerShutter",
+        "com.fibaro.remoteBaseShutter",
+        "com.fibaro.remoteRollerShutter",
+    ):
+        api.state.register_qa(5000, "shutter", device_type, {"value": 55})
+        data, status = api.dispatch("GET", "/flua/embeddedUI")
+        assert status == 200
+        view = data["5000"]
+        assert view["type"] == device_type
+        rows = view["uiView"]
+        buttons = [c for c in rows[0]["components"]]
+        assert [c["name"] for c in buttons] == ["__open", "__stop", "__close"]
+        assert [c["action"] for c in buttons] == ["open", "stop", "close"]
+        assert [c["text"] for c in buttons] == ["▲", "■", "▼"]
+        if device_type in positioned:
+            assert len(rows) == 2
+            slider = rows[1]["components"][0]
+            assert slider["type"] == "slider" and slider["action"] == "setValue"
+            # the watch tracks the position: value 55 -> the slider's value
+            assert view["values"]["__setValue"]["value"] == "55"
+        else:
+            assert len(rows) == 1
+    # embedded elements never leak into the device structure
+    device, _ = api.dispatch("GET", "/devices/5000")
+    assert "__open" not in json.dumps(device)
+
+
+def test_embedded_ui_player(api: Api) -> None:
+    # com.fibaro.player's default view: transport glyphs, a volume slider,
+    # and mute/unmute buttons that pass their fixed value to setMute
+    api.state.register_qa(5000, "player", "com.fibaro.player", {"volume": 42})
+    data, status = api.dispatch("GET", "/flua/embeddedUI")
+    assert status == 200
+    view = data["5000"]
+    rows = view["uiView"]
+    transport = rows[0]["components"]
+    assert [c["name"] for c in transport] == ["__prev", "__pause", "__play", "__stop", "__next"]
+    assert [c["action"] for c in transport] == ["prev", "pause", "play", "stop", "next"]
+    assert [c["text"] for c in transport] == ["⏮", "⏸", "▶", "⏹", "⏭"]
+    slider = rows[1]["components"][0]
+    assert slider["type"] == "slider" and slider["action"] == "setVolume"
+    assert (slider["min"], slider["max"]) == (0, 100)
+    assert view["values"]["__setVolume"]["value"] == "42"  # the volume watch
+    mute_row = rows[2]["components"]
+    assert mute_row[0]["name"] == "__unmute" and mute_row[0]["value"] == 0
+    assert mute_row[1]["name"] == "__mute" and mute_row[1]["value"] == 1
+    assert [c["action"] for c in mute_row] == ["setMute", "setMute"]
+    assert [c["text"] for c in mute_row] == ["🔊", "🔇"]
+
+
+def test_embedded_ui_color_controller(api: Api) -> None:
+    # the HC3 client shape: On/Off buttons; red/green/blue/warmWhite sliders
+    # driving setColorComponents with their component key as the JSON arg;
+    # a brightness slider over setValue
+    api.state.register_qa(5000, "color", "com.fibaro.colorController", {"value": 60})
+    data, status = api.dispatch("GET", "/flua/embeddedUI")
+    assert status == 200
+    view = data["5000"]
+    rows = view["uiView"]
+    buttons = rows[0]["components"]
+    assert [c["name"] for c in buttons] == ["__turnOff", "__turnOn"]
+    assert [c["action"] for c in buttons] == ["turnOff", "turnOn"]
+    assert [c["text"] for c in buttons] == ["Off", "On"]
+    for index, key in enumerate(("red", "green", "blue", "warmWhite")):
+        slider = rows[1 + index]["components"][0]
+        assert slider["name"] == f"__{key}"
+        assert slider["action"] == "setColorComponents"
+        assert slider["argKey"] == key
+        assert slider["max"] == 255
+        # plain label only — the thumb already carries the color, no ■ square
+        assert slider["text"] == ("Warm white" if key == "warmWhite" else key.capitalize())
+        assert slider["color"]  # ... and a thumb color
+    brightness = rows[5]["components"][0]
+    assert brightness["name"] == "__setValue"
+    assert brightness["action"] == "setValue"
+    assert brightness["text"] == "Brightness"
+    # the brightness watch follows the value property
+    assert view["values"]["__setValue"]["value"] == "60"
+
+
+def test_embedded_ui_hvac_system_auto(api: Api) -> None:
+    # the thermostat's default view, resolved per mode from the device
+    # properties: setpoint steppers + target label, the setpoint slider, and
+    # Auto/Off/Heat/Cool mode buttons driving setThermostatMode
+    api.state.register_qa(
+        5010,
+        "thermostat",
+        "com.fibaro.hvacSystemAuto",
+        {
+            "thermostatMode": "Auto",
+            "heatingThermostatSetpoint": 20,
+            "coolingThermostatSetpoint": 24,
+            "hysteresis": 1,
+            "unit": "C",
+            "heatingThermostatSetpointCapabilitiesMin": 4,
+            "heatingThermostatSetpointCapabilitiesMax": 30,
+            "coolingThermostatSetpointCapabilitiesMin": 4,
+            "coolingThermostatSetpointCapabilitiesMax": 30,
+            "heatingThermostatSetpointStep": {"C": 0.5, "F": 1},
+            "coolingThermostatSetpointStep": {"C": 0.5, "F": 1},
+        },
+    )
+    data, status = api.dispatch("GET", "/flua/embeddedUI")
+    assert status == 200
+    view = data["5010"]
+    rows = view["uiView"]
+
+    def controls() -> tuple[dict, dict, dict, dict]:
+        minus, label, plus = rows[0]["components"]
+        return minus, label, plus, rows[1]["components"][0]
+
+    # row 1: minus / target label / plus — in Auto the steppers move each
+    # side of the deadband by hysteresis
+    minus, label, plus, slider = controls()
+    assert minus["action"] == "setHeatingThermostatSetpoint"
+    assert minus["value"] == 19  # heating 20 - hysteresis 1
+    assert plus["action"] == "setCoolingThermostatSetpoint"
+    assert plus["value"] == 25  # cooling 24 + hysteresis 1
+    assert label["text"] == "22°C"  # the average of 20 and 24
+    # row 2: the setpoint slider — its range is inset by hysteresis so both
+    # sides stay within the capabilities, and one drag moves both setpoints
+    assert slider["min"] == 5
+    assert slider["max"] == 29
+    assert [c["action"] for c in slider["calls"]] == [
+        "setHeatingThermostatSetpoint",
+        "setCoolingThermostatSetpoint",
+    ]
+    assert [c["offset"] for c in slider["calls"]] == [-1, 1]
+    # rows 3-4: the mode buttons
+    modes = [c["value"] for row in rows[2:] for c in row["components"]]
+    assert modes == ["Auto", "Off", "Heat", "Cool"]
+    assert all(c["action"] == "setThermostatMode" for row in rows[2:] for c in row["components"])
+    # live values: the label and slider position follow the displayed target
+    assert view["values"]["__hvacSetpointValue"]["text"] == "22°C"
+    assert view["values"]["__hvacSetpoint"]["value"] == "22"
+
+    def set_mode(mode: str) -> None:
+        api.dispatch(
+            "POST",
+            "/plugins/updateProperty",
+            {"deviceId": 5010, "propertyName": "thermostatMode", "value": mode},
+        )
+
+    # Heat mode: both controls drive the heating side over the full range
+    set_mode("Heat")
+    data, _ = api.dispatch("GET", "/flua/embeddedUI")
+    rows = data["5010"]["uiView"]
+    minus, label, plus, slider = controls()
+    assert minus["action"] == "setHeatingThermostatSetpoint"
+    assert minus["value"] == 19.5  # heating 20 - step 0.5
+    assert plus["value"] == 20.5
+    assert slider["action"] == "setHeatingThermostatSetpoint"
+    assert slider["min"] == 4 and slider["max"] == 30
+    assert "calls" not in slider
+    assert label["text"] == "20°C"  # heating is the heat-mode target
+
+    # Cool mode drives the cooling side
+    set_mode("Cool")
+    data, _ = api.dispatch("GET", "/flua/embeddedUI")
+    rows = data["5010"]["uiView"]
+    minus, label, plus, slider = controls()
+    assert minus["action"] == "setCoolingThermostatSetpoint"
+    assert minus["value"] == 23.5  # cooling 24 - step 0.5
+    assert slider["action"] == "setCoolingThermostatSetpoint"
+    assert label["text"] == "24°C"
+
+    # Off: the setpoint controls are disabled and the label shows no target
+    set_mode("Off")
+    data, _ = api.dispatch("GET", "/flua/embeddedUI")
+    rows = data["5010"]["uiView"]
+    minus, label, plus, slider = controls()
+    assert minus["disabled"] and plus["disabled"] and slider["disabled"]
+    assert label["text"] == "--"
+    assert data["5010"]["values"]["__hvacSetpoint"]["value"] == ""
+
+
+def test_embedded_ui_hvac_cool_heat(api: Api) -> None:
+    # the single-side hvac variants reuse the auto panel: same steppers,
+    # label and slider, but only their mode set's buttons — Cool gets
+    # Off/Cool driving setCoolingThermostatSetpoint, Heat gets Off/Heat
+    # driving setHeatingThermostatSetpoint
+    api.state.register_qa(
+        5011,
+        "cooler",
+        "com.fibaro.hvacSystemCool",
+        {
+            "thermostatMode": "Cool",
+            "coolingThermostatSetpoint": 23,
+            "unit": "C",
+            "coolingThermostatSetpointCapabilitiesMin": 4,
+            "coolingThermostatSetpointCapabilitiesMax": 30,
+            "coolingThermostatSetpointStep": {"C": 0.5, "F": 1},
+        },
+    )
+    api.state.register_qa(
+        5012,
+        "heater",
+        "com.fibaro.hvacSystemHeat",
+        {
+            "thermostatMode": "Heat",
+            "heatingThermostatSetpoint": 20,
+            "unit": "C",
+            "heatingThermostatSetpointCapabilitiesMin": 4,
+            "heatingThermostatSetpointCapabilitiesMax": 30,
+            "heatingThermostatSetpointStep": {"C": 0.5, "F": 1},
+        },
+    )
+    data, status = api.dispatch("GET", "/flua/embeddedUI")
+    assert status == 200
+
+    cool = data["5011"]
+    minus, label, plus = cool["uiView"][0]["components"]
+    assert minus["action"] == "setCoolingThermostatSetpoint"
+    assert minus["value"] == 22.5  # cooling 23 - step 0.5
+    assert plus["action"] == "setCoolingThermostatSetpoint"
+    assert plus["value"] == 23.5
+    slider = cool["uiView"][1]["components"][0]
+    assert slider["action"] == "setCoolingThermostatSetpoint"
+    assert slider["min"] == 4 and slider["max"] == 30
+    assert label["text"] == "23°C"
+    # one mode row: Off and Cool (no Auto, no Heat)
+    assert cool["uiView"][2:] == [
+        {
+            "style": {"weight": "1.0"},
+            "type": "horizontal",
+            "components": [
+                {"type": "button", "name": "__modeOff", "text": "Off",
+                 "action": "setThermostatMode", "value": "Off"},
+                {"type": "button", "name": "__modeCool", "text": "Cool",
+                 "action": "setThermostatMode", "value": "Cool"},
+            ],
+        }
+    ]
+    assert cool["values"]["__hvacSetpointValue"]["text"] == "23°C"
+    assert cool["values"]["__hvacSetpoint"]["value"] == "23"
+
+    heat = data["5012"]
+    minus, label, plus = heat["uiView"][0]["components"]
+    assert minus["action"] == "setHeatingThermostatSetpoint"
+    assert minus["value"] == 19.5  # heating 20 - step 0.5
+    assert plus["value"] == 20.5
+    assert heat["uiView"][1]["components"][0]["action"] == "setHeatingThermostatSetpoint"
+    assert label["text"] == "20°C"
+    assert [c["value"] for c in heat["uiView"][2]["components"]] == ["Off", "Heat"]
+    assert heat["values"]["__hvacSetpointValue"]["text"] == "20°C"
+
+    # Off disables the setpoint controls on the single-side types too
+    api.dispatch(
+        "POST",
+        "/plugins/updateProperty",
+        {"deviceId": 5012, "propertyName": "thermostatMode", "value": "Off"},
+    )
+    data, _ = api.dispatch("GET", "/flua/embeddedUI")
+    minus, label, plus = data["5012"]["uiView"][0]["components"]
+    assert minus["disabled"] and plus["disabled"]
+    assert data["5012"]["uiView"][1]["components"][0]["disabled"]
+    assert label["text"] == "--"

@@ -52,7 +52,9 @@
     width: 14px; height: 14px; border-radius: 4px; margin-right: 8px;
     background: var(--blue);
   }
+  .component-label.plain::before { display: none; }  /* embedded slider labels */
   .control { flex: 1 1 auto; min-width: 0; }
+  .control input:disabled { opacity: .45; }
 
   /* label element: the text fills its row, centered — like the HC3
      (may carry HTML: tables, fonts). Tables render with THEIR own
@@ -75,6 +77,9 @@
   }
   button.ctl:hover { background: var(--blue-dark); }
   button.ctl:active { background: #1565c0; transform: translateY(1px); }
+  button.ctl:disabled {
+    opacity: .45; cursor: default; background: var(--blue); transform: none;
+  }
   button.ctl.ghost {
     background: #fff; color: var(--blue); border: 1px solid var(--blue);
     box-shadow: none; padding: 6px 10px; font-size: 13px;
@@ -107,10 +112,11 @@
     text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
 
-  /* slider: gray track with a blue fill and a round white knob */
+  /* slider: gray track with a blue fill and a round knob (a component
+   --thumb color repaints the knob and its border — the color sliders) */
   input[type=range] {
     -webkit-appearance: none; appearance: none; width: 100%; height: 28px;
-    background: transparent; margin: 0; --fill: 0%;
+    background: transparent; margin: 0; --fill: 0%; --thumb: var(--blue);
   }
   input[type=range]::-webkit-slider-runnable-track {
     height: 6px; border-radius: 3px;
@@ -121,12 +127,12 @@
   }
   input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%;
-    background: #fff; border: 2px solid var(--blue);
+    background: var(--thumb); border: 2px solid var(--thumb);
     margin-top: -9px; box-shadow: 0 1px 3px rgba(0,0,0,.25);
   }
   input[type=range]::-moz-range-thumb {
-    width: 22px; height: 22px; border-radius: 50%; background: #fff;
-    border: 2px solid var(--blue); box-shadow: 0 1px 3px rgba(0,0,0,.25);
+    width: 22px; height: 22px; border-radius: 50%; background: var(--thumb);
+    border: 2px solid var(--thumb); box-shadow: 0 1px 3px rgba(0,0,0,.25);
   }
   input[type=range]::-moz-range-progress {
     height: 6px; border-radius: 3px; background: var(--blue);
@@ -390,14 +396,25 @@ function renderComponent(device, component, row) {
     const btn = document.createElement("button");
     btn.className = "ctl";
     btn.textContent = text ?? component.name;
+    if (component.disabled) btn.disabled = true;
     btn.onclick = () => {
-      if (action) deviceAction(device.id, action);
+      // a fixed component value rides along as the action's single argument
+      // (the embedded mute/unmute buttons pass 0/1 to setMute)
+      if (action) deviceAction(device.id, action, component.value);
       else if (event) uiEvent(device.id, component.name, event);
     };
     row.appendChild(btn);
   } else if (t === "slider") {
-    // no side label: just the slider and its value, like the HC3
-    row.removeChild(name);
+    // only embedded (__-prefixed) sliders keep a side label, and theirs has
+    // no blue marker square; user-defined sliders get no label — the QA
+    // declares its own label row above or below
+    const isEmbedded = typeof component.name === "string" && component.name.startsWith("__");
+    if (isEmbedded && text !== undefined && text !== null && text !== "") {
+      name.classList.add("plain");
+      name.innerHTML = text;
+    } else {
+      row.removeChild(name);
+    }
     const control = document.createElement("div");
     control.className = "control";
     const slider = document.createElement("input");
@@ -406,6 +423,8 @@ function renderComponent(device, component, row) {
     slider.max = component.max ?? "100";
     slider.step = component.step ?? "1";
     slider.value = value ?? slider.min;
+    if (component.disabled) slider.disabled = true;
+    if (component.color) slider.style.setProperty("--thumb", component.color);
     const val = document.createElement("span");
     val.className = "value";
     val.textContent = slider.value;
@@ -418,8 +437,22 @@ function renderComponent(device, component, row) {
     slider.oninput = () => { val.textContent = slider.value; paint(); };
     slider.onchange = () => {
       setComponentValue(device, component, slider.value);
-      if (action) deviceAction(device.id, action, slider.value);
-      else if (event) uiEvent(device.id, component.name, event, slider.value);
+      if (component.calls) {
+        // one drag fires several actions, each with the slider value plus
+        // its offset (the hvacSystemAuto's auto slider moves both
+        // setpoints: target ± hysteresis)
+        for (const call of component.calls) {
+          const v = parseFloat(slider.value) + (call.offset || 0);
+          deviceAction(device.id, call.action, v);
+        }
+      } else if (action) {
+        // argKey sliders send a structured arg, like the HC3 client:
+        // args [{warmWhite: 59}] (the colorController's setColorComponents)
+        const arg = component.argKey
+          ? { [component.argKey]: parseFloat(slider.value) }
+          : slider.value;
+        deviceAction(device.id, action, arg);
+      } else if (event) uiEvent(device.id, component.name, event, slider.value);
     };
     control.appendChild(slider);
     row.appendChild(control);
@@ -623,7 +656,10 @@ function structureKey(device) {
       // the option list can change at runtime (updateView "options") —
       // that is a structure change, the dropdown must rebuild
       const live = liveState(device, c);
-      return [c.type, c.name, live.options !== undefined ? live.options : (c.options || null)];
+      return [
+        c.type, c.name, c.action, c.value, c.min, c.max, c.step, c.disabled, c.calls,
+        live.options !== undefined ? live.options : (c.options || null),
+      ];
     })
   ));
 }

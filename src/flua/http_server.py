@@ -197,8 +197,13 @@ def _respond_html(
     body: bytes,
     extra: dict[str, str] | None = None,
 ) -> None:
-    """The viewer page: raw bytes, not JSON."""
-    _write(writer, 200, "text/html; charset=utf-8", body, extra)
+    """The viewer page: raw bytes, not JSON. No-cache, because the page
+    is version-coupled with the engine — a browser-cached viewer from an
+    older flua would drive the sim with stale behavior."""
+    headers = {"Cache-Control": "no-cache"}
+    if extra:
+        headers.update(extra)
+    _write(writer, 200, "text/html; charset=utf-8", body, headers)
 
 
 def _write(
