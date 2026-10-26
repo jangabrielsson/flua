@@ -167,7 +167,8 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="TOOL",
         help="run a tool command instead of QAs: downloadQA <id>, "
         "uploadQA <name|main.lua>, updateQA <id> <script> (HC3 credentials "
-        "required); a bare --tool lists the installed tools",
+        "required), icons download (icon cache); a bare --tool lists the "
+        "installed tools",
     )
     parser.add_argument(
         "--nogreet",
