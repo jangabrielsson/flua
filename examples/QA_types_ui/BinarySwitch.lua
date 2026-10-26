@@ -1,4 +1,4 @@
---%%name:binary
+--%%name:BinarySwitch
 --%%type:com.fibaro.binarySwitch
 
 -- Binary switch with on/off embedded UI elements

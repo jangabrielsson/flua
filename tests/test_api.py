@@ -1388,6 +1388,21 @@ def test_embedded_ui_multilevel_sensor_unit(api: Api) -> None:
     assert data["5004"]["values"]["__multisensorValue"]["text"] == "5.65kWh"
 
 
+def test_embedded_ui_light_sensor(api: Api) -> None:
+    # a lightSensor shows its live value (with the lux unit) in the panel —
+    # the same label row the multilevelSensor gets, so a sensor QA with no
+    # --%%u UI still renders its reading in the large panel
+    api.state.register_qa(
+        5005, "lux", "com.fibaro.lightSensor", {"value": 3.14159, "unit": "lux"}
+    )
+    data, status = api.dispatch("GET", "/flua/embeddedUI")
+    assert status == 200
+    view = data["5005"]
+    row = view["uiView"][0]["components"][0]
+    assert row["name"] == "__multisensorValue"
+    assert view["values"]["__multisensorValue"]["text"] == "3.142lux"
+
+
 def test_embedded_ui_strips_insignificant_zeros(api: Api) -> None:
     # the HC3 panel style: 45.00 -> 45, 62.50 -> 62.5, 348.400 -> 348.4
     api.state.register_qa(5005, "temp", "com.fibaro.temperatureSensor", {"value": 45.0})

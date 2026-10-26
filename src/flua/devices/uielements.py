@@ -431,6 +431,10 @@ EMBEDDED_UI: dict[
     "com.fibaro.multilevelSensor": [
         [{"type": "label", "name": "__multisensorValue", "text": "0"}],
     ],
+    "com.fibaro.lightSensor": [
+        # like the multilevelSensor: a live value label (with the unit, lux)
+        [{"type": "label", "name": "__multisensorValue", "text": "0"}],
+    ],
     # electricMeter/powerMeter use the multilevelSensor dynamic plugin in the
     # HC3 device catalog (their ``view`` lists it), so they get the same
     # default value label — QAs update ``properties.value`` + ``unit`` on
@@ -486,6 +490,14 @@ EMBEDDED_WATCHES: dict[str, list[dict[str, Any]]] = {
         {"property": "value", "id": "__setValue", "prop": "value", "fmt": _int_value},
     ],
     "com.fibaro.multilevelSensor": [
+        {
+            "property": "value",
+            "id": "__multisensorValue",
+            "prop": "text",
+            "fmt": _multisensor_value,
+        },
+    ],
+    "com.fibaro.lightSensor": [
         {
             "property": "value",
             "id": "__multisensorValue",

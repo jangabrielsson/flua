@@ -1,4 +1,4 @@
---%%name:multilevel
+--%%name:MultilevelSwitch
 --%%type:com.fibaro.multilevelSwitch
 
 

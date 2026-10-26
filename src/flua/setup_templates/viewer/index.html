@@ -112,6 +112,23 @@
     text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
 
+  /* device health: alive/dead dot + battery level (panel title & condensed) */
+  .health { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; }
+  .health-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    display: inline-block; border: 1px solid rgba(0,0,0,.3);
+  }
+  .health-dot.alive { background: #43a047; }
+  .health-dot.dead { background: #e53935; }
+  .battery { font-size: 12px; color: var(--muted); font-weight: 400; }
+
+  /* condensed card's top-left status line: id, health dot, battery */
+  .smallqa-status {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; color: var(--qa-bluegray); margin-bottom: 6px;
+  }
+  .smallqa-status .health { margin-left: 0; }
+
   /* slider: gray track with a blue fill and a round knob (a component
    --thumb color repaints the knob and its border — the color sliders) */
   input[type=range] {
@@ -583,6 +600,33 @@ function renderComponent(device, component, row) {
   }
 }
 
+// device health: the HC3's ``dead`` flag (some QAs name it isDead) and the
+// battery level — a red/green dot and "🔋87%" beside the device id
+function deviceHealth(device) {
+  const props = device.properties || {};
+  const dead = props.dead !== undefined ? props.dead : props.isDead;
+  const battery = props.batteryLevel;
+  if (dead === undefined && (battery === undefined || battery === null || battery === "")) {
+    return null;
+  }
+  const health = document.createElement("span");
+  health.className = "health";
+  if (dead !== undefined) {
+    const dot = document.createElement("span");
+    dot.className = "health-dot " + (dead ? "dead" : "alive");
+    dot.title = dead ? "device is dead" : "device is alive";
+    health.appendChild(dot);
+  }
+  if (battery !== undefined && battery !== null && battery !== "") {
+    const cell = document.createElement("span");
+    cell.className = "battery";
+    cell.textContent = "\uD83D\uDD0B" + battery + "%";
+    cell.title = "battery level " + battery + "%";
+    health.appendChild(cell);
+  }
+  return health;
+}
+
 function renderDevice(device) {
   const panel = document.createElement("div");
   panel.className = "device";
@@ -591,6 +635,9 @@ function renderDevice(device) {
   const small = document.createElement("small");
   small.textContent = "id " + device.id;
   title.appendChild(small);
+  // device health right after the id: alive/dead dot + battery level
+  const health = deviceHealth(device);
+  if (health) title.appendChild(health);
   // detach: the same viewer filtered to this QA, in its own window — handy
   // when one QA (a server under test) should stay visible while others scroll
   const detach = document.createElement("button");
@@ -672,6 +719,10 @@ function valueKey(device) {
   const props = device.properties || {};
   return JSON.stringify([
     props.log || "",
+    // health changes (dead/battery) must refresh the panel title too
+    props.dead,
+    props.isDead,
+    props.batteryLevel,
     allRows(device).flatMap((row) =>
       (row.components || []).map((c) => {
         const live = liveState(device, c);
@@ -709,9 +760,13 @@ function condensedParts(device) {
   const v = props.value;
   if (v !== undefined && v !== null && v !== "" && typeof v !== "boolean") {
     if (typeof v === "number" || (typeof v === "string" && v.trim() && !isNaN(Number(v)))) {
+      const num = Number(v);
+      // a floating-point sensor reading renders with at most 4 decimals —
+      // a float's binary noise (3.141592653589793) is not a reading
+      const shown = Number.isInteger(num) ? num : Math.round(num * 10000) / 10000;
       return {
         unit: typeof props.unit === "string" ? props.unit : "",
-        valueHtml: String(Number(v)),
+        valueHtml: String(shown),
       };
     }
     return { unit: "", valueHtml: String(v) };
@@ -734,13 +789,31 @@ function condensedParts(device) {
 function condensedValueKey(device) {
   const props = device.properties || {};
   const parts = condensedParts(device);
-  return JSON.stringify([parts.unit, parts.valueHtml, device.name, props.log || ""]);
+  return JSON.stringify([
+    parts.unit,
+    parts.valueHtml,
+    device.name,
+    props.log || "",
+    // health changes (dead/battery) must refresh the status line too
+    props.dead,
+    props.isDead,
+    props.batteryLevel,
+  ]);
 }
 
 function renderCondensed(device) {
   const card = document.createElement("div");
   card.className = "smallqa";
   card.title = "id " + device.id + " \u2014 click to open the full panel";
+  // top-left status line: device id, alive/dead dot, battery level
+  const status = document.createElement("div");
+  status.className = "smallqa-status";
+  const idLabel = document.createElement("span");
+  idLabel.textContent = "id " + device.id;
+  status.appendChild(idLabel);
+  const health = deviceHealth(device);
+  if (health) status.appendChild(health);
+  card.appendChild(status);
   const parts = condensedParts(device);
   const value = document.createElement("div");
   value.className = "smallqa-value";

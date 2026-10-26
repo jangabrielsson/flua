@@ -1,4 +1,4 @@
---%%name:alarmPartition
+--%%name:AlarmPartition
 --%%type:com.fibaro.alarmPartition
 --%%description:"My description"
 
