@@ -4,6 +4,14 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.89] - 2026-10-26
+
+### Added
+- add support for light sensor and update UI elements for device health
+
+### Changed
+- Enhance embedded UI functionality and improve HTTP response handling
+
 ## [0.1.88] - 2026-10-25
 
 ### Added
