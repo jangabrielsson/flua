@@ -16,6 +16,8 @@ from __future__ import annotations
 import copy
 import functools
 import json
+import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -141,3 +143,97 @@ def skeleton_for(device_type: str | None) -> dict[str, Any] | None:
 def catalog_types() -> list[str]:
     """All known device types (sorted, for introspection/tests)."""
     return sorted(_catalog())
+
+
+_ICONS_PATH = Path(__file__).parent / "icons.json"
+
+
+@functools.lru_cache(maxsize=1)
+def _icons_document() -> dict[str, Any] | None:
+    """The checked-in icon catalog (scripts/extract_icons.py), or None when
+    the file is absent (older installs without the capture)."""
+    if not _ICONS_PATH.is_file():
+        return None
+    with open(_ICONS_PATH, encoding="utf-8") as handle:
+        document = json.load(handle)
+    if not isinstance(document, dict):
+        raise ValueError(f"invalid icon catalog: {_ICONS_PATH}")
+    return document
+
+
+def icon_catalog() -> Any:
+    """The raw ``GET /api/icons`` payload — the controller's icon library
+    (device/room/scene icon sets), stored so the sim serves the HC3's shape
+    offline and QA ``deviceIcon`` ids stay aligned with the real controller."""
+    document = _icons_document()
+    if document is None:
+        return None
+    return document.get("data")
+
+
+_ICON_MANIFEST_PATH = Path(__file__).parent / "icon_manifest.json"
+_ICON_NAME = re.compile(r"^[A-Za-z0-9._-]+$")
+_ICON_CONTENT_TYPES = {
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+}
+
+
+@functools.lru_cache(maxsize=1)
+def icon_manifest() -> dict[str, Any] | None:
+    """The checked-in icon file manifest (scripts/extract_icon_files.py):
+    ``{meta, files: {set: [names]}, source: {set: dump|hc3}}``, or None when
+    the file is absent (older installs)."""
+    if not _ICON_MANIFEST_PATH.is_file():
+        return None
+    with open(_ICON_MANIFEST_PATH, encoding="utf-8") as handle:
+        document = json.load(handle)
+    if not isinstance(document, dict):
+        raise ValueError(f"invalid icon manifest: {_ICON_MANIFEST_PATH}")
+    return document
+
+
+def icon_cache_dir() -> Path:
+    """The machine-level icon cache — ``~/.flua/icons`` (FLUA_ICON_DIR
+    overrides). One cache per user, shared by every project, so the icon
+    library is never dumped per repo."""
+    override = os.environ.get("FLUA_ICON_DIR")
+    if override:
+        return Path(override).expanduser()
+    return Path.home() / ".flua" / "icons"
+
+
+def icon_file(set_name: str, file_name: str) -> tuple[bytes, str] | None:
+    """One cached icon file as ``(bytes, content_type)``, or None when the
+    name is invalid or the file is not cached. Names are strictly
+    ``[A-Za-z0-9._-]`` and resolved inside the cache — path traversal and
+    arbitrary reads are refused by construction."""
+    if not _ICON_NAME.fullmatch(set_name) or not _ICON_NAME.fullmatch(file_name):
+        return None
+    cache = icon_cache_dir().resolve()
+    path = (cache / set_name / file_name).resolve()
+    if cache not in path.parents or not path.is_file():
+        return None
+    content_type = _ICON_CONTENT_TYPES.get(path.suffix.lower(), "application/octet-stream")
+    return path.read_bytes(), content_type
+
+
+def icon_default_file(set_name: str, file_extension: str) -> str | None:
+    """The icon set's representative state file (the viewer's static
+    default): the base file, else the off state, else the multilevel
+    middle, else the first file — None when the manifest has no files for
+    the set. (Many sets ship no base file — PresenceSensorV1 only has its
+    ``0``/``100`` states.)"""
+    names = ((icon_manifest() or {}).get("files") or {}).get(set_name) or []
+    base = f"{set_name}.{file_extension}"
+    if base in names:
+        return base
+    for suffix in ("0", "50"):
+        candidate = f"{set_name}{suffix}.{file_extension}"
+        if candidate in names:
+            return candidate
+    return names[0] if names else None

@@ -1722,3 +1722,45 @@ def test_embedded_ui_hvac_cool_heat(api: Api) -> None:
     assert minus["disabled"] and plus["disabled"]
     assert data["5012"]["uiView"][1]["components"][0]["disabled"]
     assert label["text"] == "--"
+
+
+def test_icons_served_offline_from_catalog(api: Api) -> None:
+    # GET /icons serves the checked-in HC3 icon library (scripts/
+    # extract_icons.py) so QA deviceIcon ids align with the real controller;
+    # ?deviceType= filters to that type's sets and unknown types 404
+    data, status = api.dispatch("GET", "/icons")
+    assert status == 200
+    assert set(data) == {"device", "room", "scene"}
+    assert len(data["device"]) > 100
+    entry = data["device"][0]
+    assert {"id", "deviceType", "iconSetName"} <= set(entry)
+
+    data, status = api.dispatch("GET", "/icons?deviceType=com.fibaro.binarySwitch")
+    assert status == 200
+    assert isinstance(data, list) and data
+    assert all(e["deviceType"] == "com.fibaro.binarySwitch" for e in data)
+
+    assert api.dispatch("GET", "/icons?deviceType=com.fibaro.noSuchType") == (None, 404)
+
+
+def test_icon_map_serves_device_icon_lookup(api: Api) -> None:
+    # GET /flua/iconMap: deviceIcon id -> {set, file} for the viewer's
+    # <img> tags, plus each set's full file list for live state switching;
+    # every catalog id maps to a set whose default file exists in its list
+    data, status = api.dispatch("GET", "/flua/iconMap")
+    assert status == 200
+    assert data["icons"]["300"] == {"set": "ButtonSwitchV2", "file": "ButtonSwitchV2.svg"}
+    assert "ButtonSwitchV20.svg" in data["sets"]["ButtonSwitchV2"]
+    root = Path(__file__).resolve().parent.parent
+    catalog = json.loads((root / "src/flua/devices/icons.json").read_text())["data"]["device"]
+    manifest_files = json.loads(
+        (root / "src/flua/devices/icon_manifest.json").read_text()
+    )["files"]
+    for entry in catalog:
+        mapped = data["icons"].get(str(entry["id"]))
+        assert mapped, f"catalog id {entry['id']} not mapped"
+        assert mapped["set"] == entry["iconSetName"]
+        assert mapped["file"] in manifest_files[entry["iconSetName"]]
+        assert data["sets"][entry["iconSetName"]] == sorted(
+            manifest_files[entry["iconSetName"]]
+        )

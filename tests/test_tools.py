@@ -27,6 +27,7 @@ def test_registry_discovers_all_tools() -> None:
         "createDB",
         "downloadFQA",
         "downloadQA",
+        "icons",
         "newQA",
         "pack",
         "setup",
@@ -1093,3 +1094,33 @@ def test_timeline_page_and_trace_feed_end_to_end(tmp_path) -> None:
             process.wait(timeout=5)
         except subprocess.TimeoutExpired:
             process.kill()
+
+
+def test_icons_download_from_dump(tmp_path, capsys) -> None:
+    # `--tool icons download --dump` copies the manifest-listed files that a
+    # local webroot dump carries into the shared cache; already-cached files
+    # are skipped unless --force; placeholder bodies (an SVG served under a
+    # .png name) are dropped, never cached
+    dump = tmp_path / "www" / "assets" / "icon" / "fibaro"
+    (dump / "ButtonSwitchV2").mkdir(parents=True)
+    (dump / "ButtonSwitchV2" / "ButtonSwitchV20.svg").write_bytes(b"<svg>off</svg>")
+    (dump / "ButtonSwitchV2" / "ButtonSwitchV20.png").write_bytes(b"<svg>placeholder</svg>")
+    cache = tmp_path / "cache"
+    www = tmp_path / "www"
+
+    assert tools.run_tool("icons", ["download", "--dump", str(www), "--dir", str(cache)]) == 0
+    assert (cache / "ButtonSwitchV2" / "ButtonSwitchV20.svg").read_bytes() == b"<svg>off</svg>"
+    assert not (cache / "ButtonSwitchV2" / "ButtonSwitchV20.png").exists()
+    out = capsys.readouterr().out
+    assert "copied 1 icon file(s)" in out
+    assert "1 placeholder(s) dropped" in out
+
+    # second run skips the cached file; --force copies it again
+    assert tools.run_tool("icons", ["download", "--dump", str(www), "--dir", str(cache)]) == 0
+    assert "skipped 1 cached" in capsys.readouterr().out
+    (dump / "ButtonSwitchV2" / "ButtonSwitchV20.svg").write_bytes(b"<svg>new</svg>")
+    assert (
+        tools.run_tool("icons", ["download", "--dump", str(www), "--dir", str(cache), "--force"])
+        == 0
+    )
+    assert (cache / "ButtonSwitchV2" / "ButtonSwitchV20.svg").read_bytes() == b"<svg>new</svg>"

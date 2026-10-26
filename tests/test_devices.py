@@ -1,6 +1,7 @@
 """Device type skeletons: catalog loading, scrubbing, and QA integration."""
 
 import asyncio
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -261,3 +262,74 @@ def test_qa_with_unknown_type_still_errors(tmp_path) -> None:
     )
     assert result.returncode != 0
     assert "unknown device type" in result.stderr
+
+
+def test_icon_manifest_covers_catalog() -> None:
+    # scripts/extract_icon_files.py: every device icon set in the checked-in
+    # catalog (icons.json) resolves to its state file names, so the viewer
+    # can render any deviceIcon offline (the image bytes live on the HC3 /
+    # in the webroot dump — the manifest is facts only)
+    root = Path(__file__).resolve().parent.parent
+    catalog = json.loads((root / "src/flua/devices/icons.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (root / "src/flua/devices/icon_manifest.json").read_text(encoding="utf-8")
+    )
+    files = manifest["files"]
+    assert manifest["meta"]["firmware"]
+    for entry in catalog["data"]["device"]:
+        names = files.get(entry["iconSetName"])
+        assert names, f"no icon files for set {entry['iconSetName']}"
+        assert all(isinstance(name, str) for name in names)
+
+
+def test_icon_cache_dir_env_override(tmp_path, monkeypatch) -> None:
+    # the icon cache is machine-level; FLUA_ICON_DIR overrides it (tests,
+    # portable setups)
+    from flua.devices import icon_cache_dir
+
+    monkeypatch.setenv("FLUA_ICON_DIR", str(tmp_path / "icons"))
+    assert icon_cache_dir() == tmp_path / "icons"
+
+
+def test_icon_file_resolves_only_inside_cache(tmp_path, monkeypatch) -> None:
+    # the /flua/icons channel: cached icon bytes with the right content
+    # type; traversal, separators and unknown names resolve to nothing
+    from flua.devices import icon_file
+
+    monkeypatch.setenv("FLUA_ICON_DIR", str(tmp_path / "icons"))
+    folder = tmp_path / "icons" / "ButtonSwitchV2"
+    folder.mkdir(parents=True)
+    (folder / "ButtonSwitchV20.svg").write_bytes(b"<svg>off</svg>")
+    (folder / "ButtonSwitchV20.png").write_bytes(b"\x89PNG")
+    assert icon_file("ButtonSwitchV2", "ButtonSwitchV20.svg") == (
+        b"<svg>off</svg>",
+        "image/svg+xml",
+    )
+    assert icon_file("ButtonSwitchV2", "ButtonSwitchV20.png") == (b"\x89PNG", "image/png")
+    assert icon_file("ButtonSwitchV2", "missing.svg") is None
+    # traversal and separators are refused by the name pattern / resolution
+    assert icon_file("ButtonSwitchV2", "../secret") is None
+    assert icon_file("..", "secret.svg") is None
+    assert icon_file("ButtonSwitchV2/other", "x.svg") is None
+
+
+def test_icon_default_file_prefers_base_then_off_state(monkeypatch) -> None:
+    # the viewer's static default per set: the base file when it exists,
+    # else the 0 state, else the first file — pinned against a synthetic
+    # manifest (the scraped catalog changes over firmware versions)
+    import flua.devices as devices
+
+    monkeypatch.setattr(
+        devices,
+        "icon_manifest",
+        lambda: {
+            "files": {
+                "BaseSet": ["BaseSet.svg", "BaseSet0.svg"],
+                "NoBaseSet": ["NoBaseSet0.svg", "NoBaseSet100.svg"],
+                "EmptySet": [],
+            }
+        },
+    )
+    assert devices.icon_default_file("BaseSet", "svg") == "BaseSet.svg"
+    assert devices.icon_default_file("NoBaseSet", "svg") == "NoBaseSet0.svg"
+    assert devices.icon_default_file("EmptySet", "svg") is None

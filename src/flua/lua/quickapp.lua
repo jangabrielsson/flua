@@ -488,3 +488,243 @@ end
 function RefreshStateSubscriber:stop() 
   _FLUA.refreshStateListeners[self.handle] = nil
 end
+
+-- code for handling icons upload
+QuickAppBase.iconProviders = {
+    single = {
+        info = "One icon is required for this device type",
+        fileNames = {"icon"}
+    },
+    binary = {
+        info = "Two icons are required for this device type (state off, state on)",
+        fileNames = {"icon0", "icon100"}
+    },
+    multilevel = {
+        info = "11 icons are required for this device type (states: 0%, 10%, 20%, 30%, 40%, 50%, 60%, 70%, 80%, 90%, 100%)",
+        fileNames = {"icon0", "icon10", "icon20", "icon30", "icon40", "icon50", "icon60", "icon70", "icon80", "icon90", "icon100"}
+    },
+    baseShutter = {
+        info = "5 icons are required for this device type (states: Opening, Opened, Closing, Closed, Unknown)",
+        fileNames = {"iconOpening", "iconOpened", "iconClosing", "iconClosed", "iconUnknown"}
+    }
+}
+
+QuickAppBase.deviceIconTypeMapping = {
+    -- single icon sensors/meters
+    ["com.fibaro.energyMeter"] = QuickAppBase.iconProviders.single,
+    ["com.fibaro.humiditySensor"] = QuickAppBase.iconProviders.single,
+    ["com.fibaro.powerSensor"] = QuickAppBase.iconProviders.single,
+    ["com.fibaro.energyMeter"] = QuickAppBase.iconProviders.single,
+    ["com.fibaro.temperatureSensor"] = QuickAppBase.iconProviders.single,
+    ["com.fibaro.windSensor"] = QuickAppBase.iconProviders.single,
+    ["com.fibaro.multilevelSensor"] = QuickAppBase.iconProviders.single,
+    -- binary actors
+    ["com.fibaro.binarySwitch"] = QuickAppBase.iconProviders.binary,
+    ["com.fibaro.doorLock"] = QuickAppBase.iconProviders.binary,
+    -- binary sensors
+    ["com.fibaro.binarySensor"] = QuickAppBase.iconProviders.binary,
+    ["com.fibaro.doorSensor"] = QuickAppBase.iconProviders.binary,
+    ["com.fibaro.floodSensor"] = QuickAppBase.iconProviders.binary,
+    ["com.fibaro.smokeSensor"] = QuickAppBase.iconProviders.binary,
+    ["com.fibaro.windowSensor"] = QuickAppBase.iconProviders.binary,
+    ["com.fibaro.motionSensor"] = QuickAppBase.iconProviders.binary,
+    ["com.fibaro.rainDetector"] = QuickAppBase.iconProviders.binary,
+    ["com.fibaro.heatDetector"] = QuickAppBase.iconProviders.binary,
+    ["com.fibaro.gasDetector"] = QuickAppBase.iconProviders.binary,
+    ["com.fibaro.coDetector"] = QuickAppBase.iconProviders.binary,
+    ["com.fibaro.fireDetector"] = QuickAppBase.iconProviders.binary,
+    -- multilevel actors 
+    ["com.fibaro.multilevelSwitch"] = QuickAppBase.iconProviders.multilevel,
+    ["com.fibaro.rollerShutter"] = QuickAppBase.iconProviders.multilevel,
+    -- base shutter
+    ["com.fibaro.baseShutter"] = QuickAppBase.iconProviders.baseShutter,
+    -- other
+    ["com.fibaro.deviceController"] = QuickAppBase.iconProviders.single,
+    ["com.fibaro.genericDevice"] = QuickAppBase.iconProviders.single,
+    ["com.fibaro.player"] = QuickAppBase.iconProviders.single,
+}
+
+-- Method that will upload provided icons for the given deviceType 
+-- @providerContext - a table with the following structure
+--    fileNames - an array of filenames that will be used for the upload. Its size must match the size of files array.
+--    files - an array with icons content. Its size must match the size of fileNames array.   
+--    deviceType - type of the device that will be used for the upload.
+-- @options - a table with some additional options (can be extended in the future). For now, it isn't used in this method.
+-- @successCallback (optional) - a function that will be called after a successful upload. iconId (int) will be passed as the first argument to this function.  
+-- @errorCallback (optional) - a function that will be called on error during the upload process. requestError (string) will be passed as the first argument to this function.
+function QuickAppBase:uploadIconFiles(providerContext, options, successCallback, errorCallback)
+    local http = net.HTTPClient({timeout=3000}) 
+
+    local rawIcons = providerContext.files
+    local deviceType = providerContext.deviceType
+    local fileNames = providerContext.fileNames
+
+    local boundary = "------HCFormBoundary20838a8df7cc0babd745c7af4b7d94e2"
+    local formBoundary = "--" .. boundary
+    local CRLF = "\r\n";
+
+    -- setup some base form data: icon type (type field) and device type (deviceTemplate field)
+    local content = 
+        formBoundary .. CRLF ..
+        "Content-Disposition: form-data; name=\"type\"" .. CRLF ..
+        CRLF ..
+        "device" .. CRLF ..
+        formBoundary .. CRLF ..
+        "Content-Disposition: form-data; name=\"deviceTemplate\"" .. CRLF ..
+        CRLF ..
+        deviceType .. CRLF ..
+        formBoundary .. CRLF 
+
+    -- add icons data to the form
+    for key,rawIcon in pairs(rawIcons) do
+        local fileName = fileNames[key]
+        local endOfBoundary = CRLF
+
+        -- at the end of the form data (after the last element), we need to add an additional '--'
+        if key == #rawIcons then 
+            endOfBoundary = "--" .. endOfBoundary 
+        end
+
+        content = content .. "Content-Disposition: form-data; name=\"" .. fileName .. "\"; filename=\"" .. fileName .. "\"" .. CRLF ..
+        "Content-Type: image/png" .. CRLF ..
+        CRLF ..
+        rawIcon .. CRLF ..
+        formBoundary .. endOfBoundary
+    end
+
+    http:request("http://127.0.0.1:11111/api/icons", {
+        options={
+            headers = { 
+                ["Content-Type"] = "multipart/form-data; boundary=" .. boundary,
+                ["Accept"] = "application/json"
+            },
+            method = 'POST',
+            data = content
+        },
+        success = function(response)
+            if (response.status == 201) then
+                if successCallback then
+                    local responseJson = json.decode(response.data)
+                    successCallback(responseJson.id)
+                end
+            else
+                local errorMessage = "Error while uploading icon. Status: " .. tostring(response.status) .. ". Response: " .. response.data
+                if errorCallback then
+                    errorCallback(errorMessage)
+                else
+                    self:error(errorMessage)
+                end
+            end
+        end,
+        error = function(requestError)
+            local errorMessage = "Error while uploading icon. " .. requestError
+            if errorCallback then
+                errorCallback(errorMessage)
+            else
+                self:error(errorMessage)
+            end        
+        end
+    })  
+end
+
+-- Method for downloading external icons. It will run itself recursively until all files are downloaded. 
+-- After downloading all files, QuickAppBase:uploadIconFiles method will be run. 
+-- @providerContext - a table with the following structure
+--    fileNames - an array of filenames that will be used for the upload. 
+--    files - an array with icons content. One file is added in each iteration. Its size should match fileNames table after all files are downloaded. 
+--    url -  an array of file urls to download. Its size should match fileNames table.
+--    index - current iteration number and an index used to extract url of the file to download.
+--    deviceType - type of the device that will be used for the upload.
+-- @options - a table with some additional options (can be extended in the future)
+--    checkCertificate (default true) - when set to false, it will ignore host validation during HTTPS connection. Has no effect on the HTTP connections.
+-- @successCallback (optional) - a function that will be called after a successful upload. iconId (int) will be passed as the first argument to this function.  
+-- @errorCallback (optional) - a function that will be called on error during the download or upload process. requestError (string) will be passed as the first argument to this function.
+function QuickAppBase:externalIconsDownload(providerContext, options, successCallback, errorCallback)
+    local http = net.HTTPClient({timeout=3000}) 
+    local index = providerContext.index
+    local url = providerContext.urls[index]
+    local checkCertificate = true
+
+    if options.checkCertificate ~= nil then
+        checkCertificate = options.checkCertificate
+    end
+
+    http:request(url, {
+        options={
+            checkCertificate = checkCertificate,
+            method = 'GET'
+        },
+        success = function(response)
+            if response.status < 200 or response.status >= 300  then
+                local errorMessage = "Error while downloading icon: " .. url .. ". Status: " .. tostring(response.status) .. ". Response: " .. response.data
+                if errorCallback then
+                    errorCallback(errorMessage)
+                else
+                    self:error(errorMessage)
+                end
+                return
+            end
+
+            providerContext.files[index] = response.data
+
+            if index == #providerContext.urls then
+                -- all ions files downloaded, going to upload
+                self:uploadIconFiles(providerContext, options, successCallback, errorCallback)
+            else
+                -- download another file from the list 
+                providerContext.index = index + 1
+                self:externalIconsDownload(providerContext, options, successCallback, errorCallback)
+            end
+        end,
+        error = function(requestError)
+            local errorMessage = "Error while downloading icon: " .. url .. ". Error: " .. requestError
+            if errorCallback then
+                errorCallback(errorMessage)
+            else
+                self:error(errorMessage)
+            end  
+        end
+    })
+end
+
+-- Method that will add a new icon set for the device type and set it for the current device. 
+-- @urls - an array of file urls to download. Its size should match the files count required for the device type.
+-- @options - a table with some additional options (can be extended in the future)
+--    checkCertificate (default true) - when set to false, it will ignore host validation during HTTPS connection. Has no effect on the HTTP connections.
+-- @successCallback (optional) - a function that will be called after a successful upload. iconId (int) will be passed as the first argument to this function.  
+-- @errorCallback (optional) - a function that will be called on error during the download or upload process. requestError (string) will be passed as the first argument to this function.
+function QuickAppBase:uploadExternalIconSet(urls, options, successCallback, errorCallback)
+    if options == nil then
+        options = {}
+    end
+
+    local deviceType = self.type
+    local provider = QuickApp.deviceIconTypeMapping[deviceType]
+    
+    if provider == nil then
+        error("Unsupported type " .. tostring(deviceType), 2)
+    end
+
+    -- provided urls count must match files count required by the device type 
+    if #urls ~= #provider.fileNames then
+        error(provider.info .. ", provided: " .. tostring(#urls), 2)
+    end
+
+    local providerContext = {
+        fileNames = provider.fileNames,
+        files = {},
+        urls = urls,
+        index = 1,
+        deviceType = deviceType
+    }
+
+    self:externalIconsDownload(providerContext, options, 
+        function(iconId)
+            -- set uploaded icon set for current device 
+            self:updateProperty("deviceIcon", iconId)
+            if successCallback then
+                successCallback(iconId)
+            end
+        end, 
+        errorCallback)
+end 

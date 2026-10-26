@@ -129,6 +129,12 @@
   }
   .smallqa-status .health { margin-left: 0; }
 
+  /* the device icon: beside the panel name / above the condensed card */
+  .device h2 img.qa-icon {
+    width: 22px; height: 22px; vertical-align: -5px; margin-right: 8px;
+  }
+  .smallqa-icon { width: 36px; height: 36px; display: block; margin: 0 auto 8px; }
+
   /* slider: gray track with a blue fill and a round knob (a component
    --thumb color repaints the knob and its border — the color sliders) */
   input[type=range] {
@@ -342,6 +348,11 @@ function liveState(device, component) {
 // poll from GET /flua/embeddedUI (a real HC3 has no such endpoint — the HC3
 // UI client renders the embedded view itself)
 const embeddedState = {};
+
+// deviceIcon id -> {set, file}, fetched once from GET /flua/iconMap (the
+// checked-in catalog) — the icon image itself is served by
+// GET /flua/icons/<set>/<file> from the shared icon cache
+let iconMap = null;
 
 function embeddedView(device) {
   return embeddedState[String(device.id)] || null;
@@ -602,8 +613,7 @@ function renderComponent(device, component, row) {
 
 // device health: the HC3's ``dead`` flag (some QAs name it isDead) and the
 // battery level — a red/green dot and "🔋87%" beside the device id
-function deviceHealth(device) {
-  const props = device.properties || {};
+function deviceHealth(device) {  const props = device.properties || {};
   const dead = props.dead !== undefined ? props.dead : props.isDead;
   const battery = props.batteryLevel;
   if (dead === undefined && (battery === undefined || battery === null || battery === "")) {
@@ -627,11 +637,103 @@ function deviceHealth(device) {
   return health;
 }
 
+// the device's icon file for its CURRENT state, per the HC3's switching
+// families (quickapp.lua's deviceIconTypeMapping):
+// - the baseShutter family is STATE-driven (Opening/Opened/Closing/Closed/
+//   PartialOpen/Unknown), the value ladder as fallback;
+// - everything else is VALUE-driven first (binary 0/100, multilevel
+//   nearest step), named states as a secondary signal (a stale "Unknown"
+//   must not block the ladder). Falls back to the set's default file.
+function iconFileFor(device, setName, defaultFile) {
+  const files = iconMap && iconMap.sets && iconMap.sets[setName];
+  if (!files || !files.length) return null;
+  const ext = defaultFile ? defaultFile.slice(defaultFile.lastIndexOf(".")) : null;
+  const find = (pred) => {
+    if (ext) {
+      const hit = files.find((name) => name.endsWith(ext) && pred(name));
+      if (hit) return hit;
+    }
+    return files.find(pred);
+  };
+  const props = device.properties || {};
+  // a named state file: <set><State> / <set>-<state> / <set>_<state>
+  const namedMatch = () => {
+    const state = props.state;
+    if (typeof state !== "string" || !state) return null;
+    for (const suffix of [state, "-" + state.toLowerCase(), "_" + state.toLowerCase()]) {
+      const file = find((name) => name.startsWith(setName + suffix + "."));
+      if (file) return file;
+    }
+    return null;
+  };
+  // the numeric ladder: nearest available step (0/100, 0..100, ...)
+  const ladderMatch = () => {
+    const value = props.value;
+    // the viewer's sliders send strings ("55") and QAs often store them
+    // verbatim — numeric strings count as values, like booleans
+    const targetValue =
+      typeof value === "number"
+        ? value
+        : typeof value === "boolean"
+          ? value
+          : typeof value === "string" && value.trim() !== "" && !isNaN(Number(value))
+            ? Number(value)
+            : null;
+    if (targetValue === null) return null;
+    const steps = [];
+    for (const file of files) {
+      const match = file.slice(setName.length).match(/^(\d+)\./);
+      if (match) steps.push(parseInt(match[1], 10));
+    }
+    steps.sort((a, b) => a - b);
+    if (!steps.length) return null;
+    const target =
+      typeof targetValue === "boolean"
+        ? targetValue
+          ? 100
+          : 0
+        : Math.max(0, Math.min(100, targetValue));
+    let best = steps[0];
+    for (const step of steps) {
+      if (Math.abs(step - target) <= Math.abs(best - target)) best = step;
+    }
+    return find((name) => name.startsWith(setName + best + "."));
+  };
+  const stateFirst = device.type === "com.fibaro.baseShutter";
+  return stateFirst ? namedMatch() || ladderMatch() : ladderMatch() || namedMatch();
+}
+
+// an <img> for the device icon: the state file first, falling back to the
+// set's default file when the state file is not cached (a placeholder was
+// dropped, or ``flua --tool icons download`` never ran) — then removed
+// quietly when even the default is not cached
+function deviceIconImg(device, className) {
+  const props = device.properties || {};
+  const entry = iconMap && iconMap.icons && iconMap.icons[String(props.deviceIcon)];
+  if (!entry) return null;
+  const base = $("base").value.replace(/\/+$/, "") + "/flua/icons/" + entry.set + "/";
+  const stateFile = iconFileFor(device, entry.set, entry.file);
+  const img = document.createElement("img");
+  img.className = className;
+  img.alt = "";
+  img.src = base + (stateFile || entry.file);
+  img.onerror = () => {
+    if (stateFile && stateFile !== entry.file && img.src !== base + entry.file) {
+      img.src = base + entry.file;  // the set's default is always real art
+    } else {
+      img.remove();
+    }
+  };
+  return img;
+}
+
 function renderDevice(device) {
   const panel = document.createElement("div");
   panel.className = "device";
   const title = document.createElement("h2");
-  title.textContent = device.name || ("Device " + device.id);
+  const icon = deviceIconImg(device, "qa-icon");
+  if (icon) title.appendChild(icon);
+  title.appendChild(document.createTextNode(device.name || ("Device " + device.id)));
   const small = document.createElement("small");
   small.textContent = "id " + device.id;
   title.appendChild(small);
@@ -719,10 +821,14 @@ function valueKey(device) {
   const props = device.properties || {};
   return JSON.stringify([
     props.log || "",
-    // health changes (dead/battery) must refresh the panel title too
+    // health changes (dead/battery/icon/value/state) must refresh the
+    // panel title and its icon too
     props.dead,
     props.isDead,
     props.batteryLevel,
+    props.deviceIcon,
+    props.value,
+    props.state,
     allRows(device).flatMap((row) =>
       (row.components || []).map((c) => {
         const live = liveState(device, c);
@@ -794,10 +900,14 @@ function condensedValueKey(device) {
     parts.valueHtml,
     device.name,
     props.log || "",
-    // health changes (dead/battery) must refresh the status line too
+    // health changes (dead/battery/icon/value/state) must refresh the
+    // status line and the card icon too
     props.dead,
     props.isDead,
     props.batteryLevel,
+    props.deviceIcon,
+    props.value,
+    props.state,
   ]);
 }
 
@@ -805,6 +915,9 @@ function renderCondensed(device) {
   const card = document.createElement("div");
   card.className = "smallqa";
   card.title = "id " + device.id + " \u2014 click to open the full panel";
+  // the device icon above the status line, like the HC3's device card
+  const icon = deviceIconImg(device, "smallqa-icon");
+  if (icon) card.appendChild(icon);
   // top-left status line: device id, alive/dead dot, battery level
   const status = document.createElement("div");
   status.className = "smallqa-status";
@@ -875,6 +988,12 @@ async function poll() {
       Object.assign(embeddedState, embedded || {});
     } catch {
       /* no embedded channel: keep whatever the last successful poll fetched */
+    }
+    try {
+      // deviceIcon id -> set+file, fetched once (a real HC3 404s: no icons)
+      if (!iconMap) iconMap = await json(base + "/flua/iconMap");
+    } catch {
+      /* no icon channel: device icons stay hidden */
     }
     const root = $("devices");
     // ?qa=<id> — only this QA; ?exclude=id[,id...] — hide these QAs (the

@@ -1,0 +1,5884 @@
+{
+ "meta": {
+  "fetched": "2026-10-26T16:11:23.618288+00:00",
+  "firmware": "5.210.12",
+  "note": "verbatim GET /api/icons payload from the HC3 \u2014 the controller's icon library (device/room/scene icon sets), served offline by the sim"
+ },
+ "data": {
+  "device": [
+   {
+    "id": 300,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "ButtonSwitchV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 301,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "LightBulbV3",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 302,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "CeilingLightV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 303,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "FloorLightV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 304,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "LEDStripV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 305,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "RGBLightBulbColorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 306,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "RGBLightBulbRainbowV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 307,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "RGBLightBulbWhiteV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 308,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "RGBLightBulbYellowV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 309,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "SpotLightV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 310,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "TV_v3",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 311,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "SpeakerV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 312,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "AirConditioningV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 313,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "HomeApplianceV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 314,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "GameConsoleV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 315,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "GenericMultilevelSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 316,
+    "deviceType": "com.fibaro.windSensor",
+    "iconSetName": "WindMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 317,
+    "deviceType": "com.fibaro.temperatureSensor",
+    "iconSetName": "TemperatureMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 318,
+    "deviceType": "com.fibaro.seismometer",
+    "iconSetName": "SeismometerV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 319,
+    "deviceType": "com.fibaro.rainSensor",
+    "iconSetName": "RainMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 320,
+    "deviceType": "com.fibaro.lightSensor",
+    "iconSetName": "LightMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 321,
+    "deviceType": "com.fibaro.humiditySensor",
+    "iconSetName": "HumidityMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 322,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "VOCMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 323,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "PressureMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 324,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "SecuritySensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 325,
+    "deviceType": "com.fibaro.presenceSensor",
+    "iconSetName": "PresenceSensorV1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 326,
+    "deviceType": "com.fibaro.motionSensor",
+    "iconSetName": "MotionSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 327,
+    "deviceType": "com.fibaro.doorWindowSensor",
+    "iconSetName": "DoorSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 328,
+    "deviceType": "com.fibaro.windowSensor",
+    "iconSetName": "WindowSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 329,
+    "deviceType": "com.fibaro.doorSensor",
+    "iconSetName": "DoorSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 330,
+    "deviceType": "com.fibaro.FGDW002",
+    "iconSetName": "WindowSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 331,
+    "deviceType": "com.fibaro.rainDetector",
+    "iconSetName": "RainSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 332,
+    "deviceType": "com.fibaro.gasDetector",
+    "iconSetName": "GasSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 333,
+    "deviceType": "com.fibaro.smokeSensor",
+    "iconSetName": "SmokeSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 334,
+    "deviceType": "com.fibaro.coDetector",
+    "iconSetName": "COSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 336,
+    "deviceType": "com.fibaro.fireDetector",
+    "iconSetName": "FireDetectorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 337,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "BlindWithoutPositioning",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 338,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "VenetianBlind",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 339,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "Awning",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 340,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "Curtain",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 341,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "SectionalGarageDoor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 342,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "SwingGarageDoor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 343,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "TiltGarageDoor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 344,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "SwingGateDouble",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 345,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "SwingGateSingle",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 346,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "SlidingGate",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 347,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "BarrierV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 348,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "CurtainCenter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 349,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "CurtainLeft",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 350,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "CurtainRight",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 351,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "VerticalBlindCenter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 352,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "VerticalBlindLeft",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 353,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "VerticalBlindRight",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 360,
+    "deviceType": "com.fibaro.accelerometer",
+    "iconSetName": "AccelerometerV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 361,
+    "deviceType": "com.fibaro.FGBS222",
+    "iconSetName": "FibaroSmartImplant",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 362,
+    "deviceType": "com.fibaro.FGRGBW442",
+    "iconSetName": "FGRGBW442",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 363,
+    "deviceType": "com.fibaro.multipositionSwitch",
+    "iconSetName": "HeaterV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 368,
+    "deviceType": "com.fibaro.FGGC001",
+    "iconSetName": "com.fibaro.FGGC001",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 369,
+    "deviceType": "com.fibaro.remoteBinarySwitch",
+    "iconSetName": "com.fibaro.remoteBinarySwitch",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 370,
+    "deviceType": "com.fibaro.remoteBinarySwitch",
+    "iconSetName": "ButtonSwitchV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 371,
+    "deviceType": "com.fibaro.remoteBinarySwitch",
+    "iconSetName": "HeaterV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 372,
+    "deviceType": "com.fibaro.remoteBinarySwitch",
+    "iconSetName": "LightBulbV3",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 373,
+    "deviceType": "com.fibaro.FGKF601",
+    "iconSetName": "com.fibaro.FGKF601",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 374,
+    "deviceType": "com.fibaro.FGPB101",
+    "iconSetName": "com.fibaro.FGPB101",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 375,
+    "deviceType": "com.fibaro.remoteController",
+    "iconSetName": "Remote",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 376,
+    "deviceType": "com.fibaro.soundSwitch",
+    "iconSetName": "Doorbell",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 377,
+    "deviceType": "com.fibaro.heatDetector",
+    "iconSetName": "HeatDetectorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 379,
+    "deviceType": "com.fibaro.doorLock",
+    "iconSetName": "DoorLock",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 380,
+    "deviceType": "com.fibaro.ipCamera",
+    "iconSetName": "SecurityCamera",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 381,
+    "deviceType": "intercom",
+    "iconSetName": "FibaroIntercom",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 382,
+    "deviceType": "com.fibaro.niceNvr",
+    "iconSetName": "CameraPlugin",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 383,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "SceneChangeDetectorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 389,
+    "deviceType": "com.fibaro.device",
+    "iconSetName": "UnknownDevice",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 390,
+    "deviceType": "com.fibaro.floodSensor",
+    "iconSetName": "FloodSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 391,
+    "deviceType": "com.fibaro.receiver",
+    "iconSetName": "ReceiverV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 392,
+    "deviceType": "com.fibaro.player",
+    "iconSetName": "SmartSpeaker",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 393,
+    "deviceType": "com.fibaro.multimedia",
+    "iconSetName": "multimedia",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 394,
+    "deviceType": "com.fibaro.hvacSystem",
+    "iconSetName": "ThermostatSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 397,
+    "deviceType": "com.fibaro.electricMeter",
+    "iconSetName": "EnergyMeterV7",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 402,
+    "deviceType": "com.fibaro.sprinkler",
+    "iconSetName": "IrrigationSystemV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 403,
+    "deviceType": "com.fibaro.humidifier",
+    "iconSetName": "HumidifierV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 404,
+    "deviceType": "com.fibaro.remoteRollerShutter",
+    "iconSetName": "RemoteShutter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 405,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "BlindWithoutPositioning",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 406,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "VenetianBlind",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 407,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "Awning",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 408,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "Curtain",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 409,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "SectionalGarageDoor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 410,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "SwingGarageDoor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 411,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "TiltGarageDoor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 412,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "SwingGateDouble",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 413,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "SwingGateSingle",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 414,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "SlidingGate",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 415,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "BarrierV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 416,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "PergolaV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 417,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "BinarySensorGenericV1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 418,
+    "deviceType": "com.fibaro.FGWC201",
+    "iconSetName": "Monoswitch",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 419,
+    "deviceType": "com.fibaro.usbPort",
+    "iconSetName": "USB",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 420,
+    "deviceType": "com.fibaro.WISE_EC_01",
+    "iconSetName": "VentilationV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 421,
+    "deviceType": "com.fibaro.WISE_EC_01",
+    "iconSetName": "VentureFanV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 422,
+    "deviceType": "com.fibaro.remoteMultilevelSwitch",
+    "iconSetName": "com.fibaro.remoteMultilevelSwitch",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 423,
+    "deviceType": "com.fibaro.remoteColorController",
+    "iconSetName": "com.fibaro.remoteColorController",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 424,
+    "deviceType": "com.fibaro.weather",
+    "iconSetName": "WeatherProvider",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 425,
+    "deviceType": "com.fibaro.videoGate",
+    "iconSetName": "VideoGate",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 426,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "GenericMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 427,
+    "deviceType": "com.fibaro.waterMeter",
+    "iconSetName": "WaterMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 428,
+    "deviceType": "com.fibaro.coolingMeter",
+    "iconSetName": "CoolingMeterV1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 429,
+    "deviceType": "com.fibaro.heatingMeter",
+    "iconSetName": "HeatingMeterV1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 430,
+    "deviceType": "com.fibaro.gasMeter",
+    "iconSetName": "GasMeterV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 431,
+    "deviceType": "com.fibaro.temperatureSensor",
+    "iconSetName": "DeviceTemperatureV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 432,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "SeismometerV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 440,
+    "deviceType": "com.fibaro.remoteSwitch",
+    "iconSetName": "com.fibaro.remoteBinarySwitch",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 441,
+    "deviceType": "com.fibaro.remoteSwitch",
+    "iconSetName": "RemoteShutter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 442,
+    "deviceType": "com.fibaro.remoteSwitch",
+    "iconSetName": "com.fibaro.remoteMultilevelSwitch",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 443,
+    "deviceType": "com.fibaro.remoteSwitch",
+    "iconSetName": "com.fibaro.remoteColorController",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 450,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "GenericDevice",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 451,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "CeilingFan",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 452,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Alarm",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 453,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "PinPad",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 454,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "RoofWindow",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 455,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "SmartSpeaker",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 456,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "SmartSpeakerV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 457,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "HumidifierV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 458,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "ReceiverV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 459,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Radio",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 460,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Toaster",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 461,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Coffee",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 462,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "WashMachine",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 463,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Fridge",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 464,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Microwave",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 465,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "VacuumCleaner",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 466,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Printer",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 467,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Iron",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 468,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "FanDes",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 469,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "GardenRobot",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 470,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Coffeemaker",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 471,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Dishwasher",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 472,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Freezer",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 473,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Dryer",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 474,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Roomba",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 475,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Satel",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 476,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Cooker",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 477,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Blender",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 478,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Thermomix",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 479,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "CookerPot",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 480,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "AirCleaner",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 481,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "WifiRouter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 482,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Xbox",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 483,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Playstation",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 484,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "NintendoSwitch",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 485,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Laptop",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 486,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "PC",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 487,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "CameraOutdoor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 488,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "AmazonDot",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 489,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Valve",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 490,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "Sprinkler",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 491,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "GenericFan",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 492,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "SmartPlug",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 493,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "GardenLamp",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 494,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "GardenLampV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 495,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "IrrigationSystemV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 496,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "VentureFanV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 497,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "HeaterV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 498,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "VentilationV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 501,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "BinarySensorGenericV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 502,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "AcousticSensorV1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 503,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "AcousticSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 504,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "ClimaticSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 505,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "LightSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 506,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "MultilevelSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 507,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "PressureSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 508,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "TemperatureSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 509,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "WindSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 510,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "SecuritySensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 511,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "AlarmZoneSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 512,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "MotionSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 513,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "DoorSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 514,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "WindowSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 515,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "WindowRoofSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 516,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "PositionSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 517,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "RainSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 518,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "HeatDetectorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 519,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "GasSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 520,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "CO2Sensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 521,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "SmokeSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 522,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "VOCSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 523,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "COSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 524,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "LeakDetectorSensorV1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 525,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "LeakDetectorSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 526,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "LeakDetectorSensorV3",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 527,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "FireDetectorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 528,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "PresenceSensorV1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 529,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "PresenceSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 530,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "VibrationSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 531,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "LifeDangerSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 532,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "HumiditySensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 533,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "FloodSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 534,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "CarDetection",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 535,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "PersonDetection",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 536,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "ShutterSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 537,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "GateSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 540,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "GenericMultilevelSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 541,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "WindMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 542,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "TemperatureMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 543,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "RainMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 544,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "GenericMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 545,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "WaterMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 546,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "HeatingMeterV1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 547,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "HeatingMeterV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 548,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "CoolingMeterV1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 549,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "CoolingMeterV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 550,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "GasMeterV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 551,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "GasMeterAlert",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 552,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "GasMeterError",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 553,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "EnergyMeterV1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 554,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "EnergyMeterV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 555,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "EnergyMeterV3",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 556,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "EnergyMeterV4",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 557,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "EnergyMeterV5",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 558,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "EnergyMeterV6",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 559,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "EnergyMeterV7",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 560,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "LightMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 561,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "HumidityMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 562,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "EnergyMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 563,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "HeatingMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 564,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "SeismometerV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 565,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "AccelerometerV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 566,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "DeviceTemperatureV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 580,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "GenericDevice",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 581,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "LEDStripV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 582,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "LightBulbV3",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 583,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "RGBLightBulbColorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 584,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "RGBLightBulbRainbowV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 585,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "RGBLightBulbWhiteV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 586,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "RGBLightBulbYellowV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 587,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "SpotLightV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 588,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "CeilingLightV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 589,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "FloorLightV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 590,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "GardenLamp",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 591,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "GardenLampV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 592,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "CeilingFan",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 593,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "FanDes",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 594,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "GenericFan",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 595,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "HeaterV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 596,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "VentilationV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 597,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "VentureFanV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 598,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "GarageDoor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 599,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "Shutter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 600,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "RollerShutter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 605,
+    "deviceType": "com.fibaro.FGD212",
+    "iconSetName": "LEDStripV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 606,
+    "deviceType": "com.fibaro.FGD212",
+    "iconSetName": "LightBulbV3",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 607,
+    "deviceType": "com.fibaro.FGD212",
+    "iconSetName": "RGBLightBulbColorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 608,
+    "deviceType": "com.fibaro.FGD212",
+    "iconSetName": "RGBLightBulbRainbowV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 609,
+    "deviceType": "com.fibaro.FGD212",
+    "iconSetName": "RGBLightBulbWhiteV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 610,
+    "deviceType": "com.fibaro.FGD212",
+    "iconSetName": "RGBLightBulbYellowV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 611,
+    "deviceType": "com.fibaro.FGD212",
+    "iconSetName": "SpotLightV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 612,
+    "deviceType": "com.fibaro.FGD212",
+    "iconSetName": "CeilingLightV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 613,
+    "deviceType": "com.fibaro.FGD212",
+    "iconSetName": "FloorLightV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 614,
+    "deviceType": "com.fibaro.FGD212",
+    "iconSetName": "GardenLamp",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 615,
+    "deviceType": "com.fibaro.FGD212",
+    "iconSetName": "GardenLampV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 620,
+    "deviceType": "com.fibaro.FGWD111",
+    "iconSetName": "LEDStripV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 621,
+    "deviceType": "com.fibaro.FGWD111",
+    "iconSetName": "LightBulbV3",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 622,
+    "deviceType": "com.fibaro.FGWD111",
+    "iconSetName": "RGBLightBulbColorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 623,
+    "deviceType": "com.fibaro.FGWD111",
+    "iconSetName": "RGBLightBulbRainbowV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 624,
+    "deviceType": "com.fibaro.FGWD111",
+    "iconSetName": "RGBLightBulbWhiteV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 625,
+    "deviceType": "com.fibaro.FGWD111",
+    "iconSetName": "RGBLightBulbYellowV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 626,
+    "deviceType": "com.fibaro.FGWD111",
+    "iconSetName": "SpotLightV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 627,
+    "deviceType": "com.fibaro.FGWD111",
+    "iconSetName": "CeilingLightV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 628,
+    "deviceType": "com.fibaro.FGWD111",
+    "iconSetName": "FloorLightV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 629,
+    "deviceType": "com.fibaro.FGWD111",
+    "iconSetName": "GardenLamp",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 630,
+    "deviceType": "com.fibaro.FGWD111",
+    "iconSetName": "GardenLampV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 635,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "BinarySensorGenericV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 636,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "TemperatureSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 637,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "WindSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 639,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "AlarmZoneSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 640,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "MotionSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 641,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "DoorSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 642,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "WindowSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 643,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "WindowRoofSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 644,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "PositionSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 645,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "RainSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 646,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "HeatDetectorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 647,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "GasSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 648,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "SmokeSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 649,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "COSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 650,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "LeakDetectorSensorV1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 651,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "LeakDetectorSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 652,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "LeakDetectorSensorV3",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 653,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "FireDetectorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 655,
+    "deviceType": "com.fibaro.presenceSensor",
+    "iconSetName": "BinarySensorGenericV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 656,
+    "deviceType": "com.fibaro.presenceSensor",
+    "iconSetName": "MotionSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 657,
+    "deviceType": "com.fibaro.presenceSensor",
+    "iconSetName": "PresenceSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 658,
+    "deviceType": "com.fibaro.motionSensor",
+    "iconSetName": "CarDetection",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 659,
+    "deviceType": "com.fibaro.motionSensor",
+    "iconSetName": "PersonDetection",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 660,
+    "deviceType": "com.fibaro.windowSensor",
+    "iconSetName": "BinarySensorGenericV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 661,
+    "deviceType": "com.fibaro.windowSensor",
+    "iconSetName": "WindowRoofSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 662,
+    "deviceType": "com.fibaro.doorSensor",
+    "iconSetName": "BinarySensorGenericV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 663,
+    "deviceType": "com.fibaro.rollerShutterSensor",
+    "iconSetName": "BinarySensorGenericV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 664,
+    "deviceType": "com.fibaro.rollerShutterSensor",
+    "iconSetName": "ShutterSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 665,
+    "deviceType": "com.fibaro.gateSensor",
+    "iconSetName": "BinarySensorGenericV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 666,
+    "deviceType": "com.fibaro.gateSensor",
+    "iconSetName": "GateSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 667,
+    "deviceType": "com.fibaro.gateSensor",
+    "iconSetName": "DoorSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 668,
+    "deviceType": "com.fibaro.safetySensor",
+    "iconSetName": "BinarySensorGenericV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 669,
+    "deviceType": "com.fibaro.safetySensor",
+    "iconSetName": "SecuritySensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 670,
+    "deviceType": "com.fibaro.rainDetector",
+    "iconSetName": "BinarySensorGenericV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 671,
+    "deviceType": "com.fibaro.lifeDangerSensor",
+    "iconSetName": "LifeDangerSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 672,
+    "deviceType": "com.fibaro.lifeDangerSensor",
+    "iconSetName": "SecuritySensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 673,
+    "deviceType": "com.fibaro.lifeDangerSensor",
+    "iconSetName": "TemperatureSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 674,
+    "deviceType": "com.fibaro.lifeDangerSensor",
+    "iconSetName": "HeatDetectorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 675,
+    "deviceType": "com.fibaro.lifeDangerSensor",
+    "iconSetName": "GasSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 676,
+    "deviceType": "com.fibaro.lifeDangerSensor",
+    "iconSetName": "SmokeSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 677,
+    "deviceType": "com.fibaro.lifeDangerSensor",
+    "iconSetName": "COSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 678,
+    "deviceType": "com.fibaro.lifeDangerSensor",
+    "iconSetName": "LeakDetectorSensorV1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 679,
+    "deviceType": "com.fibaro.lifeDangerSensor",
+    "iconSetName": "LeakDetectorSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 680,
+    "deviceType": "com.fibaro.lifeDangerSensor",
+    "iconSetName": "LeakDetectorSensorV3",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 681,
+    "deviceType": "com.fibaro.lifeDangerSensor",
+    "iconSetName": "FireDetectorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 682,
+    "deviceType": "com.fibaro.heatDetector",
+    "iconSetName": "BinarySensorGenericV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 683,
+    "deviceType": "com.fibaro.gasDetector",
+    "iconSetName": "BinarySensorGenericV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 684,
+    "deviceType": "com.fibaro.gasDetector",
+    "iconSetName": "CO2Sensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 685,
+    "deviceType": "com.fibaro.gasDetector",
+    "iconSetName": "VOCSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 686,
+    "deviceType": "com.fibaro.smokeSensor",
+    "iconSetName": "BinarySensorGenericV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 687,
+    "deviceType": "com.fibaro.smokeSensor",
+    "iconSetName": "FireDetectorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 688,
+    "deviceType": "com.fibaro.coDetector",
+    "iconSetName": "BinarySensorGenericV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 689,
+    "deviceType": "com.fibaro.floodSensor",
+    "iconSetName": "BinarySensorGenericV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 690,
+    "deviceType": "com.fibaro.floodSensor",
+    "iconSetName": "LeakDetectorSensorV1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 691,
+    "deviceType": "com.fibaro.floodSensor",
+    "iconSetName": "LeakDetectorSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 692,
+    "deviceType": "com.fibaro.floodSensor",
+    "iconSetName": "LeakDetectorSensorV3",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 693,
+    "deviceType": "com.fibaro.fireDetector",
+    "iconSetName": "BinarySensorGenericV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 694,
+    "deviceType": "com.fibaro.fireDetector",
+    "iconSetName": "SmokeSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 700,
+    "deviceType": "com.fibaro.windSensor",
+    "iconSetName": "GenericMultilevelSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 701,
+    "deviceType": "com.fibaro.temperatureSensor",
+    "iconSetName": "GenericMultilevelSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 702,
+    "deviceType": "com.fibaro.rainSensor",
+    "iconSetName": "GenericMultilevelSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 703,
+    "deviceType": "com.fibaro.powerSensor",
+    "iconSetName": "EnergyMeterV1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 704,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "GenericMultilevelSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 705,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "WaterMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 706,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "HeatingMeterV1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 707,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "HeatingMeterV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 708,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "CoolingMeterV1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 709,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "CoolingMeterV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 710,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "GasMeterV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 711,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "GasMeterAlert",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 712,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "GasMeterError",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 713,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "EnergyMeterV1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 714,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "EnergyMeterV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 715,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "EnergyMeterV3",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 716,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "EnergyMeterV4",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 717,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "EnergyMeterV5",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 718,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "EnergyMeterV6",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 719,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "EnergyMeterV7",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 720,
+    "deviceType": "com.fibaro.waterMeter",
+    "iconSetName": "GenericMultilevelSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 721,
+    "deviceType": "com.fibaro.heatingMeter",
+    "iconSetName": "HeatingMeterV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 722,
+    "deviceType": "com.fibaro.heatingMeter",
+    "iconSetName": "GenericMultilevelSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 723,
+    "deviceType": "com.fibaro.gasMeter",
+    "iconSetName": "GenericMultilevelSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 724,
+    "deviceType": "com.fibaro.gasMeter",
+    "iconSetName": "GasMeterV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 725,
+    "deviceType": "com.fibaro.gasMeter",
+    "iconSetName": "GasMeterAlert",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 726,
+    "deviceType": "com.fibaro.gasMeter",
+    "iconSetName": "GasMeterError",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 727,
+    "deviceType": "com.fibaro.electricMeter",
+    "iconSetName": "GenericMultilevelSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 728,
+    "deviceType": "com.fibaro.electricMeter",
+    "iconSetName": "EnergyMeterV6",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 729,
+    "deviceType": "com.fibaro.powerMeter",
+    "iconSetName": "GenericMultilevelSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 730,
+    "deviceType": "com.fibaro.powerMeter",
+    "iconSetName": "EnergyMeterV1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 731,
+    "deviceType": "com.fibaro.energyMeter",
+    "iconSetName": "GenericMultilevelSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 732,
+    "deviceType": "com.fibaro.energyMeter",
+    "iconSetName": "EnergyMeterV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 733,
+    "deviceType": "com.fibaro.energyMeter",
+    "iconSetName": "EnergyMeterV3",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 734,
+    "deviceType": "com.fibaro.energyMeter",
+    "iconSetName": "EnergyMeterV4",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 735,
+    "deviceType": "com.fibaro.energyMeter",
+    "iconSetName": "EnergyMeterV5",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 736,
+    "deviceType": "com.fibaro.coolingMeter",
+    "iconSetName": "CoolingMeterV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 737,
+    "deviceType": "com.fibaro.coolingMeter",
+    "iconSetName": "GenericMultilevelSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 738,
+    "deviceType": "com.fibaro.lightSensor",
+    "iconSetName": "GenericMultilevelSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 739,
+    "deviceType": "com.fibaro.humiditySensor",
+    "iconSetName": "GenericMultilevelSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 740,
+    "deviceType": "com.fibaro.powerSensor",
+    "iconSetName": "GenericMultilevelSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 741,
+    "deviceType": "com.fibaro.powerSensor",
+    "iconSetName": "GenericMultilevelSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 742,
+    "deviceType": "com.fibaro.seismometer",
+    "iconSetName": "GenericMeter",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 743,
+    "deviceType": "com.fibaro.seismometer",
+    "iconSetName": "GenericMultilevelSensor",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 744,
+    "deviceType": "com.fibaro.seismometer",
+    "iconSetName": "GenericMultilevelSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 745,
+    "deviceType": "com.fibaro.humiditySensor",
+    "iconSetName": "GenericMultilevelSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 746,
+    "deviceType": "com.fibaro.lightSensor",
+    "iconSetName": "GenericMultilevelSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 747,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "GenericMultilevelSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 748,
+    "deviceType": "com.fibaro.rainSensor",
+    "iconSetName": "GenericMultilevelSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 749,
+    "deviceType": "com.fibaro.temperatureSensor",
+    "iconSetName": "GenericMultilevelSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 750,
+    "deviceType": "com.fibaro.windSensor",
+    "iconSetName": "GenericMultilevelSensorV2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 751,
+    "deviceType": "com.fibaro.device",
+    "iconSetName": "OtherDevice",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 1,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "light",
+    "fileExtension": "png"
+   },
+   {
+    "id": 2,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "onoff",
+    "fileExtension": "png"
+   },
+   {
+    "id": 3,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "lampka_nocna",
+    "fileExtension": "png"
+   },
+   {
+    "id": 4,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "czajnik",
+    "fileExtension": "png"
+   },
+   {
+    "id": 5,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "kinkiet",
+    "fileExtension": "png"
+   },
+   {
+    "id": 6,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "klimatyzator",
+    "fileExtension": "png"
+   },
+   {
+    "id": 7,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "alarm",
+    "fileExtension": "png"
+   },
+   {
+    "id": 8,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "kawa",
+    "fileExtension": "png"
+   },
+   {
+    "id": 9,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "lampa_ogrodowa",
+    "fileExtension": "png"
+   },
+   {
+    "id": 10,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "tv",
+    "fileExtension": "png"
+   },
+   {
+    "id": 11,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "wiatrak_sufitowy",
+    "fileExtension": "png"
+   },
+   {
+    "id": 12,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "toster",
+    "fileExtension": "png"
+   },
+   {
+    "id": 13,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "radio",
+    "fileExtension": "png"
+   },
+   {
+    "id": 14,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "okno_dachowe",
+    "fileExtension": "png"
+   },
+   {
+    "id": 15,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "light",
+    "fileExtension": "png"
+   },
+   {
+    "id": 16,
+    "deviceType": "agd",
+    "iconSetName": "agd",
+    "fileExtension": "png"
+   },
+   {
+    "id": 17,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "garaz",
+    "fileExtension": "png"
+   },
+   {
+    "id": 18,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "roleta_zew",
+    "fileExtension": "png"
+   },
+   {
+    "id": 19,
+    "deviceType": "com.fibaro.multilevelSwitch",
+    "iconSetName": "roleta_wew",
+    "fileExtension": "png"
+   },
+   {
+    "id": 20,
+    "deviceType": "com.fibaro.rollerShutter",
+    "iconSetName": "roleta",
+    "fileExtension": "png"
+   },
+   {
+    "id": 21,
+    "deviceType": "com.fibaro.motionSensor",
+    "iconSetName": "czujnik_ruchu",
+    "fileExtension": "png"
+   },
+   {
+    "id": 22,
+    "deviceType": "com.fibaro.motionSensor",
+    "iconSetName": "czujnik_zalania",
+    "fileExtension": "png"
+   },
+   {
+    "id": 23,
+    "deviceType": "com.fibaro.motionSensor",
+    "iconSetName": "drzwi",
+    "fileExtension": "png"
+   },
+   {
+    "id": 24,
+    "deviceType": "com.fibaro.motionSensor",
+    "iconSetName": "drzwiB",
+    "fileExtension": "png"
+   },
+   {
+    "id": 25,
+    "deviceType": "com.fibaro.motionSensor",
+    "iconSetName": "drzwi_frontowe",
+    "fileExtension": "png"
+   },
+   {
+    "id": 26,
+    "deviceType": "com.fibaro.rollerShutter",
+    "iconSetName": "markiza",
+    "fileExtension": "png"
+   },
+   {
+    "id": 27,
+    "deviceType": "com.fibaro.rollerShutter",
+    "iconSetName": "zaslony",
+    "fileExtension": "png"
+   },
+   {
+    "id": 28,
+    "deviceType": "com.fibaro.device",
+    "iconSetName": "nieznane",
+    "fileExtension": "png"
+   },
+   {
+    "id": 29,
+    "deviceType": "com.fibaro.device",
+    "iconSetName": "unknown",
+    "fileExtension": "png"
+   },
+   {
+    "id": 30,
+    "deviceType": "com.fibaro.temperatureSensor",
+    "iconSetName": "termometr",
+    "fileExtension": "png"
+   },
+   {
+    "id": 31,
+    "deviceType": "com.fibaro.humiditySensor",
+    "iconSetName": "wilgotnosc",
+    "fileExtension": "png"
+   },
+   {
+    "id": 32,
+    "deviceType": "com.fibaro.lightSensor",
+    "iconSetName": "swiatlo",
+    "fileExtension": "png"
+   },
+   {
+    "id": 33,
+    "deviceType": "air_humidifier",
+    "iconSetName": "air_humidifier",
+    "fileExtension": "png"
+   },
+   {
+    "id": 34,
+    "deviceType": "com.fibaro.thermostatDanfoss",
+    "iconSetName": "thermostat",
+    "fileExtension": "png"
+   },
+   {
+    "id": 35,
+    "deviceType": "combo_device",
+    "iconSetName": "czujnik_ruchu",
+    "fileExtension": "png"
+   },
+   {
+    "id": 36,
+    "deviceType": "combo_device",
+    "iconSetName": "thermostat",
+    "fileExtension": "png"
+   },
+   {
+    "id": 37,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "thermostat",
+    "fileExtension": "png"
+   },
+   {
+    "id": 38,
+    "deviceType": "air_purifer",
+    "iconSetName": "air_purifer",
+    "fileExtension": "png"
+   },
+   {
+    "id": 39,
+    "deviceType": "audio",
+    "iconSetName": "audio",
+    "fileExtension": "png"
+   },
+   {
+    "id": 40,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "zraszacz",
+    "fileExtension": "png"
+   },
+   {
+    "id": 41,
+    "deviceType": "com.fibaro.motionSensor",
+    "iconSetName": "smoke_sensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 42,
+    "deviceType": "com.fibaro.doorSensor",
+    "iconSetName": "drzwi",
+    "fileExtension": "png"
+   },
+   {
+    "id": 43,
+    "deviceType": "com.fibaro.doorSensor",
+    "iconSetName": "drzwiB",
+    "fileExtension": "png"
+   },
+   {
+    "id": 44,
+    "deviceType": "com.fibaro.doorSensor",
+    "iconSetName": "drzwi_frontowe",
+    "fileExtension": "png"
+   },
+   {
+    "id": 45,
+    "deviceType": "com.fibaro.floodSensor",
+    "iconSetName": "czujnik_zalania",
+    "fileExtension": "png"
+   },
+   {
+    "id": 46,
+    "deviceType": "com.fibaro.smokeSensor",
+    "iconSetName": "smoke_sensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 47,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "com.fibaro.multilevelSensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 48,
+    "deviceType": "brama",
+    "iconSetName": "brama",
+    "fileExtension": "png"
+   },
+   {
+    "id": 49,
+    "deviceType": "com.fibaro.rollerShutter",
+    "iconSetName": "garaz",
+    "fileExtension": "png"
+   },
+   {
+    "id": 50,
+    "deviceType": "com.fibaro.multimedia",
+    "iconSetName": "multimedia",
+    "fileExtension": "png"
+   },
+   {
+    "id": 51,
+    "deviceType": "com.fibaro.rainSensor",
+    "iconSetName": "com.fibaro.rainSensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 52,
+    "deviceType": "com.fibaro.receiver",
+    "iconSetName": "receiver",
+    "fileExtension": "png"
+   },
+   {
+    "id": 53,
+    "deviceType": "com.fibaro.windowSensor",
+    "iconSetName": "okno_dachowe",
+    "fileExtension": "png"
+   },
+   {
+    "id": 54,
+    "deviceType": "brama-2",
+    "iconSetName": "brama-2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 55,
+    "deviceType": "com.fibaro.windSensor",
+    "iconSetName": "com.fibaro.windSensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 56,
+    "deviceType": "com.fibaro.pioneerAmplifier",
+    "iconSetName": "matrix_pioneer",
+    "fileExtension": "png"
+   },
+   {
+    "id": 57,
+    "deviceType": "com.fibaro.sonosSpeaker",
+    "iconSetName": "receiver_sonos2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 58,
+    "deviceType": "com.fibaro.denonAmplifier",
+    "iconSetName": "matrix_denon",
+    "fileExtension": "png"
+   },
+   {
+    "id": 59,
+    "deviceType": "com.fibaro.FGRGBW442",
+    "iconSetName": "rgbw_combo",
+    "fileExtension": "png"
+   },
+   {
+    "id": 60,
+    "deviceType": "com.fibaro.onkyoAmplifier",
+    "iconSetName": "matrix_onkyo",
+    "fileExtension": "png"
+   },
+   {
+    "id": 61,
+    "deviceType": "com.fibaro.panasonicTv",
+    "iconSetName": "receiver_panasonic",
+    "fileExtension": "png"
+   },
+   {
+    "id": 62,
+    "deviceType": "com.fibaro.samsungTv",
+    "iconSetName": "receiver_samsung",
+    "fileExtension": "png"
+   },
+   {
+    "id": 63,
+    "deviceType": "com.fibaro.sharpTv",
+    "iconSetName": "receiver_sharp",
+    "fileExtension": "png"
+   },
+   {
+    "id": 64,
+    "deviceType": "com.fibaro.lgDvd",
+    "iconSetName": "player_lg_dvd",
+    "fileExtension": "png"
+   },
+   {
+    "id": 65,
+    "deviceType": "com.fibaro.lgBluray",
+    "iconSetName": "player_lg_bluray",
+    "fileExtension": "png"
+   },
+   {
+    "id": 66,
+    "deviceType": "com.fibaro.pioneerDvd",
+    "iconSetName": "player_pioneer_dvd",
+    "fileExtension": "png"
+   },
+   {
+    "id": 67,
+    "deviceType": "com.fibaro.pioneerBluray",
+    "iconSetName": "player_pioneer_bluray",
+    "fileExtension": "png"
+   },
+   {
+    "id": 68,
+    "deviceType": "com.fibaro.samsungDvd",
+    "iconSetName": "player_samsung_dvd",
+    "fileExtension": "png"
+   },
+   {
+    "id": 69,
+    "deviceType": "com.fibaro.FGSS001",
+    "iconSetName": "smoke_sensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 70,
+    "deviceType": "com.fibaro.operatingMode",
+    "iconSetName": "thermostat",
+    "fileExtension": "png"
+   },
+   {
+    "id": 71,
+    "deviceType": "com.fibaro.setPoint",
+    "iconSetName": "thermostat",
+    "fileExtension": "png"
+   },
+   {
+    "id": 72,
+    "deviceType": "com.fibaro.hvacSystem",
+    "iconSetName": "thermostat",
+    "fileExtension": "png"
+   },
+   {
+    "id": 73,
+    "deviceType": "com.fibaro.fanMode",
+    "iconSetName": "thermostat",
+    "fileExtension": "png"
+   },
+   {
+    "id": 74,
+    "deviceType": "com.fibaro.thermostatState",
+    "iconSetName": "thermostat",
+    "fileExtension": "png"
+   },
+   {
+    "id": 75,
+    "deviceType": "centralSceneInterface",
+    "iconSetName": "centralSceneInterface",
+    "fileExtension": "png"
+   },
+   {
+    "id": 76,
+    "deviceType": "dehumidifier",
+    "iconSetName": "dehumidifier",
+    "fileExtension": "png"
+   },
+   {
+    "id": 77,
+    "deviceType": "com.fibaro.FGFS101",
+    "iconSetName": "czujnik_zalania",
+    "fileExtension": "png"
+   },
+   {
+    "id": 78,
+    "deviceType": "com.fibaro.zwaveDevice",
+    "iconSetName": "zwave_device",
+    "fileExtension": "png"
+   },
+   {
+    "id": 79,
+    "deviceType": "com.fibaro.doorLock",
+    "iconSetName": "door_lock",
+    "fileExtension": "png"
+   },
+   {
+    "id": 80,
+    "deviceType": "com.fibaro.kwikset",
+    "iconSetName": "door_lock",
+    "fileExtension": "png"
+   },
+   {
+    "id": 81,
+    "deviceType": "com.fibaro.polyControl",
+    "iconSetName": "door_lock",
+    "fileExtension": "png"
+   },
+   {
+    "id": 82,
+    "deviceType": "com.fibaro.schlage",
+    "iconSetName": "door_lock",
+    "fileExtension": "png"
+   },
+   {
+    "id": 83,
+    "deviceType": "com.fibaro.sonyBluray",
+    "iconSetName": "player_sony_bluray",
+    "fileExtension": "png"
+   },
+   {
+    "id": 84,
+    "deviceType": "com.fibaro.sonyTv",
+    "iconSetName": "receiver_sony",
+    "fileExtension": "png"
+   },
+   {
+    "id": 85,
+    "deviceType": "com.fibaro.philipsBluray",
+    "iconSetName": "player_philips_bluray",
+    "fileExtension": "png"
+   },
+   {
+    "id": 86,
+    "deviceType": "com.fibaro.philipsTv",
+    "iconSetName": "receiver",
+    "fileExtension": "png"
+   },
+   {
+    "id": 87,
+    "deviceType": "com.fibaro.FGRM222",
+    "iconSetName": "roleta",
+    "fileExtension": "png"
+   },
+   {
+    "id": 88,
+    "deviceType": "com.fibaro.heatDetector",
+    "iconSetName": "heat_detector",
+    "fileExtension": "png"
+   },
+   {
+    "id": 89,
+    "deviceType": "com.fibaro.seismometer",
+    "iconSetName": "seismometer",
+    "fileExtension": "png"
+   },
+   {
+    "id": 90,
+    "deviceType": "com.fibaro.FGMS001",
+    "iconSetName": "czujnik_ruchu",
+    "fileExtension": "png"
+   },
+   {
+    "id": 91,
+    "deviceType": "intercom",
+    "iconSetName": "intercom",
+    "fileExtension": "png"
+   },
+   {
+    "id": 92,
+    "deviceType": "com.fibaro.ipCamera",
+    "iconSetName": "kamera",
+    "fileExtension": "png"
+   },
+   {
+    "id": 93,
+    "deviceType": "keyfob",
+    "iconSetName": "keyfob",
+    "fileExtension": "png"
+   },
+   {
+    "id": 94,
+    "deviceType": "com.fibaro.tamperDetector",
+    "iconSetName": "tamper_detector",
+    "fileExtension": "png"
+   },
+   {
+    "id": 95,
+    "deviceType": "com.fibaro.davisVantage",
+    "iconSetName": "plugin_davis",
+    "fileExtension": "png"
+   },
+   {
+    "id": 96,
+    "deviceType": "com.fibaro.philipsHue",
+    "iconSetName": "plugin_philipsHue",
+    "fileExtension": "png"
+   },
+   {
+    "id": 97,
+    "deviceType": "com.fibaro.philipsHueLight",
+    "iconSetName": "plugin_philipsHueLight",
+    "fileExtension": "png"
+   },
+   {
+    "id": 98,
+    "deviceType": "com.fibaro.ncPlus",
+    "iconSetName": "plugin_ncPlus",
+    "fileExtension": "png"
+   },
+   {
+    "id": 99,
+    "deviceType": "com.fibaro.xbmc",
+    "iconSetName": "plugin_xbmc",
+    "fileExtension": "png"
+   },
+   {
+    "id": 100,
+    "deviceType": "com.fibaro.lgTv",
+    "iconSetName": "plugin_lgTv",
+    "fileExtension": "png"
+   },
+   {
+    "id": 101,
+    "deviceType": "com.fibaro.zwaveController",
+    "iconSetName": "zwave_controller",
+    "fileExtension": "png"
+   },
+   {
+    "id": 102,
+    "deviceType": "com.fibaro.energyMeter",
+    "iconSetName": "energy_meter",
+    "fileExtension": "png"
+   },
+   {
+    "id": 103,
+    "deviceType": "com.fibaro.remoteController",
+    "iconSetName": "pilot",
+    "fileExtension": "png"
+   },
+   {
+    "id": 104,
+    "deviceType": "com.fibaro.barrier",
+    "iconSetName": "barrier",
+    "fileExtension": "png"
+   },
+   {
+    "id": 105,
+    "deviceType": "com.fibaro.coDetector",
+    "iconSetName": "com.fibaro.gasDetector",
+    "fileExtension": "png"
+   },
+   {
+    "id": 106,
+    "deviceType": "com.fibaro.accelerometer",
+    "iconSetName": "accelerometer",
+    "fileExtension": "png"
+   },
+   {
+    "id": 107,
+    "deviceType": "com.fibaro.FGGC001",
+    "iconSetName": "com.fibaro.FGGC001",
+    "fileExtension": "png"
+   },
+   {
+    "id": 108,
+    "deviceType": "com.fibaro.FGGC001",
+    "iconSetName": "com.fibaro.FGGC001_white",
+    "fileExtension": "png"
+   },
+   {
+    "id": 109,
+    "deviceType": "com.fibaro.FGPB101",
+    "iconSetName": "com.fibaro.FGPB101",
+    "fileExtension": "png"
+   },
+   {
+    "id": 110,
+    "deviceType": "com.fibaro.FGPB101",
+    "iconSetName": "com.fibaro.FGPB101_black",
+    "fileExtension": "png"
+   },
+   {
+    "id": 111,
+    "deviceType": "com.fibaro.FGPB101",
+    "iconSetName": "com.fibaro.FGPB101_blue",
+    "fileExtension": "png"
+   },
+   {
+    "id": 112,
+    "deviceType": "com.fibaro.FGPB101",
+    "iconSetName": "com.fibaro.FGPB101_brown",
+    "fileExtension": "png"
+   },
+   {
+    "id": 113,
+    "deviceType": "com.fibaro.FGPB101",
+    "iconSetName": "com.fibaro.FGPB101_green",
+    "fileExtension": "png"
+   },
+   {
+    "id": 114,
+    "deviceType": "com.fibaro.FGPB101",
+    "iconSetName": "com.fibaro.FGPB101_orange",
+    "fileExtension": "png"
+   },
+   {
+    "id": 115,
+    "deviceType": "com.fibaro.FGPB101",
+    "iconSetName": "com.fibaro.FGPB101_white",
+    "fileExtension": "png"
+   },
+   {
+    "id": 116,
+    "deviceType": "com.fibaro.FGPB101",
+    "iconSetName": "com.fibaro.FGPB101_yellow",
+    "fileExtension": "png"
+   },
+   {
+    "id": 117,
+    "deviceType": "com.fibaro.FGKF601",
+    "iconSetName": "com.fibaro.FGKF601",
+    "fileExtension": "png"
+   },
+   {
+    "id": 118,
+    "deviceType": "com.fibaro.FGCD001",
+    "iconSetName": "com.fibaro.FGCD001",
+    "fileExtension": "png"
+   },
+   {
+    "id": 119,
+    "deviceType": "com.fibaro.gerda",
+    "iconSetName": "door_lock",
+    "fileExtension": "png"
+   },
+   {
+    "id": 120,
+    "deviceType": "com.fibaro.FGDW002",
+    "iconSetName": "drzwi",
+    "fileExtension": "png"
+   },
+   {
+    "id": 121,
+    "deviceType": "com.fibaro.FGDW002",
+    "iconSetName": "drzwiB",
+    "fileExtension": "png"
+   },
+   {
+    "id": 122,
+    "deviceType": "com.fibaro.FGDW002",
+    "iconSetName": "drzwi_frontowe",
+    "fileExtension": "png"
+   },
+   {
+    "id": 123,
+    "deviceType": "com.fibaro.FGMS001v2",
+    "iconSetName": "czujnik_ruchu",
+    "fileExtension": "png"
+   },
+   {
+    "id": 124,
+    "deviceType": "com.fibaro.FGWP101",
+    "iconSetName": "onoff",
+    "fileExtension": "png"
+   },
+   {
+    "id": 125,
+    "deviceType": "com.fibaro.FGWP102",
+    "iconSetName": "onoff",
+    "fileExtension": "png"
+   },
+   {
+    "id": 126,
+    "deviceType": "com.fibaro.FGWPB121",
+    "iconSetName": "onoff",
+    "fileExtension": "png"
+   },
+   {
+    "id": 127,
+    "deviceType": "com.fibaro.FGWPI121",
+    "iconSetName": "onoff",
+    "fileExtension": "png"
+   },
+   {
+    "id": 128,
+    "deviceType": "com.fibaro.FGWPG121",
+    "iconSetName": "onoff",
+    "fileExtension": "png"
+   },
+   {
+    "id": 129,
+    "deviceType": "com.fibaro.FGT001",
+    "iconSetName": "thermostat",
+    "fileExtension": "png"
+   },
+   {
+    "id": 130,
+    "deviceType": "com.fibaro.usbPort",
+    "iconSetName": "com.fibaro.usbPort",
+    "fileExtension": "png"
+   },
+   {
+    "id": 131,
+    "deviceType": "com.fibaro.rainDetector",
+    "iconSetName": "rain_detector",
+    "fileExtension": "png"
+   },
+   {
+    "id": 132,
+    "deviceType": "kominek",
+    "iconSetName": "kominek",
+    "fileExtension": "png"
+   },
+   {
+    "id": 133,
+    "deviceType": "com.fibaro.gasDetector",
+    "iconSetName": "com.fibaro.gasDetector",
+    "fileExtension": "png"
+   },
+   {
+    "id": 134,
+    "deviceType": "com.fibaro.FGBS222",
+    "iconSetName": "FGBS222",
+    "fileExtension": "png"
+   },
+   {
+    "id": 135,
+    "deviceType": "kominek2",
+    "iconSetName": "kominek2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 136,
+    "deviceType": "lamel",
+    "iconSetName": "lamel",
+    "fileExtension": "png"
+   },
+   {
+    "id": 137,
+    "deviceType": "lamel2",
+    "iconSetName": "lamel2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 138,
+    "deviceType": "magic_scenes",
+    "iconSetName": "magic_scenes",
+    "fileExtension": "png"
+   },
+   {
+    "id": 139,
+    "deviceType": "okno",
+    "iconSetName": "okno",
+    "fileExtension": "png"
+   },
+   {
+    "id": 140,
+    "deviceType": "okno2",
+    "iconSetName": "okno2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 141,
+    "deviceType": "okno3",
+    "iconSetName": "okno3",
+    "fileExtension": "png"
+   },
+   {
+    "id": 142,
+    "deviceType": "oswietlenie",
+    "iconSetName": "oswietlenie",
+    "fileExtension": "png"
+   },
+   {
+    "id": 143,
+    "deviceType": "player_bluray",
+    "iconSetName": "player_bluray",
+    "fileExtension": "png"
+   },
+   {
+    "id": 144,
+    "deviceType": "player_dvd",
+    "iconSetName": "player_dvd",
+    "fileExtension": "png"
+   },
+   {
+    "id": 145,
+    "deviceType": "power_sensor",
+    "iconSetName": "power_sensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 146,
+    "deviceType": "pressure_sensor",
+    "iconSetName": "pressure_sensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 147,
+    "deviceType": "projektor",
+    "iconSetName": "projektor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 148,
+    "deviceType": "rgb_driver",
+    "iconSetName": "rgb_driver",
+    "fileExtension": "png"
+   },
+   {
+    "id": 149,
+    "deviceType": "roleta_zew-2",
+    "iconSetName": "roleta_zew-2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 150,
+    "deviceType": "roleta_zew-3",
+    "iconSetName": "roleta_zew-3",
+    "fileExtension": "png"
+   },
+   {
+    "id": 151,
+    "deviceType": "rooms",
+    "iconSetName": "rooms",
+    "fileExtension": "png"
+   },
+   {
+    "id": 152,
+    "deviceType": "satel",
+    "iconSetName": "satel",
+    "fileExtension": "png"
+   },
+   {
+    "id": 153,
+    "deviceType": "scena",
+    "iconSetName": "scena",
+    "fileExtension": "png"
+   },
+   {
+    "id": 154,
+    "deviceType": "sections",
+    "iconSetName": "sections",
+    "fileExtension": "png"
+   },
+   {
+    "id": 155,
+    "deviceType": "soil_sensor",
+    "iconSetName": "soil_sensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 156,
+    "deviceType": "ubs",
+    "iconSetName": "ubs",
+    "fileExtension": "png"
+   },
+   {
+    "id": 157,
+    "deviceType": "users",
+    "iconSetName": "users",
+    "fileExtension": "png"
+   },
+   {
+    "id": 158,
+    "deviceType": "weather_station",
+    "iconSetName": "weather_station",
+    "fileExtension": "png"
+   },
+   {
+    "id": 159,
+    "deviceType": "wiatrak",
+    "iconSetName": "wiatrak",
+    "fileExtension": "png"
+   },
+   {
+    "id": 160,
+    "deviceType": "com.fibaro.FGD212",
+    "iconSetName": "light",
+    "fileExtension": "png"
+   },
+   {
+    "id": 161,
+    "deviceType": "com.fibaro.FGWD111",
+    "iconSetName": "light",
+    "fileExtension": "png"
+   },
+   {
+    "id": 170,
+    "deviceType": "com.fibaro.presenceSensor",
+    "iconSetName": "presence",
+    "fileExtension": "png"
+   },
+   {
+    "id": 171,
+    "deviceType": "com.fibaro.rollerShutterSensor",
+    "iconSetName": "binarySensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 172,
+    "deviceType": "com.fibaro.rollerShutterSensor",
+    "iconSetName": "binarySensor2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 173,
+    "deviceType": "com.fibaro.remoteSwitch",
+    "iconSetName": "com.fibaro.remoteBinarySwitch",
+    "fileExtension": "png"
+   },
+   {
+    "id": 174,
+    "deviceType": "com.fibaro.remoteSwitch",
+    "iconSetName": "com.fibaro.remoteMultilevelSwitch",
+    "fileExtension": "png"
+   },
+   {
+    "id": 175,
+    "deviceType": "com.fibaro.remoteSwitch",
+    "iconSetName": "com.fibaro.remoteRollerShutter_shutter",
+    "fileExtension": "png"
+   },
+   {
+    "id": 176,
+    "deviceType": "com.fibaro.remoteSwitch",
+    "iconSetName": "com.fibaro.remoteBaseShutter_shutter",
+    "fileExtension": "png"
+   },
+   {
+    "id": 177,
+    "deviceType": "com.fibaro.remoteSwitch",
+    "iconSetName": "com.fibaro.remoteColorController",
+    "fileExtension": "png"
+   },
+   {
+    "id": 178,
+    "deviceType": "com.fibaro.remoteSwitch",
+    "iconSetName": "com.fibaro.remoteBaseShutter_garage",
+    "fileExtension": "png"
+   },
+   {
+    "id": 179,
+    "deviceType": "com.fibaro.remoteSwitch",
+    "iconSetName": "com.fibaro.remoteRollerShutter_garage",
+    "fileExtension": "png"
+   },
+   {
+    "id": 180,
+    "deviceType": "com.fibaro.electricMeter",
+    "iconSetName": "energy_meter",
+    "fileExtension": "png"
+   },
+   {
+    "id": 181,
+    "deviceType": "com.fibaro.electricMeter",
+    "iconSetName": "com.fibaro.multilevelSensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 182,
+    "deviceType": "com.fibaro.electricMeter",
+    "iconSetName": "pressure",
+    "fileExtension": "png"
+   },
+   {
+    "id": 183,
+    "deviceType": "com.fibaro.powerMeter",
+    "iconSetName": "energy_meter",
+    "fileExtension": "png"
+   },
+   {
+    "id": 184,
+    "deviceType": "com.fibaro.powerMeter",
+    "iconSetName": "com.fibaro.multilevelSensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 185,
+    "deviceType": "com.fibaro.powerMeter",
+    "iconSetName": "pressure",
+    "fileExtension": "png"
+   },
+   {
+    "id": 186,
+    "deviceType": "com.fibaro.energyMeter",
+    "iconSetName": "com.fibaro.multilevelSensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 187,
+    "deviceType": "com.fibaro.energyMeter",
+    "iconSetName": "pressure",
+    "fileExtension": "png"
+   },
+   {
+    "id": 188,
+    "deviceType": "com.fibaro.heatingMeter",
+    "iconSetName": "com.fibaro.multilevelSensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 189,
+    "deviceType": "com.fibaro.heatingMeter",
+    "iconSetName": "pressure",
+    "fileExtension": "png"
+   },
+   {
+    "id": 190,
+    "deviceType": "com.fibaro.coolingMeter",
+    "iconSetName": "com.fibaro.multilevelSensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 191,
+    "deviceType": "com.fibaro.coolingMeter",
+    "iconSetName": "pressure",
+    "fileExtension": "png"
+   },
+   {
+    "id": 195,
+    "deviceType": "com.fibaro.tubularMotor",
+    "iconSetName": "tubularNice",
+    "fileExtension": "png"
+   },
+   {
+    "id": 196,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "garageDoor_sectional",
+    "fileExtension": "png"
+   },
+   {
+    "id": 197,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "garageDoor_swing",
+    "fileExtension": "png"
+   },
+   {
+    "id": 198,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "garageDoor_tilt",
+    "fileExtension": "png"
+   },
+   {
+    "id": 199,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "gate_doubleLeaf",
+    "fileExtension": "png"
+   },
+   {
+    "id": 200,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "gate_singleLeaf",
+    "fileExtension": "png"
+   },
+   {
+    "id": 201,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "gate_sliding",
+    "fileExtension": "png"
+   },
+   {
+    "id": 202,
+    "deviceType": "com.fibaro.soundSwitch",
+    "iconSetName": "alarm_siren_gray",
+    "fileExtension": "png"
+   },
+   {
+    "id": 203,
+    "deviceType": "com.fibaro.soundSwitch",
+    "iconSetName": "alarm_siren_red",
+    "fileExtension": "png"
+   },
+   {
+    "id": 204,
+    "deviceType": "com.fibaro.soundSwitch",
+    "iconSetName": "doorbell_dark",
+    "fileExtension": "png"
+   },
+   {
+    "id": 205,
+    "deviceType": "com.fibaro.soundSwitch",
+    "iconSetName": "doorbell_default",
+    "fileExtension": "png"
+   },
+   {
+    "id": 206,
+    "deviceType": "com.fibaro.soundSwitch",
+    "iconSetName": "doorbell_light",
+    "fileExtension": "png"
+   },
+   {
+    "id": 207,
+    "deviceType": "com.fibaro.FGR",
+    "iconSetName": "lamel_horizontal",
+    "fileExtension": "png"
+   },
+   {
+    "id": 208,
+    "deviceType": "com.fibaro.FGR",
+    "iconSetName": "lamel_vertical",
+    "fileExtension": "png"
+   },
+   {
+    "id": 209,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "lamel_horizontal_base",
+    "fileExtension": "png"
+   },
+   {
+    "id": 210,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "lamel_vertical_base",
+    "fileExtension": "png"
+   },
+   {
+    "id": 211,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "roleta_base",
+    "fileExtension": "png"
+   },
+   {
+    "id": 212,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "barrier",
+    "fileExtension": "png"
+   },
+   {
+    "id": 213,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "valve",
+    "fileExtension": "png"
+   },
+   {
+    "id": 214,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "valve2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 215,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "valve3",
+    "fileExtension": "png"
+   },
+   {
+    "id": 216,
+    "deviceType": "com.fibaro.FGWC201",
+    "iconSetName": "FGWC201_light",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 217,
+    "deviceType": "com.fibaro.FGWC201",
+    "iconSetName": "FGWC201_dark",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 218,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "com.fibaro.remoteBaseShutter_garage",
+    "fileExtension": "png"
+   },
+   {
+    "id": 219,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "com.fibaro.remoteBaseShutter_shutter",
+    "fileExtension": "png"
+   },
+   {
+    "id": 220,
+    "deviceType": "com.fibaro.remoteBinarySwitch",
+    "iconSetName": "com.fibaro.remoteBinarySwitch",
+    "fileExtension": "png"
+   },
+   {
+    "id": 221,
+    "deviceType": "com.fibaro.remoteColorController",
+    "iconSetName": "com.fibaro.remoteColorController",
+    "fileExtension": "png"
+   },
+   {
+    "id": 222,
+    "deviceType": "com.fibaro.remoteMultilevelSwitch",
+    "iconSetName": "com.fibaro.remoteMultilevelSwitch",
+    "fileExtension": "png"
+   },
+   {
+    "id": 223,
+    "deviceType": "com.fibaro.remoteRollerShutter",
+    "iconSetName": "com.fibaro.remoteRollerShutter_garage",
+    "fileExtension": "png"
+   },
+   {
+    "id": 224,
+    "deviceType": "com.fibaro.remoteRollerShutter",
+    "iconSetName": "com.fibaro.remoteRollerShutter_shutter",
+    "fileExtension": "png"
+   },
+   {
+    "id": 225,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "binarySensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 226,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "binarySensor2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 227,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "barrierNew",
+    "fileExtension": "png"
+   },
+   {
+    "id": 228,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "blind",
+    "fileExtension": "png"
+   },
+   {
+    "id": 229,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "curtain",
+    "fileExtension": "png"
+   },
+   {
+    "id": 230,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "garage_2_door",
+    "fileExtension": "png"
+   },
+   {
+    "id": 231,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "garage_panel",
+    "fileExtension": "png"
+   },
+   {
+    "id": 232,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "garage_segment",
+    "fileExtension": "png"
+   },
+   {
+    "id": 233,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "gate_1_door",
+    "fileExtension": "png"
+   },
+   {
+    "id": 234,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "gate_2_door",
+    "fileExtension": "png"
+   },
+   {
+    "id": 235,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "gate_slidingNew",
+    "fileExtension": "png"
+   },
+   {
+    "id": 236,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "marquise",
+    "fileExtension": "png"
+   },
+   {
+    "id": 237,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "shutter_dark",
+    "fileExtension": "png"
+   },
+   {
+    "id": 238,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "shutter_light",
+    "fileExtension": "png"
+   },
+   {
+    "id": 239,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "shutter_neutral",
+    "fileExtension": "png"
+   },
+   {
+    "id": 240,
+    "deviceType": "com.fibaro.multiPositionSwitch",
+    "iconSetName": "heater",
+    "fileExtension": "png"
+   },
+   {
+    "id": 241,
+    "deviceType": "com.fibaro.multiPositionSwitch",
+    "iconSetName": "switch",
+    "fileExtension": "png"
+   },
+   {
+    "id": 242,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "lightbulb",
+    "fileExtension": "png"
+   },
+   {
+    "id": 243,
+    "deviceType": "com.fibaro.remoteBinarySwitch",
+    "iconSetName": "heater",
+    "fileExtension": "png"
+   },
+   {
+    "id": 244,
+    "deviceType": "com.fibaro.remoteBinarySwitch",
+    "iconSetName": "switch",
+    "fileExtension": "png"
+   },
+   {
+    "id": 245,
+    "deviceType": "com.fibaro.remoteBinarySwitch",
+    "iconSetName": "lightbulb",
+    "fileExtension": "png"
+   },
+   {
+    "id": 246,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "barrierNew",
+    "fileExtension": "png"
+   },
+   {
+    "id": 247,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "blind",
+    "fileExtension": "png"
+   },
+   {
+    "id": 248,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "curtain",
+    "fileExtension": "png"
+   },
+   {
+    "id": 249,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "garage_2_door",
+    "fileExtension": "png"
+   },
+   {
+    "id": 250,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "garage_panel",
+    "fileExtension": "png"
+   },
+   {
+    "id": 251,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "garage_segment",
+    "fileExtension": "png"
+   },
+   {
+    "id": 252,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "gate_1_door",
+    "fileExtension": "png"
+   },
+   {
+    "id": 253,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "gate_2_door",
+    "fileExtension": "png"
+   },
+   {
+    "id": 254,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "gate_slidingNew",
+    "fileExtension": "png"
+   },
+   {
+    "id": 255,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "marquise",
+    "fileExtension": "png"
+   },
+   {
+    "id": 256,
+    "deviceType": "com.fibaro.remoteMultilevelSwitch",
+    "iconSetName": "barrierNew",
+    "fileExtension": "png"
+   },
+   {
+    "id": 257,
+    "deviceType": "com.fibaro.remoteMultilevelSwitch",
+    "iconSetName": "blind",
+    "fileExtension": "png"
+   },
+   {
+    "id": 258,
+    "deviceType": "com.fibaro.remoteMultilevelSwitch",
+    "iconSetName": "curtain",
+    "fileExtension": "png"
+   },
+   {
+    "id": 259,
+    "deviceType": "com.fibaro.remoteMultilevelSwitch",
+    "iconSetName": "garage_2_door",
+    "fileExtension": "png"
+   },
+   {
+    "id": 260,
+    "deviceType": "com.fibaro.remoteMultilevelSwitch",
+    "iconSetName": "garage_panel",
+    "fileExtension": "png"
+   },
+   {
+    "id": 261,
+    "deviceType": "com.fibaro.remoteMultilevelSwitch",
+    "iconSetName": "garage_segment",
+    "fileExtension": "png"
+   },
+   {
+    "id": 262,
+    "deviceType": "com.fibaro.remoteMultilevelSwitch",
+    "iconSetName": "gate_1_door",
+    "fileExtension": "png"
+   },
+   {
+    "id": 263,
+    "deviceType": "com.fibaro.remoteMultilevelSwitch",
+    "iconSetName": "gate_2_door",
+    "fileExtension": "png"
+   },
+   {
+    "id": 264,
+    "deviceType": "com.fibaro.remoteMultilevelSwitch",
+    "iconSetName": "gate_slidingNew",
+    "fileExtension": "png"
+   },
+   {
+    "id": 265,
+    "deviceType": "com.fibaro.remoteMultilevelSwitch",
+    "iconSetName": "marquise",
+    "fileExtension": "png"
+   },
+   {
+    "id": 266,
+    "deviceType": "com.fibaro.remoteBaseShutter",
+    "iconSetName": "shutter_neutral",
+    "fileExtension": "png"
+   },
+   {
+    "id": 267,
+    "deviceType": "com.fibaro.ipCamera",
+    "iconSetName": "camera",
+    "fileExtension": "png"
+   },
+   {
+    "id": 268,
+    "deviceType": "com.fibaro.niceNvr",
+    "iconSetName": "camera_plugin",
+    "fileExtension": "png"
+   },
+   {
+    "id": 269,
+    "deviceType": "com.fibaro.motionSensor",
+    "iconSetName": "camera_car_detector",
+    "fileExtension": "png"
+   },
+   {
+    "id": 270,
+    "deviceType": "com.fibaro.motionSensor",
+    "iconSetName": "camera_person_detector",
+    "fileExtension": "png"
+   },
+   {
+    "id": 271,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "camera_change_detector",
+    "fileExtension": "png"
+   },
+   {
+    "id": 272,
+    "deviceType": "com.fibaro.baseShutter",
+    "iconSetName": "pergola",
+    "fileExtension": "png"
+   },
+   {
+    "id": 273,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "voc_sensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 274,
+    "deviceType": "com.fibaro.multilevelSensor",
+    "iconSetName": "pressure",
+    "fileExtension": "png"
+   },
+   {
+    "id": 275,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "presence",
+    "fileExtension": "png"
+   },
+   {
+    "id": 276,
+    "deviceType": "com.fibaro.binarySensor",
+    "iconSetName": "vibration",
+    "fileExtension": "png"
+   },
+   {
+    "id": 277,
+    "deviceType": "com.fibaro.temperatureSensor",
+    "iconSetName": "device_temperature",
+    "fileExtension": "png"
+   },
+   {
+    "id": 278,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "fan",
+    "fileExtension": "png"
+   },
+   {
+    "id": 279,
+    "deviceType": "com.fibaro.WISE_EC_01",
+    "iconSetName": "fan",
+    "fileExtension": "png"
+   },
+   {
+    "id": 280,
+    "deviceType": "com.fibaro.gateSensor",
+    "iconSetName": "binarySensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 281,
+    "deviceType": "com.fibaro.gateSensor",
+    "iconSetName": "binarySensor2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 282,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "binarySensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 283,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "binarySensor2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 284,
+    "deviceType": "com.fibaro.securitySensor",
+    "iconSetName": "presence",
+    "fileExtension": "png"
+   },
+   {
+    "id": 285,
+    "deviceType": "com.fibaro.safetySensor",
+    "iconSetName": "binarySensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 286,
+    "deviceType": "com.fibaro.safetySensor",
+    "iconSetName": "binarySensor2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 287,
+    "deviceType": "com.fibaro.safetySensor",
+    "iconSetName": "camera_change_detector",
+    "fileExtension": "png"
+   },
+   {
+    "id": 288,
+    "deviceType": "com.fibaro.safetySensor",
+    "iconSetName": "presence",
+    "fileExtension": "png"
+   },
+   {
+    "id": 289,
+    "deviceType": "com.fibaro.lifeDangerSensor",
+    "iconSetName": "binarySensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 290,
+    "deviceType": "com.fibaro.lifeDangerSensor",
+    "iconSetName": "binarySensor2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 291,
+    "deviceType": "com.fibaro.lifeDangerSensor",
+    "iconSetName": "vibration",
+    "fileExtension": "png"
+   },
+   {
+    "id": 292,
+    "deviceType": "com.fibaro.fireDetector",
+    "iconSetName": "binarySensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 293,
+    "deviceType": "com.fibaro.fireDetector",
+    "iconSetName": "binarySensor2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 294,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "com.fibaro.multilevelSensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 295,
+    "deviceType": "com.fibaro.meter",
+    "iconSetName": "pressure",
+    "fileExtension": "png"
+   },
+   {
+    "id": 296,
+    "deviceType": "com.fibaro.waterMeter",
+    "iconSetName": "com.fibaro.multilevelSensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 297,
+    "deviceType": "com.fibaro.waterMeter",
+    "iconSetName": "pressure",
+    "fileExtension": "png"
+   },
+   {
+    "id": 298,
+    "deviceType": "com.fibaro.gasMeter",
+    "iconSetName": "com.fibaro.multilevelSensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 299,
+    "deviceType": "com.fibaro.gasMeter",
+    "iconSetName": "pressure",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1001,
+    "deviceType": "com.fibaro.genericDevice",
+    "iconSetName": "User1001",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1006,
+    "deviceType": "com.fibaro.genericDevice",
+    "iconSetName": "User1006",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1007,
+    "deviceType": "com.fibaro.genericDevice",
+    "iconSetName": "User1007",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1009,
+    "deviceType": "com.fibaro.deviceController",
+    "iconSetName": "User1009",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1010,
+    "deviceType": "com.fibaro.deviceController",
+    "iconSetName": "User1010",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1011,
+    "deviceType": "com.fibaro.deviceController",
+    "iconSetName": "User1011",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1012,
+    "deviceType": "com.fibaro.deviceController",
+    "iconSetName": "User1012",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1013,
+    "deviceType": "com.fibaro.deviceController",
+    "iconSetName": "User1013",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1014,
+    "deviceType": "com.fibaro.deviceController",
+    "iconSetName": "User1014",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1016,
+    "deviceType": "com.fibaro.deviceController",
+    "iconSetName": "User1016",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1017,
+    "deviceType": "com.fibaro.genericDevice",
+    "iconSetName": "User1017",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1018,
+    "deviceType": "com.fibaro.genericDevice",
+    "iconSetName": "User1018",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1020,
+    "deviceType": "com.fibaro.deviceController",
+    "iconSetName": "User1020",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1021,
+    "deviceType": "com.fibaro.deviceController",
+    "iconSetName": "User1021",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1022,
+    "deviceType": "com.fibaro.deviceController",
+    "iconSetName": "User1022",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1023,
+    "deviceType": "com.fibaro.deviceController",
+    "iconSetName": "User1023",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1024,
+    "deviceType": "com.fibaro.deviceController",
+    "iconSetName": "User1024",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1052,
+    "deviceType": "com.fibaro.deviceController",
+    "iconSetName": "User1052",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1054,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1054",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1055,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1055",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1056,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1056",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1057,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1057",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1058,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1058",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1059,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1059",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1060,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1060",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1061,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1061",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1062,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1062",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1063,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1063",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1064,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1064",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1065,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1065",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1066,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1066",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1067,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1067",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1068,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1068",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1069,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1069",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1070,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1070",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1071,
+    "deviceType": "com.fibaro.deviceController",
+    "iconSetName": "User1071",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1072,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1072",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1073,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1073",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1074,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1074",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1075,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1075",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1076,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1076",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1081,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1081",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1082,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1082",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1083,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1083",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1084,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1084",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1085,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1085",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1086,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1086",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1087,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1087",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1088,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1088",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1089,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1089",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1090,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1090",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1091,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1091",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1092,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1092",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1093,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1093",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1094,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1094",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1095,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1095",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1096,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1096",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1097,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1097",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1098,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1098",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1099,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1099",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1100,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1101,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1101",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1102,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1102",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1103,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1103",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1104,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1104",
+    "fileExtension": "png"
+   },
+   {
+    "id": 1105,
+    "deviceType": "com.fibaro.binarySwitch",
+    "iconSetName": "User1105",
+    "fileExtension": "png"
+   }
+  ],
+  "room": [
+   {
+    "id": 100,
+    "iconName": "Armchair",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 101,
+    "iconName": "Attic",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 102,
+    "iconName": "Baby",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 103,
+    "iconName": "Bathroom",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 104,
+    "iconName": "Bathtub",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 105,
+    "iconName": "Bedroom",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 106,
+    "iconName": "Bird",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 107,
+    "iconName": "Cat",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 108,
+    "iconName": "Celebration",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 109,
+    "iconName": "Cellar",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 110,
+    "iconName": "Cinema",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 111,
+    "iconName": "Dining_room",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 112,
+    "iconName": "Dog",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 113,
+    "iconName": "Entrance",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 114,
+    "iconName": "Flower",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 115,
+    "iconName": "Game",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 116,
+    "iconName": "Garage",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 117,
+    "iconName": "Garden",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 118,
+    "iconName": "Ghost",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 119,
+    "iconName": "Hallway",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 120,
+    "iconName": "Kid",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 121,
+    "iconName": "Kitchen",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 122,
+    "iconName": "Laundry",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 123,
+    "iconName": "Living_room",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 124,
+    "iconName": "Movie",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 125,
+    "iconName": "Park",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 126,
+    "iconName": "Party",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 127,
+    "iconName": "Pawn",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 128,
+    "iconName": "Pitfire",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 129,
+    "iconName": "Placeholder",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 130,
+    "iconName": "Planet",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 131,
+    "iconName": "Play",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 132,
+    "iconName": "Pool",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 133,
+    "iconName": "Porch",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 134,
+    "iconName": "Relax",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 135,
+    "iconName": "Spaceship",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 136,
+    "iconName": "Spa",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 137,
+    "iconName": "Storage",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 138,
+    "iconName": "Studio",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 139,
+    "iconName": "Terrace",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 140,
+    "iconName": "Toilet",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 141,
+    "iconName": "Tools",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 142,
+    "iconName": "Vegetable",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 143,
+    "iconName": "Wardrobe",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 144,
+    "iconName": "Wash",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 145,
+    "iconName": "Work",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 1,
+    "iconName": "room_baby",
+    "fileExtension": "png"
+   },
+   {
+    "id": 2,
+    "iconName": "room_baczek",
+    "fileExtension": "png"
+   },
+   {
+    "id": 3,
+    "iconName": "room_bathroom",
+    "fileExtension": "png"
+   },
+   {
+    "id": 4,
+    "iconName": "room_bedroom",
+    "fileExtension": "png"
+   },
+   {
+    "id": 5,
+    "iconName": "room_bile",
+    "fileExtension": "png"
+   },
+   {
+    "id": 6,
+    "iconName": "room_boy",
+    "fileExtension": "png"
+   },
+   {
+    "id": 7,
+    "iconName": "room_butymeskie",
+    "fileExtension": "png"
+   },
+   {
+    "id": 8,
+    "iconName": "room_child",
+    "fileExtension": "png"
+   },
+   {
+    "id": 9,
+    "iconName": "room_cinema",
+    "fileExtension": "png"
+   },
+   {
+    "id": 10,
+    "iconName": "room_dining",
+    "fileExtension": "png"
+   },
+   {
+    "id": 11,
+    "iconName": "room_drzwiwejsciowe",
+    "fileExtension": "png"
+   },
+   {
+    "id": 12,
+    "iconName": "room_garage",
+    "fileExtension": "png"
+   },
+   {
+    "id": 13,
+    "iconName": "room_guest",
+    "fileExtension": "png"
+   },
+   {
+    "id": 15,
+    "iconName": "room_kapelusz",
+    "fileExtension": "png"
+   },
+   {
+    "id": 16,
+    "iconName": "room_kawa",
+    "fileExtension": "png"
+   },
+   {
+    "id": 17,
+    "iconName": "room_kitchen",
+    "fileExtension": "png"
+   },
+   {
+    "id": 18,
+    "iconName": "room_klocki",
+    "fileExtension": "png"
+   },
+   {
+    "id": 19,
+    "iconName": "room_kominek",
+    "fileExtension": "png"
+   },
+   {
+    "id": 20,
+    "iconName": "room_konik",
+    "fileExtension": "png"
+   },
+   {
+    "id": 21,
+    "iconName": "room_ksiazki",
+    "fileExtension": "png"
+   },
+   {
+    "id": 22,
+    "iconName": "room_laundry",
+    "fileExtension": "png"
+   },
+   {
+    "id": 23,
+    "iconName": "room_luxurychair",
+    "fileExtension": "png"
+   },
+   {
+    "id": 24,
+    "iconName": "room_office",
+    "fileExtension": "png"
+   },
+   {
+    "id": 25,
+    "iconName": "room_organizer",
+    "fileExtension": "png"
+   },
+   {
+    "id": 26,
+    "iconName": "room_pillow",
+    "fileExtension": "png"
+   },
+   {
+    "id": 27,
+    "iconName": "room_pioro",
+    "fileExtension": "png"
+   },
+   {
+    "id": 28,
+    "iconName": "room_polkabuty",
+    "fileExtension": "png"
+   },
+   {
+    "id": 29,
+    "iconName": "room_prysznic",
+    "fileExtension": "png"
+   },
+   {
+    "id": 30,
+    "iconName": "room_recznik",
+    "fileExtension": "png"
+   },
+   {
+    "id": 31,
+    "iconName": "room_schody",
+    "fileExtension": "png"
+   },
+   {
+    "id": 32,
+    "iconName": "room_schody2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 33,
+    "iconName": "room_schody3",
+    "fileExtension": "png"
+   },
+   {
+    "id": 34,
+    "iconName": "room_sofa",
+    "fileExtension": "png"
+   },
+   {
+    "id": 35,
+    "iconName": "room_sypialnia",
+    "fileExtension": "png"
+   },
+   {
+    "id": 36,
+    "iconName": "room_sypialnia2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 37,
+    "iconName": "room_szczoteczki",
+    "fileExtension": "png"
+   },
+   {
+    "id": 38,
+    "iconName": "room_toilet",
+    "fileExtension": "png"
+   },
+   {
+    "id": 39,
+    "iconName": "room_wanna",
+    "fileExtension": "png"
+   },
+   {
+    "id": 40,
+    "iconName": "room_wardrobe",
+    "fileExtension": "png"
+   },
+   {
+    "id": 41,
+    "iconName": "room_attic",
+    "fileExtension": "png"
+   },
+   {
+    "id": 42,
+    "iconName": "room_backyard",
+    "fileExtension": "png"
+   },
+   {
+    "id": 43,
+    "iconName": "room_balcony",
+    "fileExtension": "png"
+   },
+   {
+    "id": 44,
+    "iconName": "room_bar2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 45,
+    "iconName": "room_bar",
+    "fileExtension": "png"
+   },
+   {
+    "id": 46,
+    "iconName": "room_basement",
+    "fileExtension": "png"
+   },
+   {
+    "id": 47,
+    "iconName": "room_basen",
+    "fileExtension": "png"
+   },
+   {
+    "id": 48,
+    "iconName": "room_butymeskie2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 49,
+    "iconName": "room_child2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 50,
+    "iconName": "room_closet",
+    "fileExtension": "png"
+   },
+   {
+    "id": 51,
+    "iconName": "room_front_porch",
+    "fileExtension": "png"
+   },
+   {
+    "id": 52,
+    "iconName": "room_frontyard",
+    "fileExtension": "png"
+   },
+   {
+    "id": 53,
+    "iconName": "room_garden2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 54,
+    "iconName": "room_garden3",
+    "fileExtension": "png"
+   },
+   {
+    "id": 55,
+    "iconName": "room_garden",
+    "fileExtension": "png"
+   },
+   {
+    "id": 56,
+    "iconName": "room_grill",
+    "fileExtension": "png"
+   },
+   {
+    "id": 57,
+    "iconName": "room_gym2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 58,
+    "iconName": "room_gym",
+    "fileExtension": "png"
+   },
+   {
+    "id": 59,
+    "iconName": "room_hall",
+    "fileExtension": "png"
+   },
+   {
+    "id": 60,
+    "iconName": "room_kapelusz2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 61,
+    "iconName": "room_kawa2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 62,
+    "iconName": "room_luxurychair2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 63,
+    "iconName": "room_luxurychair3",
+    "fileExtension": "png"
+   },
+   {
+    "id": 64,
+    "iconName": "room_nursery",
+    "fileExtension": "png"
+   },
+   {
+    "id": 65,
+    "iconName": "room_oczko2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 66,
+    "iconName": "room_oczko",
+    "fileExtension": "png"
+   },
+   {
+    "id": 67,
+    "iconName": "room_office2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 68,
+    "iconName": "room_office3",
+    "fileExtension": "png"
+   },
+   {
+    "id": 69,
+    "iconName": "room_office4",
+    "fileExtension": "png"
+   },
+   {
+    "id": 70,
+    "iconName": "room_organizer2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 71,
+    "iconName": "room_shed",
+    "fileExtension": "png"
+   },
+   {
+    "id": 72,
+    "iconName": "room_sofa2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 73,
+    "iconName": "room_sofa3",
+    "fileExtension": "png"
+   },
+   {
+    "id": 74,
+    "iconName": "room_study",
+    "fileExtension": "png"
+   },
+   {
+    "id": 75,
+    "iconName": "room_sypialnia3",
+    "fileExtension": "png"
+   },
+   {
+    "id": 76,
+    "iconName": "room_winter_garden2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 77,
+    "iconName": "room_winter_garden",
+    "fileExtension": "png"
+   },
+   {
+    "id": 78,
+    "iconName": "room_workshop",
+    "fileExtension": "png"
+   },
+   {
+    "id": 79,
+    "iconName": "unsigned",
+    "fileExtension": "png"
+   }
+  ],
+  "scene": [
+   {
+    "id": 100,
+    "iconName": "Alarmclock",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 101,
+    "iconName": "Alarm-CO2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 102,
+    "iconName": "Alarm-fire",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 103,
+    "iconName": "Alarm-intrusion",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 104,
+    "iconName": "Alarm-run",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 105,
+    "iconName": "Alarm-SOS",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 106,
+    "iconName": "At-home",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 107,
+    "iconName": "Baby-2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 108,
+    "iconName": "Baby-3",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 109,
+    "iconName": "Baby",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 110,
+    "iconName": "Breakfast",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 111,
+    "iconName": "Car-in",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 112,
+    "iconName": "Car-out",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 113,
+    "iconName": "Cleaning",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 114,
+    "iconName": "Cloud",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 115,
+    "iconName": "Coctail",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 116,
+    "iconName": "Cold-temperature",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 117,
+    "iconName": "Cooking",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 118,
+    "iconName": "Day",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 119,
+    "iconName": "Dinner",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 120,
+    "iconName": "Door",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 121,
+    "iconName": "Game",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 122,
+    "iconName": "Garden-light",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 123,
+    "iconName": "Garden-sprinkler",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 124,
+    "iconName": "General1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 125,
+    "iconName": "General2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 126,
+    "iconName": "General3",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 127,
+    "iconName": "General4",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 128,
+    "iconName": "General5",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 129,
+    "iconName": "General6",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 130,
+    "iconName": "General7",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 131,
+    "iconName": "General8",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 132,
+    "iconName": "Geolocalisation-2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 133,
+    "iconName": "Geolocalisation",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 134,
+    "iconName": "Green-energy",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 135,
+    "iconName": "Green",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 136,
+    "iconName": "Gym-2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 137,
+    "iconName": "Gym",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 138,
+    "iconName": "Holiday",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 139,
+    "iconName": "Home1",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 140,
+    "iconName": "Home2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 141,
+    "iconName": "Home3",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 142,
+    "iconName": "Home4",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 143,
+    "iconName": "Home5",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 144,
+    "iconName": "Home6",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 145,
+    "iconName": "Home7",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 146,
+    "iconName": "Home8",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 147,
+    "iconName": "Homework-2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 148,
+    "iconName": "Homework",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 149,
+    "iconName": "Hot-temperature",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 150,
+    "iconName": "Humidity",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 151,
+    "iconName": "Lock",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 152,
+    "iconName": "Lunch",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 153,
+    "iconName": "Music-2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 154,
+    "iconName": "Music-3",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 155,
+    "iconName": "Music",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 156,
+    "iconName": "Night-2",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 157,
+    "iconName": "Night-light",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 158,
+    "iconName": "Night",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 159,
+    "iconName": "Out-of-home",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 160,
+    "iconName": "Party",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 161,
+    "iconName": "Pedestrain-gate",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 162,
+    "iconName": "Pet",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 163,
+    "iconName": "Placeholder",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 164,
+    "iconName": "Rain",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 165,
+    "iconName": "Relax",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 166,
+    "iconName": "Sleep",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 167,
+    "iconName": "Sun",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 168,
+    "iconName": "Technical-assistance",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 169,
+    "iconName": "TV",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 170,
+    "iconName": "GarageDoor-Close",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 171,
+    "iconName": "GarageDoor-Open",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 172,
+    "iconName": "Gates-Close",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 173,
+    "iconName": "Gates-Open",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 174,
+    "iconName": "Shutter-Close",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 175,
+    "iconName": "Shutter-Open",
+    "fileExtension": "svg"
+   },
+   {
+    "id": 1,
+    "iconName": "scene_dinner",
+    "fileExtension": "png"
+   },
+   {
+    "id": 2,
+    "iconName": "scene_entrance",
+    "fileExtension": "png"
+   },
+   {
+    "id": 3,
+    "iconName": "scene_exit",
+    "fileExtension": "png"
+   },
+   {
+    "id": 4,
+    "iconName": "scene_movie",
+    "fileExtension": "png"
+   },
+   {
+    "id": 5,
+    "iconName": "scene_block",
+    "fileExtension": "png"
+   },
+   {
+    "id": 6,
+    "iconName": "scene_lua",
+    "fileExtension": "png"
+   },
+   {
+    "id": 7,
+    "iconName": "scene_auto",
+    "fileExtension": "png"
+   },
+   {
+    "id": 8,
+    "iconName": "scene_dinner2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 9,
+    "iconName": "scene_entrance2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 10,
+    "iconName": "scene_exit2",
+    "fileExtension": "png"
+   },
+   {
+    "id": 11,
+    "iconName": "scene_magic",
+    "fileExtension": "png"
+   },
+   {
+    "id": 12,
+    "iconName": "scene",
+    "fileExtension": "png"
+   },
+   {
+    "id": 13,
+    "iconName": "evening",
+    "fileExtension": "png"
+   },
+   {
+    "id": 14,
+    "iconName": "morning",
+    "fileExtension": "png"
+   },
+   {
+    "id": 15,
+    "iconName": "morningoevening",
+    "fileExtension": "png"
+   },
+   {
+    "id": 16,
+    "iconName": "airpurifer0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 17,
+    "iconName": "airpurifer100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 18,
+    "iconName": "alarm0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 19,
+    "iconName": "alarm_partial",
+    "fileExtension": "png"
+   },
+   {
+    "id": 20,
+    "iconName": "alarm_red",
+    "fileExtension": "png"
+   },
+   {
+    "id": 21,
+    "iconName": "alarm_siren_gray0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 22,
+    "iconName": "alarm_siren_gray100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 23,
+    "iconName": "alarm_siren_red0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 24,
+    "iconName": "alarm_siren_red100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 25,
+    "iconName": "audio0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 26,
+    "iconName": "audio100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 27,
+    "iconName": "barrierClosing",
+    "fileExtension": "png"
+   },
+   {
+    "id": 28,
+    "iconName": "barrierOpening",
+    "fileExtension": "png"
+   },
+   {
+    "id": 29,
+    "iconName": "brama_2-50",
+    "fileExtension": "png"
+   },
+   {
+    "id": 30,
+    "iconName": "brama50",
+    "fileExtension": "png"
+   },
+   {
+    "id": 31,
+    "iconName": "com.fibaro.rainSensor0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 32,
+    "iconName": "com.fibaro.rainSensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 33,
+    "iconName": "com.fibaro.windSensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 34,
+    "iconName": "czajnik0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 35,
+    "iconName": "czajnik100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 36,
+    "iconName": "czujnik_ruchu0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 37,
+    "iconName": "czujnik_ruchu100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 38,
+    "iconName": "czujnik_zalania0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 39,
+    "iconName": "czujnik_zalania100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 40,
+    "iconName": "dehumidifier0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 41,
+    "iconName": "dehumidifier100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 42,
+    "iconName": "doorbell_dark0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 43,
+    "iconName": "doorbell_dark100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 44,
+    "iconName": "door_lock100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 45,
+    "iconName": "drzwi0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 46,
+    "iconName": "drzwi100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 47,
+    "iconName": "energy_meter",
+    "fileExtension": "png"
+   },
+   {
+    "id": 48,
+    "iconName": "garageDoor_sectionalClosing",
+    "fileExtension": "png"
+   },
+   {
+    "id": 49,
+    "iconName": "garageDoor_sectionalOpening",
+    "fileExtension": "png"
+   },
+   {
+    "id": 50,
+    "iconName": "garageDoor_swingClosing",
+    "fileExtension": "png"
+   },
+   {
+    "id": 51,
+    "iconName": "garageDoor_swingOpening",
+    "fileExtension": "png"
+   },
+   {
+    "id": 52,
+    "iconName": "garageDoor_tiltClosing",
+    "fileExtension": "png"
+   },
+   {
+    "id": 53,
+    "iconName": "garageDoor_tiltOpening",
+    "fileExtension": "png"
+   },
+   {
+    "id": 54,
+    "iconName": "gate_doubleLeafClosing",
+    "fileExtension": "png"
+   },
+   {
+    "id": 55,
+    "iconName": "gate_doubleLeafOpening",
+    "fileExtension": "png"
+   },
+   {
+    "id": 56,
+    "iconName": "gate_singleLeafClosing",
+    "fileExtension": "png"
+   },
+   {
+    "id": 57,
+    "iconName": "gate_singleLeafOpening",
+    "fileExtension": "png"
+   },
+   {
+    "id": 58,
+    "iconName": "gate_slidingClosing",
+    "fileExtension": "png"
+   },
+   {
+    "id": 59,
+    "iconName": "gate_slidingOpening",
+    "fileExtension": "png"
+   },
+   {
+    "id": 60,
+    "iconName": "humidifier0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 61,
+    "iconName": "humidifier100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 62,
+    "iconName": "klimatyzator0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 63,
+    "iconName": "klimatyzator100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 64,
+    "iconName": "kominek2_0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 65,
+    "iconName": "kominek2_100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 66,
+    "iconName": "lamel_horizontal_baseClosing",
+    "fileExtension": "png"
+   },
+   {
+    "id": 67,
+    "iconName": "lamel_horizontal_baseOpening",
+    "fileExtension": "png"
+   },
+   {
+    "id": 68,
+    "iconName": "lamel_vertical_baseClosing",
+    "fileExtension": "png"
+   },
+   {
+    "id": 69,
+    "iconName": "lamel_vertical_baseOpening",
+    "fileExtension": "png"
+   },
+   {
+    "id": 70,
+    "iconName": "lampa_ogrodowa0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 71,
+    "iconName": "lampa_ogrodowa100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 72,
+    "iconName": "light0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 73,
+    "iconName": "light100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 75,
+    "iconName": "markiza0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 76,
+    "iconName": "markiza100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 77,
+    "iconName": "onoff0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 78,
+    "iconName": "preasure_sensor",
+    "fileExtension": "png"
+   },
+   {
+    "id": 79,
+    "iconName": "roleta_baseClosing",
+    "fileExtension": "png"
+   },
+   {
+    "id": 80,
+    "iconName": "roleta_baseOpening",
+    "fileExtension": "png"
+   },
+   {
+    "id": 81,
+    "iconName": "roleta_wew0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 82,
+    "iconName": "roleta_wew100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 83,
+    "iconName": "roleta_zew0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 84,
+    "iconName": "roleta_zew100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 85,
+    "iconName": "roleta_zew_2-0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 86,
+    "iconName": "roleta_zew_2-100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 87,
+    "iconName": "smoke_sensor0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 88,
+    "iconName": "smoke_sensor100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 89,
+    "iconName": "valve0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 90,
+    "iconName": "valve100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 91,
+    "iconName": "valve2100",
+    "fileExtension": "png"
+   },
+   {
+    "id": 92,
+    "iconName": "valve_onoff0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 93,
+    "iconName": "wiatrak0",
+    "fileExtension": "png"
+   },
+   {
+    "id": 94,
+    "iconName": "wiatrak100",
+    "fileExtension": "png"
+   }
+  ]
+ }
+}

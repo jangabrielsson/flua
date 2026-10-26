@@ -13,7 +13,7 @@ stub for real only when (a) a QA calls it, (b) a tool/agent reads it, or
 | House | scenes, rooms, sections, globals, alarm partitions, profiles, customEvents (CRUD + `{name}/publish`; firing uncreated events 404s), `/home` (+ PUT) | `/iosDevices`, `/alarms/v1/devices`, `/notificationCenter`, `/energy/devices` |
 | Panels | `/panels/location` (+ PUT `{id}`) | `/panels/climate`, `/panels/{id}`, `/panels/notifications`, `/panels/family`, `/panels/sprinklers`, `/panels/humidity`, `/panels/favoriteColors` |
 | Logs & feeds | `/refreshStates`, `/debugMessages` (+ `tags`, DELETE), `/flua/systemLog` (+ DELETE) | — |
-| System | `/settings/info` (+ PUT), `/settings/location` (+ PUT), `/weather`, `/quickApp/*` (files/export), `/proxy`, `/diagnostics` | `/icons`, `/users` |
+| System | `/settings/info` (+ PUT), `/settings/location` (+ PUT), `/weather`, `/quickApp/*` (files/export), `/proxy`, `/diagnostics`, `/icons` (the checked-in controller icon catalog — `devices/icons.json`, scraped from the HC3; `?deviceType=` filters to the type's icon sets, unknown types 404) | `/users` |
 
 Notes:
 
@@ -21,7 +21,9 @@ Notes:
   shape-compatible by design (the live compat suite pins that), they just
   carry no data.
 - **`/flua/*` routes have no HC3 counterpart** — they are the flua-only
-  machine surface (`/flua/devices`, `/flua/embeddedUI`, `/flua/systemLog`).
+  machine surface (`/flua/devices`, `/flua/embeddedUI`, `/flua/systemLog`,
+  `/flua/icons/{set}/{file}` — the icon cache channel, `/flua/iconMap` —
+  the deviceIcon id→set lookup + per-set file lists for state switching).
 - **`PUT /weather` is a flua extension** — the HC3's weather is
   provider-owned and read-only; the sim lets a test QA override it.
 - The full HC3 surface is much larger than this table (359 endpoints in

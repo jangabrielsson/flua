@@ -8,6 +8,7 @@ import time
 from typing import Any
 
 from ... import messages
+from ...devices import icon_catalog, icon_default_file, icon_manifest, skeleton_for
 from ..request import ApiRequest, remote_get
 from ..state import SimState, public
 
@@ -465,7 +466,48 @@ def icons_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     remote = remote_get(req, "/icons")
     if remote is not None:
         return remote
-    return None, 200  # the HC3 response carries no body (per the reference)
+    catalog = icon_catalog()
+    if catalog is None:
+        return None, 200  # no checked-in catalog (older install): keep the stub
+    device_type = req.query.get("deviceType")
+    if device_type:
+        # ?deviceType= filters to that type's icon sets — the HC3's array
+        # variant; a type the controller does not know is a 404
+        if skeleton_for(device_type) is None:
+            return None, 404
+        items = catalog.get("device") if isinstance(catalog, dict) else catalog
+        items = items if isinstance(items, list) else []
+        return public([e for e in items if e.get("deviceType") == device_type]), 200
+    # the full library, in the HC3's shape (device/room/scene icon sets)
+    return public(catalog), 200
+
+
+def flua_icon_map(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    """GET /flua/iconMap — the viewer's icon lookup: ``deviceIcon`` id -> the
+    icon set and its default state file (served by GET /flua/icons/{set}/
+    {file}), plus each set's full file list so the viewer can switch state
+    files live (binary 0/100, multilevel steps, shutter/sensor named
+    states). Only ids the catalog knows are mapped; the viewer hides
+    unmapped ids (an icon the controller doesn't have, or a stale capture)."""
+    catalog = icon_catalog()
+    if catalog is None:
+        return {"icons": {}, "sets": {}}, 200
+    manifest_files = (icon_manifest() or {}).get("files") or {}
+    device = catalog.get("device") if isinstance(catalog, dict) else None
+    icons: dict[str, dict[str, str]] = {}
+    sets: dict[str, list[str]] = {}
+    for entry in device or []:
+        icon_id = entry.get("id")
+        set_name = entry.get("iconSetName")
+        if icon_id is None or not set_name or str(icon_id) in icons:
+            continue
+        names = manifest_files.get(str(set_name)) or []
+        default = icon_default_file(str(set_name), str(entry.get("fileExtension") or ""))
+        if default is None:
+            continue
+        icons[str(icon_id)] = {"set": str(set_name), "file": default}
+        sets.setdefault(str(set_name), sorted(names))
+    return {"icons": icons, "sets": sets}, 200
 
 
 def users_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:

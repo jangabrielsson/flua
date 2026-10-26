@@ -404,3 +404,32 @@ def test_ui_port_busy_falls_back_to_next_free_port(tmp_path) -> None:
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait(timeout=10)
+
+
+@pytest.mark.asyncio
+async def test_icon_channel_serves_the_cache(server, tmp_path, monkeypatch) -> None:
+    # GET /flua/icons/<set>/<file> serves the machine-level icon cache for
+    # the viewer's <img> tags; uncached and invalid names 404
+    _, _, base = server
+    cache = tmp_path / "icons"
+    monkeypatch.setenv("FLUA_ICON_DIR", str(cache))
+    (cache / "ButtonSwitchV2").mkdir(parents=True)
+    (cache / "ButtonSwitchV2" / "ButtonSwitchV20.svg").write_bytes(b"<svg>off</svg>")
+
+    status, headers, body = await asyncio.to_thread(
+        _http_page, f"{base}/flua/icons/ButtonSwitchV2/ButtonSwitchV20.svg"
+    )
+    assert status == 200
+    assert "image/svg+xml" in headers["Content-Type"]
+    assert "<svg>off</svg>" in body
+
+    for path in (
+        "/flua/icons/ButtonSwitchV2/missing.svg",  # not cached
+        "/flua/icons/ButtonSwitchV2/..%2F..%2Fsecret.svg",  # traversal
+        "/flua/icons/no/such/thing",  # wrong shape
+    ):
+        try:
+            await asyncio.to_thread(urllib.request.urlopen, f"{base}{path}")
+            raise AssertionError(f"{path} should 404")
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 404

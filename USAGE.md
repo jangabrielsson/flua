@@ -1162,9 +1162,32 @@ format (individual `.lua` files) and only the HC3 sees `.fqa`:
 .venv/bin/flua --tool uploadFQA myqa.fqa
 .venv/bin/flua --tool downloadFQA 123
 
+# populate the shared icon cache (~/.flua/icons) from the HC3 or a local webroot dump
+.venv/bin/flua --tool icons download              # from the HC3 (.env chain)
+.venv/bin/flua --tool icons download --dump www   # from a var/www copy — no network (partial: the dump ships a subset)
+
 # list the installed tools (a bare --tool, or --tool help)
 .venv/bin/flua --tool
 ```
+
+The HC3's standard icon library (~13,000 state files, ~65 MB) is Fibaro
+copyrighted artwork, so flua ships only the manifest (`devices/
+icon_manifest.json`, built by `scripts/extract_icon_files.py` — live-probed
+from the HC3: every set serves 14 state suffixes in both png and svg).
+`--tool icons download` fetches the images once into a machine-level cache
+(`~/.flua/icons`, `FLUA_ICON_DIR` overrides) — one cache per user, shared
+by every project, never per repo. Placeholder state files (the generic gray
+box the HC3 serves for states with no artwork, even under the requested
+extension) are dropped rather than cached — the viewer falls back to the
+set's default art for those states. The sim serves the cache to the viewer
+at `GET /flua/icons/<set>/<file>`; uncached icons 404 until the tool runs
+once. The viewer renders each QA's `deviceIcon` (both in the panel and on
+the condensed card, via the `GET /flua/iconMap` id→set lookup) and
+switches state files live: the `value` property picks the nearest ladder
+step (binary 0/100, multilevel 0..100 in tens), and a `state` string
+matches named state files (`Opening`, `alarm`, …). Unmapped or uncached
+ids fall back to the set's default file or no icon. Later, user-uploaded
+QA icons land in the same store.
 
 A download names every file `<QA-name>_<file>_<id>.lua` (the QA name is
 sanitized for the file system) — `My QA_main_123.lua` for the main,

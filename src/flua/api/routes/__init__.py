@@ -76,6 +76,7 @@ from .system import (
     debug_messages_tags,
     diagnostics_get,
     energy_devices_list,
+    flua_icon_map,
     flua_system_log,
     flua_system_log_delete,
     global_delete,
@@ -133,6 +134,7 @@ ROUTES: list[tuple[str, str, Handler]] = [
     # -- plugins ---------------------------------------------------------------
     ("GET", "/plugins", plugins_list),
     ("GET", "/flua/embeddedUI", embedded_ui_list),  # flua-specific viewer channel
+    ("GET", "/flua/iconMap", flua_icon_map),  # deviceIcon id -> icon set + default file
     ("GET", "/plugins/callUIEvent", ui_event_call),  # before /plugins/{id}: patterns overlap
     ("POST", "/plugins/callUIEvent", ui_event_call),  # proxy devices POST their UI events
     ("GET", "/plugins/getView", plugin_get_view),  # before /plugins/{id}: same overlap

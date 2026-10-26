@@ -24,10 +24,12 @@ import asyncio
 import errno
 import json
 import logging
+import urllib.parse
 from pathlib import Path
 from typing import Any
 
 from .api import Api
+from .devices import icon_file
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +123,19 @@ class ApiServer:
             if method == "GET" and path in ("/timeline", "/timeline/"):
                 # the run timeline (virtual time x QA rows; polls /flua/systemLog)
                 _respond_html(writer, _timeline_html(), extra=_CORS)
+                return
+            if method == "GET" and path.startswith("/flua/icons/"):
+                # the icon channel: raw image bytes from the shared cache
+                # (~/.flua/icons, populated by ``flua --tool icons download``) —
+                # the viewer's <img> tags fetch deviceIcon art from here
+                rest = path[len("/flua/icons/") :].split("/")
+                if len(rest) == 2:
+                    hit = icon_file(urllib.parse.unquote(rest[0]), urllib.parse.unquote(rest[1]))
+                    if hit is not None:
+                        body, content_type = hit
+                        _write(writer, 200, content_type, body, extra=_CORS)
+                        return
+                _respond(writer, 404, {"error": "icon not cached"}, extra=_CORS)
                 return
             if path.startswith("/api/"):
                 # the HC3 REST prefix — proxy devices on the HC3 post their
