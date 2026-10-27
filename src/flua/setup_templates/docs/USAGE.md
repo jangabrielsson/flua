@@ -95,7 +95,9 @@ makes flua exit; QAs with timers or open connections keep running.
                                         # an open SSE stream or keep-alive QA can't
                                         # keep the run alive past it — and when the
                                         # deadline cuts work short, exit 1)
-.venv/bin/flua --run-for -3 script.lua # exactly 3 virtual s
+.venv/bin/flua --run-for -3 script.lua # exactly 3 virtual s (step mode: run
+                                        # until idle, at most 3 wall s — the
+                                        # deadline jumps fire regardless of 3)
 .venv/bin/flua -D mode:online -D var:x=42 script.lua
                                         # inject directives as if appended to
                                         # the QA's header — test foreign code

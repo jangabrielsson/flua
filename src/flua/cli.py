@@ -101,7 +101,9 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="N",
         help="0 = run until exit(); N>0 = at least N virtual s, then exit "
         "when idle (N wall s is a hard deadline — exit 1 if it cuts the "
-        "run short with work pending); N<0 = exactly abs(N) virtual s",
+        "run short with work pending); N<0 = exactly abs(N) virtual s "
+        "(step mode: run until idle, at most abs(N) wall s — timers beyond "
+        "N still fire)",
     )
     parser.add_argument(
         "--debugger",
@@ -468,6 +470,11 @@ def _keep_running(
             return False
         return virtual < run_for or engine.has_pending_work()
     # fixed duration: exactly N virtual seconds (never longer than N wall)
+    if engine.clock.step:
+        # step mode advances only by deadline jumps: "exactly N virtual
+        # seconds" is unreachable when the timers drain — run until idle,
+        # with the wall cap as the safety leash (timers beyond N still fire)
+        return wall < -run_for and engine.has_pending_work()
     return virtual < -run_for and wall < -run_for
 
 
@@ -663,7 +670,11 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
     # cap simulated time at the run limit (fixed --run-for, --%%maxhours) so
     # instant mode stops firing exactly there instead of overshooting
     horizon: float | None = max_virtual_seconds
-    if args.run_for is not None and args.run_for < 0:
+    if args.run_for is not None and args.run_for < 0 and not step:
+        # the fixed --run-for is a virtual-time cap; step mode advances
+        # only by deadline jumps, so the cap would block the very timers
+        # the user wants to step through — there the negative form means
+        # "run until idle, at most N wall seconds" (the wall leash below)
         horizon = -args.run_for if horizon is None else min(horizon, -args.run_for)
     if horizon is not None:
         engine.limit_run(horizon)

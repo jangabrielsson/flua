@@ -1372,3 +1372,29 @@ def test_step_conflicts_with_instant_and_speed(tmp_path) -> None:
         )
         assert result.returncode == 2, result.stdout + result.stderr
         assert "mutually exclusive" in result.stderr or "cannot be combined" in result.stderr
+
+
+def test_step_negative_run_for_fires_far_timers_and_exits_when_idle(tmp_path) -> None:
+    # --step + --run-for -N: the negative form is a fixed-duration cap that
+    # must not block the deadline jumps step mode exists for — the far
+    # timer fires, and the run ends when idle instead of sitting out the
+    # wall cap (the ER7 report: 30 s wall with no fire / 11 h hang)
+    script = tmp_path / "step.lua"
+    script.write_text(
+        "--%%name:Step\n"
+        "setTimeout(function() print('future fired') end, 9 * 3600 * 1000)\n"
+        "print('booted')\n"
+    )
+    started = time.monotonic()
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--step", "--run-for", "-30", str(script)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    wall = time.monotonic() - started
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "future fired" in result.stdout  # the 9h deadline jumped and fired
+    assert "booted" in result.stdout
+    assert wall < 10, f"run should end when idle, took {wall:.1f}s wall"
