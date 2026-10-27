@@ -1469,3 +1469,46 @@ def test_background_only_qa_exits_immediately(tmp_path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     assert "booted" in result.stdout
     assert "never fired" not in result.stdout
+
+
+def test_step_rearming_engine_deterministically_rides_the_wall_cap(tmp_path) -> None:
+    # the ER report: a daily rule that re-arms itself forever used to exit 0
+    # at a RANDOM point (the idle check sampled the re-arm gap — 73–342
+    # next-day re-fires). The settle streak makes the decision
+    # deterministic: a re-arming engine rides the wall cap and exits 1
+    script = tmp_path / "daily.lua"
+    script.write_text(
+        "--%%name:Daily\n"
+        "local function daily()\n"
+        "    local t = os.date('*t', os.time())\n"
+        "    local next = os.time({year=t.year, month=t.month, day=t.day,"
+        " hour=8, min=0, sec=0}) + 86400\n"
+        "    setTimeout(daily, (next - os.time()) * 1000)\n"
+        "end\n"
+        "local t0 = os.date('*t', os.time())\n"
+        "local first = os.time({year=t0.year, month=t0.month, day=t0.day,"
+        " hour=8, min=0, sec=0})\n"
+        "if first <= os.time() then first = first + 86400 end\n"
+        "setTimeout(daily, (first - os.time()) * 1000)\n"
+    )
+    codes = set()
+    for _ in range(4):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "flua",
+                "--step",
+                "--run-for",
+                "-1",
+                "--start",
+                "2027/01/01 07:59:58",
+                str(script),
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        codes.add(result.returncode)
+    assert codes == {1}, f"expected deterministic exit 1, got {codes}"

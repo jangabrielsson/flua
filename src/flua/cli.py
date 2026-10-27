@@ -472,9 +472,10 @@ def _keep_running(
     # fixed duration: exactly N virtual seconds (never longer than N wall)
     if engine.clock.step:
         # step mode advances only by deadline jumps: "exactly N virtual
-        # seconds" is unreachable when the timers drain — run until idle,
-        # with the wall cap as the safety leash (timers beyond N still fire)
-        return wall < -run_for and engine.has_pending_work()
+        # seconds" is unreachable when the timers drain — the wall cap is
+        # the hard stop, and the CLI loop decides the idle exit (with a
+        # settle streak, so an in-flight timer re-arm wins over the exit)
+        return wall < -run_for
     return virtual < -run_for and wall < -run_for
 
 
@@ -678,10 +679,30 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         horizon = -args.run_for if horizon is None else min(horizon, -args.run_for)
     if horizon is not None:
         engine.limit_run(horizon)
+    # the step-mode fixed-run idle exit requires a short streak of CONTINUOUS
+    # idle: a rule that re-registers its next timer asynchronously (ER's
+    # daily machinery hops through its event queue) briefly shows no pending
+    # work between hops — sampling that gap made the exit code a coin flip
+    # (73–342 next-day re-fires before exit 0). Three idle polls (~150 ms)
+    # make the decision deterministic: a truly re-arming engine re-establishes
+    # work within the window and rides the wall cap (exit 1); a drained run
+    # exits 0 after the streak.
+    settle_idle = (
+        args.run_for is not None and args.run_for < 0 and engine.clock.step
+    )
     try:
-        while _keep_running(
-            engine, args.run_for, start, max_virtual_seconds, ui_server is not None
-        ):
+        idle_streak = 0
+        while True:
+            if not _keep_running(
+                engine, args.run_for, start, max_virtual_seconds, ui_server is not None
+            ):
+                break
+            if settle_idle and not engine.has_pending_work():
+                idle_streak += 1
+                if idle_streak >= 3:
+                    break
+            else:
+                idle_streak = 0
             await asyncio.sleep(0.05)
         # --run-for's wall deadline cut the run short with work still
         # pending: a hung/incomplete suite must not look green — exit 1
