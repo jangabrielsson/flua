@@ -93,7 +93,8 @@ makes flua exit; QAs with timers or open connections keep running.
 .venv/bin/flua --run-for 5 script.lua  # at least 5 virtual s, then exit when idle —
                                         # but never past 5 WALL s (a hard deadline:
                                         # an open SSE stream or keep-alive QA can't
-                                        # keep the run alive past it)
+                                        # keep the run alive past it — and when the
+                                        # deadline cuts work short, exit 1)
 .venv/bin/flua --run-for -3 script.lua # exactly 3 virtual s
 .venv/bin/flua -D mode:online -D var:x=42 script.lua
                                         # inject directives as if appended to
@@ -115,7 +116,20 @@ an interval firing once per simulated second fires exactly five times):
 ```bash
 .venv/bin/flua --speed 60 script.lua    # 60x faster
 .venv/bin/flua --instant script.lua     # timers fire now, os.time() jumps ahead
+.venv/bin/flua --step script.lua        # deadline-ordered fast-forward (plua speedTime):
+                                        # the clock jumps to each timer's deadline before
+                                        # its callback runs, one at a time — fast AND
+                                        # os.time()-coherent (event engines, @@ rules)
 ```
+
+`--instant` collapses the whole timer heap into one pass — safe only for
+QAs that never compute delays from `os.time()`/`os.date()` (pure
+`setTimeout` chains). Event engines with `@@`-rules/daily timers and any
+`os.time()`-relative scheduling need a clock that *flows*: `--speed` for
+realtime pacing, or `--step` for the deterministic fast mode. Note that
+`--speed` runs the clock continuously — virtual time also passes *while
+your code executes* (a slow boot becomes virtual time at high speeds), so
+time-sensitive tests should assert ranges or pin deadlines with `--step`.
 
 `fibaro.sleep(ms)` suspends the *calling QA* for `ms` of virtual time — other
 QAs keep running, and the sleep follows `--speed`/`--instant` like a timer.
@@ -260,9 +274,10 @@ Parsing stops at the end-of-header marker:
 | `--%%manufacturer:...` | sets `manufacturer` |
 | `--%%file:lib.lua,lib` | extra QA file, loads before main (see below) |
 | `--%%speed:60` | virtual time speed (global) |
+| `--%%step:true` | step mode (global): deadline-ordered fast-forward, os.time()-coherent |
 | `--%%instant:true` | instant mode (global) |
 | `--%%maxhours:48` | stop after 48 virtual hours (global); timers beyond the horizon never fire and never keep the run alive — the run drains exactly at the limit |
-| `--%%time:speed=2,instant=true,hours=48,start=2027/10/6 12:00:20` | combined runtime settings (global) |
+| `--%%time:speed=2,step=true,instant=true,hours=48,start=2027/10/6 12:00:20` | combined runtime settings (global) |
 | `--%%time:2027/10/6 12:00:20` | bare form: set the virtual start time |
 | `--%%u:{label="lbl",text="Status"}` | one UI row (see below); repeatable, order kept |
 | `--%%useUiView:true` | render the new `uiView` format instead of the legacy `viewLayout` (default false) |
@@ -727,10 +742,12 @@ redeclared name wins). Includes nest — each path relative to the file
 carrying the include line — and a `--%%file` declared inside an include
 resolves relative to that include's own directory (a file directive always
 means relative to the file that declared it). Cycles are skipped; a
-missing include is a loud error. This replaces the old `.directives`
-working-directory defaults (the file was ambiguous when QAs lived in
-different subdirectories — each QA now declares its own defaults
-explicitly).
+missing include is a loud error. Note that Lua's own file I/O
+(`io.open`/`dofile`) stays cwd-relative — QAs that read project files by
+relative path must be run from the project root (flua never chdirs). This
+replaces the old `.directives` working-directory defaults (the file was
+ambiguous when QAs lived in different subdirectories — each QA now
+declares its own defaults explicitly).
 
 ### The `.flua-directives` override file
 

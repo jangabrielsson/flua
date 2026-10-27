@@ -85,12 +85,39 @@ class TimerManager:
         return len(ids)
 
     def fire_due(self) -> int:
-        """Fire every timer whose deadline has passed. Returns the count.
+        """Fire due timers; returns the count.
 
         In instant mode virtual time stands still between timers, so the
         manager advances it to each deadline as the timer fires — the
         "waiting period" is added to virtual time.
+
+        In step mode (the deterministic plua speedTime semantics) only the
+        EARLIEST timer fires per call, and the clock advances to its
+        deadline first: one deadline at a time, ``os.time()`` equals the
+        fired deadline inside the callback, so ``os.time()``-relative
+        re-scheduling (event engines like EventRunner) stays coherent.
         """
+        if self._clock.step:
+            while self._heap:
+                deadline, timer_id = self._heap[0]
+                if self._deadlines.get(timer_id) != deadline:
+                    heapq.heappop(self._heap)  # stale entry (cancelled/rescheduled)
+                    continue
+                if self._horizon is not None and deadline > self._horizon:
+                    return 0  # beyond the run horizon (fixed --run-for / maxhours)
+                heapq.heappop(self._heap)
+                del self._deadlines[timer_id]
+                if self._clock.time < deadline:
+                    self._clock.time = deadline
+                try:
+                    self._on_fire(timer_id)
+                except Exception:
+                    logger.exception("on_fire failed for timer %d", timer_id)
+                # the qa attribution stays around until after the callback, so
+                # fire-time hooks (the --trace timer events) can read it
+                self._timer_qa.pop(timer_id, None)
+                return 1
+            return 0
         fired = 0
         while self._heap:
             deadline, timer_id = self._heap[0]

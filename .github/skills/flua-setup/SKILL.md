@@ -121,9 +121,10 @@ every unpacked file).
 | `--ui [PORT]` | serve the sim API for `viewer/index.html` (stays up until Ctrl-C) |
 | `--watch` | restart QAs when their files change |
 | `--check` | static checks only (syntax, unknown `--%%` directives, deprecated APIs) |
-| `--run-for N` | 0 = until exit(); N>0 = at least N virtual s, then exit when idle; N<0 = exactly abs(N) s |
+| `--run-for N` | 0 = until exit(); N>0 = at least N virtual s, then exit when idle (N wall s is a hard deadline — exit 1 if it cuts the run short with work pending); N<0 = exactly abs(N) s |
 | `--speed N` | virtual time speed (N=60 runs 60x faster) |
-| `--instant` | timers fire immediately, time jumps ahead |
+| `--instant` | timers fire immediately, time jumps ahead — unsafe for `os.time()`-relative delay logic and `@@`-rules; use `--step` or `--speed` for those |
+| `--step` | deterministic deadline-ordered fast-forward (plua speedTime): one timer at a time, `os.time()` equals each fired deadline — the fast mode for event engines |
 | `--start WHEN` | virtual start time, e.g. `2027/10/6 12:00:20` |
 | `--debugger [PORT]` | attach the mobdebug remote debugger (default 8172) |
 | `--color always\|auto\|never` | ANSI colors on QA log lines |
@@ -197,9 +198,16 @@ path relative to the main file (like `--%%file`):
 
 The QA's own directives win per key (the mode family as a whole — a QA can
 opt out of an included `--%%mode:offline`); `--%%file` lists append;
-includes nest and a missing include is an error. This replaced the old
-`.directives` working-directory file (ambiguous with QAs in different
-subdirectories — each QA now declares its defaults explicitly).
+includes nest and a missing include is an error. A `--%%file` declared
+inside an include resolves relative to that include's own directory (a
+file directive always means relative to the file that declared it). This
+replaced the old `.directives` working-directory file (ambiguous with QAs
+in different subdirectories — each QA now declares its defaults
+explicitly).
+
+**plua migration**: plua's `--%%headers:X` maps directly to flua's
+`--%%include:X` (rename the directive); plua resolved `--%%file` paths
+cwd-relative, flua anchors them to the declaring file instead.
 
 ## Working with agents
 

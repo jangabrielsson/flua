@@ -9,6 +9,7 @@ class FakeClock:
     def __init__(self) -> None:
         self.time = 1000.0
         self.instant = False
+        self.step = False
 
 
 def make_manager(clock: FakeClock, fired: list[int]) -> TimerManager:
@@ -75,6 +76,41 @@ def test_instant_mode_jumps_virtual_time() -> None:
     assert tm.fire_due() == 2
     assert fired == [1, 2]
     assert clock.time == 1020.0  # the waiting periods were added to V
+
+
+def test_step_mode_fires_one_deadline_at_a_time() -> None:
+    # the plua speedTime semantics: each fire_due pops only the EARLIEST
+    # timer, advancing the clock to its deadline first — so callbacks see
+    # os.time() == their own deadline, and timers scheduled during the
+    # callback (the ER-style re-scheduling loop) land on the correct
+    # absolute times
+    clock, fired = FakeClock(), []
+    clock.step = True
+    tm = make_manager(clock, fired)
+    tm.set_timeout(1, 1000)
+    tm.set_timeout(2, 2000)
+    assert tm.fire_due() == 1
+    assert clock.time == 1001.0
+    assert fired == [1]
+    # the callback would re-schedule here, against clock.time == 1001
+    tm.set_timeout(3, 3000)  # deadline 1004
+    assert tm.fire_due() == 1
+    assert clock.time == 1002.0
+    assert fired == [1, 2]
+    assert tm.fire_due() == 1
+    assert clock.time == 1004.0
+    assert fired == [1, 2, 3]
+    assert tm.fire_due() == 0
+
+
+def test_step_mode_respects_the_horizon() -> None:
+    clock, fired = FakeClock(), []
+    clock.step = True
+    tm = make_manager(clock, fired)
+    tm.set_horizon(1005.0)
+    tm.set_timeout(1, 9000)  # beyond the horizon: never fires
+    assert tm.fire_due() == 0
+    assert clock.time == 1000.0
 
 
 def test_qa_timer_attribution() -> None:

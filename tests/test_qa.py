@@ -1281,3 +1281,94 @@ def test_flua_table_is_per_qa(tmp_path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     assert "A 5000 qa-a" in result.stdout
     assert "B 5001 qa-b" in result.stdout
+
+
+def test_run_for_expiry_exits_nonzero(tmp_path) -> None:
+    # a QA that never drains: --run-for's wall deadline cuts the run short
+    # — that is a failure, not a green pass (the CI false-pass guard)
+    hang = tmp_path / "hang.lua"
+    hang.write_text(
+        "--%%name:Hang\n"
+        "function QuickApp:onInit() print('started, never exits') end\n"
+        "setTimeout(function() print('later') end, 60000)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--run-for", "1", str(hang)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "expired with work pending" in result.stderr
+    assert "started, never exits" in result.stdout  # the QA did run
+
+
+def test_run_for_drained_qa_exits_zero(tmp_path) -> None:
+    # the other side of the coin: a QA that finishes before the deadline
+    # must still exit 0 (expiry only counts when work was cut short)
+    quick = tmp_path / "quick.lua"
+    quick.write_text("--%%name:Quick\nfunction QuickApp:onInit() print('done') end\n")
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--run-for", "5", str(quick)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "done" in result.stdout
+
+
+def test_step_mode_is_deadline_ordered_and_clock_coherent(tmp_path) -> None:
+    # --step (plua speedTime semantics): timers fire one deadline at a time
+    # and os.time() equals each fired deadline inside the callback — the
+    # ER-style re-scheduling loop (delay computed from os.time()) lands on
+    # exact absolute times, which --instant corrupts
+    script = tmp_path / "step.lua"
+    script.write_text(
+        "--%%name:Step\n"
+        "setTimeout(function() print('A', os.date('%H:%M:%S')) end, 3000)\n"
+        "setTimeout(function() exit(0) end, 8000)\n"
+        "local function loop()\n"
+        "    print('tick', os.date('%H:%M:%S'))\n"
+        "    setTimeout(loop, 5000)\n"
+        "end\n"
+        "setTimeout(loop, 2000)\n"
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "flua",
+            "--step",
+            "--nogreet",
+            "--start",
+            "2027/01/01 12:00:00",
+            str(script),
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "tick 12:00:02" in result.stdout
+    assert "A 12:00:03" in result.stdout
+    assert "tick 12:00:07" in result.stdout  # 02 + 5s — the clock stayed coherent
+    assert "tick 12:00:12" not in result.stdout  # exit at :08 cut the run
+
+
+def test_step_conflicts_with_instant_and_speed(tmp_path) -> None:
+    script = tmp_path / "qa.lua"
+    script.write_text("--%%name:QA\nfunction QuickApp:onInit() print('hi') end\n")
+    for extra in (["--instant"], ["--speed", "60"]):
+        result = subprocess.run(
+            [sys.executable, "-m", "flua", "--step", *extra, str(script)],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert result.returncode == 2, result.stdout + result.stderr
+        assert "mutually exclusive" in result.stderr or "cannot be combined" in result.stderr

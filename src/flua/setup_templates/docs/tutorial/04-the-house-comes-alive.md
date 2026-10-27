@@ -122,7 +122,10 @@ The two flags:
   an instant lamp would check minutes until the end of time (instantly).
 
 There's also `--speed 60` for "60 times faster than real life" — same idea,
-but you watch it run.
+but you watch it run — and `--step` for a fast run that is also
+`os.time()`-coherent: timers fire one deadline at a time, with the clock
+set to each deadline before its callback runs (the mode for event engines
+that compute their next delay from `os.time()`).
 
 > ✅ **You should see** `Lamp on` stamped `18:13:00` — the sunset from the
 > `sunsetHour` calculation, to the minute.
@@ -146,10 +149,11 @@ same as the terminal command:
 ```
 
 The directives mirror the flags: `--%%time:…` is `--start`,
-`--%%speed:60` is `--speed`, `--%%instant:true` is `--instant`, and
-`--%%maxhours:1` is `--max-hours`. A terminal flag beats a directive, so
-the same file can pin the time in its header *and* be overridden from the
-command line when you want a different date.
+`--%%speed:60` is `--speed`, `--%%instant:true` is `--instant`,
+`--%%step:true` is `--step`, and `--%%maxhours:1` is `--max-hours`. A
+terminal flag beats a directive, so the same file can pin the time in its
+header *and* be overridden from the command line when you want a different
+date.
 
 ## What did we just learn?
 
@@ -157,7 +161,8 @@ command line when you want a different date.
 - **The HC3 is a device too** — device 1 — and it answers questions like
   "when is sunset?" through `fibaro.getValue(1, …)`.
 - **flua's virtual clock** lets you test *any* time instantly: `--start`
-  sets it, `--instant`/`--speed` fast-forward it, `--max-hours` bounds it.
+  sets it, `--instant`/`--step`/`--speed` fast-forward it, `--max-hours`
+  bounds it.
 
 Next: the lamp grows a control panel of its own — a switch that turns the
 automatic mode on and off, right next to the On/Off buttons.

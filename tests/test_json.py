@@ -29,10 +29,13 @@ assert(getmetatable(withMt).__isArray == true)
 assert(getmetatable(withMt).__count == 7)
 assert(json.encode(withMt) == '[]')
 -- marking applies to nested values too
-assert(json.encode({ arr = json.util.InitArray({}) }) == '{"arr": []}')
--- unmarked dense tables keep the 1..n heuristic
-assert(json.encode({ "a", "b" }) == '["a", "b"]')
-assert(json.encode({ x = 1 }) == '{"x": 1}')
+assert(json.encode({ arr = json.util.InitArray({}) }) == '{"arr":[]}')
+-- unmarked dense tables keep the 1..n heuristic; the encoder is COMPACT
+-- like the HC3's (no spaces after commas/colons — string-exact
+-- assertions written for plua/the real HC3 compare byte-for-byte)
+assert(json.encode({ "a", "b" }) == '["a","b"]')
+assert(json.encode({ x = 1 }) == '{"x":1}')
+assert(json.encode({ 2, 4, 6 }) == '[2,4,6]')
 -- the marker wins over the heuristic in ambiguous cases
 local mixed = json.util.InitArray({ [2] = "b" })
 assert(json.encode(mixed) == '["b"]')

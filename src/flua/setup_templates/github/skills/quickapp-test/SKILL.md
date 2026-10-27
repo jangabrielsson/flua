@@ -154,8 +154,15 @@ Timer logic must be reproducible — never sleep in a test QA:
 flua --api local --start '2027/10/6 12:00:00' qa.lua   # fixed start time
 flua --api local --speed 60 qa.lua                     # 60x virtual speed
 flua --api local --instant qa.lua                      # timers fire immediately
+flua --api local --step qa.lua                         # deadline-ordered fast-forward (os.time()-coherent)
 flua --api local --max-hours 24 qa.lua                 # bound the run
 ```
+
+`--instant` collapses the whole timer heap into one pass — safe only for
+QAs that never compute delays from `os.time()`/`os.date()` (pure
+`setTimeout` chains). Event engines with `@@`-rules and any
+`os.time()`-relative re-scheduling need `--step` (fast, deadline by
+deadline, `os.time()` equals each fired deadline) or `--speed` (flowing).
 
 ## Mock the outside world (`net.*Server`)
 

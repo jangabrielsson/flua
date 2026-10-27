@@ -558,7 +558,18 @@ def _apply_mode(config: dict[str, Any]) -> dict[str, Any]:
 # sets one of these, it is copied up to the global config — the last file
 # that sets it wins. Everything else stays local to the QA's config copy.
 GLOBAL_PARAMS = frozenset(
-    {"speed", "instant", "maxhours", "time", "debug", "loglength", "warn", "trace", "syslog"}
+    {
+        "speed",
+        "step",
+        "instant",
+        "maxhours",
+        "time",
+        "debug",
+        "loglength",
+        "warn",
+        "trace",
+        "syslog",
+    }
 )
 
 # Downloaded-file metadata directives (--tool downloadQA writes them, --tool

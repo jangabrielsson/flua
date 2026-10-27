@@ -579,10 +579,10 @@ async def test_scenes_merge_online(
     await engine.start()
     try:
         engine.start_qa(str(script), None, {"scene": True, "name": "myscene"}, str(script))
-        out = await _wait_for_output(capsys, 'SCENES 2 ["hc3-scene", "myscene"]')
+        out = await _wait_for_output(capsys, 'SCENES 2 ["hc3-scene","myscene"]')
     finally:
         await engine.stop()
-    assert 'SCENES 2 ["hc3-scene", "myscene"]' in out
+    assert 'SCENES 2 ["hc3-scene","myscene"]' in out
 
 
 @pytest.mark.asyncio
@@ -611,7 +611,7 @@ async def test_plugins_merge_online(
         out = await _wait_for_output(capsys, 'PLUGINS 2')
     finally:
         await engine.stop()
-    assert 'PLUGINS 2 ["hc3-plugin", "plugins"]' in out
+    assert 'PLUGINS 2 ["hc3-plugin","plugins"]' in out
 
 
 @pytest.mark.asyncio

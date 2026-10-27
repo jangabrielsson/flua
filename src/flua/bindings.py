@@ -272,7 +272,10 @@ def install_bindings(engine: "LuaEngine") -> None:
     # an empty marked table crosses as [] instead of {} — the one case the
     # 1..n key heuristic cannot decide.
     def to_json(value: object) -> str:
-        return json.dumps(_json_to_python(value, lua))
+        # compact separators like the HC3's encoder: json.encode({2,4,6})
+        # is "[2,4,6]", not Python's default "[2, 4, 6]" — string-exact
+        # assertions written for the HC3/plua compare byte-for-byte
+        return json.dumps(_json_to_python(value, lua), separators=(",", ":"))
 
     def parse_json(text: str | bytes) -> object:
         if isinstance(text, bytes):

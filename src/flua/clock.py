@@ -9,6 +9,12 @@ consistent with timer execution in every mode:
                        all; the timer manager jumps virtual time to each
                        timer's deadline when it fires, so scripts that wait
                        for hours/days of simulated time complete instantly
+- ``step = True``      deterministic deadline-ordered fast-forward (plua
+                       speedTime): the clock only moves to the next timer's
+                       deadline right before that timer's callback runs, one
+                       timer at a time — ``os.time()``-relative delay math
+                       (event engines like EventRunner) stays coherent while
+                       the run still completes at CPU speed
 
 Debugger pauses: the debugger blocks the main thread while waiting for IDE
 commands. mobdebug's yield callback calls :meth:`note_pause`, which makes the
@@ -22,10 +28,11 @@ from datetime import datetime
 
 
 class VirtualClock:
-    def __init__(self, speed: float = 1.0) -> None:
+    def __init__(self, speed: float = 1.0, step: bool = False) -> None:
         self.time = time.time()  # virtual seconds, epoch-aligned like os.time()
         self._start = self.time
         self.speed = math.inf if math.isinf(speed) else speed
+        self.step = step
         self._last = time.monotonic()
         self._frozen_since: float | None = None
 
@@ -47,7 +54,7 @@ class VirtualClock:
         else:
             elapsed = now_monotonic - self._last
         self._last = now_monotonic
-        if not self.instant:
+        if not self.instant and not self.step:
             self.time += elapsed * self.speed
 
     def note_pause(self) -> None:

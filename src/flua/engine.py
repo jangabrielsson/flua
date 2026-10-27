@@ -148,6 +148,7 @@ class LuaEngine:
         self,
         start: float | None = None,
         speed: float = 1.0,
+        step: bool = False,
         config: dict[str, Any] | None = None,
         color: str = "auto",
         api_mode: str = "local",
@@ -214,8 +215,9 @@ class LuaEngine:
             seed = {**(seed or {}), **replay_seed}
             self._replay_queue: list[dict[str, Any]] = list(events)
         # Virtual time: 1 = realtime, N = accelerated, inf = instant (timers
-        # fire immediately and virtual time jumps to their deadlines).
-        self.clock = VirtualClock(speed)
+        # fire immediately and virtual time jumps to their deadlines), or
+        # step mode — deadline-ordered fast-forward, one timer at a time
+        self.clock = VirtualClock(speed, step=step)
         if start is not None:
             self.clock.set_start(start)
         # --%% annotations parsed from the script (exposed to Lua as _FLUA.config)
@@ -1767,6 +1769,14 @@ class LuaEngine:
     async def _pump(self) -> None:
         while self._running:
             self.clock.tick(time.monotonic())
+            if self.clock.step:
+                # step mode: process the previous callback's messages (its
+                # timer re-scheduling) BEFORE the next deadline jump — a
+                # setTimeout posted by the fired callback must be scheduled
+                # while the clock still reads the deadline that just fired,
+                # or the next fire_due would jump the clock first and the
+                # new deadline would be computed against the WRONG time
+                await self._drain_inbound()
             self._timers.fire_due()
             await self._drain_inbound()
             if self._replay_delivered and self._replay_pending:

@@ -117,9 +117,11 @@ or `--ui` to stay alive.
 
 ## Virtual time surprises
 
-`--speed`/`--instant` accelerate the VIRTUAL clock (`os.time()`, timers).
-`--run-for` counts virtual seconds. Real-world waits (HTTP, debugger) still
-take wall time.
+`--speed`/`--instant`/`--step` accelerate the VIRTUAL clock (`os.time()`,
+timers). `--run-for` counts virtual seconds. Real-world waits (HTTP,
+debugger) still take wall time. `--instant` collapses the timer heap into
+one pass — unsafe for `os.time()`-relative delay logic; `--step` is the
+fast mode that stays `os.time()`-coherent.
 
 ## The debugger freezes time
 

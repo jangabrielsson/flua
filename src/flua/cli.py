@@ -100,7 +100,8 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="N",
         help="0 = run until exit(); N>0 = at least N virtual s, then exit "
-        "when idle; N<0 = exactly abs(N) virtual s",
+        "when idle (N wall s is a hard deadline — exit 1 if it cuts the "
+        "run short with work pending); N<0 = exactly abs(N) virtual s",
     )
     parser.add_argument(
         "--debugger",
@@ -128,6 +129,14 @@ def _build_parser() -> argparse.ArgumentParser:
         "--instant",
         action="store_true",
         help="instant mode: timers fire immediately, os.time() jumps by each delay",
+    )
+    parser.add_argument(
+        "--step",
+        action="store_true",
+        help="deterministic deadline-ordered fast-forward (plua speedTime): "
+        "the clock advances to each timer's deadline before its callback "
+        "runs, one timer at a time — os.time()-relative delay math (event "
+        "engines) stays coherent, and the run completes at CPU speed",
     )
     parser.add_argument(
         "--start",
@@ -364,12 +373,12 @@ def _resolve_runtime(
     parser: argparse.ArgumentParser,
     args: argparse.Namespace,
     global_config: dict[str, Any],
-) -> tuple[float, float | None, float | None]:
+) -> tuple[float, bool, float | None, float | None]:
     """Resolve virtual-time settings; CLI flags win over global config.
 
-    Global config keys: speed, instant, maxhours, or the combined
-    --%%time:speed=N,instant=true,hours=H.
-    Returns (speed, max_virtual_hours, start_epoch_seconds).
+    Global config keys: speed, step, instant, maxhours, or the combined
+    --%%time:speed=N,instant=true,step=true,hours=H.
+    Returns (speed, step, max_virtual_hours, start_epoch_seconds).
     """
     time_raw = global_config.get("time")
     time_cfg = time_raw if isinstance(time_raw, dict) else {}
@@ -383,6 +392,14 @@ def _resolve_runtime(
     instant = args.instant
     if not instant:
         instant = bool(time_cfg.get("instant", global_config.get("instant", False)))
+
+    step = args.step
+    if not step:
+        step = bool(time_cfg.get("step", global_config.get("step", False)))
+    if step and instant:
+        parser.error("--step and --instant are mutually exclusive time modes")
+    if step and (args.speed is not None or "speed" in time_cfg):
+        parser.error("--step cannot be combined with --speed (the clock jumps by deadlines)")
     if instant:
         speed = float("inf")
 
@@ -406,7 +423,7 @@ def _resolve_runtime(
         except ValueError as exc:
             parser.error(str(exc))
 
-    return speed, max_hours, start_epoch
+    return speed, step, max_hours, start_epoch
 
 
 def _start_debugger(engine: LuaEngine, port: int) -> None:
@@ -462,7 +479,7 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
 
     global_config, qa_specs = _load_qas(parser, args)
 
-    speed, max_hours, start_epoch = _resolve_runtime(parser, args, global_config)
+    speed, step, max_hours, start_epoch = _resolve_runtime(parser, args, global_config)
     seed: dict[str, Any] | None = None
     if args.seed:
         try:
@@ -524,6 +541,7 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         engine = LuaEngine(
             start=start_epoch,
             speed=speed,
+            step=step,
             config=global_config,
             color=args.color,
             api_mode=api_mode,
@@ -654,11 +672,26 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             engine, args.run_for, start, max_virtual_seconds, ui_server is not None
         ):
             await asyncio.sleep(0.05)
+        # --run-for's wall deadline cut the run short with work still
+        # pending: a hung/incomplete suite must not look green — exit 1
+        # with a named reason (checked before stop(): the timers/queues
+        # that count as pending work still exist)
+        expired = (
+            args.run_for is not None
+            and args.run_for > 0
+            and time.monotonic() - start >= args.run_for
+            and engine.has_pending_work()
+        )
     finally:
         with contextlib.suppress(asyncio.CancelledError):
             await engine.stop()
         if ui_server is not None:
             await ui_server.stop()
+    if expired:
+        message = f"--run-for {args.run_for}s expired with work pending"
+        engine.post_log("warning", "flua: " + message)
+        print(f"flua: {message} (exit 1)", file=sys.stderr)
+        return 1
     if max_virtual_seconds is not None and engine.clock.elapsed() >= max_virtual_seconds:
         print(f"flua: virtual time limit reached ({max_hours}h)", file=sys.stderr)
     for qa_id, name, code in engine.failed_qas():
