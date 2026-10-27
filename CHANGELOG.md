@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.97] - 2026-10-27
+
+### Added
+- ensure deterministic exit for step-rearming engine with idle checks
+
 ## [0.1.96] - 2026-10-27
 
 ### Added
