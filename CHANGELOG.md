@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.91] - 2026-10-27
+
+### Added
+- update include file path resolution to anchor against the include's directory
+- enhance tool command help text to include icons download information
+
 ## [0.1.90] - 2026-10-26
 
 ### Added
