@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.94] - 2026-10-27
+
+### Added
+- update --run-for handling to include wall cap logic and adjust related tests
+
 ## [0.1.93] - 2026-10-27
 
 ### Added
