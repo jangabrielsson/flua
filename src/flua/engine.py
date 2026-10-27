@@ -1801,6 +1801,11 @@ class LuaEngine:
                 batch.append(self._outbound.get_nowait())
             self._deliver_to_lua(batch)
             self._replay_delivered = True
+            if self.clock.step:
+                # an endless timer chain keeps the outbound queue busy
+                # forever: yield to the event loop so the CLI's wall-cap
+                # check runs (and Ctrl-C stays interruptible)
+                await asyncio.sleep(0)
 
     async def _drain_inbound(self) -> None:
         while self._inbound:

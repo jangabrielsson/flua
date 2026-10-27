@@ -687,19 +687,27 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         # pending: a hung/incomplete suite must not look green — exit 1
         # with a named reason (checked before stop(): the timers/queues
         # that count as pending work still exist)
-        expired = (
-            args.run_for is not None
-            and args.run_for > 0
-            and time.monotonic() - start >= args.run_for
-            and engine.has_pending_work()
-        )
+        # --run-for's wall deadline cut the run short with work still
+        # pending: a hung/incomplete suite must not look green — exit 1
+        # with a named reason (checked before stop(): the timers/queues
+        # that count as pending work still exist). The negative form's
+        # wall cap is the same leash in step mode (the run ends at the
+        # cap only when the timer chain never drained).
+        wall = time.monotonic() - start
+        if args.run_for is not None and args.run_for > 0:
+            wall_capped = wall >= args.run_for
+        elif args.run_for is not None and args.run_for < 0 and engine.clock.step:
+            wall_capped = wall >= -args.run_for
+        else:
+            wall_capped = False
+        expired = wall_capped and engine.has_pending_work()
     finally:
         with contextlib.suppress(asyncio.CancelledError):
             await engine.stop()
         if ui_server is not None:
             await ui_server.stop()
     if expired:
-        message = f"--run-for {args.run_for}s expired with work pending"
+        message = f"--run-for {args.run_for}s wall cap reached with work pending"
         engine.post_log("warning", "flua: " + message)
         print(f"flua: {message} (exit 1)", file=sys.stderr)
         return 1

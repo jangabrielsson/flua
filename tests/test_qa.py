@@ -1300,7 +1300,7 @@ def test_run_for_expiry_exits_nonzero(tmp_path) -> None:
         timeout=60,
     )
     assert result.returncode == 1, result.stdout + result.stderr
-    assert "expired with work pending" in result.stderr
+    assert "wall cap reached with work pending" in result.stderr
     assert "started, never exits" in result.stdout  # the QA did run
 
 
@@ -1398,3 +1398,26 @@ def test_step_negative_run_for_fires_far_timers_and_exits_when_idle(tmp_path) ->
     assert "future fired" in result.stdout  # the 9h deadline jumped and fired
     assert "booted" in result.stdout
     assert wall < 10, f"run should end when idle, took {wall:.1f}s wall"
+
+
+def test_step_negative_run_for_wall_cap_is_a_failure(tmp_path) -> None:
+    # --step --run-for -N: an endless timer chain steps for at most N WALL
+    # seconds — and when the cap cuts it short with work pending, that is
+    # exit 1 (the CI false-pass guard), not a silent green
+    script = tmp_path / "loop.lua"
+    script.write_text(
+        "--%%name:Loop\n"
+        "local function loop()\n"
+        "    setTimeout(loop, 1000)\n"
+        "end\n"
+        "setTimeout(loop, 1)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--step", "--run-for", "-1", str(script)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "wall cap reached with work pending" in result.stderr
