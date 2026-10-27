@@ -24,7 +24,11 @@ COND = {
     operator = "any",
     conditions = {
         { type = "date", property = "cron", operator = "match",
-          value = {"*", "*", "*", "*", "*", "*"}, isTrigger = true },
+          -- year-pinned so the boot-time date trigger never arms: an
+          -- all-wildcards cron matches every minute, and a boot landing
+          -- near a minute boundary fired the scene inside the test's
+          -- assertion window (the CI flake)
+          value = {"*", "*", "*", "*", "*", "2050"}, isTrigger = true },
     }
 }
 -- ===== SCENE ACTIONS =====
@@ -253,3 +257,46 @@ def test_example_scenes_self_tests() -> None:
     ):
         assert f"PASS: {line}" in result.stdout
     assert "failures: 0" in result.stdout
+
+
+@pytest.mark.asyncio
+async def test_date_trigger_evaluates_at_scheduled_fire_time(tmp_path, capsys) -> None:
+    # a date timer that fires LATE must still test its cron against the
+    # SCHEDULED fire instant: the pump can overshoot a deadline (high
+    # --speed does it every tick), and evaluating against the late clock
+    # would silently miss the scene's slot. The clock jump here simulates
+    # exactly that overshoot, deterministically.
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        # the next minute boundary, pinned as the cron's minute AND hour
+        # (so the hour rollover cannot shift the match)
+        now = int(engine.clock.time)
+        boundary = now - now % 60 + 60
+        t = time.localtime(boundary)
+        minute, hour = str(t.tm_min), str(t.tm_hour)
+        script = tmp_path / "scene.lua"
+        script.write_text(
+            "--%%name:TestScene\n"
+            "--%%scene:true\n"
+            "COND = {\n"
+            "    operator = 'any',\n"
+            "    conditions = {\n"
+            "        { type = 'date', property = 'cron', operator = 'match',\n"
+            f"          value = {{{minute!r}, {hour!r}, '*', '*', '*', '*'}},"
+            " isTrigger = true },\n"
+            "    }\n"
+            "}\n"
+            "-- ===== SCENE ACTIONS =====\n"
+            'print("SCENE_RAN", _sceneId, sourceTrigger and sourceTrigger.type)\n'
+        )
+        qa_id = engine.start_qa(
+            str(script), None, {"scene": True, "name": "TestScene"}, str(script)
+        )
+        await asyncio.sleep(0.3)  # the scene boots and arms its date timer
+        assert "SCENE_RAN" not in capsys.readouterr().out
+        # fire the timer 61 s late: the clock reads minute+1 at evaluation
+        engine.clock.time = float(boundary + 61)
+        await wait_for_output(capsys, f"SCENE_RAN {qa_id} date")
+    finally:
+        await engine.stop()

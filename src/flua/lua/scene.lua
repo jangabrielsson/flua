@@ -103,8 +103,8 @@ end
 
 -- the HC3 cron tuple: {minute, hour, day-of-month, month, day-of-week,
 -- year}; day-of-week is 1=Monday .. 7=Sunday (Lua's wday is 1=Sunday)
-local function nowTuple()
-  local t = os.date("*t")
+local function nowTuple(at)
+  local t = os.date("*t", at or os.time())
   local dow = (t.wday - 1) % 7 + 1
   return {
     tostring(t.min), tostring(t.hour), tostring(t.day),
@@ -351,7 +351,16 @@ local function armDateTrigger(leaf)
   setTimeout(function()
     _PY.post{
       type = "sceneTrigger",
-      event = { type = "date", property = leaf.property, value = leaf.value },
+      event = {
+        type = "date",
+        property = leaf.property,
+        value = leaf.value,
+        -- the cond must be evaluated at the SCHEDULED fire instant, not at
+        -- the possibly-late clock: the pump can fire the timer several
+        -- virtual minutes past its deadline at high --speed, and a cron
+        -- tested against that late time would miss its slot
+        time = nextFire,
+      },
     }
     armDateTrigger(leaf) -- re-arm for the next fire
   end, delay)
@@ -371,13 +380,15 @@ local function makeRunner(cond)
   end
 
   local function evaluate(event)
-    local now = nowTuple()
+    -- date triggers carry their scheduled fire time: the cond is tested
+    -- at the instant the trigger meant, not at the clock read now
+    local now = nowTuple(event and event.time)
     local holds = evalTree(cond, event, now)
     if holds then
       if maxDuration > 0 and not pending then
         pending = setTimeout(function()
           pending = nil
-          if evalTree(cond, event, nowTuple()) then
+          if evalTree(cond, event, now) then
             lastTrue = false
             runScene(event)
           end
