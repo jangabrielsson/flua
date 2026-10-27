@@ -117,7 +117,9 @@ def test_property_directives_merge_with_scalar_values() -> None:
 def test_include_expands_as_defaults(tmp_path) -> None:
     # --%%include inserts the file's directives as defaults: the QA's own
     # win per key, the mode family overrides as a whole, and --%%file lists
-    # append (defaults first, redeclared names win)
+    # append (defaults first, redeclared names win). The include's file
+    # paths anchor to the INCLUDE's directory (absolute); the QA's own
+    # stay relative to the main file.
     (tmp_path / "defaults.lua").write_text(
         "--%%name:Default\n--%%mode:offline\n--%%file:extra.lua,extra\n--%%file:util.lua,util\n"
     )
@@ -128,8 +130,25 @@ def test_include_expands_as_defaults(tmp_path) -> None:
     assert merged["name"] == "Mine"  # the QA's own directive wins
     assert merged["mode"] == "offline"  # the included mode was kept
     # files append; the QA's redeclaration of util wins at its position
-    assert merged["file"] == ["extra.lua,extra", "util.lua,util", "lib.lua,lib"]
+    # (and, being the QA's own, stays main-relative)
+    assert merged["file"] == [
+        f"{tmp_path / 'extra.lua'},extra",
+        "util.lua,util",
+        "lib.lua,lib",
+    ]
     assert "include" not in merged  # consumed during expansion
+
+
+def test_include_file_paths_anchor_to_the_include(tmp_path) -> None:
+    # the reported layout: the main QA lives in test/ and includes
+    # ../myincludes.txt at the root — the include's --%%file must resolve
+    # against the INCLUDE's directory (the root), not the main QA's
+    (tmp_path / "test").mkdir()
+    (tmp_path / "myincludes.txt").write_text("--%%file:lib.lua,lib\n")
+    merged = expand_includes(
+        parse_annotations("--%%include:../myincludes.txt\n"), tmp_path / "test"
+    )
+    assert merged["file"] == [f"{tmp_path / 'lib.lua'},lib"]
 
 
 def test_include_resolves_nested_and_guards_cycles(tmp_path) -> None:

@@ -90,17 +90,19 @@ def expand_includes(annotations: dict[str, Any], base_dir: str | Path) -> dict[s
 
     Include paths resolve relative to the file carrying the include line
     (the QA's own includes: relative to the main file's directory); nested
-    includes are allowed and resolve the same way. A later include
-    overrides an earlier one, and the QA's own directives override all of
-    them — the ``--%%file`` lists append (defaults first). Include cycles
-    are resolved by skipping the already-included file. A missing or
-    unreadable include is an error (it is explicit, unlike the old
-    .directives lookup).
+    includes are allowed and resolve the same way. ``--%%file`` paths
+    declared inside an include resolve against the INCLUDE file's own
+    directory — a file directive always means relative to the file that
+    declared it. A later include overrides an earlier one, and the QA's own
+    directives override all of them — the ``--%%file`` lists append
+    (defaults first). Include cycles are resolved by skipping the
+    already-included file. A missing or unreadable include is an error (it
+    is explicit, unlike the old .directives lookup).
     """
     merged: dict[str, Any] = {}
     seen: set[str] = set()
 
-    def absorb(anns: dict[str, Any], directory: Path) -> None:
+    def absorb(anns: dict[str, Any], directory: Path, from_include: bool = False) -> None:
         includes = anns.pop(INCLUDE_DIRECTIVE, None)
         if includes:
             entries = [includes] if isinstance(includes, str) else list(includes)
@@ -118,11 +120,30 @@ def expand_includes(annotations: dict[str, Any], base_dir: str | Path) -> dict[s
                     raise ValueError(
                         f"--%%include:{entry}: cannot read {include_path}: {exc}"
                     ) from exc
-                absorb(parse_annotations(source), include_path.parent)
+                absorb(parse_annotations(source), include_path.parent, from_include=True)
+        if from_include:
+            files = anns.get("file")
+            if files:
+                entries = files if isinstance(files, list) else [files]
+                anns["file"] = [_anchor_file(spec, directory) for spec in entries]
         _merge_defaults(merged, anns)
 
     absorb(dict(annotations), Path(base_dir))
     return _apply_mode(merged)
+
+
+def _anchor_file(spec: Any, directory: Path) -> str:
+    """Rewrite a ``--%%file`` spec declared inside an include so its path
+    resolves against the include file's own directory:
+    "lib.lua,lib" -> "/abs/dir/lib.lua,lib". Bundled (``$``) and absolute
+    paths pass through unchanged."""
+    text = str(spec)
+    path, sep, name = text.partition(",")
+    path = path.strip()
+    if not path or path.startswith("$") or Path(path).is_absolute():
+        return text
+    anchored = str((directory / path).resolve())
+    return f"{anchored},{name}" if sep else anchored
 
 
 def parse_scalar(text: str) -> Any:

@@ -724,10 +724,13 @@ The included file's directives are defaults: the QA's own win per key, the
 `mode` family overrides as a whole (a QA can opt out of an included
 `--%%mode:offline`), and `--%%file` lists append (defaults first, a
 redeclared name wins). Includes nest — each path relative to the file
-carrying the include line — and cycles are skipped; a missing include is a
-loud error. This replaces the old `.directives` working-directory defaults
-(the file was ambiguous when QAs lived in different subdirectories — each
-QA now declares its own defaults explicitly).
+carrying the include line — and a `--%%file` declared inside an include
+resolves relative to that include's own directory (a file directive always
+means relative to the file that declared it). Cycles are skipped; a
+missing include is a loud error. This replaces the old `.directives`
+working-directory defaults (the file was ambiguous when QAs lived in
+different subdirectories — each QA now declares its own defaults
+explicitly).
 
 ### The `.flua-directives` override file
 

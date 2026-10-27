@@ -795,3 +795,33 @@ async def test_set_color_components_structured_arg_chain(capsys) -> None:
     finally:
         await engine.stop()
     assert "CC table 59" in seen
+
+
+@pytest.mark.asyncio
+async def test_include_file_paths_anchor_to_the_include_file(capsys) -> None:
+    # the reported layout: the QA lives in test/ and includes
+    # ../myincludes.txt at the root — the include's --%%file:lib.lua,lib
+    # must resolve against the INCLUDE's directory (the root), not the
+    # main QA's directory (test/)
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        (root / "myincludes.txt").write_text("--%%file:lib.lua,lib\n")
+        (root / "lib.lua").write_text('lib = { hello = "from root lib" }\n')
+        (root / "test").mkdir()
+        main = root / "test" / "main.lua"
+        main.write_text(
+            "--%%include:../myincludes.txt\n"
+            "function QuickApp:onInit()\n"
+            '  print("LIB", lib and lib.hello)\n'
+            "end\n"
+        )
+        engine = LuaEngine()
+        await engine.start()
+        try:
+            engine.load_qa_file(str(main))
+            await asyncio.sleep(0.6)
+        finally:
+            await engine.stop()
+    assert "LIB from root lib" in capsys.readouterr().out
