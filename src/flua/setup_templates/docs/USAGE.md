@@ -132,6 +132,10 @@ realtime pacing, or `--step` for the deterministic fast mode. Note that
 `--speed` runs the clock continuously — virtual time also passes *while
 your code executes* (a slow boot becomes virtual time at high speeds), so
 time-sensitive tests should assert ranges or pin deadlines with `--step`.
+Engines with a perpetual housekeeping loop (EventRunner's midnight
+scheduler) should tag it `_FLUA.background(fn)`: tagged timers still fire
+while the run lives but never keep it alive, so `--step --run-for -N`
+exits 0 the moment the real rules drain instead of riding the wall cap.
 
 `fibaro.sleep(ms)` suspends the *calling QA* for `ms` of virtual time — other
 QAs keep running, and the sleep follows `--speed`/`--instant` like a timer.
@@ -1478,4 +1482,10 @@ live on `_FLUA` so your code stays portable:
   as strings. The verify loop's browser-free UI testing (with
   `self:getView()` to read the rendered view).
 - `_FLUA.setTimeout(fn, ms, qaId)` — timer with explicit QA attribution
+- `_FLUA.background(fn)` — tag a callback as housekeeping: its timers fire
+  while the run lives but never keep it alive (the pending-work check skips
+  them), so a run drains when the real work is done — the escape hatch for
+  keep-alive loops like EventRunner's midnight scheduler. Compose inline:
+  `setTimeout(_FLUA.background(loop), ms)`; a QA whose *only* work is
+  tagged exits immediately. Returns `fn`.
 - `if _FLUA then` — detect flua at runtime

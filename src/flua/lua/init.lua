@@ -24,6 +24,13 @@ local callbacks = {}
 local callback_qas = {} -- timer id -> owning qaId (nil = runtime/main-state timer)
 local nextId = 0
 
+-- background (housekeeping) callbacks, tagged via _FLUA.background(fn):
+-- their timers still fire while the run is alive, but never keep it alive —
+-- the pending-work check skips them, so a run drains when the real work is
+-- done (EventRunner's midnight scheduler is the canonical case). Weak keys:
+-- tagged functions still get garbage-collected.
+local backgroundCallbacks = setmetatable({}, { __mode = "k" })
+
 local function register(fn, qa)
   nextId = nextId + 1
   callbacks[nextId] = fn
@@ -214,11 +221,25 @@ local function traceback(err)
 end
 
 -- ------------------------------------------------------------------- timers
+function _FLUA.background(fn)
+  -- tag a callback as housekeeping: its timers fire while the run lives
+  -- but never keep it alive (see backgroundCallbacks). Returns fn so it
+  -- composes: setTimeout(_FLUA.background(loop), ms)
+  backgroundCallbacks[fn] = true
+  return fn
+end
+
 function _FLUA.setTimeout(fn, ms, qa)
   ms = ms or 0
   local id = register(fn, qa)
   -- qa attributes the timer to a QA; nil = runtime/untracked
-  _PY.post{ type = "setTimeout", id = id, delay = ms, qa = qa }
+  _PY.post{
+    type = "setTimeout",
+    id = id,
+    delay = ms,
+    qa = qa,
+    background = backgroundCallbacks[fn] == true or nil,
+  }
   return id
 end
 setTimeout = _FLUA.setTimeout

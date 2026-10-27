@@ -117,6 +117,15 @@ model) and ARCHITECTURE.md (components).
   concurrency.md). `--%%keep-alive:true` (online) and `--%%mode:proxy` hold
   the run open past idle; the HC3 poller alone never does.
   *Pinned by:* `tests/test_hc3.py::test_keep_alive_directive_keeps_engine_pending`
+- **Background timers never keep the run alive** — a callback tagged with
+  `_FLUA.background(fn)` still fires while the run lives, but its timers
+  are excluded from the pending-work check, so the run drains when the
+  real work is done (EventRunner's midnight scheduler). The tag rides the
+  function, so self-rescheduling loops inherit it; a QA whose only work is
+  tagged exits immediately at boot.
+  *Pinned by:* `tests/test_timers.py::test_background_timers_do_not_count_as_pending`,
+  `tests/test_qa.py::test_background_timers_fire_but_never_keep_the_run_alive`,
+  `tests/test_qa.py::test_background_only_qa_exits_immediately`
 - **Exit codes aggregate**: a failing QA fails the process; the last failing
   QA's code wins. Verdict lines go to stderr so stdout stays parseable.
   *Pinned by:* `tests/test_agent_dx.py::test_multi_qa_exit_aggregation`

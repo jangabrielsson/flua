@@ -158,3 +158,37 @@ def test_beyond_horizon_timers_do_not_count_as_pending() -> None:
     tm2 = make_manager(FakeClock(), [])
     tm2.set_timeout(3, 50_000)
     assert tm2.active_count() == 1
+
+
+def test_background_timers_do_not_count_as_pending() -> None:
+    # _FLUA.background-tagged callbacks: their timers fire while the run
+    # lives but never keep it alive — the pending check is
+    # active_count() - background_count(), and fired/unregistered timers
+    # unmark themselves
+    clock = FakeClock()
+    fired: list[int] = []
+    tm = TimerManager(clock, fired.append)
+    tm.set_timeout(1, 1000, background=True)
+    tm.set_timeout(2, 2000)
+    assert tm.active_count() == 2
+    assert tm.background_count() == 1
+    assert tm.active_count() - tm.background_count() == 1  # the engine's check
+    clock.time = 1001.5  # only the 1000 ms timer is due
+    assert tm.fire_due() == 1
+    assert tm.background_count() == 0  # fired background timers unmark
+    assert tm.active_count() - tm.background_count() == 1
+    tm.clear_timeout(2)
+    assert tm.active_count() == 0
+
+
+def test_background_count_respects_the_horizon() -> None:
+    # the horizon filter matches active_count, so the subtraction can never
+    # go negative: beyond-horizon background timers count for neither
+    clock = FakeClock()
+    tm = TimerManager(clock, lambda timer_id: None)
+    tm.set_horizon(1005.0)
+    tm.set_timeout(1, 9000, background=True)  # beyond the horizon
+    tm.set_timeout(2, 1000, background=True)
+    assert tm.active_count() == 1
+    assert tm.background_count() == 1
+    assert tm.active_count() - tm.background_count() == 0

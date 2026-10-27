@@ -1421,3 +1421,51 @@ def test_step_negative_run_for_wall_cap_is_a_failure(tmp_path) -> None:
     )
     assert result.returncode == 1, result.stdout + result.stderr
     assert "wall cap reached with work pending" in result.stderr
+
+
+def test_background_timers_fire_but_never_keep_the_run_alive(tmp_path) -> None:
+    # _FLUA.background(fn): the tagged callback still fires while the run
+    # lives, but once the real work drains the run exits 0 — even though
+    # the housekeeping loop is still scheduled (EventRunner's midnight
+    # scheduler under --step --run-for -N)
+    script = tmp_path / "bg.lua"
+    script.write_text(
+        "--%%name:Bg\n"
+        "local function loop()\n"
+        "    print('bg tick')\n"
+        "    setTimeout(loop, 5000)\n"
+        "end\n"
+        "setTimeout(_FLUA.background(loop), 500)  -- tagged once; reschedules inherit\n"
+        "setTimeout(function() print('work done') end, 1000)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--step", "--run-for", "-5", str(script)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "bg tick" in result.stdout  # the housekeeping timer fired while alive
+    assert "work done" in result.stdout
+
+
+def test_background_only_qa_exits_immediately(tmp_path) -> None:
+    # the tag's contract: a QA whose ONLY work is background drains at boot
+    # (no --run-for) — a tagged timer never keeps a run alive
+    script = tmp_path / "bg.lua"
+    script.write_text(
+        "--%%name:Bg\n"
+        "setTimeout(_FLUA.background(function() print('never fired') end), 60000)\n"
+        "print('booted')\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", str(script)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "booted" in result.stdout
+    assert "never fired" not in result.stdout

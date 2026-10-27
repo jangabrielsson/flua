@@ -121,7 +121,7 @@ every unpacked file).
 | `--ui [PORT]` | serve the sim API for `viewer/index.html` (stays up until Ctrl-C) |
 | `--watch` | restart QAs when their files change |
 | `--check` | static checks only (syntax, unknown `--%%` directives, deprecated APIs) |
-| `--run-for N` | 0 = until exit(); N>0 = at least N virtual s, then exit when idle (N wall s is a hard deadline — exit 1 if it cuts the run short with work pending); N<0 = exactly abs(N) virtual s (step mode: run until idle, at most abs(N) wall s — far timers still fire) |
+| `--run-for N` | 0 = until exit(); N>0 = at least N virtual s, then exit when idle (N wall s is a hard deadline — exit 1 if it cuts the run short with work pending); N<0 = exactly abs(N) virtual s (step mode: run until idle, at most abs(N) wall s — far timers still fire). Tag perpetual housekeeping loops `_FLUA.background(fn)` — they fire while the run lives but never keep it alive, so a run exits 0 when the real work drains |
 | `--speed N` | virtual time speed (N=60 runs 60x faster) |
 | `--instant` | timers fire immediately, time jumps ahead — unsafe for `os.time()`-relative delay logic and `@@`-rules; use `--step` or `--speed` for those |
 | `--step` | deterministic deadline-ordered fast-forward (plua speedTime): one timer at a time, `os.time()` equals each fired deadline — the fast mode for event engines |

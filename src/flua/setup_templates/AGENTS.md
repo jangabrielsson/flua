@@ -175,7 +175,10 @@ QAs that never compute delays from `os.time()`/`os.date()` (pure
 `os.time()`-relative scheduling need a clock that flows: `--step` for the
 fast deterministic mode (deadline by deadline, `os.time()` equals each
 fired deadline), or `--speed` for realtime pacing; `--instant` corrupts
-their scheduling.
+their scheduling. Perpetual housekeeping loops (event engines' midnight
+schedulers, keep-alive pollers) should be tagged `_FLUA.background(fn)`:
+they still fire while the run lives but never keep it alive, so `--step
+--run-for -N` exits 0 when the real work drains.
 
 Use the built-in assertions library instead of hand-rolled expect():
 `local Test = require("flua-test"); local t = Test.new()` — `t:expect`,

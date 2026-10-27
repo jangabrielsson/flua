@@ -1752,9 +1752,11 @@ class LuaEngine:
 
     def has_pending_work(self) -> bool:
         """True while timers, message queues, in-flight worker tasks, or a
-        --%%keep-alive QA (online) exist."""
+        --%%keep-alive QA (online) exist. Timers whose callback is tagged
+        ``_FLUA.background`` (housekeeping loops like EventRunner's midnight
+        scheduler) fire while the run lives but never keep it alive."""
         return (
-            self._timers.active_count() > 0
+            self._timers.active_count() - self._timers.background_count() > 0
             or self._keep_alive_active()
             or bool(self._inbound)
             or not self._outbound.empty()
@@ -1802,6 +1804,12 @@ class LuaEngine:
             self._deliver_to_lua(batch)
             self._replay_delivered = True
             if self.clock.step:
+                # the delivered callback may have posted messages (its own
+                # re-scheduling): process them BEFORE yielding, so the
+                # pending-work check sees the SCHEDULED background timer,
+                # not a transient inbound message that would keep the run
+                # alive forever
+                await self._drain_inbound()
                 # an endless timer chain keeps the outbound queue busy
                 # forever: yield to the event loop so the CLI's wall-cap
                 # check runs (and Ctrl-C stays interruptible)
@@ -1843,7 +1851,9 @@ class LuaEngine:
                 # the chain dies (cancel_qa can't see it yet — it is still
                 # a message, not a scheduled timer)
                 return
-        self._timers.set_timeout(int(msg["id"]), int(msg["delay"]), qa)
+        self._timers.set_timeout(
+            int(msg["id"]), int(msg["delay"]), qa, bool(msg.get("background"))
+        )
         self.trace_event(
             "timer",
             int(qa) if qa is not None else None,

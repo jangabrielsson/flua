@@ -30,6 +30,7 @@ class TimerManager:
         self._heap: list[tuple[float, int]] = []  # (deadline, timer_id)
         self._deadlines: dict[int, float] = {}
         self._timer_qa: dict[int, int] = {}  # timer_id -> qa_id attribution
+        self._background: set[int] = set()  # timer_ids of background callbacks
         self._horizon: float | None = None  # absolute virtual run limit
 
     def set_horizon(self, deadline: float | None) -> None:
@@ -38,16 +39,26 @@ class TimerManager:
         heap would otherwise race far past the limit between CLI polls."""
         self._horizon = deadline
 
-    def set_timeout(self, timer_id: int, delay_ms: int, qa_id: int | None = None) -> None:
+    def set_timeout(
+        self,
+        timer_id: int,
+        delay_ms: int,
+        qa_id: int | None = None,
+        background: bool = False,
+    ) -> None:
         """Schedule a one-shot timer; re-using an existing ID replaces it.
 
         ``qa_id`` attributes the timer to a QA; None means untracked.
+        ``background`` marks the callback as housekeeping (never keeps the
+        run alive — see ``background_count``).
         """
         self.clear_timeout(timer_id)
         deadline = self._clock.time + max(int(delay_ms), 0) / 1000.0
         self._deadlines[timer_id] = deadline
         if qa_id is not None:
             self._timer_qa[timer_id] = qa_id
+        if background:
+            self._background.add(timer_id)
         heapq.heappush(self._heap, (deadline, timer_id))
         logger.debug("timeout %d scheduled for vtime %.3f", timer_id, deadline)
 
@@ -56,6 +67,7 @@ class TimerManager:
         if timer_id in self._deadlines:
             del self._deadlines[timer_id]
             self._timer_qa.pop(timer_id, None)
+            self._background.discard(timer_id)
             return True
         return False
 
@@ -67,6 +79,21 @@ class TimerManager:
         if self._horizon is None:
             return len(self._deadlines)
         return sum(1 for deadline in self._deadlines.values() if deadline <= self._horizon)
+
+    def background_count(self) -> int:
+        """Active timers whose callback is tagged background (housekeeping):
+        they fire while the run lives but must not keep it alive — the
+        engine subtracts them from the pending-work check. The horizon
+        filter matches ``active_count`` so the subtraction never goes
+        negative."""
+        if self._horizon is None:
+            return sum(1 for timer_id in self._background if timer_id in self._deadlines)
+        return sum(
+            1
+            for timer_id in self._background
+            if timer_id in self._deadlines
+            and self._deadlines[timer_id] <= self._horizon
+        )
 
     def qa_timer_count(self, qa_id: int) -> int:
         """Active timers attributed to a QA."""
@@ -116,6 +143,7 @@ class TimerManager:
                 # the qa attribution stays around until after the callback, so
                 # fire-time hooks (the --trace timer events) can read it
                 self._timer_qa.pop(timer_id, None)
+                self._background.discard(timer_id)
                 return 1
             return 0
         fired = 0
@@ -139,10 +167,12 @@ class TimerManager:
             # the qa attribution stays around until after the callback, so
             # fire-time hooks (the --trace timer events) can read it
             self._timer_qa.pop(timer_id, None)
+            self._background.discard(timer_id)
             fired += 1
         return fired
 
     def stop(self) -> None:
         self._deadlines.clear()
         self._timer_qa.clear()
+        self._background.clear()
         self._heap.clear()
