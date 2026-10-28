@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.98] - 2026-10-28
+
+### Added
+- write JSON with raw UTF-8 encoding to handle emojis correctly
+
 ## [0.1.97] - 2026-10-27
 
 ### Added
