@@ -647,7 +647,7 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         # proxy's HC3 id in proxy mode) is only known once the proxies are
         # resolved. It still rides the pump's FIFO ahead of the QAs' own
         # output — the QAs boot as 0 ms timers, delivered after this log.
-        mode = "offline" if api_mode == "local" else "online"
+        mode = "offline (sim HC3, real network)" if api_mode == "local" else "online"
         if main_qa_id is not None:
             info = engine.qa_info(main_qa_id)
             if info and info.get("proxy"):

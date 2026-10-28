@@ -28,6 +28,7 @@ def test_registry_discovers_all_tools() -> None:
         "downloadFQA",
         "downloadQA",
         "icons",
+        "migrate",
         "newQA",
         "pack",
         "setup",
@@ -1124,3 +1125,37 @@ def test_icons_download_from_dump(tmp_path, capsys) -> None:
         == 0
     )
     assert (cache / "ButtonSwitchV2" / "ButtonSwitchV20.svg").read_bytes() == b"<svg>new</svg>"
+
+
+def test_migrate_tool_scans_a_project(tmp_path, capsys) -> None:
+    # one-pass plua-migration scan: directive spellings, plua-only
+    # directives, script invocations, stale packages, baked IPs
+    (tmp_path / "qa.lua").write_text(
+        "-- %%save:Old.fqa\n"
+        "--%%headers:defaults.lua\n"
+        '--%%var:IP="192.168.50.165"\n'
+        "print('hi')\n"
+    )
+    (tmp_path / "dist").mkdir()
+    old_fqa = tmp_path / "dist" / "Old.fqa"
+    old_fqa.write_text('{"files": [{"name": "main", "type": "lua"}]}')
+    import os
+
+    os.utime(old_fqa, (0, 0))  # predates the sources: stale
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "build.sh").write_text("plua -t pack main.lua out.fqa\n")
+    assert tools.run_tool("migrate", [str(tmp_path)]) == 1
+    out = capsys.readouterr().out
+    assert "space before %%" in out
+    assert "--%%include" in out  # the headers replacement
+    assert "bakes a literal IP" in out
+    assert "plua binary invocation" in out
+    assert "pre-flua-format package" in out
+    assert "stale package" in out
+    assert "6 finding(s)" in out
+
+
+def test_migrate_tool_clean_project_exits_zero(tmp_path, capsys) -> None:
+    (tmp_path / "qa.lua").write_text("--%%name:Clean\nprint('hi')\n")
+    assert tools.run_tool("migrate", ["--json", str(tmp_path)]) == 0
+    assert capsys.readouterr().out == ""

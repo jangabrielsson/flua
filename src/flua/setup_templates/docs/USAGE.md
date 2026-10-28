@@ -758,6 +758,27 @@ replaces the old `.directives` working-directory defaults (the file was
 ambiguous when QAs lived in different subdirectories — each QA now
 declares its own defaults explicitly).
 
+### Migrating from plua
+
+plua projects migrate with a mostly mechanical pass: `flua --tool migrate .`
+scans the project for every plua-ism in one pass (directive spellings,
+script invocations, stale packages, baked IPs — exit 1 until clean), and
+`flua --check` covers the syntax. The directive renames:
+
+- `--%%headers:FILE` → `--%%include:FILE` (declaring-file-relative paths)
+- `-- %%save`/`-- %%port` → gone (`flua export -o` / `--tool pack -o`)
+- `-- %%proxy:true` → `--%%mode:proxy`; `--%%conceal` → `--%%clobber`
+- tools: `plua -t pack SRC OUT` → `flua --tool pack SRC -o OUT -f`; the
+  uploadQA/updateQA/downloadQA/uploadFile names carry over
+- behavior: `--api remote` overrides the main QA's `--%%mode:offline`;
+  `plugin.restart()` aborts the current turn like the HC3; `--instant` is
+  unsafe for `os.time()`-relative logic (`--step` is the deterministic fast
+  mode); tag perpetual housekeeping loops `_FLUA.background(fn)`
+
+The full checklist, the verified emulated-surface matrix, and the gotchas
+from real migrations live in the `plua-migration` skill
+(`flua --tool setup` installs the skill pack).
+
 ### The `.flua-directives` override file
 
 Testing someone else's QA usually needs one or two overridden values — a
@@ -940,6 +961,11 @@ flua picks one of three modes per run: an explicit `--api local|remote` wins,
 then the main QA's directives (`--%%mode:...` — `-D` flags and
 `.flua-directives` over its header over any `--%%include`'d defaults), then
 the default — `offline` (the simulated HC3).
+
+"Offline" names the **HC3 surface**, not the network: `net.HTTPClient`,
+`net.WebSocketClientTls` and friends make real connections in every mode —
+only the controller's REST API is simulated. A hub-integration QA can talk
+to its real hub in offline mode.
 
 | Aspect | `offline` | `online` | `proxy` |
 |---|---|---|---|
@@ -1198,6 +1224,9 @@ format (individual `.lua` files) and only the HC3 sees `.fqa`:
 # populate the shared icon cache (~/.flua/icons) from the HC3 or a local webroot dump
 .venv/bin/flua --tool icons download              # from the HC3 (.env chain)
 .venv/bin/flua --tool icons download --dump www   # from a var/www copy — no network (partial: the dump ships a subset)
+
+# scan a project for plua leftovers (one-pass migration gate)
+.venv/bin/flua --tool migrate .                   # exit 1 on findings; --json for agents
 
 # list the installed tools (a bare --tool, or --tool help)
 .venv/bin/flua --tool
