@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.99] - 2026-10-28
+
+### Added
+- enhance API behavior and documentation for remote mode and plugin.restart()
+- implement watch mode to survive QA boot errors and restart on file save
+
 ## [0.1.98] - 2026-10-28
 
 ### Added
