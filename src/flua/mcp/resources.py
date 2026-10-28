@@ -47,6 +47,12 @@ DESCRIPTIONS = {
     "walkthroughs.md": "guided traces of key flows",
     "mcp.md": "the flua-mcp server: protocol, tools, host setup",
     "rest-endpoints.md": "REST routes: real vs shape-only stubs",
+    "dirigera_plua_flua_migration.md": (
+        "a real plua→flua migration report (Dirigera project): "
+        "checklist, gotchas, upstream findings"
+    ),
+    "DIRIGERA_FLUA_BUG_REPORT.md": "the Dirigera migration's upstream bug reports with repros",
+    "flua-feedback_from_eventrunner7.md": "the EventRunner7 migration's feedback report",
     "specs/hc3-api.json": "the HC3 REST API structural reference",
     "specs/refreshEvents.json": "HC3 refreshState event shapes",
     "decisions/README.md": "index of the ADR-lite decision log",

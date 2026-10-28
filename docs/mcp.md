@@ -69,16 +69,33 @@ One-shot: the run ends when the QAs drain.
 ```
 
 Arguments: `files` (required), `mode` (`local`|`remote`), `instant`,
-`speed`, `start` (virtual start time, e.g. `"2027/10/6 18:30:00"`),
-`maxHours` (cap virtual time; timers beyond the horizon never fire),
-`timeout` (wall seconds, default 120), `filter` (`{levels?, match?}` —
-server-side log narrowing; the agent asks for "just the failures" instead
-of shelling out).
+`step` (deterministic deadline-ordered fast-forward — mutually exclusive
+with `instant`), `runFor` (positive = at least N virtual s then exit when
+idle, N wall s hard deadline; negative = exactly abs(N) virtual s — step
+mode: run until idle, at most abs(N) wall s), `speed`, `start` (virtual
+start time, e.g. `"2027/10/6 18:30:00"`), `maxHours` (cap virtual time;
+timers beyond the horizon never fire), `timeout` (wall seconds, default
+120), `filter` (`{levels?, match?}` — server-side log narrowing; the agent
+asks for "just the failures" instead of shelling out).
 
 Result: `{"exitCode", "logs", "verdict", "summary"}` — `logs` are the QA's
 `--log json` lines, `verdict` the stderr notices, and `summary` the answer
 without jq: level counts and flua-test `pass`/`fail`/`failures` tallies. A
 nonzero `exitCode` is a failed run.
+
+#### `flua_tool`
+
+Runs one `flua --tool` command and returns its exit code and output — the
+whole tool registry (`migrate`, `icons download`, `state`, `pack`, `unpack`,
+…) without per-tool schemas.
+
+```json
+{"name": "flua_tool", "arguments": {"name": "migrate", "args": ["."]}}
+```
+
+Arguments: `name` (required — a bare `flua --tool` lists them), `args`
+(optional list of strings, the tool's own arguments). Result:
+`{"exitCode", "stdout", "stderr"}`.
 
 #### `qa_ui`
 

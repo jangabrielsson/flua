@@ -170,6 +170,7 @@ def test_tools_list_shape() -> None:
         "qa_sessions",
         "docs_list",
         "docs_read",
+        "flua_tool",
     ]
     for tool in result["tools"]:
         assert tool["description"]
@@ -889,3 +890,27 @@ def test_stdio_ctrl_c_exits_cleanly(tmp_path) -> None:
     assert process.returncode == 130
     assert "flua-mcp: interrupted" in stderr
     assert "Traceback" not in stderr
+
+
+def test_qa_run_step_and_run_for(tmp_path) -> None:
+    # the recent time modes reach MCP hosts: step (deadline-ordered
+    # fast-forward) + runFor (the wall-cap/idle semantics) — the ER-test
+    # pattern, driven through the tool
+    script = tmp_path / "step.lua"
+    script.write_text(
+        "setTimeout(function() print('far') end, 9 * 3600 * 1000)\n"
+        "print('booted')\n"
+    )
+    result = _tool("qa_run", {"files": [str(script)], "step": True, "runFor": -30})
+    assert result["exitCode"] == 0
+    assert any(
+        isinstance(line, dict) and line.get("msg") == "far" for line in result["logs"]
+    )
+
+
+def test_flua_tool_exposes_the_tool_registry(tmp_path) -> None:
+    # the whole --tool registry through one MCP tool: migrate on a fixture
+    (tmp_path / "qa.lua").write_text("-- %%save:Old.fqa\nprint('hi')\n")
+    result = _tool("flua_tool", {"name": "migrate", "args": [str(tmp_path)]})
+    assert result["exitCode"] == 1
+    assert "space before %%" in result["stdout"]

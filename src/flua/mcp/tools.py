@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import io
 import json
 import os
 import re
@@ -21,6 +22,7 @@ import threading
 import time
 from typing import Any
 
+from .. import tools as tools_registry
 from ..check import check_file
 from ..engine import LuaEngine
 from ..tools.ui import ui_dump
@@ -273,8 +275,15 @@ def _qa_run(args: dict[str, Any]) -> dict[str, Any]:
     command = [sys.executable, "-m", "flua", "--log", "json"]
     if mode is not None:
         command += ["--api", mode]
+    step = args.get("step")
+    if step and args.get("instant"):
+        raise JsonRpcError(INVALID_PARAMS, "step and instant are mutually exclusive")
     if args.get("instant"):
         command.append("--instant")
+    if step:
+        command.append("--step")
+    if args.get("runFor") is not None:
+        command += ["--run-for", str(args["runFor"])]
     if args.get("speed") is not None:
         command += ["--speed", str(args["speed"])]
     if args.get("start") is not None:
@@ -401,6 +410,25 @@ def _filter_logs(logs: list[Any], filt: dict[str, Any]) -> list[Any]:
     return logs
 
 
+def _flua_tool(args: dict[str, Any]) -> dict[str, Any]:
+    """One ``flua --tool`` command (migrate, icons, state, pack, ...),
+    with its exit code and output — the whole tool registry stays reachable
+    from MCP hosts without per-tool schema work."""
+    name = args.get("name")
+    argv = args.get("args") or []
+    if not isinstance(name, str) or name not in tools_registry.tool_names():
+        raise JsonRpcError(INVALID_PARAMS, f"unknown tool: {name!r}")
+    if not isinstance(argv, list) or not all(isinstance(entry, str) for entry in argv):
+        raise JsonRpcError(INVALID_PARAMS, "args must be a list of strings")
+    stdout, stderr = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        try:
+            code = tools_registry.run_tool(name, list(argv))
+        except SystemExit as exc:  # a tool's parser.error path
+            code = exc.code if isinstance(exc.code, int) else 1
+    return {"exitCode": code, "stdout": stdout.getvalue(), "stderr": stderr.getvalue()}
+
+
 TOOLS: dict[str, Tool] = {
     "qa_check": {
         "description": (
@@ -453,6 +481,24 @@ TOOLS: dict[str, Tool] = {
                 "instant": {
                     "type": "boolean",
                     "description": "instant mode: virtual time jumps deadline to deadline",
+                },
+                "step": {
+                    "type": "boolean",
+                    "description": (
+                        "step mode: deterministic deadline-ordered fast-forward "
+                        "(one timer at a time, os.time() equals each fired "
+                        "deadline — the mode for event engines). Mutually "
+                        "exclusive with instant."
+                    ),
+                },
+                "runFor": {
+                    "type": "number",
+                    "description": (
+                        "--run-for: positive = at least N virtual s then exit "
+                        "when idle (N wall s is a hard deadline, exit 1 if it "
+                        "cuts the run short); negative = exactly abs(N) virtual "
+                        "s (step mode: run until idle, at most abs(N) wall s)"
+                    ),
                 },
                 "speed": {"type": "number", "description": "virtual clock multiplier (--speed)"},
                 "start": {
@@ -680,5 +726,30 @@ TOOLS: dict[str, Tool] = {
             "required": ["path"],
         },
         "handler": _docs_read,
+    },
+    "flua_tool": {
+        "description": (
+            "Run one `flua --tool` command and return its exit code and "
+            "output — the whole tool registry (migrate, icons download, "
+            "state, pack, unpack, ...) without per-tool schemas. "
+            "`name` is the tool name; `args` the tool's own arguments as "
+            "strings (e.g. ['migrate', ['.']])."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "the tool name (bare `flua --tool` lists them)",
+                },
+                "args": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "the tool's arguments (as after `flua --tool <name>`)",
+                },
+            },
+            "required": ["name"],
+        },
+        "handler": _flua_tool,
     },
 }
