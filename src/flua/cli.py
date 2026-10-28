@@ -486,6 +486,12 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         return _check_cli(parser, args)
 
     global_config, qa_specs = _load_qas(parser, args)
+    if args.watch:
+        # watch mode survives QA boot errors: the flag rides the global
+        # config into every QA's _FLUA.config, and the bootstrap's error
+        # branches log + leave the QA dead instead of exiting the engine —
+        # the user fixes the file and the next save restarts it
+        global_config["watch"] = True
 
     speed, step, max_hours, start_epoch = _resolve_runtime(parser, args, global_config)
     seed: dict[str, Any] | None = None

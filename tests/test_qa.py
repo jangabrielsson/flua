@@ -1532,3 +1532,40 @@ def test_export_writes_raw_utf8_for_emoji(tmp_path) -> None:
     payload = out.read_text(encoding="utf-8")
     assert "🕒" in payload
     assert "\\ud83d" not in payload and "\\uD83D" not in payload
+
+
+@pytest.mark.slow
+def test_watch_survives_boot_errors_and_recovers(tmp_path) -> None:
+    # --watch must not terminate on a QA boot error: the error is logged,
+    # the process stays alive, and the next save with fixed code restarts
+    # the QA (the editor workflow: break it, see the error, fix it)
+    script = tmp_path / "qa.lua"
+    script.write_text("--%%name:QA\nthis is not lua(\n")
+    log = tmp_path / "out.log"
+    with open(log, "w") as handle:
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "flua", "--watch", "--nogreet", str(script)],
+            cwd=REPO_ROOT,
+            stdout=handle,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+    try:
+        deadline = time.monotonic() + 10.0
+        while "Error loading" not in log.read_text():
+            assert proc.poll() is None, "flua exited on a boot error in watch mode"
+            assert time.monotonic() < deadline, "the boot error line never appeared"
+            time.sleep(0.2)
+        # fix the file: the next save must restart the QA — flua stays up
+        script.write_text("--%%name:QA\nprint('FIXED')\n")
+        deadline = time.monotonic() + 10.0
+        while "FIXED" not in log.read_text():
+            assert proc.poll() is None, "flua exited before the fixed save restarted"
+            assert time.monotonic() < deadline, "the fixed code never ran"
+            time.sleep(0.2)
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()

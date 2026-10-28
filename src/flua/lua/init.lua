@@ -959,7 +959,7 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
       if not ok then
         -- a faulty --%%var is a startup error: name the var and stop
         print("error in --%%var:" .. tostring(name) .. ": " .. tostring(expr) .. " — " .. tostring(value))
-        _FLUA.exit(1)
+        if not config.watch then _FLUA.exit(1) end
         return
       end
       vars[name] = value
@@ -984,7 +984,9 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
     print("Error loading " .. tostring(sourceName) .. ": " .. tostring(err))
     _PY.system_event("qa_error", qaId, "boot failed: " .. tostring(err))
     qaInstances[qaId] = nil
-    _FLUA.exit(1)
+    -- watch mode survives boot errors: log, leave the QA dead, and let the
+    -- user fix the file (the watch loop restarts on the next save)
+    if not config.watch then _FLUA.exit(1) end
     return
   end
   local ok, err2 = pcall(chunk)
@@ -993,7 +995,7 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
     print(debug.traceback(nil, 2))
     _PY.system_event("qa_error", qaId, "boot failed: " .. tostring(err2))
     qaInstances[qaId] = nil
-    _FLUA.exit(1)
+    if not config.watch then _FLUA.exit(1) end
     return
   end
   -- QA code loaded: construct the QuickApp instance (calls onInit).
@@ -1006,7 +1008,7 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
       print(debug.traceback(nil, 2))
       _PY.system_event("qa_error", qaId, "bootstrap failed: " .. tostring(berr))
       qaInstances[qaId] = nil
-      _FLUA.exit(1)
+      if not config.watch then _FLUA.exit(1) end
       return
     end
   end

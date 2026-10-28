@@ -227,7 +227,10 @@ The fastest loop for tinkering:
 ```
 
 flua restarts the QA whenever you save the file (or any `--%%file` file).
-Ctrl-C stops it. Works on top of the debugger too.
+A boot error in the saved file (syntax error, a bad `--%%var`, an `onInit`
+crash) is logged and that QA is left dead — flua itself stays up, and the
+next save with fixed code restarts the QA. Ctrl-C stops it. Works on top
+of the debugger too.
 
 ### Without the repo (pip install)
 
