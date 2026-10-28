@@ -107,24 +107,34 @@ def _component_line(component: dict[str, Any], cbs: dict[str, dict[str, str]]) -
     return f"{typ} {name} {label}".strip()
 
 
+def _walk_components(components: Any):
+    """Yield the leaf components, descending into row containers
+    (vertical/horizontal) — the legacy viewLayout nests buttons inside
+    horizontal rows, one level (or more) deep."""
+    for component in components or []:
+        if not isinstance(component, dict):
+            continue
+        if str(component.get("type")) in ("vertical", "horizontal"):
+            yield from _walk_components(component.get("components"))
+        else:
+            yield component
+
+
 def _components(initial: dict[str, Any]) -> list[dict[str, Any]]:
     """The active format's components, flattened (containers descend)."""
-    components: list[dict[str, Any]] = []
     if initial.get("useUiView"):
         rows = initial.get("uiView") or []
+        components: list[dict[str, Any]] = []
         for row in rows:
             if isinstance(row, dict):
-                components.extend(
-                    c for c in row.get("components") or [] if isinstance(c, dict)
-                )
+                components.extend(_walk_components(row.get("components")))
         return components
     jason = (initial.get("viewLayout") or {}).get("$jason") or {}
     sections = ((jason.get("body") or {}).get("sections") or {}).get("items") or []
+    components = []
     for item in sections:
         if isinstance(item, dict):
-            components.extend(
-                c for c in item.get("components") or [] if isinstance(c, dict)
-            )
+            components.extend(_walk_components(item.get("components")))
     return components
 
 
@@ -135,11 +145,10 @@ def _render_view_layout(layout: Any, cbs: dict[str, dict[str, str]]) -> list[str
     for item in sections:
         if not isinstance(item, dict):
             continue
-        for component in item.get("components") or []:
-            if isinstance(component, dict):
-                line = _component_line(component, cbs)
-                if line:
-                    lines.append(line)
+        for component in _walk_components(item.get("components")):
+            line = _component_line(component, cbs)
+            if line:
+                lines.append(line)
     return lines
 
 
@@ -148,11 +157,10 @@ def _render_ui_view(rows: Any, cbs: dict[str, dict[str, str]]) -> list[str]:
     for row in rows or []:
         if not isinstance(row, dict):
             continue
-        for component in row.get("components") or []:
-            if isinstance(component, dict):
-                line = _component_line(component, cbs)
-                if line:
-                    lines.append(line)
+        for component in _walk_components(row.get("components")):
+            line = _component_line(component, cbs)
+            if line:
+                lines.append(line)
     return lines
 
 

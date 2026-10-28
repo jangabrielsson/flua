@@ -59,7 +59,13 @@ function plugin.createChildDevice(opts) return api.post("/plugins/createChildDev
 -- Restarts a QuickApp plugin
 -- @param id - The device ID to restart (optional, defaults to mainDeviceId)
 -- @return Result of the restart operation
-function plugin.restart(id) return api.post("/plugins/restart",{deviceId=id or plugin.mainDeviceId}) end
+function plugin.restart(id)
+  local result = api.post("/plugins/restart",{deviceId=id or plugin.mainDeviceId})
+  -- like the HC3: the process dies at the call, so code after it must not
+  -- run — abort the current turn silently (the restart is already posted)
+  if _FLUA and _FLUA.restartAbort then error(_FLUA.restartAbort) end
+  return result
+end
 
 class 'QuickAppBase'
 -- Constructor for QuickAppBase class

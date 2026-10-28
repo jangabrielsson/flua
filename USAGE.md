@@ -834,8 +834,11 @@ The backend is picked from the **main QA's directives — `-D` flags and
 
 `--%%mode:offline` on a *secondary* QA pins just that QA's `api.*` calls to
 the sim while the rest of the run stays online — handy for keeping test QAs
-sandboxed against a live controller. The legacy `--%%offline:true` is an
-alias for `--%%mode:offline`.
+sandboxed against a live controller. An explicit `--api remote` also
+overrides the MAIN QA's own `--%%mode:offline` pin (the flag outranks the
+header — the main QA's pin drove the engine mode, and the flag wins);
+secondary QAs' pins always hold. The legacy `--%%offline:true` is an alias
+for `--%%mode:offline`.
 
 With `--api remote`, the `api` table talks to the real HC3: the controller
 is authoritative for its resources — reads of rooms, scenes, sections,
@@ -1023,7 +1026,8 @@ everything works between them:
   already during `onInit` (the HC3's `initialProperties` behavior)
 - `plugin.restart(id)` — re-runs the QA's code (onInit runs again, like the
   HC3 restarting the plugin); timers are cancelled and deferred messages
-  dropped
+  dropped — and like the HC3, the call kills the current turn: code after
+  `plugin.restart()` never runs
 - `GET /refreshStates?last=N` — the HC3's polling change feed
 
 QAs find each other by name with `fibaro.getIds({type = "quickApp"})` — see

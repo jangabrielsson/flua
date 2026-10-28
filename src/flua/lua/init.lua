@@ -14,6 +14,10 @@ _PY = _PY or {}
 -- _PY holds the pure Python bridge (post, now, vtime, tcp_*, ...) and is
 -- not meant for user code.
 _FLUA = {}
+-- plugin.restart() aborts the current turn: the sentinel is raised after
+-- the restart is posted and swallowed silently by the callback runner —
+-- on the HC3 the process dies at the call, so code after it never runs
+_FLUA.restartAbort = {}
 _FLUA.version = _PY.version()
 
 -- ----------------------------------------------------------------- registry
@@ -370,6 +374,12 @@ end
 resumeQa = function(qaId, co, ...)
   local ok, res = coroutine.resume(co, ...)
   if not ok then
+    if res == _FLUA.restartAbort then
+      -- plugin.restart(): the turn ends here silently (the HC3 kills the
+      -- process at the call) — the restart itself was already posted
+      if qaRunners[qaId] == co then qaRunners[qaId] = nil end
+      return
+    end
     -- a callback crash: record it in the system log (flua's structured
     -- crash feed) in addition to the console traceback
     _PY.system_event("crash", qaId, tostring(res))
@@ -991,6 +1001,7 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
   end
   local ok, err2 = pcall(chunk)
   if not ok then
+    if err2 == _FLUA.restartAbort then return end  -- top-level plugin.restart()
     print("Error:", err2)
     print(debug.traceback(nil, 2))
     _PY.system_event("qa_error", qaId, "boot failed: " .. tostring(err2))
@@ -1004,6 +1015,7 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
   if not config.scene then
     local bok, berr = pcall(bootstrapQa, env, qaId, config)
     if not bok then
+      if berr == _FLUA.restartAbort then return end  -- plugin.restart() in onInit
       print("Error in bootstrap:", berr)
       print(debug.traceback(nil, 2))
       _PY.system_event("qa_error", qaId, "bootstrap failed: " .. tostring(berr))

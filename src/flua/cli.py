@@ -550,6 +550,17 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
                 elif mode in ("online", "proxy"):
                     api_mode = "remote"
                 break
+        if args.api == "remote":
+            # an explicit --api remote wins over the MAIN QA's
+            # --%%mode:offline pin too (its mode drove the engine above;
+            # the flag overrides it). Secondary QAs' pins stay — per-QA
+            # pinning is their documented feature.
+            for main_path, _main_code, main_params in qa_specs:
+                if main_path is None:
+                    continue
+                if main_params.get("offline"):
+                    main_params["mode"] = "online"  # _apply_mode clears the pin
+                break
         if api_mode is None:
             api_mode = "local"  # default: offline (the sim) — online is opt-in
         engine = LuaEngine(

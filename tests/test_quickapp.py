@@ -825,3 +825,29 @@ async def test_include_file_paths_anchor_to_the_include_file(capsys) -> None:
         finally:
             await engine.stop()
     assert "LIB from root lib" in capsys.readouterr().out
+
+
+@pytest.mark.asyncio
+async def test_plugin_restart_aborts_the_current_turn(capsys) -> None:
+    # like the HC3, plugin.restart() kills the QA at the call: code after it
+    # never runs (the Dirigera report — flua used to run the trailing code),
+    # and the new instance boots right away
+    out = await _run_qas(
+        {
+            "main.lua": (
+                "function QuickApp:onInit()\n"
+                "  local n = tonumber(self:getVariable('boots')) or 0\n"
+                "  print('BOOT', n)\n"
+                "  if n > 0 then _FLUA.exit(0) end\n"
+                "  self:setVariable('boots', 1)\n"
+                "  plugin.restart()\n"
+                "  print('AFTER (should not print)')\n"
+                "end\n"
+            ),
+        },
+        sleep=1.0,
+        capsys=capsys,
+    )
+    assert "BOOT 0" in out
+    assert "BOOT 1" in out  # the restart booted the new instance
+    assert "AFTER" not in out  # the turn aborted at plugin.restart()

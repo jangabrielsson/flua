@@ -1614,3 +1614,36 @@ def test_cli_tool_listing(tmp_path) -> None:
         for tool in ("downloadQA", "updateQA", "uploadQA"):
             assert tool in result.stdout
         assert "flua --tool <name> --help" in result.stdout
+
+
+def test_api_remote_overrides_main_qa_offline_pin(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # the Dirigera report: the main QA's --%%mode:offline used to pin its
+    # api.* calls to the sim even under an explicit --api remote — the flag
+    # now overrides the MAIN QA's pin (secondary QAs' pins stay their own
+    # feature). _FLUA.mode reports online too.
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))  # isolate from the user's ~/.env
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    script = tmp_path / "pinned.lua"
+    script.write_text(
+        "--%%mode:offline\n"
+        "function QuickApp:onInit()\n"
+        "  print('MODE', _FLUA.mode)\n"
+        "  local info = api.get('/settings/info')\n"
+        "  print('SERIAL', info and info.serialNumber)\n"
+        "  _FLUA.exit(0)\n"
+        "end\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--api", "remote", "--nogreet", str(script)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "MODE online" in result.stdout  # the pin no longer applies
+    assert "SERIAL HC3-00000422" in result.stdout  # the MOCK HC3's serial, not the sim's

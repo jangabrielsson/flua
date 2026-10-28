@@ -278,3 +278,22 @@ def test_verdict_line_only_for_failures(tmp_path) -> None:
     result = _run("ok.lua", cwd=tmp_path)
     assert result.returncode == 0
     assert "exited with code" not in result.stderr
+
+
+def test_tool_ui_renders_nested_containers(tmp_path) -> None:
+    # the legacy viewLayout nests buttons inside horizontal rows: the text
+    # renderer must descend into containers (the Dirigera report — buttons
+    # inside {{button=...},{button=...}} rows disappeared from --tool ui)
+    from flua.tools.ui import ui_dump
+
+    script = tmp_path / "uitest.lua"
+    script.write_text(
+        "--%%name:UITest\n"
+        "--%%type:com.fibaro.deviceController\n"
+        '--%%u:{label="titelLabel",text="Dirigera"}\n'
+        '--%%u:{{button="b1",text="Request token",visible=true,onReleased="requestToken"},'
+        '{button="b2",text="Get token",visible=true,onReleased="getToken"}}\n'
+    )
+    dump = ui_dump(str(script))
+    names = [e.get("name") for e in dump["elements"] if e.get("name")]
+    assert "b1" in names and "b2" in names
