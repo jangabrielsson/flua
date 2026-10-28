@@ -1512,3 +1512,23 @@ def test_step_rearming_engine_deterministically_rides_the_wall_cap(tmp_path) -> 
         )
         codes.add(result.returncode)
     assert codes == {1}, f"expected deterministic exit 1, got {codes}"
+
+
+def test_export_writes_raw_utf8_for_emoji(tmp_path) -> None:
+    # the HC3's web importer does not decode \uXXXX surrogate pairs: .fqa
+    # files must carry raw UTF-8 (ensure_ascii=False) or emojis outside the
+    # BMP (🕒) get mangled on upload
+    script = tmp_path / "emoji.lua"
+    script.write_text('--%%name:Emoji\n--%%u:{label="L1",text="🕒 clock"}\nprint("🕒")\n')
+    out = tmp_path / "emoji.fqa"
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "export", str(script), "-o", str(out)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    payload = out.read_text(encoding="utf-8")
+    assert "🕒" in payload
+    assert "\\ud83d" not in payload and "\\uD83D" not in payload

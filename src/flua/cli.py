@@ -797,7 +797,7 @@ def _export_cli(parser: argparse.ArgumentParser, args: argparse.Namespace) -> in
     except (FileNotFoundError, ValueError) as exc:
         parser.error(str(exc))
     output = Path(args.output) if args.output else default_fqa_output(path, annotations)
-    output.write_text(json.dumps(fqa, indent=2) + "\n", encoding="utf-8")
+    output.write_text(json.dumps(fqa, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"exported {len(fqa['files'])} files to {output}")
     return 0
 

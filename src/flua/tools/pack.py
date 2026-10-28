@@ -51,6 +51,6 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     output = Path(args.output) if args.output else default_fqa_output(script, annotations)
     if output.exists() and not args.force:
         parser.error(f"{output} exists — pass --force to overwrite")
-    output.write_text(json.dumps(fqa, indent=2), encoding="utf-8")
+    output.write_text(json.dumps(fqa, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"packed {fqa['name']} ({len(fqa.get('files') or [])} files) to {output}")
     return 0

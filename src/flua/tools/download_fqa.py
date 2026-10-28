@@ -51,6 +51,6 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     )
     if output.exists() and not args.force:
         parser.error(f"{output} exists — pass --force to overwrite")
-    output.write_text(json.dumps(fqa, indent=2), encoding="utf-8")
+    output.write_text(json.dumps(fqa, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"downloaded {fqa.get('name')} (id {args.id}) to {output}")
     return 0

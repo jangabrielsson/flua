@@ -148,7 +148,9 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         # the target names an existing QA: sync files, name, properties, UI
         return _update_existing(engine, parser, qa_id, fqa)
     body: dict[str, Any] = {
-        "file": base64.b64encode(json.dumps(fqa).encode("utf-8")).decode("ascii")
+        "file": base64.b64encode(
+            json.dumps(fqa, ensure_ascii=False).encode("utf-8")
+        ).decode("ascii")
     }
     if args.room is not None:
         body["roomId"] = args.room
