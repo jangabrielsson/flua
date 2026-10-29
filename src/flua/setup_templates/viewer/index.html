@@ -430,6 +430,11 @@ function renderComponent(device, component, row) {
       // (the embedded mute/unmute buttons pass 0/1 to setMute)
       if (action) deviceAction(device.id, action, component.value);
       else if (event) uiEvent(device.id, component.name, event);
+      // release the button's focus: the poll skips value refreshes while
+      // the panel contains the active element, and a clicked button keeps
+      // focus — a QA's updateView-driven label/button text changes would
+      // otherwise stay stale until a page reload (the Zone Up/Down report)
+      btn.blur();
     };
     row.appendChild(btn);
   } else if (t === "slider") {
@@ -503,6 +508,7 @@ function renderComponent(device, component, row) {
       if (action) deviceAction(device.id, action, v);
       else if (event) uiEvent(device.id, component.name, event, v);
       paint();
+      btn.blur();  // same as the button: don't hold the panel's value refresh hostage
     };
     row.appendChild(btn);
   } else if (t === "select") {
