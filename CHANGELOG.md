@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.102] - 2026-10-29
+
+### Changed
+- Implement Sec-WebSocket-Protocol header validation and handling in WsClient
+
 ## [0.1.101] - 2026-10-28
 
 ### Added
