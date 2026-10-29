@@ -2179,8 +2179,12 @@ class LuaEngine:
             int(msg["qa"]) if msg.get("qa") is not None else None,
             {"kind": "wsConnect", "url": str(msg["url"]), "ok": True},
         )
-        self._on_ws_event(conn, "connected", None)
-        self.qa_websockets.start_receiver(conn)
+        if self.qa_websockets.is_open(conn):
+            self._on_ws_event(conn, "connected", None)
+            self.qa_websockets.start_receiver(conn)
+        # else: a close() raced the handshake — the pool already closed the
+        # socket and delivered disconnected (the HC3 contract: connected is
+        # never fired after a pre-handshake close)
 
     def _handle_ws_send(self, msg: dict[str, Any]) -> None:
         logger.debug("ws send conn=%s", msg["conn"])

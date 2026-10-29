@@ -118,6 +118,25 @@ class WsClient:
                 v = str(value).strip()
                 if not n or "\r" in n or "\n" in n or "\r" in v or "\n" in v:
                     raise WsError("invalid websocket header")
+                if n.lower() == "sec-websocket-protocol":
+                    # the HC3's subprotocol handling: the value splits on
+                    # commas and each entry is a requested subprotocol — an
+                    # empty value omits the header, a non-HTTP-token entry
+                    # is a connect error, and the request joins the entries
+                    # in the canonical ", " form (wire bytes unchanged)
+                    if not v:
+                        continue
+                    entries = [entry.strip() for entry in v.split(",")]
+                    if any(
+                        not entry
+                        or re.fullmatch(r"[!#$%&'*+\-.^_`|~0-9A-Za-z]+", entry) is None
+                        for entry in entries
+                    ):
+                        raise WsError(
+                            f"invalid Sec-WebSocket-Protocol value {v!r}: "
+                            "subprotocols must be comma-separated HTTP tokens"
+                        )
+                    v = ", ".join(entries)
                 extra += f"{n}: {v}\r\n"
             request = (
                 f"GET {self._path} HTTP/1.1\r\n"
@@ -358,6 +377,7 @@ class WebSocketPool:
         self._trace = trace
         self._lock = threading.Lock()
         self._entries: dict[int, dict[str, Any]] = {}  # conn -> {client, qa}
+        self._close_requested: set[int] = set()  # close() raced the handshake
         self._counter = 0
 
     def new_slot(self, qa: int) -> int:
@@ -399,6 +419,16 @@ class WebSocketPool:
             return False, str(exc)
         with self._lock:
             entry["client"] = client
+            if conn in self._close_requested:
+                # close() arrived while the handshake was in flight: the HC3
+                # closes the socket as soon as the handshake finishes and
+                # delivers only disconnected — connected is never fired
+                self._close_requested.discard(conn)
+                close_early = True
+            else:
+                close_early = False
+        if close_early:
+            client.close()
         return True, None
 
     def start_receiver(self, conn: int) -> None:
@@ -430,6 +460,12 @@ class WebSocketPool:
         entry = self._entry(conn)
         client = entry["client"] if entry else None
         if client is None:
+            if entry is not None:
+                # the handshake is still in flight: remember the request —
+                # connect() closes the socket the moment it completes and
+                # connected is never delivered
+                with self._lock:
+                    self._close_requested.add(conn)
             return False
         client.close()
         return True

@@ -3,6 +3,7 @@
 import asyncio
 import base64
 import hashlib
+import os
 import re
 import socket
 import ssl
@@ -79,9 +80,12 @@ class EchoWsServer:
         self,
         tls_ctx: ssl.SSLContext | None = None,
         initial_frame: bytes | None = None,
+        handshake_delay: float = 0.0,
     ) -> None:
         self.seen_requests: list[bytes] = []  # raw handshakes (for assertions)
+        self.seen_frames: list[tuple[int, bytes]] = []  # frames from the client
         self.initial_frame = initial_frame  # sent with the 101 response (one segment)
+        self.handshake_delay = handshake_delay  # slow 101 (close-before-connected)
         self.listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.listener.bind(("127.0.0.1", 0))
@@ -117,6 +121,8 @@ class EchoWsServer:
             if match is None:
                 return
             self.seen_requests.append(request)
+            if self.handshake_delay:
+                time.sleep(self.handshake_delay)
             accept = base64.b64encode(
                 hashlib.sha1(match.group(1).strip() + _GUID).digest()
             ).decode()
@@ -136,6 +142,7 @@ class EchoWsServer:
                 if frame is None:
                     return
                 opcode, payload = frame
+                self.seen_frames.append((opcode, payload))
                 if opcode == 0x8:  # close
                     conn.sendall(_server_frame(0x8, payload))
                     return
@@ -393,3 +400,156 @@ async def test_websocket_debug_trace_logs_frames(capsys) -> None:
     assert any('"token":"***"' in line for line in ws_lines)
     assert not any("s3cret" in line for line in ws_lines)
     assert "tx close" in seen  # the QA's close handshake
+
+
+@pytest.mark.asyncio
+async def test_websocket_subprotocol_header_canonical_and_validated(capsys) -> None:
+    # the HC3's Sec-WebSocket-Protocol handling: entries split on commas,
+    # joined canonically (", "), and a non-HTTP-token entry is a connect
+    # error delivered through the error event
+    server = EchoWsServer()
+    seen = await _run_qa(
+        f"""
+        local ws = net.WebSocketClient()
+        ws:addEventListener("connected", function() print("CONNECTED") exit(0) end)
+        ws:addEventListener("error", function(err) print("ERROR", err) exit(0) end)
+        ws:connect("ws://127.0.0.1:{server.port}/", {{["Sec-WebSocket-Protocol"]="mqtt,  v1"}})
+        """,
+        capsys,
+        "CONNECTED",
+    )
+    assert b"Sec-WebSocket-Protocol: mqtt, v1\r\n" in server.seen_requests[0]
+    assert "ERROR" not in seen
+
+    bad = EchoWsServer()
+    seen = await _run_qa(
+        f"""
+        local ws = net.WebSocketClient()
+        ws:addEventListener("error", function(err) print("ERROR", err) exit(0) end)
+        ws:connect("ws://127.0.0.1:{bad.port}/", {{["Sec-WebSocket-Protocol"]="mq tt"}})
+        """,
+        capsys,
+        "ERROR",
+    )
+    assert "invalid Sec-WebSocket-Protocol" in seen
+
+
+@pytest.mark.asyncio
+async def test_websocket_text_send_rejects_invalid_utf8(capsys) -> None:
+    # RFC 6455: a text frame must be valid UTF-8 — invalid bytes fire the
+    # error event (pointing at sendBinary) and nothing reaches the wire
+    server = EchoWsServer()
+    seen = await _run_qa(
+        f"""
+        local ws = net.WebSocketClient()
+        ws:addEventListener("connected", function() ws:send(string.char(255)) end)
+        ws:addEventListener("error", function(err) print("ERROR", err) exit(0) end)
+        ws:connect("ws://127.0.0.1:{server.port}/")
+        """,
+        capsys,
+        "ERROR",
+    )
+    assert "sendBinary" in seen
+    await asyncio.sleep(0.3)  # give a hypothetical frame time to arrive
+    assert all(opcode != 0x1 for opcode, _ in server.seen_frames)  # no text frame
+
+
+@pytest.mark.asyncio
+async def test_websocket_close_before_connected_fires_only_disconnected(capsys) -> None:
+    # a close() while the handshake is in flight: connected is never
+    # delivered, only disconnected once the socket is down (the HC3 contract)
+    server = EchoWsServer(handshake_delay=0.5)
+    seen = await _run_qa(
+        f"""
+        local ws = net.WebSocketClient()
+        ws:addEventListener("connected", function() print("EVENT_CONNECTED") end)
+        ws:addEventListener("disconnected", function() print("EVENT_DISCONNECTED") exit(0) end)
+        ws:connect("ws://127.0.0.1:{server.port}/")
+        ws:close()
+        """,
+        capsys,
+        "EVENT_DISCONNECTED",
+    )
+    assert "EVENT_CONNECTED" not in seen, seen
+
+
+class MqttBrokerWs(EchoWsServer):
+    """Speaks just enough MQTT 3.1.1 over the websocket echo server:
+    CONNACK on CONNECT, SUBACK on SUBSCRIBE, close on DISCONNECT."""
+
+    def _handle(self, conn: socket.socket) -> None:
+        with conn:
+            request = b""
+            while b"\r\n\r\n" not in request:
+                chunk = conn.recv(4096)
+                if not chunk:
+                    return
+                request += chunk
+            match = re.search(rb"Sec-WebSocket-Key: (.+)\r\n", request)
+            if match is None:
+                return
+            accept = base64.b64encode(
+                hashlib.sha1(match.group(1).strip() + _GUID).digest()
+            ).decode()
+            response = (
+                "HTTP/1.1 101 Switching Protocols\r\n"
+                "Upgrade: websocket\r\n"
+                "Connection: Upgrade\r\n"
+                f"Sec-WebSocket-Accept: {accept}\r\n\r\n"
+            ).encode()
+            conn.sendall(response)
+            while True:
+                frame = _read_frame(conn)
+                if frame is None:
+                    return
+                opcode, payload = frame
+                if opcode == 0x8:
+                    conn.sendall(_server_frame(0x8, payload))
+                    return
+                if opcode != 0x2 or not payload:
+                    continue
+                kind = payload[0] >> 4
+                if kind == 0x1:  # CONNECT -> CONNACK (session present)
+                    conn.sendall(_server_frame(0x2, bytes([0x20, 0x02, 0x00, 0x00])))
+                elif kind == 0x8:  # SUBSCRIBE -> SUBACK (granted QoS 0)
+                    conn.sendall(_server_frame(0x2, bytes([0x90, 0x03]) + payload[2:4] + b"\x00"))
+                elif kind == 0xE:  # DISCONNECT -> done
+                    return
+
+
+def test_example_mqtt_over_websocket_runs_against_a_mock_broker() -> None:
+    # the 5.221 pattern: MQTT built in Lua on top of the websocket client —
+    # the example's CONNECT/SUBSCRIBE/DISCONNECT flow completes against a
+    # minimal broker, byte-for-byte
+    broker = MqttBrokerWs()
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--nogreet", "examples/mqtt-over-websocket.lua"],
+        cwd=REPO_ROOT,
+        env={**os.environ, "BROKER_URL": f"ws://127.0.0.1:{broker.port}/mqtt"},
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "CONNACK received" in result.stdout
+    assert "SUBACK received" in result.stdout
+
+
+def test_example_mqtt_over_websocket_terminates_without_a_broker() -> None:
+    # the example's error path: connection refused -> error event -> clean exit
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "flua",
+            "--nogreet",
+            "examples/mqtt-over-websocket.lua",
+        ],
+        cwd=REPO_ROOT,
+        env={**os.environ, "BROKER_URL": "ws://127.0.0.1:1/mqtt"},
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "ws error" in result.stdout

@@ -261,7 +261,22 @@ function WsBase:connect(url, headers, options)
 end
 
 function WsBase:send(data)
-  _PY.post{ type = "wsSend", qa = qaId, conn = self._conn, data = tostring(data) }
+  data = tostring(data)
+  -- RFC 6455: a text frame must be valid UTF-8 — invalid bytes are
+  -- rejected with an error event pointing at sendBinary (nothing is
+  -- sent), like the HC3
+  if not utf8.len(data, 1, -1, false) then
+    local list = self._listeners["error"]
+    if list then
+      for _, fn in ipairs(list) do
+        xpcall(function()
+          fn("send: data is not valid UTF-8 — use sendBinary for binary payloads")
+        end, callbackErr)
+      end
+    end
+    return
+  end
+  _PY.post{ type = "wsSend", qa = qaId, conn = self._conn, data = data }
 end
 
 function WsBase:sendBinary(data)

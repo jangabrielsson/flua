@@ -1,0 +1,3677 @@
+<!DOCTYPE html>
+<html lang="en-US" dir="ltr">
+	<head>
+		<title>MQTT over secure WebSockets - documentation - Update 5.221 BETA - Smart Home Forum by FIBARO</title>
+		
+		<!--[if lt IE 9]>
+			
+		    <script src="//forum.fibaro.com/applications/core/interface/html5shiv/html5shiv.js"></script>
+		<![endif]-->
+		
+
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+	
+	
+		<meta property="og:image" content="https://forum.fibaro.com/uploads/monthly_2019_02/smart-home-forum.png.ba1c995b4698c8474162c45bbc0466cd.png">
+	
+
+
+	<meta name="twitter:card" content="summary_large_image" />
+
+
+	
+		<meta name="twitter:site" content="@fibaro_global" />
+	
+
+
+
+	
+		
+			
+				<meta property="og:title" content="MQTT over secure WebSockets - documentation">
+			
+		
+	
+
+	
+		
+			
+				<meta property="og:type" content="website">
+			
+		
+	
+
+	
+		
+			
+				<meta property="og:url" content="https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/">
+			
+		
+	
+
+	
+		
+			
+				<meta name="description" content="Two classes, identical API: net.WebSocketClient (ws://) and net.WebSocketClientTls (wss://). namespace net { interface WebSocketClient { void connect(string url, [table headers]); void send(string data); void sendBinary(string data); bool isOpen(); void close(); void addEventListener(string event...">
+			
+		
+	
+
+	
+		
+			
+				<meta property="og:description" content="Two classes, identical API: net.WebSocketClient (ws://) and net.WebSocketClientTls (wss://). namespace net { interface WebSocketClient { void connect(string url, [table headers]); void send(string data); void sendBinary(string data); bool isOpen(); void close(); void addEventListener(string event...">
+			
+		
+	
+
+	
+		
+			
+				<meta property="og:updated_time" content="2026-10-29T10:07:04Z">
+			
+		
+	
+
+	
+		
+			
+				<meta name="keywords" content="chaneglog">
+			
+		
+	
+
+	
+		
+			
+				<meta property="og:site_name" content="Smart Home Forum by FIBARO">
+			
+		
+	
+
+	
+		
+			
+				<meta property="og:locale" content="en_US">
+			
+		
+	
+
+
+	
+		<link rel="canonical" href="https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/" />
+	
+
+
+
+
+
+<link rel="manifest" href="https://forum.fibaro.com/manifest.webmanifest/">
+<meta name="msapplication-config" content="https://forum.fibaro.com/browserconfig.xml/">
+<meta name="msapplication-starturl" content="/">
+<meta name="application-name" content="Smart Home Forum by FIBARO">
+<meta name="apple-mobile-web-app-title" content="Smart Home Forum by FIBARO">
+
+	<meta name="theme-color" content="#191818">
+
+
+
+	<link rel="mask-icon" href="https://forum.fibaro.com/uploads/monthly_2020_02/smart-home-forums-ios_svg.4ad4e15e0319033f03f7f603a365a8c3?v=1715784034" color="#ffffff">
+
+
+
+
+	
+
+	
+		
+			<link rel="icon" sizes="36x36" href="https://forum.fibaro.com/uploads/monthly_2020_02/android-chrome-36x36.png?v=1715784034">
+		
+	
+
+	
+		
+			<link rel="icon" sizes="48x48" href="https://forum.fibaro.com/uploads/monthly_2020_02/android-chrome-48x48.png?v=1715784034">
+		
+	
+
+	
+		
+			<link rel="icon" sizes="72x72" href="https://forum.fibaro.com/uploads/monthly_2020_02/android-chrome-72x72.png?v=1715784034">
+		
+	
+
+	
+		
+			<link rel="icon" sizes="96x96" href="https://forum.fibaro.com/uploads/monthly_2020_02/android-chrome-96x96.png?v=1715784034">
+		
+	
+
+	
+		
+			<link rel="icon" sizes="144x144" href="https://forum.fibaro.com/uploads/monthly_2020_02/android-chrome-144x144.png?v=1715784034">
+		
+	
+
+	
+		
+			<link rel="icon" sizes="192x192" href="https://forum.fibaro.com/uploads/monthly_2020_02/android-chrome-192x192.png?v=1715784034">
+		
+	
+
+	
+		
+			<link rel="icon" sizes="256x256" href="https://forum.fibaro.com/uploads/monthly_2020_02/android-chrome-256x256.png?v=1715784034">
+		
+	
+
+	
+		
+			<link rel="icon" sizes="384x384" href="https://forum.fibaro.com/uploads/monthly_2020_02/android-chrome-384x384.png?v=1715784034">
+		
+	
+
+	
+		
+			<link rel="icon" sizes="512x512" href="https://forum.fibaro.com/uploads/monthly_2020_02/android-chrome-512x512.png?v=1715784034">
+		
+	
+
+	
+		
+			<meta name="msapplication-square70x70logo" content="https://forum.fibaro.com/uploads/monthly_2020_02/msapplication-square70x70logo.png?v=1715784034"/>
+		
+	
+
+	
+		
+			<meta name="msapplication-TileImage" content="https://forum.fibaro.com/uploads/monthly_2020_02/msapplication-TileImage.png?v=1715784034"/>
+		
+	
+
+	
+		
+			<meta name="msapplication-square150x150logo" content="https://forum.fibaro.com/uploads/monthly_2020_02/msapplication-square150x150logo.png?v=1715784034"/>
+		
+	
+
+	
+		
+			<meta name="msapplication-wide310x150logo" content="https://forum.fibaro.com/uploads/monthly_2020_02/msapplication-wide310x150logo.png?v=1715784034"/>
+		
+	
+
+	
+		
+			<meta name="msapplication-square310x310logo" content="https://forum.fibaro.com/uploads/monthly_2020_02/msapplication-square310x310logo.png?v=1715784034"/>
+		
+	
+
+	
+		
+			
+				<link rel="apple-touch-icon" href="https://forum.fibaro.com/uploads/monthly_2020_02/apple-touch-icon-57x57.png?v=1715784034">
+			
+		
+	
+
+	
+		
+			
+				<link rel="apple-touch-icon" sizes="60x60" href="https://forum.fibaro.com/uploads/monthly_2020_02/apple-touch-icon-60x60.png?v=1715784034">
+			
+		
+	
+
+	
+		
+			
+				<link rel="apple-touch-icon" sizes="72x72" href="https://forum.fibaro.com/uploads/monthly_2020_02/apple-touch-icon-72x72.png?v=1715784034">
+			
+		
+	
+
+	
+		
+			
+				<link rel="apple-touch-icon" sizes="76x76" href="https://forum.fibaro.com/uploads/monthly_2020_02/apple-touch-icon-76x76.png?v=1715784034">
+			
+		
+	
+
+	
+		
+			
+				<link rel="apple-touch-icon" sizes="114x114" href="https://forum.fibaro.com/uploads/monthly_2020_02/apple-touch-icon-114x114.png?v=1715784034">
+			
+		
+	
+
+	
+		
+			
+				<link rel="apple-touch-icon" sizes="120x120" href="https://forum.fibaro.com/uploads/monthly_2020_02/apple-touch-icon-120x120.png?v=1715784034">
+			
+		
+	
+
+	
+		
+			
+				<link rel="apple-touch-icon" sizes="144x144" href="https://forum.fibaro.com/uploads/monthly_2020_02/apple-touch-icon-144x144.png?v=1715784034">
+			
+		
+	
+
+	
+		
+			
+				<link rel="apple-touch-icon" sizes="152x152" href="https://forum.fibaro.com/uploads/monthly_2020_02/apple-touch-icon-152x152.png?v=1715784034">
+			
+		
+	
+
+	
+		
+			
+				<link rel="apple-touch-icon" sizes="180x180" href="https://forum.fibaro.com/uploads/monthly_2020_02/apple-touch-icon-180x180.png?v=1715784034">
+			
+		
+	
+
+
+
+
+
+<link rel="preload" href="//forum.fibaro.com/applications/core/interface/font/fontawesome-webfont.woff2?v=4.7.0" as="font" crossorigin="anonymous">
+		
+
+
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+	
+
+
+
+	<link rel='stylesheet' href='https://forum.fibaro.com/uploads/css_built_13/341e4a57816af3ba440d891ca87450ff_framework.css?v=aaa94e0c9e1757681734' media='all'>
+
+	<link rel='stylesheet' href='https://forum.fibaro.com/uploads/css_built_13/05e81b71abe4f22d6eb8d1a929494829_responsive.css?v=aaa94e0c9e1757681734' media='all'>
+
+	<link rel='stylesheet' href='https://forum.fibaro.com/uploads/css_built_13/20446cf2d164adcc029377cb04d43d17_flags.css?v=aaa94e0c9e1757681734' media='all'>
+
+	<link rel='stylesheet' href='https://forum.fibaro.com/uploads/css_built_13/90eb5adf50a8c640f633d47fd7eb1778_core.css?v=aaa94e0c9e1757681734' media='all'>
+
+	<link rel='stylesheet' href='https://forum.fibaro.com/uploads/css_built_13/5a0da001ccc2200dc5625c3f3934497d_core_responsive.css?v=aaa94e0c9e1757681734' media='all'>
+
+	<link rel='stylesheet' href='https://forum.fibaro.com/uploads/css_built_13/fa14879227d11d638405bb86b9ef9148_notes.css?v=aaa94e0c9e1757681734' media='all'>
+
+	<link rel='stylesheet' href='https://forum.fibaro.com/uploads/css_built_13/62e269ced0fdab7e30e026f1d30ae516_forums.css?v=aaa94e0c9e1757681734' media='all'>
+
+	<link rel='stylesheet' href='https://forum.fibaro.com/uploads/css_built_13/76e62c573090645fb99a15a363d8620e_forums_responsive.css?v=aaa94e0c9e1757681734' media='all'>
+
+	<link rel='stylesheet' href='https://forum.fibaro.com/uploads/css_built_13/ebdea0c6a7dab6d37900b9190d3ac77b_topics.css?v=aaa94e0c9e1757681734' media='all'>
+
+
+
+
+
+<link rel='stylesheet' href='https://forum.fibaro.com/uploads/css_built_13/258adbb6e4f3e83cd3b355f84e3fa002_custom.css?v=aaa94e0c9e1757681734' media='all'>
+
+
+
+
+		
+		
+
+	
+	<link rel='shortcut icon' href='https://forum.fibaro.com/uploads/monthly_2020_02/smart-home-forum.png' type="image/png">
+
+		<meta name="google-site-verification" content="XeBD1Uzi6Zb0pBKyW50kk5GFrHfmJNtr_3-qgJVJZW0">
+		<!-- Global site tag (gtag.js) - Google Analytics -->
+		<script async src="https://www.googletagmanager.com/gtag/js?id=UA-23034710-19"></script>
+		<script>
+			window.dataLayer = window.dataLayer || [];
+			function gtag(){dataLayer.push(arguments);}
+			gtag('js', new Date());
+			gtag('config', 'UA-23034710-19');
+		</script>
+		<script>
+   			(function(h,o,t,j,a,r){
+	        h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
+        	h._hjSettings={hjid:1861014,hjsv:6};
+        	a=o.getElementsByTagName('head')[0];
+        	r=o.createElement('script');r.async=1;
+        	r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
+        	a.appendChild(r);
+    		})(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
+		</script>
+	
+
+
+<script src=""></script>
+
+
+<script>
+var theme;
+var gaProperty = '';
+var disableStr = 'ga-disable-' + gaProperty;
+var message;
+
+  
+if (0 == 0) {
+	theme = "dark-bottom";
+}
+if (0 == 1) {
+	theme = "light-bottom";
+}
+if (0 == 2) {
+	theme = "dark-top";
+}
+if (0 == 3) {
+	theme = "light-top";
+}
+if (0 == 4) {
+	theme = "dark-floating";
+}
+if (0 == 5) {
+	theme = "light-floating";
+}
+
+if (1 == 0) {
+    message = "This website uses cookies to ensure you get the best experience on our website."
+    } else {
+    message =  "We use cookies to personalize content, customize and analyze advertising and ensure the safe use of the site. By clicking or navigating this site, you consent to the collection of information at forum.fibaro.com and beyond using cookies."
+}
+  
+window.cookieconsent_options = {
+		message: ''+message+'',
+        learnMore: 'More info',
+        link: 'https://www.fibaro.com/en/privacy-policy/',
+    	dismiss: 'Got it!',
+      	theme: ''+theme+'',
+};
+
+  
+if (document.cookie.indexOf('cookieconsent_dismissed') == -1 && 0 == 1)  {
+	window[disableStr] = true;
+}
+
+  
+var domain = window.location.hostname;
+function deleteCookie(key)
+{
+	domain = domain.replace(/^www\./, "");
+	document.cookie = key + '=; Path=/; Domain=.'+domain+'; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+}
+
+  
+if (document.cookie.indexOf('_ga') > -1 && 0 == 1 && document.cookie.indexOf('cookieconsent_dismissed') == -1)  {
+    deleteCookie("_ga");
+  	deleteCookie("_gat");
+}
+  
+
+</script>
+
+</head>
+	<body class="ipsApp ipsApp_front ipsJS_has ipsClearfix" data-controller="core.front.core.app"  data-message=""  data-pageapp="forums" data-pagelocation="front" data-pagemodule="forums" data-pagecontroller="topic">
+
+<style>
+	
+#ebsGlobalMessage_dismiss a {
+	color: #ffffff;
+}
+
+.ebsGlobalMessage_custom {
+	background-color: #23c248;
+	color: #ffffff;
+}
+.ebsGlobalMessage_custom p::before {
+	content: '\\'f06a\'';
+}
+</style>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		<a href="#elContent" class="ipsHide" title="Go to main content on this page" accesskey="m">Jump to content</a>
+		
+		<div id="ipsLayout_header" class="ipsClearfix">
+			
+
+
+
+<div class='cAnnouncements' data-controller="core.front.core.announcementBanner" >
+	
+	<div class='cAnnouncementPageTop ipsJS_hide ipsAnnouncement ipsMessage_success' data-announcementId="55">
+        
+        <a href='https://forum.fibaro.com/announcement/55-guides-for-the-forum/' data-ipsDialog data-ipsDialog-title="Guides for the Forum">Guides for the Forum</a>
+        
+
+		<a href='#' data-role="dismissAnnouncement">×</a>
+	</div>
+	
+	<div class='cAnnouncementPageTop ipsJS_hide ipsAnnouncement ipsMessage_success' data-announcementId="56">
+        
+        <a href='https://forum.fibaro.com/announcement/56-poradniki-na-forum/' data-ipsDialog data-ipsDialog-title="Poradniki na Forum">Poradniki na Forum</a>
+        
+
+		<a href='#' data-role="dismissAnnouncement">×</a>
+	</div>
+	
+</div>
+
+
+
+			
+			
+<ul id="elMobileNav" class="ipsResponsive_hideDesktop" data-controller="core.front.core.mobileNav">
+
+			<li id="cCreate">
+				<a href="#elCreateNew_menu" id="elCreateNew" data-ipstooltip data-ipsmenu title="Create new content">
+					<strong><i class="fa fa-plus"></i></strong>
+				</a>
+				<div id="elCreateNew_menu" class="ipsMenu ipsMenu_auto ipsHide">
+					<ul>
+						
+							<li class="ipsMenu_item">
+								<a href="https://forum.fibaro.com/index.php?app=core&amp;module=status&amp;controller=ajaxcreate"   data-ipsdialog-remotesubmit="1"  data-ipsDialog="1"  data-role="updateStatus"    data-ipsdialog-title="Status Update"   data-ipsdialog-flashmessage="Saved" >Status</a>
+							</li>
+						
+							<li class="ipsMenu_item">
+								<a href="https://forum.fibaro.com/submit/"   data-ipsDialog="1"  data-ipsDialog-size="narrow"    data-ipsdialog-title="Select Forum"  >Topic</a>
+							</li>
+						
+							<li class="ipsMenu_item">
+								<a href="https://forum.fibaro.com/files/submit/?_new=1"   data-ipsDialog="1"  data-ipsDialog-size="narrow"    data-ipsdialog-title="Select a Category"  >File Download</a>
+							</li>
+						
+					</ul>
+				</div>
+			</li>
+			<li class="elUserNav_sep">
+
+
+	
+		
+			
+			
+				
+				
+			
+				
+				
+			
+				
+				
+			
+				
+					<li id="elMobileBreadcrumb">
+						<a href="https://forum.fibaro.com/forum/1764-update-5221-beta/">
+							<span>Update 5.221 BETA</span>
+						</a>
+					</li>
+				
+				
+			
+				
+				
+			
+		
+	
+	
+	
+	<li >
+		<a data-action="defaultStream" href="https://forum.fibaro.com/discover/unread/"><i class="fa fa-newspaper-o" aria-hidden="true"></i></a>
+	</li>
+
+	
+	<li data-ipsdrawer data-ipsdrawer-drawerelem="#elMobileCreateMenuDrawer">
+		<a href="#"><i class="fa fa-plus"></i></a>
+	</li>
+	
+
+	
+		<li class="ipsJS_show">
+			<a href="https://forum.fibaro.com/search/"><i class="fa fa-search"></i></a>
+		</li>
+	
+</ul>
+			<header>
+				<div class="ipsLayout_container">
+					
+
+
+<a href='https://forum.fibaro.com/' id='elLogo' accesskey='1'><img src="https://forum.fibaro.com/uploads/monthly_2023_05/1949060470_origialkopia.jpg.bef5ef90b11b6203f0bd5f65451d8be9.jpg" alt='Smart Home Forum by FIBARO'></a>
+
+					
+
+	<ul id="elUserNav" class="ipsList_inline cSignedIn ipsResponsive_showDesktop" data-controller="core.front.core.userbar,core.front.core.instantNotifications">
+		
+		
+			<li id="cCreate">
+				<a href="#elCreateNew_menu" id="elCreateNew" data-ipstooltip data-ipsmenu title="Create new content">
+					<i class="fa fa-plus"></i>  Create <i class="fa fa-caret-down"></i>
+				</a>
+				<div id="elCreateNew_menu" class="ipsMenu ipsMenu_auto ipsHide">
+					<ul>
+						
+							<li class="ipsMenu_item">
+								<a href="https://forum.fibaro.com/index.php?app=core&amp;module=status&amp;controller=ajaxcreate"   data-ipsdialog-remotesubmit="1"  data-ipsDialog="1"  data-role="updateStatus"    data-ipsdialog-title="Status Update"   data-ipsdialog-flashmessage="Saved" >Status</a>
+							</li>
+						
+							<li class="ipsMenu_item">
+								<a href="https://forum.fibaro.com/submit/"   data-ipsDialog="1"  data-ipsDialog-size="narrow"    data-ipsdialog-title="Select Forum"  >Topic</a>
+							</li>
+						
+							<li class="ipsMenu_item">
+								<a href="https://forum.fibaro.com/files/submit/?_new=1"   data-ipsDialog="1"  data-ipsDialog-size="narrow"    data-ipsdialog-title="Select a Category"  >File Download</a>
+							</li>
+						
+					</ul>
+				</div>
+			</li>
+			<li class="elUserNav_sep">
+		
+		<li class="cNotifications cUserNav_icon">
+			<a href="https://forum.fibaro.com/notifications/" id="elFullNotifications" data-ipstooltip title="Notifications" data-ipsmenu data-ipsmenu-closeonclick="false">
+				<i class="fa fa-bell"></i> <span class="ipsNotificationCount ipsHide" data-notificationtype="notify" data-currentcount="0">0</span>
+			</a>
+			<div id="elFullNotifications_menu" class="ipsMenu ipsMenu_wide ipsHide">
+				<div class="ipsMenu_headerBar">
+					<a href="https://forum.fibaro.com/notifications/options/" class="ipsButton ipsButton_verySmall ipsButton_link"><i class="fa fa-cog"></i> Notification Settings</a>
+					<h4 class="ipsType_sectionHead">Notifications</h4>
+				</div>
+				<div class="ipsMenu_innerContent">
+					<div id="elNotificationsBrowser" data-controller="core.front.core.notifications"></div>
+					<ol class="ipsDataList ipsDataList_readStatus" data-role="notifyList" data-ipskeynav data-ipskeynav-observe="return" id="elNotifyContent"></ol>
+				</div>
+				<div class="ipsMenu_footerBar ipsType_center">
+					<a href="https://forum.fibaro.com/notifications/"><i class="fa fa-bars"></i> View all notifications</a>
+				
+<a href='https://forum.fibaro.com/index.php?app=core&amp;module=system&amp;controller=plugins&amp;do=clearNotifications' style="margin-left: 10px"><i class='fa fa-refresh'></i> Clear notifications</a>
+</div>
+			</div>
+		</li>
+		
+			<li class="cInbox cUserNav_icon">
+				<a href="https://forum.fibaro.com/messenger/" id="elFullInbox" data-ipstooltip title="Messages"  data-ipsmenu data-ipsmenu-closeonclick="false">
+					<i class="fa fa-envelope"></i> <span class="ipsNotificationCount ipsHide" data-notificationtype="inbox" data-currentcount="0">0</span>
+				</a>
+				<div id="elFullInbox_menu" class="ipsMenu ipsMenu_wide ipsHide" data-controller="core.front.core.messengerMenu">
+					<div class="ipsMenu_headerBar">
+						<a href="https://forum.fibaro.com/messenger/compose/" data-ipsdialog data-ipsdialog-title="Compose New" data-ipsdialog-remotesubmit data-ipsdialog-destructonclose data-ipsdialog-flashmessage="Message Sent." id="elMessengerPopup_compose" class="ipsButton ipsButton_primary ipsButton_verySmall">Compose New</a>
+						<h4 class="ipsType_sectionHead">Messages</h4>
+					</div>
+					<div class="ipsMenu_innerContent"><ol class="ipsDataList" data-role="inboxList" data-ipskeynav data-ipskeynav-observe="return" id="elInboxContent"></ol></div>
+					<div class="ipsMenu_footerBar ipsType_center">
+						<a href="https://forum.fibaro.com/messenger/"><i class="fa fa-bars"></i> Go to inbox</a>
+					</div>
+				</div>
+			</li>
+		
+		
+		<li class="elUserNav_sep">
+		<li id="cUserLink">
+            
+			
+
+
+	<a href="https://forum.fibaro.com/profile/2168-jgab/" rel="nofollow" data-ipsHover data-ipsHover-width="370" data-ipsHover-target="https://forum.fibaro.com/profile/2168-jgab/?do=hovercard" class="ipsUserPhoto ipsUserPhoto_tiny" title="Go to jgab's profile">
+		<img src='data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201024%201024%22%20style%3D%22background%3A%2362c4ab%22%3E%3Cg%3E%3Ctext%20text-anchor%3D%22middle%22%20dy%3D%22.35em%22%20x%3D%22512%22%20y%3D%22512%22%20fill%3D%22%23ffffff%22%20font-size%3D%22700%22%20font-family%3D%22-apple-system%2C%20BlinkMacSystemFont%2C%20Roboto%2C%20Helvetica%2C%20Arial%2C%20sans-serif%22%3EJ%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fsvg%3E' alt='jgab' loading="lazy">
+	</a>
+
+            
+			<a href="#elUserLink_menu" id="elUserLink" data-ipsmenu>
+				jgab <i class="fa fa-caret-down"></i>
+			</a>
+			<ul id="elUserLink_menu" class="ipsMenu ipsMenu_normal ipsHide">
+				
+					<li class="ipsPadding">
+						<div class="elUserNav_achievements ipsFlex ipsGap:4 ipsGap_row:0">
+							<div class="elUserNav_achievements__icon ipsFlex-flex:00">
+<img src='https://forum.fibaro.com/uploads/monthly_2018_01/rank_premium_3@2x.png.8af6d2888cb7c93faad47becca440d31.png' loading="lazy" alt="Home Automation Guru" class="ipsDimension:5" data-ipsTooltip title="Rank: Home Automation Guru (8/8)"></div>
+							<div class="elUserNav_achievements__content ipsFlex-flex:11">
+								<div class="ipsType_light">Your Current Rank</div>
+								<div>
+<strong class="ipsType_large">Home Automation Guru</strong> (8/8)</div>
+								
+							</div>
+						</div>
+					</li>
+				
+				<li class="ipsMenu_title">Content</li>
+				
+					<li class="ipsMenu_item" data-menuitem="profile"><a href="https://forum.fibaro.com/profile/2168-jgab/" title="Go to your profile">Profile</a></li>
+				
+				
+				
+					<li class="ipsMenu_item" data-menuitem="attachments"><a href="https://forum.fibaro.com/attachments/">My Attachments</a></li>
+				
+				<li class="ipsMenu_title">Settings</li>
+				
+				
+				<li class="ipsMenu_item" data-menuitem="manageFollowed"><a href="https://forum.fibaro.com/followed/">Manage Followed Content</a></li>
+                <li class="ipsMenu_item" id="elAccountSettingsLink" data-menuitem="settings"><a href="https://forum.fibaro.com/settings/" title="Edit account settings" class="">Account Settings</a></li>
+				
+            	    <li class="ipsMenu_item" data-menuitem="ignoredUsers"><a href="https://forum.fibaro.com/ignore/">Ignored Users</a></li>
+            	
+				<li class="ipsMenu_sep"><hr></li>
+				
+					
+						<li class="ipsMenu_item" data-menuitem="modcp"><a href="https://forum.fibaro.com/modcp/">ModeratorCP</a></li>
+					
+					
+					<li class="ipsMenu_sep"><hr></li>
+				
+				<li class="ipsMenu_item" data-menuitem="signout">
+					<a href="https://forum.fibaro.com/logout/?csrfKey=99746ac5e2a1bacfbc5c71702c5d54e8">
+						Sign Out
+					</a>
+				</li>
+			</ul>
+		</li>
+	</ul>
+
+				</div>
+			</header>
+			
+
+	<nav data-controller='core.front.core.navBar' class=' ipsResponsive_showDesktop'>
+		<div class='ipsNavBar_primary ipsLayout_container '>
+			<ul data-role="primaryNavBar" class='ipsClearfix'>
+				
+
+
+	
+		
+		
+		<li  id='elNavSecondary_12' data-role="navBarItem" data-navApp="core" data-navExt="CustomItem">
+			
+			
+				<a href="http://www.fibaro.com/en" target='_blank' rel="noopener" data-navItem-id="12" >
+					FIBARO.COM<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+		</li>
+	
+	
+
+	
+		
+		
+			
+		
+		<li class='ipsNavBar_active' data-active id='elNavSecondary_1' data-role="navBarItem" data-navApp="core" data-navExt="CustomItem">
+			
+			
+				<a href="https://forum.fibaro.com"  data-navItem-id="1" data-navDefault>
+					FORUM<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+				<ul class='ipsNavBar_secondary ' data-role='secondaryNavBar'>
+					
+
+
+	
+		
+		
+			
+		
+		<li class='ipsNavBar_active' data-active id='elNavSecondary_8' data-role="navBarItem" data-navApp="forums" data-navExt="Forums">
+			
+			
+				<a href="https://forum.fibaro.com"  data-navItem-id="8" data-navDefault>
+					Forums<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+		</li>
+	
+	
+
+	
+		
+		
+		<li  id='elNavSecondary_10' data-role="navBarItem" data-navApp="core" data-navExt="StaffDirectory">
+			
+			
+				<a href="https://forum.fibaro.com/staff/"  data-navItem-id="10" >
+					Staff<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+		</li>
+	
+	
+
+	
+		
+		
+		<li  id='elNavSecondary_11' data-role="navBarItem" data-navApp="core" data-navExt="OnlineUsers">
+			
+			
+				<a href="https://forum.fibaro.com/online/"  data-navItem-id="11" >
+					Online Users<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+		</li>
+	
+	
+
+					<li class='ipsHide' id='elNavigationMore_1' data-role='navMore'>
+						<a href='#' data-ipsMenu data-ipsMenu-appendTo='#elNavigationMore_1' id='elNavigationMore_1_dropdown'>More <i class='fa fa-caret-down'></i></a>
+						<ul class='ipsHide ipsMenu ipsMenu_auto' id='elNavigationMore_1_dropdown_menu' data-role='moreDropdown'></ul>
+					</li>
+				</ul>
+			
+		</li>
+	
+	
+
+	
+		
+		
+		<li  id='elNavSecondary_2' data-role="navBarItem" data-navApp="core" data-navExt="CustomItem">
+			
+			
+				<a href="https://forum.fibaro.com/discover/?amp="  data-navItem-id="2" >
+					ACTIVITY<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+				<ul class='ipsNavBar_secondary ipsHide' data-role='secondaryNavBar'>
+					
+
+
+	
+		
+		
+		<li  id='elNavSecondary_3' data-role="navBarItem" data-navApp="core" data-navExt="AllActivity">
+			
+			
+				<a href="https://forum.fibaro.com/discover/"  data-navItem-id="3" >
+					All Activity<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+		</li>
+	
+	
+
+	
+		
+		
+		<li  id='elNavSecondary_4' data-role="navBarItem" data-navApp="core" data-navExt="YourActivityStreams">
+			
+			
+				<a href="#" id="elNavigation_4" data-ipsMenu data-ipsMenu-appendTo='#elNavSecondary_2' data-ipsMenu-activeClass='ipsNavActive_menu' data-navItem-id="4" >
+					My Activity Streams <i class="fa fa-caret-down"></i><span class='ipsNavBar_active__identifier'></span>
+				</a>
+				<ul id="elNavigation_4_menu" class="ipsMenu ipsMenu_auto ipsHide">
+					
+
+	
+		
+			<li class='ipsMenu_title'>
+				Default Streams
+			</li>
+		
+	
+
+	
+		
+			<li class='ipsMenu_item' data-streamid='1'>
+				<a href='https://forum.fibaro.com/discover/unread/' >
+					Unread Content
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li class='ipsMenu_item' data-streamid='2'>
+				<a href='https://forum.fibaro.com/discover/content-started/' >
+					Content I Started
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li class='ipsMenu_item' data-streamid='5'>
+				<a href='https://forum.fibaro.com/discover/content-posted/' >
+					Content I Posted In
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li class='ipsMenu_item' data-streamid='3'>
+				<a href='https://forum.fibaro.com/discover/followed-content/' >
+					Content I Follow
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li class='ipsMenu_item' data-streamid='4'>
+				<a href='https://forum.fibaro.com/discover/followed-members/' >
+					Members I Follow
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li class='ipsMenu_title'>
+				Custom Streams
+			</li>
+		
+	
+
+	
+		
+			<li class='ipsMenu_item' data-streamid='26'>
+				<a href='https://forum.fibaro.com/discover/26/' >
+					Content I Started
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li class='ipsMenu_item' data-streamid='29'>
+				<a href='https://forum.fibaro.com/discover/29/' >
+					Unread Content
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li class='ipsMenu_sep'>
+				<hr>
+			</li>
+		
+	
+
+	
+		
+			<li class='ipsPad_half'>
+				<a href='https://forum.fibaro.com/discover/?do=create' class='ipsButton ipsButton_primary ipsButton_verySmall ipsButton_fullWidth'>
+					Create New Stream
+				</a>
+			</li>
+		
+	
+
+				</ul>
+			
+			
+		</li>
+	
+	
+
+	
+		
+		
+		<li  id='elNavSecondary_23' data-role="navBarItem" data-navApp="core" data-navExt="YourActivityStreamsItem">
+			
+			
+				<a href="https://forum.fibaro.com/discover/content-started/"  data-navItem-id="23" >
+					Content I Started<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+		</li>
+	
+	
+
+	
+		
+		
+		<li  id='elNavSecondary_7' data-role="navBarItem" data-navApp="core" data-navExt="Search">
+			
+			
+				<a href="https://forum.fibaro.com/search/"  data-navItem-id="7" >
+					Search<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+		</li>
+	
+	
+
+					<li class='ipsHide' id='elNavigationMore_2' data-role='navMore'>
+						<a href='#' data-ipsMenu data-ipsMenu-appendTo='#elNavigationMore_2' id='elNavigationMore_2_dropdown'>More <i class='fa fa-caret-down'></i></a>
+						<ul class='ipsHide ipsMenu ipsMenu_auto' id='elNavigationMore_2_dropdown_menu' data-role='moreDropdown'></ul>
+					</li>
+				</ul>
+			
+		</li>
+	
+	
+
+	
+		
+		
+		<li  id='elNavSecondary_19' data-role="navBarItem" data-navApp="core" data-navExt="CustomItem">
+			
+			
+				<a href="https://forum.fibaro.com/?amp="  data-navItem-id="19" >
+					KNOWLEDGE<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+				<ul class='ipsNavBar_secondary ipsHide' data-role='secondaryNavBar'>
+					
+
+
+	
+		
+		
+		<li  id='elNavSecondary_21' data-role="navBarItem" data-navApp="core" data-navExt="CustomItem">
+			
+			
+				<a href="http://manuals.fibaro.com/" target='_blank' rel="noopener" data-navItem-id="21" >
+					MANUALS<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+		</li>
+	
+	
+
+	
+		
+		
+		<li  id='elNavSecondary_25' data-role="navBarItem" data-navApp="core" data-navExt="CustomItem">
+			
+			
+				<a href="http://manuals.fibaro.com/knowledge-base/" target='_blank' rel="noopener" data-navItem-id="25" >
+					KNOWLEDGE BASE<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+		</li>
+	
+	
+
+	
+		
+		
+		<li  id='elNavSecondary_31' data-role="navBarItem" data-navApp="core" data-navExt="CustomItem">
+			
+			
+				<a href="https://compatibility.fibaro.com/" target='_blank' rel="noopener" data-navItem-id="31" >
+					COMPATIBILITY<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+		</li>
+	
+	
+
+					<li class='ipsHide' id='elNavigationMore_19' data-role='navMore'>
+						<a href='#' data-ipsMenu data-ipsMenu-appendTo='#elNavigationMore_19' id='elNavigationMore_19_dropdown'>More <i class='fa fa-caret-down'></i></a>
+						<ul class='ipsHide ipsMenu ipsMenu_auto' id='elNavigationMore_19_dropdown_menu' data-role='moreDropdown'></ul>
+					</li>
+				</ul>
+			
+		</li>
+	
+	
+
+	
+		
+		
+		<li  id='elNavSecondary_28' data-role="navBarItem" data-navApp="core" data-navExt="CustomItem">
+			
+			
+				<a href="https://forum.fibaro.com/files/" target='_blank' rel="noopener" data-navItem-id="28" >
+					DOWNLOADS<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+				<ul class='ipsNavBar_secondary ipsHide' data-role='secondaryNavBar'>
+					
+
+
+	
+		
+		
+		<li  id='elNavSecondary_33' data-role="navBarItem" data-navApp="core" data-navExt="CustomItem">
+			
+			
+				<a href="https://forum.fibaro.com/files/submit/?_new=1"  data-navItem-id="33" >
+					Submit a file<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+		</li>
+	
+	
+
+	
+		
+		
+		<li  id='elNavSecondary_35' data-role="navBarItem" data-navApp="core" data-navExt="CustomItem">
+			
+			
+				<a href="https://forum.fibaro.com/files/category/2-scenes/"  data-navItem-id="35" >
+					Scenes<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+		</li>
+	
+	
+
+	
+		
+		
+		<li  id='elNavSecondary_36' data-role="navBarItem" data-navApp="core" data-navExt="CustomItem">
+			
+			
+				<a href="https://forum.fibaro.com/files/category/3-virtual-devices/"  data-navItem-id="36" >
+					Virtual Devices<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+		</li>
+	
+	
+
+	
+		
+		
+		<li  id='elNavSecondary_39' data-role="navBarItem" data-navApp="core" data-navExt="CustomItem">
+			
+			
+				<a href="https://forum.fibaro.com/files/category/5-quick-apps/"  data-navItem-id="39" >
+					Quick Apps<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+		</li>
+	
+	
+
+	
+		
+		
+		<li  id='elNavSecondary_37' data-role="navBarItem" data-navApp="core" data-navExt="CustomItem">
+			
+			
+				<a href="https://forum.fibaro.com/files/category/4-icons/"  data-navItem-id="37" >
+					Icons<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+		</li>
+	
+	
+
+					<li class='ipsHide' id='elNavigationMore_28' data-role='navMore'>
+						<a href='#' data-ipsMenu data-ipsMenu-appendTo='#elNavigationMore_28' id='elNavigationMore_28_dropdown'>More <i class='fa fa-caret-down'></i></a>
+						<ul class='ipsHide ipsMenu ipsMenu_auto' id='elNavigationMore_28_dropdown_menu' data-role='moreDropdown'></ul>
+					</li>
+				</ul>
+			
+		</li>
+	
+	
+
+	
+		
+		
+		<li  id='elNavSecondary_30' data-role="navBarItem" data-navApp="core" data-navExt="CustomItem">
+			
+			
+				<a href="https://fibaro.com/en/support" target='_blank' rel="noopener" data-navItem-id="30" >
+					SUPPORT<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+				<ul class='ipsNavBar_secondary ipsHide' data-role='secondaryNavBar'>
+					
+
+
+	
+		
+		
+		<li  id='elNavSecondary_34' data-role="navBarItem" data-navApp="core" data-navExt="CustomItem">
+			
+			
+				<a href="https://support.fibaro.com/"  data-navItem-id="34" >
+					Contact Support<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+		</li>
+	
+	
+
+	
+		
+		
+		<li  id='elNavSecondary_32' data-role="navBarItem" data-navApp="core" data-navExt="CustomItem">
+			
+			
+				<a href="http://more.fibaro.com" target='_blank' rel="noopener" data-navItem-id="32" >
+					FIBARO Services<span class='ipsNavBar_active__identifier'></span>
+				</a>
+			
+			
+		</li>
+	
+	
+
+					<li class='ipsHide' id='elNavigationMore_30' data-role='navMore'>
+						<a href='#' data-ipsMenu data-ipsMenu-appendTo='#elNavigationMore_30' id='elNavigationMore_30_dropdown'>More <i class='fa fa-caret-down'></i></a>
+						<ul class='ipsHide ipsMenu ipsMenu_auto' id='elNavigationMore_30_dropdown_menu' data-role='moreDropdown'></ul>
+					</li>
+				</ul>
+			
+		</li>
+	
+	
+
+	
+	
+
+	
+	
+
+				<li class='ipsHide' id='elNavigationMore' data-role='navMore'>
+					<a href='#' data-ipsMenu data-ipsMenu-appendTo='#elNavigationMore' id='elNavigationMore_dropdown'>More</a>
+					<ul class='ipsNavBar_secondary ipsHide' data-role='secondaryNavBar'>
+						<li class='ipsHide' id='elNavigationMore_more' data-role='navMore'>
+							<a href='#' data-ipsMenu data-ipsMenu-appendTo='#elNavigationMore_more' id='elNavigationMore_more_dropdown'>More <i class='fa fa-caret-down'></i></a>
+							<ul class='ipsHide ipsMenu ipsMenu_auto' id='elNavigationMore_more_dropdown_menu' data-role='moreDropdown'></ul>
+						</li>
+					</ul>
+				</li>
+			</ul>
+			
+
+	<div id="elSearchWrapper">
+		<div id='elSearch' data-controller="core.front.core.quickSearch">
+			<form accept-charset='utf-8' action='//forum.fibaro.com/search/?do=quicksearch' method='post'>
+                <input type='search' id='elSearchField' placeholder='Search...' name='q' autocomplete='off' aria-label='Search'>
+                <details class='cSearchFilter'>
+                    <summary class='cSearchFilter__text'></summary>
+                    <ul class='cSearchFilter__menu'>
+                        
+                        <li><label><input type="radio" name="type" value="all" ><span class='cSearchFilter__menuText'>Everywhere</span></label></li>
+                        
+                            
+                                <li><label><input type="radio" name="type" value='contextual_{&quot;type&quot;:&quot;forums_topic&quot;,&quot;nodes&quot;:1764}' checked><span class='cSearchFilter__menuText'>This Forum</span></label></li>
+                            
+                                <li><label><input type="radio" name="type" value='contextual_{&quot;type&quot;:&quot;forums_topic&quot;,&quot;item&quot;:80470}' checked><span class='cSearchFilter__menuText'>This Topic</span></label></li>
+                            
+                        
+                        
+                            <li><label><input type="radio" name="type" value="core_statuses_status"><span class='cSearchFilter__menuText'>Status Updates</span></label></li>
+                        
+                            <li><label><input type="radio" name="type" value="forums_topic"><span class='cSearchFilter__menuText'>Topics</span></label></li>
+                        
+                            <li><label><input type="radio" name="type" value="downloads_file"><span class='cSearchFilter__menuText'>Files</span></label></li>
+                        
+                            <li><label><input type="radio" name="type" value="core_members"><span class='cSearchFilter__menuText'>Members</span></label></li>
+                        
+                    </ul>
+                </details>
+				<button class='cSearchSubmit' type="submit" aria-label='Search'><i class="fa fa-search"></i></button>
+			</form>
+		</div>
+	</div>
+
+		</div>
+	</nav>
+
+		</div>
+		<main id="ipsLayout_body" class="ipsLayout_container">
+			<div id="ipsLayout_contentArea">
+				<div id="ipsLayout_contentWrapper">
+					
+<nav class='ipsBreadcrumb ipsBreadcrumb_top ipsFaded_withHover'>
+	
+
+	<ul class='ipsList_inline ipsPos_right'>
+		
+		<li >
+			<a data-action="defaultStream" class='ipsType_light '  href='https://forum.fibaro.com/discover/unread/'><i class="fa fa-newspaper-o" aria-hidden="true"></i> <span>Unread Content</span></a>
+		</li>
+		
+			<li>
+				<a data-action="markSiteRead" class='ipsType_light' data-controller="core.front.core.markRead" href='https://forum.fibaro.com/markallread/?csrfKey=99746ac5e2a1bacfbc5c71702c5d54e8&amp;ref=aHR0cHM6Ly9mb3J1bS5maWJhcm8uY29tL3RvcGljLzgwNDcwLW1xdHQtb3Zlci1zZWN1cmUtd2Vic29ja2V0cy1kb2N1bWVudGF0aW9uLw==' title='Mark all content on the site as read' data-ipsTooltip><i class='fa fa-check' aria-hidden="true"></i> Mark site read</a>
+			</li>
+		
+	</ul>
+
+	<ul data-role="breadcrumbList">
+		<li>
+			<a title="Home" href='https://forum.fibaro.com/'>
+				<span>Home <i class='fa fa-angle-right'></i></span>
+			</a>
+		</li>
+		
+		
+			<li>
+				
+					<a href='https://forum.fibaro.com/forum/26-fibaro-update/'>
+						<span>FIBARO Update <i class='fa fa-angle-right' aria-hidden="true"></i></span>
+					</a>
+				
+			</li>
+		
+			<li>
+				
+					<a href='https://forum.fibaro.com/forum/27-fibaro-system-update/'>
+						<span>FIBARO System Update <i class='fa fa-angle-right' aria-hidden="true"></i></span>
+					</a>
+				
+			</li>
+		
+			<li>
+				
+					<a href='https://forum.fibaro.com/forum/1265-yubii-home/'>
+						<span>Yubii Home <i class='fa fa-angle-right' aria-hidden="true"></i></span>
+					</a>
+				
+			</li>
+		
+			<li>
+				
+					<a href='https://forum.fibaro.com/forum/1764-update-5221-beta/'>
+						<span>Update 5.221 BETA <i class='fa fa-angle-right' aria-hidden="true"></i></span>
+					</a>
+				
+			</li>
+		
+			<li>
+				
+					MQTT over secure WebSockets - documentation
+				
+			</li>
+		
+	</ul>
+</nav>
+					
+					<div id="ipsLayout_mainArea">
+						<a id="elContent"></a>
+						
+						
+						
+						
+
+	
+
+
+
+
+						
+
+
+
+<div class="ipsPageHeader ipsResponsive_pull ipsBox ipsPadding sm:ipsPadding:half ipsMargin_bottom">
+		
+	
+	<div class="ipsFlex ipsFlex-ai:center ipsFlex-fw:wrap ipsGap:4">
+		<div class="ipsFlex-flex:11">
+			<h1 class="ipsType_pageTitle ipsContained_container">
+				
+                    
+                    
+					
+						<span><span class="ipsBadge ipsBadge_icon ipsBadge_positive" data-ipstooltip title="Pinned"><i class="fa fa-thumb-tack"></i></span></span>
+					
+					
+				
+
+				
+					<span  >
+						
+
+	<a href="https://forum.fibaro.com/tags/chaneglog/" title="Find other content tagged with 'chaneglog'" class='ipsTag_prefix' rel="tag" data-tag-label='chaneglog'><span>chaneglog</span></a>
+
+					</span>
+				
+				
+					<span class="ipsType_break ipsContained">
+						<span>MQTT over secure WebSockets - documentation</span>
+					</span>
+				
+			</h1>
+			
+			
+		</div>
+		
+	</div>
+	<hr class="ipsHr">
+	<div class="ipsPageHeader__meta ipsFlex ipsFlex-jc:between ipsFlex-ai:center ipsFlex-fw:wrap ipsGap:3">
+		<div class="ipsFlex-flex:11">
+			<div class="ipsPhotoPanel ipsPhotoPanel_mini ipsPhotoPanel_notPhone ipsClearfix">
+				
+
+
+	<a href="https://forum.fibaro.com/profile/45608-kdrozynski/?wr=eyJhcHAiOiJmb3J1bXMiLCJtb2R1bGUiOiJmb3J1bXMiLCJpZF8xIjo4MDQ3MH0=" rel="nofollow" data-ipsHover data-ipsHover-width="370" data-ipsHover-target="https://forum.fibaro.com/profile/45608-kdrozynski/?wr=eyJhcHAiOiJmb3J1bXMiLCJtb2R1bGUiOiJmb3J1bXMiLCJpZF8xIjo4MDQ3MH0=&amp;do=hovercard" class="ipsUserPhoto ipsUserPhoto_mini" title="Go to K.Drozynski's profile">
+		<img src='data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201024%201024%22%20style%3D%22background%3A%2399c462%22%3E%3Cg%3E%3Ctext%20text-anchor%3D%22middle%22%20dy%3D%22.35em%22%20x%3D%22512%22%20y%3D%22512%22%20fill%3D%22%23ffffff%22%20font-size%3D%22700%22%20font-family%3D%22-apple-system%2C%20BlinkMacSystemFont%2C%20Roboto%2C%20Helvetica%2C%20Arial%2C%20sans-serif%22%3EK%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fsvg%3E' alt='K.Drozynski' loading="lazy">
+	</a>
+
+				<div>
+					<p class="ipsType_reset ipsType_blendLinks">
+						<span class="ipsType_normal">
+						
+							<strong>By 
+
+
+<a href='https://forum.fibaro.com/profile/45608-kdrozynski/?wr=eyJhcHAiOiJmb3J1bXMiLCJtb2R1bGUiOiJmb3J1bXMiLCJpZF8xIjo4MDQ3MH0=' rel="nofollow" data-ipsHover data-ipsHover-width='370' data-ipsHover-target='https://forum.fibaro.com/profile/45608-kdrozynski/?do=hovercard&amp;wr=eyJhcHAiOiJmb3J1bXMiLCJtb2R1bGUiOiJmb3J1bXMiLCJpZF8xIjo4MDQ3MH0=&amp;referrer=https%253A%252F%252Fforum.fibaro.com%252Ftopic%252F80470-mqtt-over-secure-websockets-documentation%252F' title="Go to K.Drozynski's profile" class="ipsType_break">K.Drozynski</a></strong><br>
+							<span class="ipsType_light"><time datetime='2026-10-29T10:07:04Z' title='10/29/2026 11:07  AM' data-short='6 hr'>6 hours ago</time> in <a href="https://forum.fibaro.com/forum/1764-update-5221-beta/">Update 5.221 BETA</a></span>
+						
+						</span>
+					</p>
+				</div>
+			</div>
+		</div>
+		
+			<div class="ipsFlex-flex:01 ipsResponsive_hidePhone">
+				<div class="ipsShareLinks">
+					
+						
+
+
+    <a href='#elShareItem_289087947_menu' id='elShareItem_289087947' data-ipsMenu class='ipsShareButton ipsButton ipsButton_verySmall ipsButton_link ipsButton_link--light'>
+        <span><i class='fa fa-share-alt'></i></span> &nbsp;Share
+    </a>
+
+    <div class='ipsPadding ipsMenu ipsMenu_normal ipsHide' id='elShareItem_289087947_menu' data-controller="core.front.core.sharelink">
+        
+        
+        <span data-ipsCopy data-ipsCopy-flashmessage>
+            <a href="https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/" class="ipsButton ipsButton_light ipsButton_small ipsButton_fullWidth" data-role="copyButton" data-clipboard-text="https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/" data-ipstooltip title='Copy Link to Clipboard'><i class="fa fa-clone"></i> https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/</a>
+        </span>
+        <ul class='ipsShareLinks ipsMargin_top:half'>
+            
+                <li>
+<a href="https://x.com/share?url=https%3A%2F%2Fforum.fibaro.com%2Ftopic%2F80470-mqtt-over-secure-websockets-documentation%2F" class="cShareLink cShareLink_x" target="_blank" data-role="shareLink" title='Share on X' data-ipsTooltip rel='nofollow noopener'>
+    <i class="fa fa-x"></i>
+</a></li>
+            
+                <li>
+<a href="https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fforum.fibaro.com%2Ftopic%2F80470-mqtt-over-secure-websockets-documentation%2F" class="cShareLink cShareLink_facebook" target="_blank" data-role="shareLink" title='Share on Facebook' data-ipsTooltip rel='noopener nofollow'>
+	<i class="fa fa-facebook"></i>
+</a></li>
+            
+                <li>
+<a href="https://www.reddit.com/submit?url=https%3A%2F%2Fforum.fibaro.com%2Ftopic%2F80470-mqtt-over-secure-websockets-documentation%2F&amp;title=MQTT+over+secure+WebSockets+-+documentation" rel="nofollow noopener" class="cShareLink cShareLink_reddit" target="_blank" title='Share on Reddit' data-ipsTooltip>
+	<i class="fa fa-reddit"></i>
+</a></li>
+            
+                <li>
+<a href="/cdn-cgi/l/email-protection#5b64282e39313e382f66160a0f0f7e696b342d3e297e696b283e382e293e7e696b0c3e39083438303e2f287e696b767e696b3f34382e363e352f3a2f3234357d39343f2266332f2f2b287e681a7e691d7e691d3d34292e36753d32393a2934753834367e691d2f342b32387e691d636b6f6c6b76362a2f2f76342d3e2976283e382e293e762c3e39283438303e2f28763f34382e363e352f3a2f3234357e691d" rel='nofollow' class='cShareLink cShareLink_email' title='Share via email' data-ipsTooltip>
+	<i class="fa fa-envelope"></i>
+</a></li>
+            
+                <li>
+<a href="https://pinterest.com/pin/create/button/?url=https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/&amp;media=https://forum.fibaro.com/uploads/monthly_2019_02/smart-home-forum.png.ba1c995b4698c8474162c45bbc0466cd.png" class="cShareLink cShareLink_pinterest" rel="nofollow noopener" target="_blank" data-role="shareLink" title='Share on Pinterest' data-ipsTooltip>
+	<i class="fa fa-pinterest"></i>
+</a></li>
+            
+        </ul>
+        
+            <hr class='ipsHr'>
+            <button class='ipsHide ipsButton ipsButton_verySmall ipsButton_light ipsButton_fullWidth ipsMargin_top:half' data-controller='core.front.core.webshare' data-role='webShare' data-webShareTitle='MQTT over secure WebSockets - documentation' data-webShareText='MQTT over secure WebSockets - documentation' data-webShareUrl='https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/'>More sharing options...</button>
+        
+    </div>
+
+					
+					
+                    
+
+					
+
+
+
+					
+
+<div data-followApp='forums' data-followArea='topic' data-followID='80470' data-controller='core.front.core.followButton'>
+	
+
+		
+		<div class="ipsFollow ipsButton ipsButton_light ipsButton_verySmall" data-role="followButton" data-following="false">
+			<a href="https://forum.fibaro.com/index.php?app=core&amp;module=system&amp;controller=notifications&amp;do=follow&amp;follow_app=forums&amp;follow_area=topic&amp;follow_id=80470" rel="nofollow" title="Follow this content" data-ipsTooltip class="ipsType_blendLinks ipsType_noUnderline" data-ipsHover data-ipsHover-cache='false' data-ipsHover-onClick>Follow</a>
+			
+				<span class='ipsCommentCount'>0</span>
+			
+		</div>
+	
+
+</div>
+				</div>
+			</div>
+					
+	</div>
+	
+	
+</div>
+
+
+
+
+
+
+
+
+<div class="ipsClearfix">
+	<ul class="ipsToolList ipsToolList_horizontal ipsClearfix ipsSpacer_both ">
+		
+		
+			<li class="ipsResponsive_hidePhone">
+				
+					<a href="https://forum.fibaro.com/forum/1764-update-5221-beta/?do=add" rel="nofollow" class="ipsButton ipsButton_link ipsButton_medium ipsButton_fullWidth" title="Start a new topic in this forum">Start a topic</a>
+				
+			</li>
+		
+		
+			<li>
+				<a href="#elTopicActions_menu" id="elTopicActions" class="ipsButton ipsButton_link ipsButton_medium ipsButton_fullWidth" data-ipsmenu>Moderate topic <i class="fa fa-caret-down"></i></a>
+				<ul id="elTopicActions_menu" class="ipsMenu ipsMenu_auto ipsHide">
+					
+                        
+										
+							<li class="ipsMenu_item"><a href="https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/?csrfKey=99746ac5e2a1bacfbc5c71702c5d54e8&amp;do=moderate&amp;action=feature">Feature</a></li>
+						
+						
+						
+						
+										
+							<li class="ipsMenu_item"><a href="https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/?csrfKey=99746ac5e2a1bacfbc5c71702c5d54e8&amp;do=moderate&amp;action=hide" data-ipsdialog data-ipsdialog-size="medium" data-ipsdialog-title="Hide" data-ipsdialog-destructonclose="true">Hide</a></li>
+						
+						
+						
+						
+						
+						
+						
+                        
+						
+						
+						
+						
+					
+					
+				</ul>
+			</li>
+		
+	</ul>
+</div>
+
+<div id="comments" data-controller="core.front.core.commentFeed,forums.front.topic.view, core.front.core.ignoredComments,postnotes.front.notes" data-autopoll data-baseurl="https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/" data-lastpage data-feedid="topic-80470" class="cTopic ipsClear ipsSpacer_top">
+	
+			
+	
+
+	
+
+<div data-controller='core.front.core.recommendedComments' data-url='https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/?recommended=comments' class='ipsRecommendedComments ipsHide'>
+	<div data-role="recommendedComments">
+		<h2 class='ipsType_sectionHead ipsType_large ipsType_bold ipsMargin_bottom'>Recommended Posts</h2>
+		
+	</div>
+</div>
+	
+	<div id="elPostFeed" data-role="commentFeed" data-controller="core.front.core.moderation" >
+		<form action="https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/?csrfKey=99746ac5e2a1bacfbc5c71702c5d54e8&amp;do=multimodComment" method="post" data-ipspageaction data-role="moderationTools">
+			
+			
+				
+
+					
+
+					
+					
+
+
+
+
+<a id="comment-298499"></a>
+<article  id="elComment_298499" class="cPost ipsBox  ipsComment  ipsComment_parent ipsClearfix ipsClear ipsColumns ipsColumns_noSpacing ipsColumns_collapsePhone  ">
+	
+
+	<div class="cAuthorPane cAuthorPane_mobile ipsResponsive_showPhone ipsResponsive_block">
+		<h3 class="ipsType_sectionHead cAuthorPane_author ipsResponsive_showPhone ipsResponsive_inlineBlock ipsType_break ipsType_blendLinks ipsTruncate ipsTruncate_line">
+			
+
+
+<a href='https://forum.fibaro.com/profile/45608-kdrozynski/?wr=eyJhcHAiOiJmb3J1bXMiLCJtb2R1bGUiOiJmb3J1bXMtY29tbWVudCIsImlkXzEiOjgwNDcwLCJpZF8yIjoyOTg0OTl9' rel="nofollow" data-ipsHover data-ipsHover-width='370' data-ipsHover-target='https://forum.fibaro.com/profile/45608-kdrozynski/?do=hovercard&amp;wr=eyJhcHAiOiJmb3J1bXMiLCJtb2R1bGUiOiJmb3J1bXMtY29tbWVudCIsImlkXzEiOjgwNDcwLCJpZF8yIjoyOTg0OTl9&amp;referrer=https%253A%252F%252Fforum.fibaro.com%252Ftopic%252F80470-mqtt-over-secure-websockets-documentation%252F' title="Go to K.Drozynski's profile" class="ipsType_break"><b><span style='color:#E61A00;'>K.Drozynski</span></b></a>
+			<span class="ipsResponsive_showPhone ipsResponsive_inline">  
+
+	
+		<a href='https://forum.fibaro.com/profile/45608-kdrozynski/reputation/' title="Member's total reputation" data-ipsTooltip class='ipsRepBadge ipsRepBadge_positive'>
+	
+			<i class='fa fa-plus-circle'></i> 134
+	
+		</a>
+	
+</span>
+		</h3>
+		<div class="cAuthorPane_photo">
+			
+
+
+	<a href="https://forum.fibaro.com/profile/45608-kdrozynski/?wr=eyJhcHAiOiJmb3J1bXMiLCJtb2R1bGUiOiJmb3J1bXMtY29tbWVudCIsImlkXzEiOjgwNDcwLCJpZF8yIjoyOTg0OTl9" rel="nofollow" data-ipsHover data-ipsHover-width="370" data-ipsHover-target="https://forum.fibaro.com/profile/45608-kdrozynski/?wr=eyJhcHAiOiJmb3J1bXMiLCJtb2R1bGUiOiJmb3J1bXMtY29tbWVudCIsImlkXzEiOjgwNDcwLCJpZF8yIjoyOTg0OTl9&amp;do=hovercard" class="ipsUserPhoto ipsUserPhoto_large" title="Go to K.Drozynski's profile">
+		<img src='data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201024%201024%22%20style%3D%22background%3A%2399c462%22%3E%3Cg%3E%3Ctext%20text-anchor%3D%22middle%22%20dy%3D%22.35em%22%20x%3D%22512%22%20y%3D%22512%22%20fill%3D%22%23ffffff%22%20font-size%3D%22700%22%20font-family%3D%22-apple-system%2C%20BlinkMacSystemFont%2C%20Roboto%2C%20Helvetica%2C%20Arial%2C%20sans-serif%22%3EK%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fsvg%3E' alt='K.Drozynski' loading="lazy">
+	</a>
+
+		</div>
+
+
+
+	</div>
+	<aside class="ipsComment_author cAuthorPane ipsColumn ipsColumn_medium ipsResponsive_hidePhone">
+		<h3 class="ipsType_sectionHead cAuthorPane_author ipsType_blendLinks ipsType_break">
+<strong>
+  
+    
+
+
+<a href='https://forum.fibaro.com/profile/45608-kdrozynski/?wr=eyJhcHAiOiJmb3J1bXMiLCJtb2R1bGUiOiJmb3J1bXMtY29tbWVudCIsImlkXzEiOjgwNDcwLCJpZF8yIjoyOTg0OTl9' rel="nofollow" data-ipsHover data-ipsHover-width='370' data-ipsHover-target='https://forum.fibaro.com/profile/45608-kdrozynski/?do=hovercard&amp;wr=eyJhcHAiOiJmb3J1bXMiLCJtb2R1bGUiOiJmb3J1bXMtY29tbWVudCIsImlkXzEiOjgwNDcwLCJpZF8yIjoyOTg0OTl9&amp;referrer=https%253A%252F%252Fforum.fibaro.com%252Ftopic%252F80470-mqtt-over-secure-websockets-documentation%252F' title="Go to K.Drozynski's profile" class="ipsType_break">K.Drozynski</a>
+  
+</strong> <span class="ipsResponsive_showPhone ipsResponsive_inline">  
+
+	
+		<a href='https://forum.fibaro.com/profile/45608-kdrozynski/reputation/' title="Member's total reputation" data-ipsTooltip class='ipsRepBadge ipsRepBadge_positive'>
+	
+			<i class='fa fa-plus-circle'></i> 134
+	
+		</a>
+	
+</span>
+</h3>
+		
+		<ul class="cAuthorPane_info ipsList_reset">
+			
+				 <li class="ipsType_break">Contributor</li>
+			
+			
+				<li>
+<img src='https://forum.fibaro.com/uploads/monthly_2018_01/rank_4@2x.png.33c3d5a3971779babc6b88960603d18b.png' loading="lazy" alt="Contributor"  data-ipsTooltip title="Rank: Contributor (4/8)"></li>
+			
+
+			
+
+
+<li class="cAuthorPane_photo">
+				
+
+
+	<a href="https://forum.fibaro.com/profile/45608-kdrozynski/?wr=eyJhcHAiOiJmb3J1bXMiLCJtb2R1bGUiOiJmb3J1bXMtY29tbWVudCIsImlkXzEiOjgwNDcwLCJpZF8yIjoyOTg0OTl9" rel="nofollow" data-ipsHover data-ipsHover-width="370" data-ipsHover-target="https://forum.fibaro.com/profile/45608-kdrozynski/?wr=eyJhcHAiOiJmb3J1bXMiLCJtb2R1bGUiOiJmb3J1bXMtY29tbWVudCIsImlkXzEiOjgwNDcwLCJpZF8yIjoyOTg0OTl9&amp;do=hovercard" class="ipsUserPhoto ipsUserPhoto_large" title="Go to K.Drozynski's profile">
+		<img src='data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201024%201024%22%20style%3D%22background%3A%2399c462%22%3E%3Cg%3E%3Ctext%20text-anchor%3D%22middle%22%20dy%3D%22.35em%22%20x%3D%22512%22%20y%3D%22512%22%20fill%3D%22%23ffffff%22%20font-size%3D%22700%22%20font-family%3D%22-apple-system%2C%20BlinkMacSystemFont%2C%20Roboto%2C%20Helvetica%2C%20Arial%2C%20sans-serif%22%3EK%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fsvg%3E' alt='K.Drozynski' loading="lazy">
+	</a>
+
+			</li>
+			<!-- <li><b><span style='color:#E61A00;'>Administrator</span></b></li> -->
+			
+				<li><img src="https://forum.fibaro.com/uploads/monthly_2019_02/group_admin@2x.png.5a1418f8d6e81adca2ad046ad772d867.png" alt="" class="cAuthorGroupIcon"></li>
+			
+			
+				<li>
+
+	
+		<a href='https://forum.fibaro.com/profile/45608-kdrozynski/reputation/' title="Member's total reputation" data-ipsTooltip class='ipsRepBadge ipsRepBadge_positive'>
+	
+			<i class='fa fa-plus-circle'></i> 134
+	
+		</a>
+	
+</li>
+				<li class="ipsType_light">615 posts</li>
+				
+				
+
+	
+	<li data-role='custom-field' class='ipsResponsive_hidePhone ipsType_break'>
+		
+ Polska
+	</li>
+	
+	<li data-role='custom-field' class='ipsResponsive_hidePhone ipsType_break'>
+		
+<strong>Gateway/s:</strong> Home Center 3
+	</li>
+	
+
+			
+		</ul>
+	</aside>
+	<div class="ipsColumn ipsColumn_fluid">
+		
+
+<div id="comment-298499_wrap" data-controller="core.front.core.comment" data-commentapp="forums" data-commenttype="forums" data-commentid="298499" data-quotedata="{&quot;userid&quot;:45608,&quot;username&quot;:&quot;K.Drozynski&quot;,&quot;timestamp&quot;:1793268424,&quot;contentapp&quot;:&quot;forums&quot;,&quot;contenttype&quot;:&quot;forums&quot;,&quot;contentid&quot;:80470,&quot;contentclass&quot;:&quot;forums_Topic&quot;,&quot;contentcommentid&quot;:298499}" class="ipsComment_content ipsType_medium">
+
+	<div class="ipsComment_meta ipsType_light ipsFlex ipsFlex-ai:center ipsFlex-jc:between ipsFlex-fd:row-reverse">
+		<div class="ipsType_light ipsType_reset ipsType_blendLinks ipsComment_toolWrap">
+			<div class="ipsResponsive_hidePhone ipsComment_badges">
+				<ul class="ipsList_reset ipsFlex ipsFlex-jc:end ipsFlex-fw:wrap ipsGap:2 ipsGap_row:1">
+					
+					
+					
+					
+					
+				</ul>
+			</div>
+			<ul class="ipsList_reset ipsComment_tools">
+				<li>
+					<a href="#elControls_298499_menu" class="ipsComment_ellipsis" id="elControls_298499" title="More options..." data-ipsmenu data-ipsmenu-appendto="#comment-298499_wrap"><i class="fa fa-ellipsis-h"></i></a>
+					<ul id="elControls_298499_menu" class="ipsMenu ipsMenu_narrow ipsHide">
+						
+							<li class="ipsMenu_item"><a href="https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/?do=reportComment&amp;comment=298499" data-ipsdialog data-ipsdialog-remotesubmit data-ipsdialog-size="medium" data-ipsdialog-flashmessage="Thanks for your report." data-ipsdialog-title="Report post"  data-action="reportComment" title="Report this content">Report</a></li>
+						
+						
+						
+							<li class="ipsMenu_item"><a href="https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/" title="Share this post" data-ipsdialog data-ipsdialog-size="narrow" data-ipsdialog-content="#elShareComment_298499_menu" data-ipsdialog-title="Share this post" id="elSharePost_298499" data-role="shareComment">Share</a></li>
+						
+						
+                        
+						
+						
+						
+							
+								
+							
+							
+							
+							
+							
+							
+						
+					</ul>
+				</li>
+				
+			</ul>
+		</div>
+
+		<div class="ipsType_reset ipsResponsive_hidePhone">
+		    <a href="https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/#findComment-298499" rel="nofollow" class="ipsType_blendLinks">
+		   Posted <time datetime='2026-10-29T10:07:04Z' title='10/29/2026 11:07  AM' data-short='6 hr'>6 hours ago</time>
+		   </a>
+			
+			<span class="ipsResponsive_hidePhone">
+				
+				
+			</span>
+		</div>
+	</div>
+
+	
+
+    
+
+	<div class="cPost_contentWrap">
+		
+		<div data-role="commentContent" class="ipsType_normal ipsType_richText ipsPadding_bottom ipsContained" data-controller="core.front.core.lightboxedImages">
+			<p style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	Two classes, identical API: <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">net.WebSocketClient</code> (<code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">ws://</code>) and <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">net.WebSocketClientTls</code> (<code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">wss://</code>).
+</p>
+
+<pre style="background-color:oklch(0.96 0 0); border-radius:8px; border:0px solid oklch(0.9 0 0); color:oklch(0.929 0.013 255.508); font-size:0.875em; padding:16px; text-align:start"><code style="background-color:rgba(0, 0, 0, 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:inherit; font-size:14px; padding:0px"><span style="color:#000000">namespace net {
+
+interface WebSocketClient {
+    void connect(string url, [table headers]);
+    void send(string data);
+    void sendBinary(string data);
+    bool isOpen();
+    void close();
+
+    void addEventListener(string eventName, function handler);  // alias of registerEvent()
+    void registerEvent(string eventName, function handler);
+    void unregisterEvent(string eventName);  // TODO: not callable from Lua yet
+
+    event connected;
+    event disconnected;
+    event dataReceived;
+    event error;
+}
+
+} // namespace net</span>
+</code></pre>
+
+<h2 style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:1.5em; padding:0px; text-align:start">
+	Connect
+</h2>
+
+<pre style="background-color:oklch(0.96 0 0); border-radius:8px; border:0px solid oklch(0.9 0 0); color:oklch(0.929 0.013 255.508); font-size:0.875em; padding:16px; text-align:start"><span style="color:#000000"><code style="background-color:rgba(0, 0, 0, 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:inherit; font-size:14px; padding:0px">void connect(string url, [table headers]);
+</code></span></pre>
+
+<ul style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	<li style="border:0px solid oklch(0.9 0 0); padding:0px">
+		<code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">url</code> - <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">ws://host[:port]/path</code> for <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">WebSocketClient</code>, <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">wss://...</code> for <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">WebSocketClientTls</code>.
+	</li>
+	<li style="border:0px solid oklch(0.9 0 0); padding:0px">
+		<code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">headers</code> - a table of header name/value pairs added to the handshake request, e.g. <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">Origin</code> or<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+		<code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">Authorization</code>.
+	</li>
+</ul>
+
+<p style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	<code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">Sec-WebSocket-Protocol</code> is handled specially: its value is split on <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">,</code> and each entry is registered as a<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	requested subprotocol, so it takes part in the library’s subprotocol handling instead of being sent as an<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	opaque header. The request on the wire is unchanged. An entry that is not a valid HTTP token raises a Lua<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	error from <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">connect()</code>.
+</p>
+
+<pre style="background-color:oklch(0.96 0 0); border-radius:8px; border:0px solid oklch(0.9 0 0); color:oklch(0.929 0.013 255.508); font-size:0.875em; padding:16px; text-align:start"><span style="color:#000000"><code style="background-color:rgba(0, 0, 0, 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:inherit; font-size:14px; padding:0px">self.sock:connect("wss://broker.example.com/mqtt", {
+  ["Sec-WebSocket-Protocol"] = "mqtt",
+  ["Authorization"] = "Bearer " .. token,
+})
+</code></span></pre>
+
+<p style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	<code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">connected</code> event - fired once the handshake completes. No arguments.
+</p>
+
+<p style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	<code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">disconnected</code> event - fired when the connection is closed by either side. No arguments.
+</p>
+
+<h2 style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:1.5em; padding:0px; text-align:start">
+	Send
+</h2>
+
+<pre style="background-color:oklch(0.96 0 0); border-radius:8px; border:0px solid oklch(0.9 0 0); color:oklch(0.929 0.013 255.508); font-size:0.875em; padding:16px; text-align:start"><span style="color:#000000"><code style="background-color:rgba(0, 0, 0, 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:inherit; font-size:14px; padding:0px">void send(string data);
+</code></span></pre>
+
+<p style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	Sends a <strong style="border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); padding:0px">text</strong> frame. RFC 6455 requires a text payload to be valid UTF-8; if <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">data</code> is not, nothing is<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	sent and the <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">error</code> event fires with a message pointing at <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">sendBinary()</code>.
+</p>
+
+<pre style="background-color:oklch(0.96 0 0); border-radius:8px; border:0px solid oklch(0.9 0 0); color:oklch(0.929 0.013 255.508); font-size:0.875em; padding:16px; text-align:start"><span style="color:#000000"><code style="background-color:rgba(0, 0, 0, 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:inherit; font-size:14px; padding:0px">void sendBinary(string data);
+</code></span></pre>
+
+<p style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	Sends a <strong style="border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); padding:0px">binary</strong> frame, with no constraint on the bytes. Use this for any protocol that is not UTF-8<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	text - MQTT over WebSocket, for instance, mandates binary frames.
+</p>
+
+<p style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	Lua strings are byte strings, so both methods take the same type; the method chosen decides the frame<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	opcode.
+</p>
+
+<pre style="background-color:oklch(0.96 0 0); border-radius:8px; border:0px solid oklch(0.9 0 0); color:oklch(0.929 0.013 255.508); font-size:0.875em; padding:16px; text-align:start"><span style="color:#000000"><code style="background-color:rgba(0, 0, 0, 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:inherit; font-size:14px; padding:0px">self.sock:send("hello")        -- text frame
+self.sock:sendBinary(packet)   -- binary frame, e.g. an MQTT CONNECT
+</code></span></pre>
+
+<p style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	<code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">packet</code> above is just a Lua string holding the raw bytes of the protocol frame, assembled with<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	<code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">string.char</code>. An MQTT 3.1.1 CONNECT, for example - a 2 byte length prefix before every string field, and a<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	varint Remaining Length after the fixed header byte:
+</p>
+
+<pre style="background-color:oklch(0.96 0 0); border-radius:8px; border:0px solid oklch(0.9 0 0); color:oklch(0.929 0.013 255.508); font-size:0.875em; padding:16px; text-align:start"><span style="color:#000000"><code style="background-color:rgba(0, 0, 0, 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:inherit; font-size:14px; padding:0px">-- Remaining Length: 7 payload bits per byte, MSB set while more bytes follow.
+local function varint(n)
+  local out = {}
+  repeat
+    local byte = n % 128
+    n = n // 128
+    if n &gt; 0 then byte = byte + 128 end
+    out[#out + 1] = string.char(byte)
+  until n == 0
+  return table.concat(out)
+end
+
+-- MQTT string field: 2 byte big-endian length, then the raw bytes.
+local function mqttString(text)
+  return string.char(#text // 256, #text % 256) .. text
+end
+
+local function connectPacket(clientId, keepAlive)
+  local variableHeader = mqttString("MQTT")  -- protocol name
+      .. string.char(0x04)                   -- protocol level 4 = MQTT 3.1.1
+      .. string.char(0x02)                   -- connect flags: clean session
+      .. string.char(keepAlive // 256, keepAlive % 256)
+  local payload = mqttString(clientId)
+  local body = variableHeader .. payload
+
+  return string.char(0x10) .. varint(#body) .. body  -- 0x10 = CONNECT
+end
+
+local packet = connectPacket("hc3-client", 60)
+-- 10 16 00 04 4D 51 54 54 04 02 00 3C 00 0A 68 63 33 2D 63 6C 69 65 6E 74
+self.sock:sendBinary(packet)
+</code></span></pre>
+
+<p style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	The same bytes would be rejected by <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">send()</code>: <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">0x10</code> and <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">0x04</code> are fine, but <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">mqttString</code> lengths and<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	binary flag bytes routinely fall outside UTF-8.
+</p>
+
+<p style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	A received frame is decoded the same way, with one caveat: a WebSocket frame is not guaranteed to hold<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	exactly one protocol packet. It may hold several, or only part of one, so a <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">dataReceived</code> handler must<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	accumulate bytes and pull off whole packets rather than assume one frame == one packet.
+</p>
+
+<pre style="background-color:oklch(0.96 0 0); border-radius:8px; border:0px solid oklch(0.9 0 0); color:oklch(0.929 0.013 255.508); font-size:0.875em; padding:16px; text-align:start"><span style="color:#000000"><code style="background-color:rgba(0, 0, 0, 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:inherit; font-size:14px; padding:0px">self.sock:addEventListener("dataReceived", function(payload, isBinary)
+  self.buffer = self.buffer .. payload
+  -- ... peel complete MQTT packets off self.buffer, keep the remainder
+end)
+</code></span></pre>
+
+<p style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	The same applies in the other direction: one <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">sendBinary()</code> call is one frame, but a broker is free to<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	split or merge packets across frames, so never assume a one-to-one mapping.
+</p>
+
+<h2 style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:1.5em; padding:0px; text-align:start">
+	Receive
+</h2>
+
+<p style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	<code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">dataReceived</code> event arguments:
+</p>
+
+<ul style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	<li style="border:0px solid oklch(0.9 0 0); padding:0px">
+		<code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">payload:string</code> - the frame payload, bytes preserved.
+	</li>
+	<li style="border:0px solid oklch(0.9 0 0); padding:0px">
+		<code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">isBinary:bool</code> - <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">true</code> for a binary frame, <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">false</code> for a text frame.
+	</li>
+</ul>
+
+<pre style="background-color:oklch(0.96 0 0); border-radius:8px; border:0px solid oklch(0.9 0 0); color:oklch(0.929 0.013 255.508); font-size:0.875em; padding:16px; text-align:start"><span style="color:#000000"><strong><code style="background-color:rgba(0, 0, 0, 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:inherit; font-size:14px; padding:0px">self.sock:addEventListener("dataReceived", function(payload, isBinary) ... end)
+</code></strong></span></pre>
+
+<h2 style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:1.5em; padding:0px; text-align:start">
+	Error Event
+</h2>
+
+<p style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	<code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">error</code> event is fired when the handshake fails or a send is rejected. Argument:
+</p>
+
+<ul style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	<li style="border:0px solid oklch(0.9 0 0); padding:0px">
+		<code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">message:string</code> - human readable description.
+	</li>
+</ul>
+
+<h2 style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:1.5em; padding:0px; text-align:start">
+	Backwards compatibility
+</h2>
+
+<p style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	<code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">sendBinary()</code> is additive and <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">send()</code>'s signature is unchanged, so existing callers are unaffected.
+</p>
+
+<p style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	<code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">dataReceived</code>’s second argument is safe to add: a handler is always a Lua function and Lua discards<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	surplus arguments, so a one-parameter handler is untouched. Only a <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">function(...)</code> varargs handler, or a<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	library function used directly as the handler, would observe it.
+</p>
+
+<p style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	The <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">Sec-WebSocket-Protocol</code> rerouting keeps the request bytes identical - the requested list is joined<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	with <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">", "</code>, the same canonical form the raw header used - and the subprotocol echoed back in the server’s<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	response is not validated, so no previously-working handshake can start failing.
+</p>
+
+<p style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	One edge case is not compatible: a subprotocol containing a character that is not allowed in an HTTP token<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	(a space, <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">/</code>, <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">:</code>) is now rejected and <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">connect()</code> raises a Lua error, where such a value was previously<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	sent verbatim and ignored by the server. A malformed value that used to connect now raises. An empty value<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	now omits the header rather than sending it empty.
+</p>
+
+<h2 style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:1.5em; padding:0px; text-align:start">
+	Remarks
+</h2>
+
+<p style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	Ping/pong, fragmentation and continuation frames are managed internally and are not exposed.<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	Closing the socket happens automatically when the object is finalized by Lua.
+</p>
+
+<p style="background-color:oklch(0.985 0 0); border:0px solid oklch(0.9 0 0); color:oklch(0.145 0 0); font-size:16px; padding:0px; text-align:start">
+	<code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">close()</code> may be called before <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">connected</code> has fired. The socket is then closed as soon as the handshake<br style="border:0px solid oklch(0.9 0 0); padding:0px">
+	finishes, and <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">connected</code> is not delivered - only <code style="background-color:oklch(0.96 0 0); border-radius:0.25rem; border:0px solid oklch(0.9 0 0); color:oklch(0.208 0.042 265.755); font-size:14px; padding:0px">disconnected</code>, once the connection is down.
+</p>
+
+
+			
+		</div>
+
+		
+			<div class="ipsItemControls">
+				
+					
+						
+
+	<div data-controller='core.front.core.reaction' class='ipsItemControls_right ipsClearfix '>	
+		<div class='ipsReact ipsPos_right'>
+			
+				
+				<div class='ipsReact_blurb ipsHide' data-role='reactionBlurb'>
+					
+				</div>
+			
+			
+			
+				
+				
+
+				<div class='ipsReact_types' data-role='reactionInteraction' data-unreact="https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/?do=unreactComment&amp;comment=298499&amp;csrfKey=99746ac5e2a1bacfbc5c71702c5d54e8">
+					
+						<ul class='ipsList_inline' data-role='reactTypes'>
+							
+								
+									
+								
+
+								<li>
+									<a href='https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/?do=reactComment&amp;comment=298499&amp;reaction=2&amp;csrfKey=99746ac5e2a1bacfbc5c71702c5d54e8' class='ipsReact_reaction' data-role="reaction" >
+										<img src='https://forum.fibaro.com/uploads/reactions/react_thanks.png' alt="Thanks" data-ipsTooltip title="Thanks" loading="lazy">
+										<span class='ipsReact_name'>Thanks</span>
+									</a>
+								</li>
+							
+						</ul>
+					
+
+					<span class='ipsReact_button ' data-action='reactLaunch'>
+						<a href='https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/?do=reactComment&amp;comment=298499&amp;reaction=1&amp;csrfKey=99746ac5e2a1bacfbc5c71702c5d54e8' class='ipsReact_reaction' data-role="reaction" data-defaultReaction>
+							<img src='https://forum.fibaro.com/uploads/reactions/react_like.png' alt="Like" data-ipsTooltip title="Like" loading="lazy">
+							<span class='ipsReact_name'>Like</span>
+						</a>
+					</span>
+
+					<a href='https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/?do=unreactComment&amp;comment=298499&amp;csrfKey=99746ac5e2a1bacfbc5c71702c5d54e8' class='ipsReact_unreact ipsHide' data-action='unreact' data-ipsTooltip title='Remove your reaction'>&times;</a>
+				</div>
+			
+		</div>
+	</div>
+
+					
+				
+				<ul class="ipsComment_controls ipsClearfix ipsItemControls_left" data-role="commentControls">
+					
+						
+						
+						
+						
+												
+					
+					<li class="ipsHide" data-role="commentLoading">
+						<span class="ipsLoading ipsLoading_tiny ipsLoading_noAnim"></span>
+					</li>
+				</ul>
+			</div>
+		
+
+		
+	</div>
+
+	
+    
+	
+
+
+
+<div class='ipsPadding ipsHide cPostShareMenu' id='elShareComment_298499_menu'>
+	<h5 class='ipsType_normal ipsType_reset'>Link to comment</h5>
+	
+		
+	
+	
+    <span data-ipsCopy data-ipsCopy-flashmessage>
+        <a href="https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/" class="ipsButton ipsButton_light ipsButton_small ipsButton_fullWidth" data-role="copyButton" data-clipboard-text="https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/" data-ipstooltip title='Copy Link to Clipboard'><i class="fa fa-clone"></i> https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/</a>
+    </span>
+
+	
+	<h5 class='ipsType_normal ipsType_reset ipsSpacer_top'>Share on other sites</h5>
+	
+
+	<ul class='ipsList_inline ipsList_noSpacing ipsClearfix' data-controller="core.front.core.sharelink">
+		
+			<li>
+<a href="https://x.com/share?url=https%3A%2F%2Fforum.fibaro.com%2Ftopic%2F80470-mqtt-over-secure-websockets-documentation%2F%3Fdo%3DfindComment%26comment%3D298499" class="cShareLink cShareLink_x" target="_blank" data-role="shareLink" title='Share on X' data-ipsTooltip rel='nofollow noopener'>
+    <i class="fa fa-x"></i>
+</a></li>
+		
+			<li>
+<a href="https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fforum.fibaro.com%2Ftopic%2F80470-mqtt-over-secure-websockets-documentation%2F%3Fdo%3DfindComment%26comment%3D298499" class="cShareLink cShareLink_facebook" target="_blank" data-role="shareLink" title='Share on Facebook' data-ipsTooltip rel='noopener nofollow'>
+	<i class="fa fa-facebook"></i>
+</a></li>
+		
+			<li>
+<a href="https://www.reddit.com/submit?url=https%3A%2F%2Fforum.fibaro.com%2Ftopic%2F80470-mqtt-over-secure-websockets-documentation%2F%3Fdo%3DfindComment%26comment%3D298499&amp;title=MQTT+over+secure+WebSockets+-+documentation" rel="nofollow noopener" class="cShareLink cShareLink_reddit" target="_blank" title='Share on Reddit' data-ipsTooltip>
+	<i class="fa fa-reddit"></i>
+</a></li>
+		
+			<li>
+<a href="/cdn-cgi/l/email-protection#b788c4c2d5ddd2d4c38afae6e3e3928587d8c1d2c5928587c4d2d4c2c5d2928587e0d2d5e4d8d4dcd2c3c49285879a928587d3d8d4c2dad2d9c3d6c3ded8d991d5d8d3ce8adfc3c3c7c49284f69285f19285f1d1d8c5c2da99d1ded5d6c5d899d4d8da9285f1c3d8c7ded49285f18f878380879adac6c3c39ad8c1d2c59ac4d2d4c2c5d29ac0d2d5c4d8d4dcd2c3c49ad3d8d4c2dad2d9c3d6c3ded8d99285f19284f1d3d89284f3d1ded9d3f4d8dadad2d9c3928581d4d8dadad2d9c39284f3858e8f838e8e" rel='nofollow' class='cShareLink cShareLink_email' title='Share via email' data-ipsTooltip>
+	<i class="fa fa-envelope"></i>
+</a></li>
+		
+			<li>
+<a href="https://pinterest.com/pin/create/button/?url=https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/?do=findComment%26comment=298499&amp;media=https://forum.fibaro.com/uploads/monthly_2019_02/smart-home-forum.png.ba1c995b4698c8474162c45bbc0466cd.png" class="cShareLink cShareLink_pinterest" rel="nofollow noopener" target="_blank" data-role="shareLink" title='Share on Pinterest' data-ipsTooltip>
+	<i class="fa fa-pinterest"></i>
+</a></li>
+		
+	</ul>
+
+
+	<hr class='ipsHr'>
+	<button class='ipsHide ipsButton ipsButton_small ipsButton_light ipsButton_fullWidth ipsMargin_top:half' data-controller='core.front.core.webshare' data-role='webShare' data-webShareTitle='MQTT over secure WebSockets - documentation' data-webShareText='Two classes, identical API: net.WebSocketClient (ws://) and net.WebSocketClientTls (wss://).
+ 
+
+namespace net {
+
+interface WebSocketClient {
+    void connect(string url, [table headers]);
+    void send(string data);
+    void sendBinary(string data);
+    bool isOpen();
+    void close();
+
+    void addEventListener(string eventName, function handler);  // alias of registerEvent()
+    void registerEvent(string eventName, function handler);
+    void unregisterEvent(string eventName);  // TODO: not callable from Lua yet
+
+    event connected;
+    event disconnected;
+    event dataReceived;
+    event error;
+}
+
+} // namespace net
+
+
+
+	Connect
+ 
+
+void connect(string url, [table headers]);
+
+
+
+	
+		url - ws://host[:port]/path for WebSocketClient, wss://... for WebSocketClientTls.
+	 
+	
+		headers - a table of header name/value pairs added to the handshake request, e.g. Origin or
+		Authorization.
+	 
+
+
+
+	Sec-WebSocket-Protocol is handled specially: its value is split on , and each entry is registered as a
+	requested subprotocol, so it takes part in the library’s subprotocol handling instead of being sent as an
+	opaque header. The request on the wire is unchanged. An entry that is not a valid HTTP token raises a Lua
+	error from connect().
+ 
+
+self.sock:connect(&quot;wss://broker.example.com/mqtt&quot;, {
+  [&quot;Sec-WebSocket-Protocol&quot;] = &quot;mqtt&quot;,
+  [&quot;Authorization&quot;] = &quot;Bearer &quot; .. token,
+})
+
+
+
+	connected event - fired once the handshake completes. No arguments.
+ 
+
+
+	disconnected event - fired when the connection is closed by either side. No arguments.
+ 
+
+
+	Send
+ 
+
+void send(string data);
+
+
+
+	Sends a text frame. RFC 6455 requires a text payload to be valid UTF-8; if data is not, nothing is
+	sent and the error event fires with a message pointing at sendBinary().
+ 
+
+void sendBinary(string data);
+
+
+
+	Sends a binary frame, with no constraint on the bytes. Use this for any protocol that is not UTF-8
+	text - MQTT over WebSocket, for instance, mandates binary frames.
+ 
+
+
+	Lua strings are byte strings, so both methods take the same type; the method chosen decides the frame
+	opcode.
+ 
+
+self.sock:send(&quot;hello&quot;)        -- text frame
+self.sock:sendBinary(packet)   -- binary frame, e.g. an MQTT CONNECT
+
+
+
+	packet above is just a Lua string holding the raw bytes of the protocol frame, assembled with
+	string.char. An MQTT 3.1.1 CONNECT, for example - a 2 byte length prefix before every string field, and a
+	varint Remaining Length after the fixed header byte:
+ 
+
+-- Remaining Length: 7 payload bits per byte, MSB set while more bytes follow.
+local function varint(n)
+  local out = {}
+  repeat
+    local byte = n % 128
+    n = n // 128
+    if n &gt; 0 then byte = byte + 128 end
+    out[#out + 1] = string.char(byte)
+  until n == 0
+  return table.concat(out)
+end
+
+-- MQTT string field: 2 byte big-endian length, then the raw bytes.
+local function mqttString(text)
+  return string.char(#text // 256, #text % 256) .. text
+end
+
+local function connectPacket(clientId, keepAlive)
+  local variableHeader = mqttString(&quot;MQTT&quot;)  -- protocol name
+      .. string.char(0x04)                   -- protocol level 4 = MQTT 3.1.1
+      .. string.char(0x02)                   -- connect flags: clean session
+      .. string.char(keepAlive // 256, keepAlive % 256)
+  local payload = mqttString(clientId)
+  local body = variableHeader .. payload
+
+  return string.char(0x10) .. varint(#body) .. body  -- 0x10 = CONNECT
+end
+
+local packet = connectPacket(&quot;hc3-client&quot;, 60)
+-- 10 16 00 04 4D 51 54 54 04 02 00 3C 00 0A 68 63 33 2D 63 6C 69 65 6E 74
+self.sock:sendBinary(packet)
+
+
+
+	The same bytes would be rejected by send(): 0x10 and 0x04 are fine, but mqttString lengths and
+	binary flag bytes routinely fall outside UTF-8.
+ 
+
+
+	A received frame is decoded the same way, with one caveat: a WebSocket frame is not guaranteed to hold
+	exactly one protocol packet. It may hold several, or only part of one, so a dataReceived handler must
+	accumulate bytes and pull off whole packets rather than assume one frame == one packet.
+ 
+
+self.sock:addEventListener(&quot;dataReceived&quot;, function(payload, isBinary)
+  self.buffer = self.buffer .. payload
+  -- ... peel complete MQTT packets off self.buffer, keep the remainder
+end)
+
+
+
+	The same applies in the other direction: one sendBinary() call is one frame, but a broker is free to
+	split or merge packets across frames, so never assume a one-to-one mapping.
+ 
+
+
+	Receive
+ 
+
+
+	dataReceived event arguments:
+ 
+
+
+	
+		payload:string - the frame payload, bytes preserved.
+	 
+	
+		isBinary:bool - true for a binary frame, false for a text frame.
+	 
+
+
+self.sock:addEventListener(&quot;dataReceived&quot;, function(payload, isBinary) ... end)
+
+
+
+	Error Event
+ 
+
+
+	error event is fired when the handshake fails or a send is rejected. Argument:
+ 
+
+
+	
+		message:string - human readable description.
+	 
+
+
+
+	Backwards compatibility
+ 
+
+
+	sendBinary() is additive and send()&#039;s signature is unchanged, so existing callers are unaffected.
+ 
+
+
+	dataReceived’s second argument is safe to add: a handler is always a Lua function and Lua discards
+	surplus arguments, so a one-parameter handler is untouched. Only a function(...) varargs handler, or a
+	library function used directly as the handler, would observe it.
+ 
+
+
+	The Sec-WebSocket-Protocol rerouting keeps the request bytes identical - the requested list is joined
+	with &quot;, &quot;, the same canonical form the raw header used - and the subprotocol echoed back in the server’s
+	response is not validated, so no previously-working handshake can start failing.
+ 
+
+
+	One edge case is not compatible: a subprotocol containing a character that is not allowed in an HTTP token
+	(a space, /, :) is now rejected and connect() raises a Lua error, where such a value was previously
+	sent verbatim and ignored by the server. A malformed value that used to connect now raises. An empty value
+	now omits the header rather than sending it empty.
+ 
+
+
+	Remarks
+ 
+
+
+	Ping/pong, fragmentation and continuation frames are managed internally and are not exposed.
+	Closing the socket happens automatically when the object is finalized by Lua.
+ 
+
+
+	close() may be called before connected has fired. The socket is then closed as soon as the handshake
+	finishes, and connected is not delivered - only disconnected, once the connection is down.
+ 
+' data-webShareUrl='https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/?do=findComment&amp;comment=298499'>More sharing options...</button>
+
+	
+</div>
+	
+</div>
+
+	</div>
+</article>
+
+					
+						<ul class="ipsTopicMeta">
+							
+								
+									<li class="ipsTopicMeta__item ipsTopicMeta__item--moderation">
+										<span class="ipsTopicMeta__time ipsType_light"><time datetime='2026-10-29T11:45:03Z' title='10/29/2026 12:45  PM' data-short='4 hr'>4 hr</time></span>
+										<span class="ipsTopicMeta__action">
+
+
+<a href='https://forum.fibaro.com/profile/45608-kdrozynski/' rel="nofollow" data-ipsHover data-ipsHover-width='370' data-ipsHover-target='https://forum.fibaro.com/profile/45608-kdrozynski/?do=hovercard&amp;referrer=https%253A%252F%252Fforum.fibaro.com%252Ftopic%252F80470-mqtt-over-secure-websockets-documentation%252F' title="Go to K.Drozynski's profile" class="ipsType_break">K.Drozynski</a> changed the title to <em>MQTT over secure WebSockets - documentation</em></span>
+									</li>
+								
+							
+							
+						</ul>
+					
+					
+					
+				
+			
+			
+<input type="hidden" name="csrfKey" value="99746ac5e2a1bacfbc5c71702c5d54e8" />
+
+
+	<div class="ipsClearfix">
+		<div class="ipsAreaBackground ipsPad ipsClearfix ipsJS_hide" data-role="pageActionOptions">
+			<div class="ipsPos_right">
+				<select name="modaction" data-role="moderationAction">
+					
+					
+					
+						<optgroup label="Hide" data-icon='eye' data-action='hide'>
+							
+								<option value='hide'>Hide</option>
+							
+							
+								<option value='unhide'>Unhide</option>
+							
+						</optgroup>
+					
+					
+				</select>
+				<button type="submit" class="ipsButton ipsButton_alternate ipsButton_verySmall">Submit</button>
+			</div>
+		</div>
+	</div>
+
+		</form>
+	</div>
+
+	
+	
+	
+	
+	
+		<a id="replyForm"></a>
+	<div data-role="replyArea" class="cTopicPostArea ipsBox ipsResponsive_pull ipsPadding cTopicPostArea_noSize ipsSpacer_top" >
+			
+				
+					
+<div class='ipsComposeArea ipsComposeArea_withPhoto ipsComposeArea_unavailable ipsClearfix'>
+	<div class='ipsPos_left ipsResponsive_hidePhone ipsResponsive_block'>
+
+
+	<a href="https://forum.fibaro.com/profile/2168-jgab/" rel="nofollow" data-ipsHover data-ipsHover-width="370" data-ipsHover-target="https://forum.fibaro.com/profile/2168-jgab/?do=hovercard" class="ipsUserPhoto ipsUserPhoto_small" title="Go to jgab's profile">
+		<img src='data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201024%201024%22%20style%3D%22background%3A%2362c4ab%22%3E%3Cg%3E%3Ctext%20text-anchor%3D%22middle%22%20dy%3D%22.35em%22%20x%3D%22512%22%20y%3D%22512%22%20fill%3D%22%23ffffff%22%20font-size%3D%22700%22%20font-family%3D%22-apple-system%2C%20BlinkMacSystemFont%2C%20Roboto%2C%20Helvetica%2C%20Arial%2C%20sans-serif%22%3EJ%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fsvg%3E' alt='jgab' loading="lazy">
+	</a>
+</div>
+	<div class='ipsComposeArea_editor'>
+		<div class="ipsComposeArea_dummy">
+			<span class='ipsType_warning'><i class="fa fa-warning"></i> This topic is now closed to further replies. </span>
+		
+			
+		</div>
+	</div>
+</div>
+				
+			
+		</div>
+	
+
+	
+		<div class="ipsBox ipsPadding ipsResponsive_pull ipsResponsive_showPhone ipsMargin_top">
+			<div class="ipsShareLinks">
+				
+					
+
+
+    <a href='#elShareItem_1323997717_menu' id='elShareItem_1323997717' data-ipsMenu class='ipsShareButton ipsButton ipsButton_verySmall ipsButton_light '>
+        <span><i class='fa fa-share-alt'></i></span> &nbsp;Share
+    </a>
+
+    <div class='ipsPadding ipsMenu ipsMenu_normal ipsHide' id='elShareItem_1323997717_menu' data-controller="core.front.core.sharelink">
+        
+        
+        <span data-ipsCopy data-ipsCopy-flashmessage>
+            <a href="https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/" class="ipsButton ipsButton_light ipsButton_small ipsButton_fullWidth" data-role="copyButton" data-clipboard-text="https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/" data-ipstooltip title='Copy Link to Clipboard'><i class="fa fa-clone"></i> https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/</a>
+        </span>
+        <ul class='ipsShareLinks ipsMargin_top:half'>
+            
+                <li>
+<a href="https://x.com/share?url=https%3A%2F%2Fforum.fibaro.com%2Ftopic%2F80470-mqtt-over-secure-websockets-documentation%2F" class="cShareLink cShareLink_x" target="_blank" data-role="shareLink" title='Share on X' data-ipsTooltip rel='nofollow noopener'>
+    <i class="fa fa-x"></i>
+</a></li>
+            
+                <li>
+<a href="https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fforum.fibaro.com%2Ftopic%2F80470-mqtt-over-secure-websockets-documentation%2F" class="cShareLink cShareLink_facebook" target="_blank" data-role="shareLink" title='Share on Facebook' data-ipsTooltip rel='noopener nofollow'>
+	<i class="fa fa-facebook"></i>
+</a></li>
+            
+                <li>
+<a href="https://www.reddit.com/submit?url=https%3A%2F%2Fforum.fibaro.com%2Ftopic%2F80470-mqtt-over-secure-websockets-documentation%2F&amp;title=MQTT+over+secure+WebSockets+-+documentation" rel="nofollow noopener" class="cShareLink cShareLink_reddit" target="_blank" title='Share on Reddit' data-ipsTooltip>
+	<i class="fa fa-reddit"></i>
+</a></li>
+            
+                <li>
+<a href="/cdn-cgi/l/email-protection#724d010710181711064f3f2326265740421d041700574042011711070017574042251710211d11191706015740425f574042161d11071f171c0613061b1d1c54101d160b4f1a06060201574133574034574034141d00071f5c141b1013001d5c111d1f574034061d021b115740344a424645425f1f0306065f1d0417005f0117110700175f051710011d11191706015f161d11071f171c0613061b1d1c574034" rel='nofollow' class='cShareLink cShareLink_email' title='Share via email' data-ipsTooltip>
+	<i class="fa fa-envelope"></i>
+</a></li>
+            
+                <li>
+<a href="https://pinterest.com/pin/create/button/?url=https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/&amp;media=https://forum.fibaro.com/uploads/monthly_2019_02/smart-home-forum.png.ba1c995b4698c8474162c45bbc0466cd.png" class="cShareLink cShareLink_pinterest" rel="nofollow noopener" target="_blank" data-role="shareLink" title='Share on Pinterest' data-ipsTooltip>
+	<i class="fa fa-pinterest"></i>
+</a></li>
+            
+        </ul>
+        
+            <hr class='ipsHr'>
+            <button class='ipsHide ipsButton ipsButton_verySmall ipsButton_light ipsButton_fullWidth ipsMargin_top:half' data-controller='core.front.core.webshare' data-role='webShare' data-webShareTitle='MQTT over secure WebSockets - documentation' data-webShareText='MQTT over secure WebSockets - documentation' data-webShareUrl='https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/'>More sharing options...</button>
+        
+    </div>
+
+				
+				
+                
+
+                
+
+<div data-followApp='forums' data-followArea='topic' data-followID='80470' data-controller='core.front.core.followButton'>
+	
+
+		
+		<div class="ipsFollow ipsButton ipsButton_light ipsButton_verySmall" data-role="followButton" data-following="false">
+			<a href="https://forum.fibaro.com/index.php?app=core&amp;module=system&amp;controller=notifications&amp;do=follow&amp;follow_app=forums&amp;follow_area=topic&amp;follow_id=80470" rel="nofollow" title="Follow this content" data-ipsTooltip class="ipsType_blendLinks ipsType_noUnderline" data-ipsHover data-ipsHover-cache='false' data-ipsHover-onClick>Follow</a>
+			
+				<span class='ipsCommentCount'>0</span>
+			
+		</div>
+	
+
+</div>
+				
+			</div>
+		</div>
+	
+</div>
+
+
+	<ul class="ipsToolList ipsToolList_horizontal ipsClearfix ipsSpacer_top ipsResponsive_hidePhone">
+		<li>
+			<a href="#elTopicActionsBottom_menu" id="elTopicActionsBottom" class="ipsButton ipsButton_link ipsButton_link--light ipsButton_medium ipsButton_fullWidth" data-ipsmenu>Moderate topic <i class="fa fa-caret-down"></i></a>
+			<ul id="elTopicActionsBottom_menu" class="ipsMenu ipsMenu_auto ipsHide">
+				
+					
+						<li class="ipsMenu_item"><a href="https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/?csrfKey=99746ac5e2a1bacfbc5c71702c5d54e8&amp;do=moderate&amp;action=feature">Feature</a></li>
+					
+					
+					
+					
+					
+						<li class="ipsMenu_item"><a href="https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/?csrfKey=99746ac5e2a1bacfbc5c71702c5d54e8&amp;do=moderate&amp;action=hide" data-ipsdialog data-ipsdialog-title="Hide">Hide</a></li>
+					
+					
+					
+					
+					
+					
+					
+					
+					
+					
+					
+					
+                    
+                    
+			</ul>
+		</li>
+	</ul>
+
+
+<div class="ipsPager ipsSpacer_top">
+	<div class="ipsPager_prev">
+		
+			<a href="https://forum.fibaro.com/forum/1764-update-5221-beta/" title="Go to Update 5.221 BETA" rel="parent">
+				<span class="ipsPager_type">Go to topic listing</span>
+			</a>
+		
+	</div>
+	
+		<div class="ipsPager_next">
+			<a href="https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/?do=nextUnread" title="Go to the next topic that has new content">
+				<span class="ipsPager_type">Next unread topic</span>
+			</a>
+		</div>
+	
+</div>
+
+
+						
+
+
+					</div>
+					
+
+
+					
+<nav class='ipsBreadcrumb ipsBreadcrumb_bottom ipsFaded_withHover'>
+	
+		
+
+
+	
+
+	<ul class='ipsList_inline ipsPos_right'>
+		
+		<li >
+			<a data-action="defaultStream" class='ipsType_light '  href='https://forum.fibaro.com/discover/unread/'><i class="fa fa-newspaper-o" aria-hidden="true"></i> <span>Unread Content</span></a>
+		</li>
+		
+			<li>
+				<a data-action="markSiteRead" class='ipsType_light' data-controller="core.front.core.markRead" href='https://forum.fibaro.com/markallread/?csrfKey=99746ac5e2a1bacfbc5c71702c5d54e8&amp;ref=aHR0cHM6Ly9mb3J1bS5maWJhcm8uY29tL3RvcGljLzgwNDcwLW1xdHQtb3Zlci1zZWN1cmUtd2Vic29ja2V0cy1kb2N1bWVudGF0aW9uLw==' title='Mark all content on the site as read' data-ipsTooltip><i class='fa fa-check' aria-hidden="true"></i> Mark site read</a>
+			</li>
+		
+	</ul>
+
+	<ul data-role="breadcrumbList">
+		<li>
+			<a title="Home" href='https://forum.fibaro.com/'>
+				<span>Home <i class='fa fa-angle-right'></i></span>
+			</a>
+		</li>
+		
+		
+			<li>
+				
+					<a href='https://forum.fibaro.com/forum/26-fibaro-update/'>
+						<span>FIBARO Update <i class='fa fa-angle-right' aria-hidden="true"></i></span>
+					</a>
+				
+			</li>
+		
+			<li>
+				
+					<a href='https://forum.fibaro.com/forum/27-fibaro-system-update/'>
+						<span>FIBARO System Update <i class='fa fa-angle-right' aria-hidden="true"></i></span>
+					</a>
+				
+			</li>
+		
+			<li>
+				
+					<a href='https://forum.fibaro.com/forum/1265-yubii-home/'>
+						<span>Yubii Home <i class='fa fa-angle-right' aria-hidden="true"></i></span>
+					</a>
+				
+			</li>
+		
+			<li>
+				
+					<a href='https://forum.fibaro.com/forum/1764-update-5221-beta/'>
+						<span>Update 5.221 BETA <i class='fa fa-angle-right' aria-hidden="true"></i></span>
+					</a>
+				
+			</li>
+		
+			<li>
+				
+					MQTT over secure WebSockets - documentation
+				
+			</li>
+		
+	</ul>
+</nav>
+				</div>
+			</div>
+			
+		</main>
+		<footer id="ipsLayout_footer" class="ipsClearfix">
+			<div class="ipsLayout_container">
+				
+				
+
+<ul id='elFooterSocialLinks' class='ipsList_inline ipsType_center ipsSpacer_top'>
+	
+
+	
+		<li class='cUserNav_icon'>
+			<a href='https://www.facebook.com/fibaro.global/' target='_blank' class='cShareLink cShareLink_facebook' rel='noopener noreferrer'><i class='fa fa-facebook'></i></a>
+        </li>
+	
+		<li class='cUserNav_icon'>
+			<a href='https://www.instagram.com/fibaro/' target='_blank' class='cShareLink cShareLink_instagram' rel='noopener noreferrer'><i class='fa fa-instagram'></i></a>
+        </li>
+	
+		<li class='cUserNav_icon'>
+			<a href='https://www.linkedin.com/company/fibar-group/' target='_blank' class='cShareLink cShareLink_linkedin' rel='noopener noreferrer'><i class='fa fa-linkedin'></i></a>
+        </li>
+	
+		<li class='cUserNav_icon'>
+			<a href='https://www.youtube.com/user/FibaroCom' target='_blank' class='cShareLink cShareLink_youtube' rel='noopener noreferrer'><i class='fa fa-youtube'></i></a>
+        </li>
+	
+		<li class='cUserNav_icon'>
+			<a href='https://x.com/fibaro_global' target='_blank' class='cShareLink cShareLink_x' rel='noopener noreferrer'><i class='fa fa-x'></i></a>
+        </li>
+	
+
+</ul>
+
+
+<ul class='ipsList_inline ipsType_center ipsSpacer_top' id="elFooterLinks">
+	
+	
+		<li>
+			<a href='#elNavLang_menu' id='elNavLang' data-ipsMenu data-ipsMenu-above>Language <i class='fa fa-caret-down'></i></a>
+			<ul id='elNavLang_menu' class='ipsMenu ipsMenu_selectable ipsHide'>
+			
+				<li class='ipsMenu_item ipsMenu_itemChecked'>
+					<form action="//forum.fibaro.com/language/?csrfKey=99746ac5e2a1bacfbc5c71702c5d54e8" method="post">
+					<button type='submit' name='id' value='1' class='ipsButton ipsButton_link ipsButton_link_secondary'><i class='ipsFlag ipsFlag-us'></i> English (USA) (Default)</button>
+					</form>
+				</li>
+			
+				<li class='ipsMenu_item'>
+					<form action="//forum.fibaro.com/language/?csrfKey=99746ac5e2a1bacfbc5c71702c5d54e8" method="post">
+					<button type='submit' name='id' value='2' class='ipsButton ipsButton_link ipsButton_link_secondary'><i class='ipsFlag ipsFlag-pl'></i> Polski </button>
+					</form>
+				</li>
+			
+			</ul>
+		</li>
+	
+	
+	
+	
+		<li><a href='https://www.fibaro.com/en/privacy-policy/'>Privacy Policy</a></li>
+	
+	
+		<li><a rel="nofollow" href='https://forum.fibaro.com/contact/' data-ipsdialog data-ipsDialog-remoteSubmit data-ipsDialog-flashMessage='Thanks, your message has been sent to the administrators.' data-ipsdialog-title="Contact Us">Contact Us</a></li>
+	
+</ul>	
+
+
+<p id='elCopyright'>
+	<span id='elCopyright_userLine'>2024 © Nice - Polska | All rights reserved.</span>
+	<a rel='nofollow' title='Invision Community' href='https://www.invisioncommunity.com/'>Powered by Invision Community</a>
+</p>
+			</div>
+		</footer>
+		
+<div id='elMobileDrawer' class='ipsDrawer ipsHide'>
+	<div class='ipsDrawer_menu'>
+		<a href='#' class='ipsDrawer_close' data-action='close'><span>&times;</span></a>
+		<div class='ipsDrawer_content ipsFlex ipsFlex-fd:column'>
+			
+				<div class='elMobileDrawer__user ipsBorder_bottom ipsAreaBackground_reset ipsPadding_horizontal ipsPadding_vertical:half ipsPos_sticky ipsFlex ipsFlex-jc:between ipsFlex-ai:center ipsFlex-fw:wrap'>
+					<div class='ipsFlex-flex:11'>
+						<ul class='elMobileDrawer__user-panel ipsList_reset ipsType_blendLinks ipsFlex ipsFlex-ai:center'>
+							<li class='ipsMargin_right:half'>
+								
+
+
+	<a href="https://forum.fibaro.com/profile/2168-jgab/" rel="nofollow" data-ipsHover data-ipsHover-width="370" data-ipsHover-target="https://forum.fibaro.com/profile/2168-jgab/?do=hovercard" class="ipsUserPhoto ipsUserPhoto_mini" title="Go to jgab's profile">
+		<img src='data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%201024%201024%22%20style%3D%22background%3A%2362c4ab%22%3E%3Cg%3E%3Ctext%20text-anchor%3D%22middle%22%20dy%3D%22.35em%22%20x%3D%22512%22%20y%3D%22512%22%20fill%3D%22%23ffffff%22%20font-size%3D%22700%22%20font-family%3D%22-apple-system%2C%20BlinkMacSystemFont%2C%20Roboto%2C%20Helvetica%2C%20Arial%2C%20sans-serif%22%3EJ%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fsvg%3E' alt='jgab' loading="lazy">
+	</a>
+
+							</li>
+							<li>
+								<div class='ipsType_light'>Signed in as</div>
+								<div class='ipsType_dark ipsType_large ipsType_bold'><a href='https://forum.fibaro.com/profile/2168-jgab/' title='Go to your profile'>jgab</a></div>
+							</li>
+						</ul>
+					</div>
+					<ul id='elUserNav_mobile' class='ipsList_inline signed_in ipsClearfix'>
+						<li class='cNotifications cUserNav_icon'>
+							<a href='#elMobNotifications_menu' id='elMobNotifications' data-ipsMenu data-ipsMenu-menuID='elFullNotifications_menu' data-ipsMenu-closeOnClick='false'>
+								<i class='fa fa-bell'></i> <span class='ipsNotificationCount ipsHide' data-notificationType='notify'>0</span>
+							</a>
+						</li>
+						
+							<li class='cInbox cUserNav_icon'>
+								<a href='#elMobInbox_menu' id='elMobInbox' data-ipsMenu data-ipsMenu-menuID='elFullInbox_menu' data-ipsMenu-closeOnClick='false'>
+									<i class='fa fa-envelope ' ></i> <span class='ipsNotificationCount ipsHide' data-notificationType='inbox'>0</span>
+								</a>
+							</li>
+						
+						
+					</ul>
+				</div>
+			
+
+			
+
+			<ul class='ipsDrawer_list ipsFlex-flex:11'>
+				
+					<li class='ipsDrawer_itemParent'>
+                        <h4 class='ipsDrawer_title'><a href='#'><span >Account</span></a></h4>
+						<ul class='ipsDrawer_list'>
+							<li data-action="back"><a href='#'>Back</a></li>
+							
+								<li><a href='https://forum.fibaro.com/profile/2168-jgab/' title='Go to your profile'>Profile</a></li>
+							
+							
+							
+								<li><a href='https://forum.fibaro.com/attachments/'>My Attachments</a></li>
+							
+                            
+                            
+							<li><a href='https://forum.fibaro.com/followed/'>Manage Followed Content</a></li>
+							<li id='elAccountSettingsLinkMobile'>
+                                <a href='https://forum.fibaro.com/settings/' title='Edit account settings' >
+                                    Account Settings
+                                </a>
+                            </li>
+							
+			                	<li><a href='https://forum.fibaro.com/ignore/'>Ignored Users</a></li>
+			                
+							
+								
+									<li><a href='https://forum.fibaro.com/modcp/'>ModeratorCP</a></li>
+								
+								
+							
+						</ul>
+					</li>
+				
+
+				
+				
+				
+				
+					
+						
+						
+							<li><a href='http://www.fibaro.com/en' target='_blank' rel="noopener">FIBARO.COM</a></li>
+						
+					
+				
+					
+						
+						
+							<li class='ipsDrawer_itemParent'>
+								<h4 class='ipsDrawer_title'><a href='#'>FORUM</a></h4>
+								<ul class='ipsDrawer_list'>
+									<li data-action="back"><a href='#'>Back</a></li>
+									
+									
+										
+										
+										
+											
+												
+													
+													
+									
+													
+									
+									
+									
+										
+
+
+	
+		
+			<li>
+				<a href='https://forum.fibaro.com' >
+					Forums
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li>
+				<a href='https://forum.fibaro.com/staff/' >
+					Staff
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li>
+				<a href='https://forum.fibaro.com/online/' >
+					Online Users
+				</a>
+			</li>
+		
+	
+
+										
+								</ul>
+							</li>
+						
+					
+				
+					
+						
+						
+							<li class='ipsDrawer_itemParent'>
+								<h4 class='ipsDrawer_title'><a href='#'>ACTIVITY</a></h4>
+								<ul class='ipsDrawer_list'>
+									<li data-action="back"><a href='#'>Back</a></li>
+									
+									
+										
+										
+										
+											
+												
+											
+										
+											
+												
+													
+														
+													
+														
+													
+														
+													
+														
+													
+														
+													
+														
+													
+														
+													
+														
+													
+														
+													
+														
+													
+														
+													
+												
+											
+										
+											
+												
+											
+										
+											
+												
+											
+										
+									
+													
+									
+										<li><a href='https://forum.fibaro.com/discover/?amp='>ACTIVITY</a></li>
+									
+									
+									
+										
+
+
+	
+		
+			<li>
+				<a href='https://forum.fibaro.com/discover/' >
+					All Activity
+				</a>
+			</li>
+		
+	
+
+	
+		
+			
+			<li class='ipsDrawer_itemParent'>
+				<h4 class='ipsDrawer_title'><a href='#'>My Activity Streams</a></h4>
+				<ul class='ipsDrawer_list'>
+					<li data-action="back"><a href='#'>Back</a></li>
+					
+					
+
+
+	
+		
+			<li class='ipsDrawer_section'>
+				Default Streams
+			</li>
+		
+	
+
+	
+		
+			<li>
+				<a href='https://forum.fibaro.com/discover/unread/' >
+					Unread Content
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li>
+				<a href='https://forum.fibaro.com/discover/content-started/' >
+					Content I Started
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li>
+				<a href='https://forum.fibaro.com/discover/content-posted/' >
+					Content I Posted In
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li>
+				<a href='https://forum.fibaro.com/discover/followed-content/' >
+					Content I Follow
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li>
+				<a href='https://forum.fibaro.com/discover/followed-members/' >
+					Members I Follow
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li class='ipsDrawer_section'>
+				Custom Streams
+			</li>
+		
+	
+
+	
+		
+			<li>
+				<a href='https://forum.fibaro.com/discover/26/' >
+					Content I Started
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li>
+				<a href='https://forum.fibaro.com/discover/29/' >
+					Unread Content
+				</a>
+			</li>
+		
+	
+
+	
+		
+			
+		
+	
+
+	
+		
+			<li class='ipsPad_half'>
+				<a href='https://forum.fibaro.com/discover/?do=create' class='ipsButton ipsButton_important ipsButton_verySmall ipsButton_fullWidth'>
+					Create New Stream
+				</a>
+			</li>
+		
+	
+
+				</ul>
+			</li>
+		
+	
+
+	
+		
+			<li>
+				<a href='https://forum.fibaro.com/discover/content-started/' >
+					Content I Started
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li>
+				<a href='https://forum.fibaro.com/search/' >
+					Search
+				</a>
+			</li>
+		
+	
+
+										
+								</ul>
+							</li>
+						
+					
+				
+					
+						
+						
+							<li class='ipsDrawer_itemParent'>
+								<h4 class='ipsDrawer_title'><a href='#'>KNOWLEDGE</a></h4>
+								<ul class='ipsDrawer_list'>
+									<li data-action="back"><a href='#'>Back</a></li>
+									
+									
+										
+										
+										
+											
+												
+											
+										
+											
+												
+											
+										
+											
+												
+											
+										
+									
+													
+									
+										<li><a href='https://forum.fibaro.com/?amp='>KNOWLEDGE</a></li>
+									
+									
+									
+										
+
+
+	
+		
+			<li>
+				<a href='http://manuals.fibaro.com/' target='_blank' rel="noopener">
+					MANUALS
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li>
+				<a href='http://manuals.fibaro.com/knowledge-base/' target='_blank' rel="noopener">
+					KNOWLEDGE BASE
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li>
+				<a href='https://compatibility.fibaro.com/' target='_blank' rel="noopener">
+					COMPATIBILITY
+				</a>
+			</li>
+		
+	
+
+										
+								</ul>
+							</li>
+						
+					
+				
+					
+						
+						
+							<li class='ipsDrawer_itemParent'>
+								<h4 class='ipsDrawer_title'><a href='#'>DOWNLOADS</a></h4>
+								<ul class='ipsDrawer_list'>
+									<li data-action="back"><a href='#'>Back</a></li>
+									
+									
+										
+										
+										
+											
+												
+											
+										
+											
+												
+											
+										
+											
+												
+											
+										
+											
+												
+											
+										
+											
+												
+											
+										
+									
+													
+									
+										<li><a href='https://forum.fibaro.com/files/'>DOWNLOADS</a></li>
+									
+									
+									
+										
+
+
+	
+		
+			<li>
+				<a href='https://forum.fibaro.com/files/submit/?_new=1' >
+					Submit a file
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li>
+				<a href='https://forum.fibaro.com/files/category/2-scenes/' >
+					Scenes
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li>
+				<a href='https://forum.fibaro.com/files/category/3-virtual-devices/' >
+					Virtual Devices
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li>
+				<a href='https://forum.fibaro.com/files/category/5-quick-apps/' >
+					Quick Apps
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li>
+				<a href='https://forum.fibaro.com/files/category/4-icons/' >
+					Icons
+				</a>
+			</li>
+		
+	
+
+										
+								</ul>
+							</li>
+						
+					
+				
+					
+						
+						
+							<li class='ipsDrawer_itemParent'>
+								<h4 class='ipsDrawer_title'><a href='#'>SUPPORT</a></h4>
+								<ul class='ipsDrawer_list'>
+									<li data-action="back"><a href='#'>Back</a></li>
+									
+									
+										
+										
+										
+											
+												
+											
+										
+											
+												
+											
+										
+									
+													
+									
+										<li><a href='https://fibaro.com/en/support'>SUPPORT</a></li>
+									
+									
+									
+										
+
+
+	
+		
+			<li>
+				<a href='https://support.fibaro.com/' >
+					Contact Support
+				</a>
+			</li>
+		
+	
+
+	
+		
+			<li>
+				<a href='http://more.fibaro.com' target='_blank' rel="noopener">
+					FIBARO Services
+				</a>
+			</li>
+		
+	
+
+										
+								</ul>
+							</li>
+						
+					
+				
+					
+				
+					
+				
+				
+					<li>
+						<a data-action="markSiteRead" data-controller="core.front.core.markRead" href='https://forum.fibaro.com/markallread/?csrfKey=99746ac5e2a1bacfbc5c71702c5d54e8'>Mark site read</a>
+					</li>
+					<li>
+						<a href='https://forum.fibaro.com/index.php?app=core&amp;module=system&amp;controller=login&amp;do=logout&amp;csrfKey=99746ac5e2a1bacfbc5c71702c5d54e8'>
+							Sign Out
+						</a>
+					</li>
+				
+			</ul>
+
+			
+				<div class='elMobileDrawer__rank ipsAreaBackground_reset ipsPadding_horizontal ipsPadding_vertical:half ipsBorder_top'>
+					<div class='elUserNav_achievements ipsFlex ipsGap:4 ipsGap_row:0'>
+						<div class='elUserNav_achievements__icon'>
+<img src='https://forum.fibaro.com/uploads/monthly_2018_01/rank_premium_3@2x.png.8af6d2888cb7c93faad47becca440d31.png' loading="lazy" alt="Home Automation Guru" class="ipsDimension:3" data-ipsTooltip title="Rank: Home Automation Guru (8/8)"></div>
+						<div class='elUserNav_achievements__content'>
+							<div class='ipsType_light'>Your Current Rank</div>
+							<div><strong class='ipsType_large'>Home Automation Guru</strong></div>
+							
+							
+						</div>
+					</div>
+				</div>
+			
+		</div>
+	</div>
+</div>
+
+<div id='elMobileCreateMenuDrawer' class='ipsDrawer ipsHide'>
+	<div class='ipsDrawer_menu'>
+		<a href='#' class='ipsDrawer_close' data-action='close'><span>&times;</span></a>
+		<div class='ipsDrawer_content ipsSpacer_bottom ipsPad'>
+			<ul class='ipsDrawer_list'>
+				<li class="ipsDrawer_listTitle ipsType_reset">Create New...</li>
+				
+					<li>
+						<a href="https://forum.fibaro.com/index.php?app=core&amp;module=status&amp;controller=ajaxcreate"
+							
+								
+									data-ipsdialog-remotesubmit="1"
+								
+									data-ipsDialog="1"
+								
+									data-role="updateStatus"
+								
+							
+							 data-ipsDialog-title='Status Update'
+							 data-ipsdialog-flashmessage="Saved" data-ipsdialog-fixed="true"
+							>Status</a>
+					</li>
+				
+					<li>
+						<a href="https://forum.fibaro.com/submit/"
+							
+								
+									data-ipsDialog="1"
+								
+									data-ipsDialog-size="narrow"
+								
+							
+							 data-ipsDialog-title='Select Forum'
+							 data-ipsdialog-fixed="true"
+							>Topic</a>
+					</li>
+				
+					<li>
+						<a href="https://forum.fibaro.com/files/submit/?_new=1"
+							
+								
+									data-ipsDialog="1"
+								
+									data-ipsDialog-size="narrow"
+								
+							
+							 data-ipsDialog-title='Select a Category'
+							 data-ipsdialog-fixed="true"
+							>File Download</a>
+					</li>
+				
+			</ul>
+		</div>
+	</div>
+</div>
+		
+
+	
+	<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script type='text/javascript'>
+		var ipsDebug = false;		
+	
+		var CKEDITOR_BASEPATH = '//forum.fibaro.com/applications/core/interface/ckeditor/ckeditor/';
+	
+		var ipsSettings = {
+			
+			
+			cookie_path: "/",
+			
+			cookie_prefix: "ips4_",
+			
+			
+			cookie_ssl: true,
+			
+            essential_cookies: ["oauth_authorize","member_id","login_key","clearAutosave","lastSearch","device_key","IPSSessionFront","loggedIn","noCache","hasJS","cookie_consent","cookie_consent_optional","language","codeVerifier","forumpass_*"],
+			upload_imgURL: "",
+			message_imgURL: "",
+			notification_imgURL: "",
+			baseURL: "//forum.fibaro.com/",
+			jsURL: "//forum.fibaro.com/applications/core/interface/js/js.php",
+			csrfKey: "99746ac5e2a1bacfbc5c71702c5d54e8",
+			antiCache: "aaa94e0c9e1757681734",
+			jsAntiCache: "aaa94e0c9e1771496458",
+			disableNotificationSounds: true,
+			useCompiledFiles: true,
+			links_external: true,
+			memberID: 2168,
+			lazyLoadEnabled: false,
+			blankImg: "//forum.fibaro.com/applications/core/interface/js/spacer.png",
+			googleAnalyticsEnabled: false,
+			matomoEnabled: false,
+			viewProfiles: true,
+			mapProvider: 'none',
+			mapApiKey: '',
+			pushPublicKey: "BBQfQ8tMH2_tXQrlebruabEwHKJTsWekuqX36Q0VeYFwu-5xsVFKgqY0MWda0ADFuioZxQ3NIGR55gVLRm8tvZQ",
+			relativeDates: true
+		};
+		
+		
+		
+		
+			ipsSettings['maxImageDimensions'] = {
+				width: 1000,
+				height: 1000
+			};
+		
+		
+	</script>
+
+
+
+
+
+<script type='text/javascript' src='https://forum.fibaro.com/uploads/javascript_global/root_library.js?v=aaa94e0c9e1771496458' data-ips></script>
+
+
+<script type='text/javascript' src='https://forum.fibaro.com/uploads/javascript_global/root_js_lang_1.js?v=aaa94e0c9e1771496458' data-ips></script>
+
+
+<script type='text/javascript' src='https://forum.fibaro.com/uploads/javascript_global/root_framework.js?v=aaa94e0c9e1771496458' data-ips></script>
+
+
+<script type='text/javascript' src='https://forum.fibaro.com/uploads/javascript_core/global_global_core.js?v=aaa94e0c9e1771496458' data-ips></script>
+
+
+<script type='text/javascript' src='https://forum.fibaro.com/uploads/javascript_core/plugins_plugins.js?v=aaa94e0c9e1771496458' data-ips></script>
+
+
+<script type='text/javascript' src='https://forum.fibaro.com/uploads/javascript_global/root_front.js?v=aaa94e0c9e1771496458' data-ips></script>
+
+
+<script type='text/javascript' src='https://forum.fibaro.com/uploads/javascript_core/front_front_core.js?v=aaa94e0c9e1771496458' data-ips></script>
+
+
+<script type='text/javascript' src='https://forum.fibaro.com/uploads/javascript_postnotes/front_front_notes.js?v=aaa94e0c9e1771496458' data-ips></script>
+
+
+<script type='text/javascript' src='https://forum.fibaro.com/uploads/javascript_forums/front_front_topic.js?v=aaa94e0c9e1771496458' data-ips></script>
+
+
+<script type='text/javascript' src='https://forum.fibaro.com/uploads/javascript_global/root_map.js?v=aaa94e0c9e1771496458' data-ips></script>
+
+
+
+	<script type='text/javascript'>
+		
+			ips.setSetting( 'date_format', jQuery.parseJSON('"mm\/dd\/yy"') );
+		
+			ips.setSetting( 'date_first_day', jQuery.parseJSON('0') );
+		
+			ips.setSetting( 'ipb_url_filter_option', jQuery.parseJSON('"black"') );
+		
+			ips.setSetting( 'url_filter_any_action', jQuery.parseJSON('"allow"') );
+		
+			ips.setSetting( 'bypass_profanity', jQuery.parseJSON('0') );
+		
+			ips.setSetting( 'emoji_style', jQuery.parseJSON('"native"') );
+		
+			ips.setSetting( 'emoji_shortcodes', jQuery.parseJSON('true') );
+		
+			ips.setSetting( 'emoji_ascii', jQuery.parseJSON('true') );
+		
+			ips.setSetting( 'emoji_cache', jQuery.parseJSON('1695652657') );
+		
+			ips.setSetting( 'image_jpg_quality', jQuery.parseJSON('85') );
+		
+			ips.setSetting( 'cloud2', jQuery.parseJSON('false') );
+		
+			ips.setSetting( 'isAnonymous', jQuery.parseJSON('false') );
+		
+		
+        
+    </script>
+
+
+
+<script type='application/ld+json'>
+{
+    "name": "MQTT over secure WebSockets - documentation",
+    "headline": "MQTT over secure WebSockets - documentation",
+    "text": "Two classes, identical API: net.WebSocketClient (ws://) and net.WebSocketClientTls (wss://).\n \n\nnamespace net {\n\ninterface WebSocketClient {\n    void connect(string url, [table headers]);\n    void send(string data);\n    void sendBinary(string data);\n    bool isOpen();\n    void close();\n\n    void addEventListener(string eventName, function handler);  // alias of registerEvent()\n    void registerEvent(string eventName, function handler);\n    void unregisterEvent(string eventName);  // TODO: not callable from Lua yet\n\n    event connected;\n    event disconnected;\n    event dataReceived;\n    event error;\n}\n\n} // namespace net\n\n\n\n\tConnect\n \n\nvoid connect(string url, [table headers]);\n\n\n\n\t\n\t\turl - ws://host[:port]/path for WebSocketClient, wss://... for WebSocketClientTls.\n\t \n\t\n\t\theaders - a table of header name/value pairs added to the handshake request, e.g. Origin or\n\t\tAuthorization.\n\t \n\n\n\n\tSec-WebSocket-Protocol is handled specially: its value is split on , and each entry is registered as a\n\trequested subprotocol, so it takes part in the library\u2019s subprotocol handling instead of being sent as an\n\topaque header. The request on the wire is unchanged. An entry that is not a valid HTTP token raises a Lua\n\terror from connect().\n \n\nself.sock:connect(\"wss://broker.example.com/mqtt\", {\n  [\"Sec-WebSocket-Protocol\"] = \"mqtt\",\n  [\"Authorization\"] = \"Bearer \" .. token,\n})\n\n\n\n\tconnected event - fired once the handshake completes. No arguments.\n \n\n\n\tdisconnected event - fired when the connection is closed by either side. No arguments.\n \n\n\n\tSend\n \n\nvoid send(string data);\n\n\n\n\tSends a text frame. RFC 6455 requires a text payload to be valid UTF-8; if data is not, nothing is\n\tsent and the error event fires with a message pointing at sendBinary().\n \n\nvoid sendBinary(string data);\n\n\n\n\tSends a binary frame, with no constraint on the bytes. Use this for any protocol that is not UTF-8\n\ttext - MQTT over WebSocket, for instance, mandates binary frames.\n \n\n\n\tLua strings are byte strings, so both methods take the same type; the method chosen decides the frame\n\topcode.\n \n\nself.sock:send(\"hello\")        -- text frame\nself.sock:sendBinary(packet)   -- binary frame, e.g. an MQTT CONNECT\n\n\n\n\tpacket above is just a Lua string holding the raw bytes of the protocol frame, assembled with\n\tstring.char. An MQTT 3.1.1 CONNECT, for example - a 2 byte length prefix before every string field, and a\n\tvarint Remaining Length after the fixed header byte:\n \n\n-- Remaining Length: 7 payload bits per byte, MSB set while more bytes follow.\nlocal function varint(n)\n  local out = {}\n  repeat\n    local byte = n % 128\n    n = n // 128\n    if n \u0026gt; 0 then byte = byte + 128 end\n    out[#out + 1] = string.char(byte)\n  until n == 0\n  return table.concat(out)\nend\n\n-- MQTT string field: 2 byte big-endian length, then the raw bytes.\nlocal function mqttString(text)\n  return string.char(#text // 256, #text % 256) .. text\nend\n\nlocal function connectPacket(clientId, keepAlive)\n  local variableHeader = mqttString(\"MQTT\")  -- protocol name\n      .. string.char(0x04)                   -- protocol level 4 = MQTT 3.1.1\n      .. string.char(0x02)                   -- connect flags: clean session\n      .. string.char(keepAlive // 256, keepAlive % 256)\n  local payload = mqttString(clientId)\n  local body = variableHeader .. payload\n\n  return string.char(0x10) .. varint(#body) .. body  -- 0x10 = CONNECT\nend\n\nlocal packet = connectPacket(\"hc3-client\", 60)\n-- 10 16 00 04 4D 51 54 54 04 02 00 3C 00 0A 68 63 33 2D 63 6C 69 65 6E 74\nself.sock:sendBinary(packet)\n\n\n\n\tThe same bytes would be rejected by send(): 0x10 and 0x04 are fine, but mqttString lengths and\n\tbinary flag bytes routinely fall outside UTF-8.\n \n\n\n\tA received frame is decoded the same way, with one caveat: a WebSocket frame is not guaranteed to hold\n\texactly one protocol packet. It may hold several, or only part of one, so a dataReceived handler must\n\taccumulate bytes and pull off whole packets rather than assume one frame == one packet.\n \n\nself.sock:addEventListener(\"dataReceived\", function(payload, isBinary)\n  self.buffer = self.buffer .. payload\n  -- ... peel complete MQTT packets off self.buffer, keep the remainder\nend)\n\n\n\n\tThe same applies in the other direction: one sendBinary() call is one frame, but a broker is free to\n\tsplit or merge packets across frames, so never assume a one-to-one mapping.\n \n\n\n\tReceive\n \n\n\n\tdataReceived event arguments:\n \n\n\n\t\n\t\tpayload:string - the frame payload, bytes preserved.\n\t \n\t\n\t\tisBinary:bool - true for a binary frame, false for a text frame.\n\t \n\n\nself.sock:addEventListener(\"dataReceived\", function(payload, isBinary) ... end)\n\n\n\n\tError Event\n \n\n\n\terror event is fired when the handshake fails or a send is rejected. Argument:\n \n\n\n\t\n\t\tmessage:string - human readable description.\n\t \n\n\n\n\tBackwards compatibility\n \n\n\n\tsendBinary() is additive and send()\u0027s signature is unchanged, so existing callers are unaffected.\n \n\n\n\tdataReceived\u2019s second argument is safe to add: a handler is always a Lua function and Lua discards\n\tsurplus arguments, so a one-parameter handler is untouched. Only a function(...) varargs handler, or a\n\tlibrary function used directly as the handler, would observe it.\n \n\n\n\tThe Sec-WebSocket-Protocol rerouting keeps the request bytes identical - the requested list is joined\n\twith \", \", the same canonical form the raw header used - and the subprotocol echoed back in the server\u2019s\n\tresponse is not validated, so no previously-working handshake can start failing.\n \n\n\n\tOne edge case is not compatible: a subprotocol containing a character that is not allowed in an HTTP token\n\t(a space, /, :) is now rejected and connect() raises a Lua error, where such a value was previously\n\tsent verbatim and ignored by the server. A malformed value that used to connect now raises. An empty value\n\tnow omits the header rather than sending it empty.\n \n\n\n\tRemarks\n \n\n\n\tPing/pong, fragmentation and continuation frames are managed internally and are not exposed.\n\tClosing the socket happens automatically when the object is finalized by Lua.\n \n\n\n\tclose() may be called before connected has fired. The socket is then closed as soon as the handshake\n\tfinishes, and connected is not delivered - only disconnected, once the connection is down.\n \n",
+    "dateCreated": "2026-10-29T11:07:04+0100",
+    "datePublished": "2026-10-29T11:07:04+0100",
+    "dateModified": "2026-10-29T11:07:04+0100",
+    "image": "https://forum.fibaro.com/applications/core/interface/email/default_photo.png",
+    "author": {
+        "@type": "Person",
+        "name": "K.Drozynski",
+        "image": "https://forum.fibaro.com/applications/core/interface/email/default_photo.png",
+        "url": "https://forum.fibaro.com/profile/45608-kdrozynski/"
+    },
+    "interactionStatistic": [
+        {
+            "@type": "InteractionCounter",
+            "interactionType": "http://schema.org/ViewAction",
+            "userInteractionCount": 28
+        },
+        {
+            "@type": "InteractionCounter",
+            "interactionType": "http://schema.org/CommentAction",
+            "userInteractionCount": 0
+        },
+        {
+            "@type": "InteractionCounter",
+            "interactionType": "http://schema.org/FollowAction",
+            "userInteractionCount": 0
+        }
+    ],
+    "@context": "http://schema.org",
+    "@type": "DiscussionForumPosting",
+    "@id": "https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/",
+    "isPartOf": {
+        "@id": "https://forum.fibaro.com/#website"
+    },
+    "publisher": {
+        "@id": "https://forum.fibaro.com/#organization",
+        "member": {
+            "@type": "Person",
+            "name": "K.Drozynski",
+            "image": "https://forum.fibaro.com/applications/core/interface/email/default_photo.png",
+            "url": "https://forum.fibaro.com/profile/45608-kdrozynski/"
+        }
+    },
+    "url": "https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/",
+    "discussionUrl": "https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/",
+    "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "https://forum.fibaro.com/topic/80470-mqtt-over-secure-websockets-documentation/"
+    },
+    "pageStart": 1,
+    "pageEnd": 1
+}	
+</script>
+
+<script type='application/ld+json'>
+{
+    "@context": "http://www.schema.org",
+    "publisher": "https://forum.fibaro.com/#organization",
+    "@type": "WebSite",
+    "@id": "https://forum.fibaro.com/#website",
+    "mainEntityOfPage": "https://forum.fibaro.com/",
+    "name": "Smart Home Forum by FIBARO",
+    "url": "https://forum.fibaro.com/",
+    "potentialAction": {
+        "type": "SearchAction",
+        "query-input": "required name=query",
+        "target": "https://forum.fibaro.com/search/?q={query}"
+    },
+    "inLanguage": [
+        {
+            "@type": "Language",
+            "name": "English (USA)",
+            "alternateName": "en-US"
+        },
+        {
+            "@type": "Language",
+            "name": "Polski",
+            "alternateName": "pl-PL"
+        }
+    ]
+}	
+</script>
+
+<script type='application/ld+json'>
+{
+    "@context": "http://www.schema.org",
+    "@type": "Organization",
+    "@id": "https://forum.fibaro.com/#organization",
+    "mainEntityOfPage": "https://forum.fibaro.com/",
+    "name": "Smart Home Forum by FIBARO",
+    "url": "https://forum.fibaro.com/",
+    "logo": {
+        "@type": "ImageObject",
+        "@id": "https://forum.fibaro.com/#logo",
+        "url": "https://forum.fibaro.com/uploads/monthly_2023_05/1949060470_origialkopia.jpg.bef5ef90b11b6203f0bd5f65451d8be9.jpg"
+    },
+    "sameAs": [
+        "https://www.facebook.com/fibaro.global/",
+        "https://www.instagram.com/fibaro/",
+        "https://www.linkedin.com/company/fibar-group/",
+        "https://www.youtube.com/user/FibaroCom",
+        "https://x.com/fibaro_global"
+    ]
+}	
+</script>
+
+<script type='application/ld+json'>
+{
+    "@context": "http://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+        {
+            "@type": "ListItem",
+            "position": 1,
+            "item": {
+                "name": "FIBARO Update",
+                "@id": "https://forum.fibaro.com/forum/26-fibaro-update/"
+            }
+        },
+        {
+            "@type": "ListItem",
+            "position": 2,
+            "item": {
+                "name": "FIBARO System Update",
+                "@id": "https://forum.fibaro.com/forum/27-fibaro-system-update/"
+            }
+        },
+        {
+            "@type": "ListItem",
+            "position": 3,
+            "item": {
+                "name": "Yubii Home",
+                "@id": "https://forum.fibaro.com/forum/1265-yubii-home/"
+            }
+        },
+        {
+            "@type": "ListItem",
+            "position": 4,
+            "item": {
+                "name": "Update 5.221 BETA",
+                "@id": "https://forum.fibaro.com/forum/1764-update-5221-beta/"
+            }
+        },
+        {
+            "@type": "ListItem",
+            "position": 5,
+            "item": {
+                "name": "MQTT over secure WebSockets - documentation"
+            }
+        }
+    ]
+}	
+</script>
+
+<script type='application/ld+json'>
+{
+    "@context": "http://schema.org",
+    "@type": "ContactPage",
+    "url": "https://forum.fibaro.com/contact/"
+}	
+</script>
+
+
+
+<script type='text/javascript'>
+    (() => {
+        let gqlKeys = [];
+        for (let [k, v] of Object.entries(gqlKeys)) {
+            ips.setGraphQlData(k, v);
+        }
+    })();
+</script>
+		
+		
+		
+		<!--ipsQueryLog-->
+		<!--ipsCachingLog-->
+		
+	</body>
+</html>
