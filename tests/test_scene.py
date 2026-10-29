@@ -300,3 +300,31 @@ async def test_date_trigger_evaluates_at_scheduled_fire_time(tmp_path, capsys) -
         await wait_for_output(capsys, f"SCENE_RAN {qa_id} date")
     finally:
         await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_year_pinned_cron_scene_boots_fast(capsys) -> None:
+    # the year-pinned cron idiom (a "never fire" date trigger) must not
+    # scan the whole 366-day window on boot — that was ~1.7 s of os.date
+    # calls per scene boot and pushed the execute tests past their wait
+    # window under CI load (the 0.1.102 failure)
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        script = Path(d) / "scene.lua"
+        script.write_text(SCENE_SOURCE)
+        engine = LuaEngine()
+        await engine.start()
+        try:
+            scene_id = engine.start_qa(
+                str(script), None, {"scene": True, "name": "TestScene"}, str(script)
+            )
+            deadline = time.monotonic() + 1.0
+            while time.monotonic() < deadline:
+                info = engine.qa_info(scene_id)
+                if info and info.get("loaded"):
+                    break
+                await asyncio.sleep(0.02)
+            assert engine.qa_info(scene_id).get("loaded"), "scene boot stalled"
+        finally:
+            await engine.stop()

@@ -303,6 +303,17 @@ local function nextCronFire(cond)
   -- (sec == 0); otherwise the scan starts at the next minute boundary.
   local now = os.time()
   local t0 = os.date("*t", now)
+  -- a pinned YEAR outside the 366-day window can never match: bail out
+  -- instead of scanning half a million minute-grid instants — the
+  -- year-pinned cron idiom (a "never fire" date trigger in tests) would
+  -- otherwise burn ~2 s of os.date calls on every scene boot
+  if cond[6] and cond[6] ~= "*" then
+    if not cronFieldMatch(cond[6], tostring(t0.year))
+      and not cronFieldMatch(cond[6], tostring(t0.year + 1))
+    then
+      return nil
+    end
+  end
   local start = t0.sec == 0 and 0 or 60 - t0.sec
   for offset = start, 366 * 24 * 60 * 60, 60 do
     local t = os.date("*t", now + offset)
