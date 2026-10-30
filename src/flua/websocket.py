@@ -92,6 +92,11 @@ class WsClient:
         self._stop = threading.Event()
         self._open = False
         self._disconnected_emitted = False
+        self._close_sent = False
+        # SSL_write is not thread-safe: sends arrive from the engine's
+        # thread pool (one thread per wsSend) and the receiver thread
+        # writes pong/close replies — one writer at a time, ever.
+        self._write_lock = threading.Lock()
         self._buffer = b""
         self._message: list[bytes] = []
 
@@ -323,7 +328,23 @@ class WsClient:
         masked = bytearray(payload)
         for i in range(len(masked)):
             masked[i] ^= mask[i % 4]
-        sock.sendall(bytes(header) + mask + bytes(masked))
+        with self._write_lock:
+            if opcode == _OP_CLOSE:
+                if self._close_sent:
+                    # RFC 6455: one close frame per endpoint. A close echoed
+                    # by the receive loop must not be repeated by close().
+                    return
+                self._close_sent = True
+            previous = sock.gettimeout()
+            if previous is not None and previous < (self._timeout or previous):
+                # the receiver's 0.5s recv-poll timeout is socket-wide — a
+                # large sendBinary on a slow link must not inherit it
+                sock.settimeout(self._timeout)
+            try:
+                sock.sendall(bytes(header) + mask + bytes(masked))
+            finally:
+                if previous is not None and sock.gettimeout() != previous:
+                    sock.settimeout(previous)
 
     def send(self, data: str) -> None:
         if not self._open or self._stop.is_set():
@@ -343,16 +364,20 @@ class WsClient:
                 self._send_frame(_OP_CLOSE, b"", sock)
             except OSError:
                 pass
-            try:
-                sock.shutdown(socket.SHUT_RDWR)
-            except OSError:
-                pass
+            with self._write_lock:
+                # never tear the socket down under an in-flight sendall:
+                # the write lock makes shutdown/close wait for the writers
+                try:
+                    sock.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
             self._emit_disconnected(None)
         if sock is not None:
-            try:
-                sock.close()
-            except OSError:
-                pass
+            with self._write_lock:
+                try:
+                    sock.close()
+                except OSError:
+                    pass
         self._open = False
 
     def is_open(self) -> bool:

@@ -80,11 +80,14 @@ class EchoWsServer:
         tls_ctx: ssl.SSLContext | None = None,
         initial_frame: bytes | None = None,
         handshake_delay: float = 0.0,
+        close_after: float | None = None,
     ) -> None:
         self.seen_requests: list[bytes] = []  # raw handshakes (for assertions)
         self.seen_frames: list[tuple[int, bytes]] = []  # frames from the client
         self.initial_frame = initial_frame  # sent with the 101 response (one segment)
         self.handshake_delay = handshake_delay  # slow 101 (close-before-connected)
+        self.close_after = close_after  # server-initiated close, N seconds in
+        self.server_errors: list[str] = []  # _handle exceptions (failure diagnostics)
         self.listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.listener.bind(("127.0.0.1", 0))
@@ -136,19 +139,30 @@ class EchoWsServer:
                 # auth_required frame this way
                 response += self.initial_frame
             conn.sendall(response)
+            if self.close_after is not None:
+                # server-initiated close: fire a close frame after the delay,
+                # then read the client's echo (RFC 6455: exactly one reply)
+                time.sleep(self.close_after)
+                conn.sendall(_server_frame(0x8, b"\x03\xe8"))
             while True:
-                frame = _read_frame(conn)
-                if frame is None:
+                try:
+                    frame = _read_frame(conn)
+                    if frame is None:
+                        return
+                    opcode, payload = frame
+                    self.seen_frames.append((opcode, payload))
+                    if opcode == 0x8:  # close
+                        conn.sendall(_server_frame(0x8, payload))
+                        return
+                    if opcode == 0x9:  # ping -> pong
+                        conn.sendall(_server_frame(0xA, payload))
+                    elif opcode in (0x1, 0x2):
+                        conn.sendall(_server_frame(opcode, payload))
+                except (OSError, ssl.SSLError) as exc:
+                    # the client tore the connection down mid-echo (burst
+                    # tests close abruptly) — expected, not a harness error
+                    self.server_errors.append(repr(exc))
                     return
-                opcode, payload = frame
-                self.seen_frames.append((opcode, payload))
-                if opcode == 0x8:  # close
-                    conn.sendall(_server_frame(0x8, payload))
-                    return
-                if opcode == 0x9:  # ping -> pong
-                    conn.sendall(_server_frame(0xA, payload))
-                elif opcode in (0x1, 0x2):
-                    conn.sendall(_server_frame(opcode, payload))
 
 
 async def _run_qa(script: str, capsys, needle: str, timeout: float = 5.0) -> str:
@@ -560,3 +574,71 @@ def test_example_mqtt_over_websocket_terminates_without_a_broker() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "ws error" in result.stdout
+
+
+def test_wss_concurrent_sends_are_serialized() -> None:
+    # SSL_write is not thread-safe: burst sends from several threads (the
+    # engine runs each wsSend in its own to_thread) used to corrupt the TLS
+    # record stream — SonosLib flushes 7+ subscribes on connect and hit
+    # exactly this. The client's write lock must serialize them; the pin is
+    # that every frame arrives intact (the unsynchronized code corrupts or
+    # drops ~half the bursts at this pressure — calibrated on 3.14).
+    import ssl as _ssl
+
+    from flua.websocket import WsClient
+
+    ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(
+        str(Path(__file__).parent / "certs" / "cert.pem"),
+        str(Path(__file__).parent / "certs" / "key.pem"),
+    )
+    server = EchoWsServer(tls_ctx=ctx)
+    client = WsClient(
+        f"wss://127.0.0.1:{server.port}", 5.0, lambda event, data, is_binary=False: None
+    )
+    client.connect()
+    threading.Thread(target=client.run, daemon=True).start()
+    payloads = [f"subscribe{i:02d}".encode() + bytes([i]) * 2048 for i in range(32)]
+
+    def send(payload: bytes) -> None:
+        try:
+            client.send_binary(payload)
+        except Exception:
+            pass  # a corrupted stream makes sends fail — the frame check catches it
+
+    try:
+        threads = [threading.Thread(target=send, args=(p,)) for p in payloads]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        deadline = time.monotonic() + 3.0
+        while time.monotonic() < deadline and len(server.seen_frames) < len(payloads):
+            time.sleep(0.01)
+        got = {payload for opcode, payload in server.seen_frames if opcode == 0x2}
+        assert got == set(payloads)  # every frame arrived intact, TLS stream uncorrupted
+    finally:
+        client.close()
+
+
+def test_server_initiated_close_sends_exactly_one_close_frame() -> None:
+    # RFC 6455: one close frame per endpoint. A close echoed by the receive
+    # loop must not be repeated by close() (run()'s finally) — the old code
+    # sent the echo plus a second empty close frame.
+    from flua.websocket import WsClient
+
+    server = EchoWsServer(close_after=0.1)
+    events: list[tuple[str, object]] = []
+    client = WsClient(
+        f"ws://127.0.0.1:{server.port}", 5.0, lambda event, data: events.append((event, data))
+    )
+    client.connect()
+    threading.Thread(target=client.run, daemon=True).start()
+    deadline = time.monotonic() + 3.0
+    while time.monotonic() < deadline:
+        if any(event == "disconnected" for event, _ in events):
+            break
+        time.sleep(0.01)
+    assert any(event == "disconnected" for event, _ in events)
+    closes = [payload for opcode, payload in server.seen_frames if opcode == 0x8]
+    assert closes == [b"\x03\xe8"]  # one echo of the server's close, nothing after
