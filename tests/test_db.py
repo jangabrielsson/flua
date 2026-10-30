@@ -194,7 +194,13 @@ async def test_db_online_persists_only_emulator_state(
     await engine.start()
     try:
         engine.start_qa(str(script), None, {}, str(script))
-        await asyncio.sleep(0.4)
+        # onInit's calls suspend the QA (online mode); wait until the
+        # internalStorage round trip has landed in the sim state — a raw
+        # sleep races the worker thread and loses the token at stop()
+        await wait_until(
+            lambda: engine.api.state.plugin_variables.get(5000, {}).get("token")
+            is not None
+        )
     finally:
         await engine.stop()
 
