@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.107] - 2026-10-30
+
+### Fixed
+- improve wait mechanism in test_db_online_persists_only_emulator_state to avoid race conditions
+
 ## [0.1.106] - 2026-10-30
 
 ### Added

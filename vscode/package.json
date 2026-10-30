@@ -3,7 +3,7 @@
   "displayName": "flua",
   "description": "HC3 QuickApp support for VS Code: run flua tools from the explorer, check QA files on save, and read .fqa packages.",
   "icon": "icon.png",
-  "version": "0.1.106",
+  "version": "0.1.107",
   "publisher": "GsonSoft-development",
   "license": "MIT",
   "repository": {
