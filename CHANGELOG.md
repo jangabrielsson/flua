@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.108] - 2026-10-31
+
+### Fixed
+- enhance websocket client and server handling for connection stability and error resilience
+- ensure thread-safe writes in WsClient and handle server-initiated close correctly
+
 ## [0.1.107] - 2026-10-30
 
 ### Fixed
