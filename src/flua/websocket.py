@@ -201,6 +201,13 @@ class WsClient:
 
     def run(self) -> None:
         try:
+            # the 0.5s recv poll wakes the loop periodically (to notice
+            # close()); set it ONCE — re-setting it every iteration would
+            # mutate the socket's blocking state under the writers' in-flight
+            # sendall calls, and their ssl writes then see EAGAIN (Errno 35)
+            # as a fatal read error and tear the connection down
+            if self._sock is not None:
+                self._sock.settimeout(0.5)
             while not self._stop.is_set() and self._sock is not None:
                 # Frames may already sit in the buffer from the handshake read
                 # (a server can send data in the same segment as its 101
@@ -211,7 +218,6 @@ class WsClient:
                     self._parse_buffer()
                     if self._stop.is_set() or self._sock is None:
                         break
-                self._sock.settimeout(0.5)
                 try:
                     chunk = self._sock.recv(4096)
                 except TimeoutError:
@@ -242,8 +248,8 @@ class WsClient:
             if opcode == _OP_PING:
                 try:
                     self._send_frame(_OP_PONG, payload)
-                except OSError:
-                    pass
+                except (OSError, WsError):
+                    pass  # socket gone (close raced the echo) — best effort
             elif opcode == _OP_PONG:
                 pass
             elif opcode == _OP_CLOSE:
@@ -252,8 +258,8 @@ class WsClient:
                 self._trace_line(f"rx close code={code} reason={reason!r}")
                 try:
                     self._send_frame(_OP_CLOSE, payload)
-                except OSError:
-                    pass
+                except (OSError, WsError):
+                    pass  # the socket was detached by close() — nothing to echo on
                 self._stop.set()
                 self._emit_disconnected(None)
                 return
@@ -335,16 +341,13 @@ class WsClient:
                     # by the receive loop must not be repeated by close().
                     return
                 self._close_sent = True
-            previous = sock.gettimeout()
-            if previous is not None and previous < (self._timeout or previous):
-                # the receiver's 0.5s recv-poll timeout is socket-wide — a
-                # large sendBinary on a slow link must not inherit it
-                sock.settimeout(self._timeout)
-            try:
-                sock.sendall(bytes(header) + mask + bytes(masked))
-            finally:
-                if previous is not None and sock.gettimeout() != previous:
-                    sock.settimeout(previous)
+            # NOTE: the receiver's 0.5s recv-poll timeout is socket-wide, so
+            # sends inherit it — a large sendBinary on a stalled peer can
+            # fail after 0.5s. That is a known trade-off: writers must NOT
+            # call settimeout() to raise it, because mutating the SSLSocket's
+            # timeout concurrently with the receiver's in-flight read makes
+            # the read fail with EAGAIN and tears the connection down.
+            sock.sendall(bytes(header) + mask + bytes(masked))
 
     def send(self, data: str) -> None:
         if not self._open or self._stop.is_set():

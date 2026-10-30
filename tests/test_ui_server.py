@@ -20,6 +20,7 @@ import re
 import socket
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -318,6 +319,15 @@ def test_ui_flag_keeps_api_alive_after_qa_drains(tmp_path) -> None:
         stderr=subprocess.STDOUT,
         text=True,
     )
+    # drain the subprocess output continuously: an unread PIPE can block a
+    # chatty run (and the drained text is the failure diagnostic)
+    drained: list[str] = []
+
+    def drain() -> None:
+        for line in proc.stdout:
+            drained.append(line)
+
+    threading.Thread(target=drain, daemon=True).start()
     try:
         deadline = time.monotonic() + 15.0
         saw_button = False
@@ -335,8 +345,8 @@ def test_ui_flag_keeps_api_alive_after_qa_drains(tmp_path) -> None:
                     break
             except (OSError, ValueError):
                 time.sleep(0.1)
-        assert proc.poll() is None, "flua --ui exited before serving the API: " + proc.stdout.read()
-        assert saw_button, "UI API never served the QA device"
+        assert proc.poll() is None, "flua --ui exited before serving the API: " + "".join(drained)
+        assert saw_button, "UI API never served the QA device: " + "".join(drained)
         # the QA has no timers — a plain run would have drained and exited by
         # now; the UI session must still be alive and answering
         time.sleep(1.0)

@@ -512,22 +512,27 @@ class MqttBrokerWs(EchoWsServer):
             ).encode()
             conn.sendall(response)
             while True:
-                frame = _read_frame(conn)
-                if frame is None:
-                    return
-                opcode, payload = frame
-                if opcode == 0x8:
-                    conn.sendall(_server_frame(0x8, payload))
-                    return
-                if opcode != 0x2 or not payload:
-                    continue
-                kind = payload[0] >> 4
-                if kind == 0x1:  # CONNECT -> CONNACK (session present)
-                    conn.sendall(_server_frame(0x2, bytes([0x20, 0x02, 0x00, 0x00])))
-                elif kind == 0x8:  # SUBSCRIBE -> SUBACK (granted QoS 0)
-                    conn.sendall(_server_frame(0x2, bytes([0x90, 0x03]) + payload[2:4] + b"\x00"))
-                elif kind == 0xE:  # DISCONNECT -> done
-                    return
+                try:
+                    frame = _read_frame(conn)
+                    if frame is None:
+                        return
+                    opcode, payload = frame
+                    if opcode == 0x8:
+                        conn.sendall(_server_frame(0x8, payload))
+                        return
+                    if opcode != 0x2 or not payload:
+                        continue
+                    kind = payload[0] >> 4
+                    if kind == 0x1:  # CONNECT -> CONNACK (session present)
+                        conn.sendall(_server_frame(0x2, bytes([0x20, 0x02, 0x00, 0x00])))
+                    elif kind == 0x8:  # SUBSCRIBE -> SUBACK (granted QoS 0)
+                        conn.sendall(
+                            _server_frame(0x2, bytes([0x90, 0x03]) + payload[2:4] + b"\x00")
+                        )
+                    elif kind == 0xE:  # DISCONNECT -> done
+                        return
+                except (OSError, ssl.SSLError):
+                    return  # client tore the connection down mid-frame — expected
 
 
 def test_example_mqtt_over_websocket_runs_against_a_mock_broker() -> None:
@@ -593,8 +598,13 @@ def test_wss_concurrent_sends_are_serialized() -> None:
         str(Path(__file__).parent / "certs" / "key.pem"),
     )
     server = EchoWsServer(tls_ctx=ctx)
+    events: list[tuple[str, object]] = []
+    traces: list[str] = []
     client = WsClient(
-        f"wss://127.0.0.1:{server.port}", 5.0, lambda event, data, is_binary=False: None
+        f"wss://127.0.0.1:{server.port}",
+        5.0,
+        lambda event, data, is_binary=False: events.append((event, data)),
+        trace=traces.append,
     )
     client.connect()
     threading.Thread(target=client.run, daemon=True).start()
@@ -616,7 +626,11 @@ def test_wss_concurrent_sends_are_serialized() -> None:
         while time.monotonic() < deadline and len(server.seen_frames) < len(payloads):
             time.sleep(0.01)
         got = {payload for opcode, payload in server.seen_frames if opcode == 0x2}
-        assert got == set(payloads)  # every frame arrived intact, TLS stream uncorrupted
+        assert got == set(payloads), (
+            [line[:80] for line in traces[-6:]],
+            events[-4:],
+            server.server_errors,
+        )  # every frame intact
     finally:
         client.close()
 
@@ -630,7 +644,9 @@ def test_server_initiated_close_sends_exactly_one_close_frame() -> None:
     server = EchoWsServer(close_after=0.1)
     events: list[tuple[str, object]] = []
     client = WsClient(
-        f"ws://127.0.0.1:{server.port}", 5.0, lambda event, data: events.append((event, data))
+        f"ws://127.0.0.1:{server.port}",
+        5.0,
+        lambda event, data, is_binary=False: events.append((event, data)),
     )
     client.connect()
     threading.Thread(target=client.run, daemon=True).start()
@@ -640,5 +656,13 @@ def test_server_initiated_close_sends_exactly_one_close_frame() -> None:
             break
         time.sleep(0.01)
     assert any(event == "disconnected" for event, _ in events)
+    # wait for the echoed close to reach the server, then a grace window for
+    # any (wrong) second close frame to show up before counting
+    deadline = time.monotonic() + 3.0
+    while time.monotonic() < deadline:
+        if any(opcode == 0x8 for opcode, _ in server.seen_frames):
+            break
+        time.sleep(0.01)
+    time.sleep(0.3)
     closes = [payload for opcode, payload in server.seen_frames if opcode == 0x8]
     assert closes == [b"\x03\xe8"]  # one echo of the server's close, nothing after
