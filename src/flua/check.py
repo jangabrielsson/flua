@@ -53,14 +53,14 @@ def check_source(source: str, name: str, lua: Any, base_dir: str | Path = ".") -
             f"line {source[:match.start()].count(chr(10)) + 1} — flua parses '--%%' "
             "with no space; this line is ignored"
         )
-    # even older spelling: "--%%name=value" (the pre-plua '=' syntax). flua
-    # parses "--%%name:value" with a colon — the '=' lines are ignored.
+    # even older spelling: "--%%name=value" (the pre-plua '=' syntax) is
+    # ACCEPTED by the parser — say so, but nudge toward the colon form.
     for match in re.finditer(r"^--%%([A-Za-z_][A-Za-z0-9_-]*)=", source, re.MULTILINE):
         directive = match.group(1)
         findings.append(
-            f"{name}: warning: old-style directive spelling (--%%{directive}=...): "
-            f"line {source[:match.start()].count(chr(10)) + 1} — flua parses "
-            f"'--%%{directive}:...' with a colon; this line is ignored"
+            f"{name}: warning: legacy directive spelling (--%%{directive}=...): "
+            f"line {source[:match.start()].count(chr(10)) + 1} — accepted for "
+            f"compatibility; respell as '--%%{directive}:...'"
         )
     for method, prefix, advice in DEPRECATED_API:
         pattern = rf"api\.{method.lower()}\s*\(\s*['\"]({re.escape(prefix)}[^'\"]*)['\"]"

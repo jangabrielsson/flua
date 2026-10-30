@@ -13,7 +13,8 @@ warnings are the migration map. Then walk this checklist.
 
 | plua | flua | notes |
 |---|---|---|
-| `--%%headers:FILE` | `--%%include:FILE` | paths relative to the file that declares them (nested includes anchor per level) |
+| `--%%headers:FILE` | `--%%include:FILE` | **accepted as an alias** — respell when convenient; paths relative to the file that declares them |
+| `--%%name=value` | `--%%name:value` | **accepted** — the pre-plua `=` form parses like `:` (respell when convenient) |
 | `-- %%save:NAME.fqa` | *(gone)* | use `flua export -o NAME.fqa` / `flua --tool pack -o` |
 | `-- %%proxy:true` | `--%%mode:proxy` | proxy needs online mode |
 | `-- %%port=N` | *(gone)* | no per-QA port in flua |

@@ -1150,7 +1150,7 @@ def test_migrate_tool_scans_a_project(tmp_path, capsys) -> None:
     assert "space before %%" in out
     assert "--%%include" in out  # the headers replacement
     assert "bakes a literal IP" in out
-    assert "old-style directive spelling" in out
+    assert "legacy directive spelling" in out
     assert "plua binary invocation" in out
     assert "pre-flua-format package" in out
     assert "stale package" in out

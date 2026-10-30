@@ -113,8 +113,9 @@ def test_plua_spelling_warns_in_check(tmp_path) -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "plua-style directive spelling" in result.stdout
-    # the even older pre-plua '=' syntax (--%%name=value) is named too
-    assert "old-style directive spelling (--%%name=...)" in result.stdout
+    # the even older pre-plua '=' syntax (--%%name=value) is accepted for
+    # compatibility, with a respell nudge
+    assert "legacy directive spelling (--%%name=...)" in result.stdout
     assert "line 1" in result.stdout
     assert "line 2" in result.stdout
 

@@ -79,8 +79,8 @@ def _scan_file(path: Path) -> list[dict[str, str]]:
                     _finding(
                         path,
                         lineno,
-                        "old-style directive spelling (--%%name=...): flua parses "
-                        "'--%%name:...' with a colon — this line is ignored",
+                        "legacy directive spelling (--%%name=...): accepted for "
+                        "compatibility — respell '--%%name:...'",
                     )
                 )
                 continue
@@ -92,8 +92,16 @@ def _scan_file(path: Path) -> list[dict[str, str]]:
                     _finding(
                         path,
                         lineno,
-                        f"plua-only directive --%%{name} — "
-                        + (f"use {replacement} instead" if replacement else "remove it"),
+                        f"plua directive --%%{name} — "
+                        + (
+                            f"accepted as {replacement}; respell"
+                            if replacement and name == "headers"
+                            else (
+                                f"use {replacement} instead"
+                                if replacement
+                                else "remove it"
+                            )
+                        ),
                     )
                 )
             if _IP_VAR.search(raw) and ',"' not in raw.split("=", 1)[-1]:

@@ -763,9 +763,13 @@ declares its own defaults explicitly).
 plua projects migrate with a mostly mechanical pass: `flua --tool migrate .`
 scans the project for every plua-ism in one pass (directive spellings,
 script invocations, stale packages, baked IPs — exit 1 until clean), and
-`flua --check` covers the syntax. The directive renames:
+`flua --check` covers the syntax. Two legacy spellings are **accepted** so
+old QAs run unchanged — `--%%name=value` (the pre-plua `=` form, parsed
+like `:`) and plua's `--%%headers:FILE` (an alias for `--%%include`);
+respell both when convenient. The remaining renames:
 
-- `--%%headers:FILE` → `--%%include:FILE` (declaring-file-relative paths)
+- `--%%headers:FILE` → `--%%include:FILE` (accepted as an alias — respell;
+  paths relative to the declaring file)
 - `-- %%save`/`-- %%port` → gone (`flua export -o` / `--tool pack -o`)
 - `-- %%proxy:true` → `--%%mode:proxy`; `--%%conceal` → `--%%clobber`
 - tools: `plua -t pack SRC OUT` → `flua --tool pack SRC -o OUT -f`; the

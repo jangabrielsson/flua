@@ -405,3 +405,22 @@ def test_u_literal_errors_are_clear() -> None:
         parse_lua_literal("{label=#a}")
     with pytest.raises(ValueError, match="must be a table"):
         parse_lua_literal('"not a table"')
+
+
+def test_legacy_equals_spelling_parses_like_colon() -> None:
+    # pre-plua "--%%name=value" is accepted like "--%%name:value", so old
+    # QAs run with their intended settings (values with an = stay intact —
+    # the FIRST = or : after the directive name is the separator)
+    assert parse_annotations("--%%name=Old\n--%%type=com.fibaro.binarySwitch\n") == {
+        "name": "Old",
+        "type": "com.fibaro.binarySwitch",
+    }
+    assert parse_annotations("--%%var:x=1\n") == {"var": {"x": "1"}}
+
+
+def test_plua_headers_directive_maps_to_include() -> None:
+    # plua's --%%headers:FILE is accepted as --%%include:FILE, so plua QAs
+    # run unchanged
+    assert parse_annotations("--%%headers:defaults.lua\n") == {
+        "include": "defaults.lua"
+    }

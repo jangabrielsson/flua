@@ -408,9 +408,17 @@ def parse_annotations(source: str, warn_unknown: bool = True) -> dict[str, Any]:
             continue
         body = stripped[4:].strip()
         name, sep, value = body.partition(":")
+        if not sep:
+            # legacy pre-plua spelling: --%%name=value is accepted like the
+            # colon form, so old QAs run with their intended settings
+            name, sep, value = body.partition("=")
         name = name.strip()
         if not sep or not name:
             continue
+        if name == "headers":
+            # plua's --%%headers:X is --%%include:X — the alias is accepted
+            # so plua QAs run unchanged
+            name = "include"
         value = value.strip()
         if not value:
             continue
