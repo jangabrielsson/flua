@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.106] - 2026-10-30
+
+### Added
+- add support for secret QuickApp variables with --%%svar directive
+
 ## [0.1.105] - 2026-10-30
 
 ### Added

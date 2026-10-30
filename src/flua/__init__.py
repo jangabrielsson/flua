@@ -1,3 +1,3 @@
 """flua — a minimal Lua engine on lupa + asyncio with a message-passing bridge."""
 
-__version__ = "0.1.105"
+__version__ = "0.1.106"
