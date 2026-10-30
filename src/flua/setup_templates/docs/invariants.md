@@ -96,6 +96,15 @@ model) and ARCHITECTURE.md (components).
   already shows them, so QAs that build child devices from variable names
   (the SolarEdge Live pattern) work.
   *Pinned by:* `tests/test_modbus_mock.py::test_var_directives_seed_quick_app_variables`
+- **`--%%svar` values are `--%%var` values typed `password`**: the device's
+  `quickAppVariables` entry carries `type: "password"` (the HC3's web quickvar
+  editor masks it with `*****`), while `getVariable`/the API still return the
+  real value. A `--%%svar` wins over a same-named `--%%var`, and the
+  package bake (`--tool pack`/`flua export`) keeps the `password` type, so
+  the placeholder a distribution package ships stays masked on the receiving
+  HC3 too.
+  *Pinned by:* `tests/test_qa.py::test_svar_seeds_password_typed_variable`,
+  `tests/test_tools.py::test_build_fqa_svar_bakes_password_type`
 - **HC3 string extensions exist**: `string.split`, `string.starts`,
   `string.ends` behave like the HC3's.
   *Pinned by:* `tests/test_modbus_mock.py::test_string_starts_and_ends`

@@ -76,6 +76,28 @@ def test_check_flags_unknown_directive() -> None:
         assert "unknown directive --%%instnat" in result.stdout
 
 
+def test_check_var_with_package_value_is_clean() -> None:
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        script = Path(d) / "pkg.lua"
+        script.write_text('--%%var:pwd=config.pwd,"<set me>"\nprint("hi")\n')
+        result = _run("--check", str(script))
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "unknown directive" not in result.stdout  # varPkg is internal
+
+
+def test_check_flags_var_svar_conflict() -> None:
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        script = Path(d) / "both.lua"
+        script.write_text("--%%var:x=1\n--%%svar:x=2\nprint('hi')\n")
+        result = _run("--check", str(script))
+        assert result.returncode == 0  # a warning, not an error
+        assert "both --%%var and --%%svar declare 'x'" in result.stdout
+
+
 def test_check_flags_deprecated_api() -> None:
     import tempfile
 

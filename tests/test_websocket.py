@@ -3,7 +3,6 @@
 import asyncio
 import base64
 import hashlib
-import os
 import re
 import socket
 import ssl
@@ -523,9 +522,16 @@ def test_example_mqtt_over_websocket_runs_against_a_mock_broker() -> None:
     # minimal broker, byte-for-byte
     broker = MqttBrokerWs()
     result = subprocess.run(
-        [sys.executable, "-m", "flua", "--nogreet", "examples/mqtt-over-websocket.lua"],
+        [
+            sys.executable,
+            "-m",
+            "flua",
+            "--nogreet",
+            "-D",
+            f'var:BROKER_URL="ws://127.0.0.1:{broker.port}/mqtt"',
+            "examples/mqtt-over-websocket.lua",
+        ],
         cwd=REPO_ROOT,
-        env={**os.environ, "BROKER_URL": f"ws://127.0.0.1:{broker.port}/mqtt"},
         capture_output=True,
         text=True,
         timeout=60,
@@ -543,10 +549,11 @@ def test_example_mqtt_over_websocket_terminates_without_a_broker() -> None:
             "-m",
             "flua",
             "--nogreet",
+            "-D",
+            'var:BROKER_URL="ws://127.0.0.1:1/mqtt"',
             "examples/mqtt-over-websocket.lua",
         ],
         cwd=REPO_ROOT,
-        env={**os.environ, "BROKER_URL": "ws://127.0.0.1:1/mqtt"},
         capture_output=True,
         text=True,
         timeout=60,

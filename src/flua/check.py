@@ -42,8 +42,14 @@ def check_source(source: str, name: str, lua: Any, base_dir: str | Path = ".") -
         findings.append(f"{name}: error: {exc}")
         return findings
     for key in annotations:
-        if key not in KNOWN_DIRECTIVES:
+        if key not in ("varPkg", "svarPkg") and key not in KNOWN_DIRECTIVES:
             findings.append(f"{name}: warning: unknown directive --%%{key}")
+    both = set(annotations.get("var") or {}) & set(annotations.get("svar") or {})
+    for var_name in sorted(both):
+        findings.append(
+            f"{name}: warning: both --%%var and --%%svar declare '{var_name}'"
+            " — the secret (--%%svar) wins"
+        )
     # plua-era spelling: a space between the comment dashes and %%. flua's
     # parser only matches "--%%" with no space, so these lines are silently
     # ignored — say so, it is almost always a stale plua directive.

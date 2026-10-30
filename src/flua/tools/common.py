@@ -69,29 +69,39 @@ def _bake_packaged_vars(
     *,
     dist: bool,
 ) -> dict[str, Any]:
-    """Evaluate --%%var expressions (no QA code runs) and bake the values
-    into the package: quickAppVariables in initialProperties, and the main
-    file's --%%var header lines rewritten to the baked literals so the file
-    content never carries an expression or a secret literal that was not
-    meant to travel. Unset (nil) variables are dropped from both."""
+    """Evaluate --%%var/--%%svar expressions (no QA code runs) and bake the
+    values into the package: quickAppVariables in initialProperties, and the
+    main file's --%%var/--%%svar header lines rewritten to the baked
+    literals so the file content never carries an expression or a secret
+    literal that was not meant to travel. Unset (nil) variables are dropped
+    from both. --%%svar entries keep type='password' in the package."""
     var_exprs = local_params.get("var") or {}
     if not isinstance(var_exprs, dict):
         var_exprs = {}
+    svar_exprs = local_params.get("svar") or {}
+    if not isinstance(svar_exprs, dict):
+        svar_exprs = {}
     var_pkg = local_params.get("varPkg") or {}
+    svar_pkg = local_params.get("svarPkg") or {}
     clobber = local_params.get("clobber") or {}
     for name in clobber:
-        if name not in var_exprs:
+        if name not in var_exprs and name not in svar_exprs:
             raise ValueError(
-                f"--%%clobber:{name}=... names a variable without a --%%var:{name} directive"
+                f"--%%clobber:{name}=... names a variable without a"
+                f" --%%var/--%%svar:{name} directive"
             )
-        if name in var_pkg:
+        if name in var_pkg or name in svar_pkg:
             raise ValueError(
-                f"--%%var:{name} declares a package value AND a --%%clobber:{name} — use one"
+                f"--%%var/--%%svar:{name} declares a package value AND a"
+                f" --%%clobber:{name} — use one"
             )
-    values = engine.evaluate_vars(var_exprs)
+    exprs = {**var_exprs, **svar_exprs}  # a secret wins over a same-named --%%var
+    values = engine.evaluate_vars(exprs)
     final: dict[str, Any] = {}
-    for name in var_exprs:
-        pkg = var_pkg[name] if name in var_pkg else clobber.get(name)
+    for name in exprs:
+        pkg = var_pkg.get(name, svar_pkg.get(name))
+        if pkg is None:
+            pkg = clobber.get(name)
         if dist and pkg is not None:
             final[name] = pkg
         elif name in values:
@@ -99,7 +109,12 @@ def _bake_packaged_vars(
     if final:
         initial = fqa.setdefault("initialProperties", {})
         initial["quickAppVariables"] = [
-            {"name": name, "value": _wire_value(value)} for name, value in sorted(final.items())
+            {
+                "name": name,
+                "value": _wire_value(value),
+                **({"type": "password"} if name in svar_exprs else {}),
+            }
+            for name, value in sorted(final.items())
         ]
     main = next((f for f in fqa.get("files") or [] if f.get("isMain")), None)
     if main is None:
@@ -111,11 +126,12 @@ def _bake_packaged_vars(
         if in_header and _is_eoh(stripped):
             in_header = False
         ending = line[len(line.rstrip("\r\n")) :]
-        if in_header and stripped.startswith("--%%var:"):
-            name = stripped[len("--%%var:") :].partition("=")[0].strip()
-            if name in var_exprs:
+        if in_header and (stripped.startswith("--%%var:") or stripped.startswith("--%%svar:")):
+            prefix, _, rest = stripped.partition(":")
+            name = rest.partition("=")[0].strip()
+            if name in exprs:
                 if name in final:
-                    scrubbed.append(f"--%%var:{name}={lua_literal(final[name])}{ending}")
+                    scrubbed.append(f"{prefix}:{name}={lua_literal(final[name])}{ending}")
                 else:  # evaluated nil — not packaged
                     continue
             else:

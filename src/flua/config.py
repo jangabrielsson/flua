@@ -459,6 +459,27 @@ def parse_annotations(source: str, warn_unknown: bool = True) -> dict[str, Any]:
                     pkgs[key] = pkg
                     config["varPkg"] = pkgs
             config["var"] = sub
+        elif name == "svar":
+            # --%%svar:name=expr — SECRET QuickApp variable initializers,
+            # parsed exactly like --%%var (same expression semantics and
+            # package-value slot). The device entry is typed 'password',
+            # which the HC3's web quickvar editor masks with *****; the
+            # value itself stays readable through getVariable and the API.
+            sub = config.get("svar")
+            if not isinstance(sub, dict):
+                sub = {}
+            key, _, val = value.partition("=")
+            key = key.strip()
+            if key:
+                expr, pkg = _split_var_package_value(val)
+                sub[key] = expr
+                if pkg is not None:
+                    pkgs = config.get("svarPkg")
+                    if not isinstance(pkgs, dict):
+                        pkgs = {}
+                    pkgs[key] = pkg
+                    config["svarPkg"] = pkgs
+            config["svar"] = sub
         elif name == "clobber":
             # --%%clobber:name=value — the legacy Plua spelling for the
             # package value: replace --%%var:name's value with this string
@@ -597,6 +618,7 @@ KNOWN_DIRECTIVES = frozenset(
         "properties",
         "property",
         "var",
+        "svar",  # --%%svar:name=expr — secret QuickApp variables (type='password')
         "clobber",  # --%%clobber:name=value — Plua-compatible package value
         "file",
         "mode",
@@ -656,7 +678,7 @@ def merge_annotations(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, 
     """
     merged = dict(base)
     for key, value in extra.items():
-        if key in ("var", "property", "varPkg", "clobber"):
+        if key in ("var", "svar", "property", "varPkg", "svarPkg", "clobber"):
             sub = dict(merged.get(key) or {})
             sub.update(value or {})
             merged[key] = sub

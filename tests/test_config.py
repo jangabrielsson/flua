@@ -3,6 +3,7 @@
 from flua.config import (
     _apply_mode,
     expand_includes,
+    merge_annotations,
     parse_annotations,
     parse_lua_literal,
     parse_scalar,
@@ -74,6 +75,27 @@ def test_var_directives_merge_with_string_values() -> None:
     # whole value after the first '=' is kept (tables contain commas)
     source = "--%%var:x=1\n--%%var:y='hello'\n--%%var:t={a=1,b=2}\n"
     assert parse_annotations(source) == {"var": {"x": "1", "y": "'hello'", "t": "{a=1,b=2}"}}
+
+
+def test_svar_parses_like_var_with_its_own_package_values() -> None:
+    # --%%svar:name=expr[,"<placeholder>"] — same shape as --%%var, stored
+    # separately so the runtime can type the entries 'password'.
+    cfg = parse_annotations(
+        "--%%svar:user=config.user,'<set user>'\n"
+        "--%%svar:pwd=os.getenv('PW')\n--%%var:plain=42\n"
+    )
+    assert cfg["svar"] == {"user": "config.user", "pwd": "os.getenv('PW')"}
+    assert cfg["svarPkg"] == {"user": "<set user>"}
+    assert cfg["var"] == {"plain": "42"}
+
+
+def test_svar_merges_per_variable_like_var() -> None:
+    # -D svar:x=... / .flua-directives merge into the QA's own header
+    base = parse_annotations("--%%svar:a='x'\n--%%var:b=1\n")
+    extra = parse_annotations("--%%svar:a='y'\n--%%svar:c='z'\n")
+    merged = merge_annotations(base, extra)
+    assert merged["svar"] == {"a": "'y'", "c": "'z'"}
+    assert merged["var"] == {"b": "1"}
 
 
 def test_var_package_value_splits_at_top_level_comma() -> None:

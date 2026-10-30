@@ -1,11 +1,14 @@
 --%%name:MQTT over WebSocket
 --%%type:com.fibaro.deviceController
+--%%var:BROKER_URL="ws://127.0.0.1:8080/mqtt","ws://your-broker/mqtt"
 -- Example: MQTT over WebSocket, built in Lua on top of net.WebSocketClient —
 -- the pattern from Fibaro's 5.221 BETA documentation, so QA code written
--- for the HC3 runs identically under flua.
+-- for the HC3 runs identically under flua (no flua-only APIs: the broker
+-- URL is a QuickApp variable, settable on the HC3 too).
 --
 -- Run with:
---   BROKER_URL=ws://127.0.0.1:8080/mqtt .venv/bin/flua examples/mqtt-over-websocket.lua
+--   .venv/bin/flua examples/mqtt-over-websocket.lua
+--   .venv/bin/flua -D 'var:BROKER_URL="ws://127.0.0.1:8080/mqtt"' examples/mqtt-over-websocket.lua
 --
 -- The QA connects with the mqtt subprotocol, sends an MQTT 3.1.1 CONNECT
 -- via sendBinary, accumulates received bytes (one WebSocket frame is NOT
@@ -13,8 +16,10 @@
 -- the SUBACK. Without a broker the connect fails, the error event fires,
 -- and the QA exits cleanly — the example always terminates.
 
-local broker = os.getenv("BROKER_URL") or "ws://127.0.0.1:8080/mqtt"
-local clientId = "flua-demo-" .. tostring(os.time())
+-- the QA's runtime configuration, resolved in onInit (HC3-safe: QuickApp
+-- variables instead of os.getenv)
+local broker
+local clientId
 
 -- Remaining Length: 7 payload bits per byte, MSB set while more bytes follow.
 local function varint(n)
@@ -72,6 +77,8 @@ end
 function QuickApp:onInit()
   self.buffer = ""
   self.finished = false
+  broker = self:getVariable("BROKER_URL") or "ws://127.0.0.1:8080/mqtt"
+  clientId = "flua-demo-" .. tostring(os.time())
   -- a safety leash: a silent broker must not hang the run
   setTimeout(function() self:finish("no broker response") end, 10000)
 

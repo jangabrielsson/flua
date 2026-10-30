@@ -276,6 +276,7 @@ Parsing stops at the end-of-header marker:
 | `--%%property:value=true` | raw property, scalar values; repeatable, merges |
 | `--%%var:name=expr` | initializes a **QuickApp variable**; `expr` is a Lua expression — `'text'`, `42`, `{a=1}`, `config.color`, `os.getenv("X")` (one per line). An optional quoted string after a top-level comma is the **package value** distribution packages get: `--%%var:name=expr,"<placeholder>"` |
 | `--%%clobber:name=value` | Plua-compatible spelling of the package value (replaces `--%%var:name`'s value in distribution packages) |
+| `--%%svar:name=expr` | initializes a **secret QuickApp variable**: same expression semantics and package-value slot as `--%%var`, but the device entry is typed `password`, so the HC3's web quickvar editor masks the value (`*****`) — `getVariable` and the API still return the real value. A `--%%svar` wins over a same-named `--%%var` |
 | `--%%uid:...` | sets `quickAppUuid` |
 | `--%%description:...` | sets `userDescription` |
 | `--%%model:...` | sets `model` |

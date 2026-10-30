@@ -964,6 +964,39 @@ async def test_dynamic_load_with_directives(tmp_path, capsys) -> None:
     assert names == {"friend": 42, "greeting": "from-file"}
 
 
+def test_svar_seeds_password_typed_variable(tmp_path) -> None:
+    # --%%svar: the device entry carries type='password' (the HC3's web
+    # quickvar editor masks it), while getVariable and the API still return
+    # the real value. Plain --%%var entries stay untyped.
+    script = tmp_path / "secret.lua"
+    script.write_text(
+        "--%%name:secret\n"
+        "--%%svar:user='alice','<set user>'\n"
+        "--%%var:user='shadow'\n"
+        "--%%var:plain='bob'\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit()\n"
+        "  print('GV', self:getVariable('user'), self:getVariable('plain'))\n"
+        "  local dev = api.get('/devices/' .. self.id)\n"
+        "  local entries = {}\n"
+        "  for _, v in ipairs(dev.properties.quickAppVariables or {}) do entries[v.name] = v end\n"
+        "  print('TYPED', entries.user and entries.user.type == 'password',"
+        " entries.plain and entries.plain.type == nil)\n"
+        "  exit(0)\n"
+        "end\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--nogreet", str(script)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "GV alice bob" in result.stdout
+    assert "TYPED true true" in result.stdout
+
+
 def test_example_dynamic_loading() -> None:
     result = subprocess.run(
         [sys.executable, "-m", "flua", "--api", "local", "examples/dynamic.lua"],

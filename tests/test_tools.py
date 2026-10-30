@@ -987,6 +987,34 @@ def test_pack_bakes_package_values_into_dist_fqa(tmp_path, monkeypatch) -> None:
     assert "--%%var:opt" not in main
 
 
+def test_build_fqa_svar_bakes_password_type(tmp_path, monkeypatch) -> None:
+    # --%%svar keeps type='password' in the baked package: a distribution
+    # package ships the masked placeholder, a personal upload the real value
+    from flua.tools import common
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".flua.lua").write_text("return { secretPwd = 'hunter2' }\n")
+    (tmp_path / "main.lua").write_text(
+        "--%%name:pkg\n"
+        "--%%svar:pwd=config.secretPwd,'<set password>'\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() end\n"
+    )
+    fqa, _ = common.build_fqa("main.lua", dist=True)
+    assert fqa["initialProperties"]["quickAppVariables"] == [
+        {"name": "pwd", "value": "<set password>", "type": "password"}
+    ]
+    main = next(f for f in fqa["files"] if f["isMain"])["content"]
+    assert "--%%svar:pwd='<set password>'" in main
+    assert "config.secretPwd" not in main
+    assert "hunter2" not in main
+    # personal upload: the real value, still password-typed
+    fqa_up, _ = common.build_fqa("main.lua", dist=False)
+    assert fqa_up["initialProperties"]["quickAppVariables"] == [
+        {"name": "pwd", "value": "hunter2", "type": "password"}
+    ]
+
+
 def test_build_fqa_upload_bakes_real_values(tmp_path, monkeypatch) -> None:
     # A personal upload (--tool uploadQA) bakes the REAL evaluated values —
     # the placeholder is a distribution concern, your own HC3 gets the

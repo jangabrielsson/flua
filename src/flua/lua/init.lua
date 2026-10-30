@@ -889,27 +889,37 @@ local function bootstrapQa(env, qaId, config)
     properties = cfg.properties or {},
   }
   -- --%%var values (evaluated expressions) become QuickApp variables on the
-  -- instance before onInit runs, so self:getVariable sees them immediately
-  local varValues = cfg.var
-  if type(varValues) == "table" and next(varValues) ~= nil then
+  -- instance before onInit runs, so self:getVariable sees them immediately;
+  -- --%%svar values do the same, but the device entry is typed 'password'
+  -- (the HC3's web quickvar editor masks it — the value stays readable)
+  local function seedQuickVars(dev, values, entryType)
     local props = dev.properties
     if type(props) ~= "table" then props = {} end
     local vars = props.quickAppVariables
     if type(vars) ~= "table" then vars = {} end
-    for name, value in pairs(varValues) do
+    for name, value in pairs(values) do
       local found = false
       for _, v in ipairs(vars) do
         if v.name == name then
           v.value = value
+          if entryType then v.type = entryType end
           found = true
         end
       end
       if not found then
-        vars[#vars + 1] = { name = name, value = value, isHidden = false }
+        local entry = { name = name, value = value, isHidden = false }
+        if entryType then entry.type = entryType end
+        vars[#vars + 1] = entry
       end
     end
     props.quickAppVariables = vars
     dev.properties = props
+  end
+  if type(cfg.var) == "table" and next(cfg.var) ~= nil then
+    seedQuickVars(dev, cfg.var, nil)
+  end
+  if type(cfg.svar) == "table" and next(cfg.svar) ~= nil then
+    seedQuickVars(dev, cfg.svar, "password")
   end
   -- Construct the QuickApp (onInit runs synchronously in __init, before
   -- initChildDevices — the HC3 order). The QA identity was registered as a
@@ -976,6 +986,23 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
     end
     config.var = vars
     _PY.post{ type = "qaVars", id = qaId, vars = vars }
+  end
+  -- --%%svar: the same expression semantics, but the variable is a SECRET
+  -- (device entry typed 'password'; the HC3's web editor masks the value)
+  local svarExprs = config.svar
+  if type(svarExprs) == "table" then
+    local svars = {}
+    for name, expr in pairs(svarExprs) do
+      local ok, value = pcall(load("return " .. tostring(expr), nil, "t", { config = config, os = os }))
+      if not ok then
+        print("error in --%%svar:" .. tostring(name) .. ": " .. tostring(expr) .. " — " .. tostring(value))
+        if not config.watch then _FLUA.exit(1) end
+        return
+      end
+      svars[name] = value
+    end
+    config.svar = svars
+    _PY.post{ type = "qaVars", id = qaId, vars = svars, secret = true }
   end
   -- the QA's log tag, <name><id>, bound before its files execute: the HC3
   -- binds __TAG when the QA loads — onInit is only the user entry point and

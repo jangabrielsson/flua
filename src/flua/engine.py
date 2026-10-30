@@ -874,30 +874,49 @@ class LuaEngine:
             "proxy": proxy_enabled,
         }
         self._qas[qa_id]["files"] = self._build_files(path, code, qa_config)
-        # --%%var values become the device's quickAppVariables BEFORE the QA
-        # boots: on the HC3 the device is created with initialProperties, so
-        # api.get("/devices/<id>") inside onInit already shows them (QAs that
-        # build child devices from variable names depend on this). Evaluate
-        # the expressions in Lua with the same scope as the QA's own
-        # bootstrap (bootstrapQa), then seed the registration properties.
+        # --%%var/--%%svar values become the device's quickAppVariables
+        # BEFORE the QA boots: on the HC3 the device is created with
+        # initialProperties, so api.get("/devices/<id>") inside onInit
+        # already shows them (QAs that build child devices from variable
+        # names depend on this). Evaluate the expressions in Lua with the
+        # same scope as the QA's own bootstrap (bootstrapQa), then seed the
+        # registration properties. --%%svar entries are typed 'password'
+        # (the HC3's web editor masks them). A secret wins over a
+        # same-named --%%var.
         var_exprs = qa_config.get("var")
-        if isinstance(var_exprs, dict) and var_exprs:
+        svar_exprs = qa_config.get("svar")
+        exprs: dict[str, Any] = {}
+        if isinstance(var_exprs, dict):
+            exprs.update(var_exprs)
+        if isinstance(svar_exprs, dict):
+            exprs.update(svar_exprs)
+        if exprs:
             try:
                 flua = self._lua.globals()["_FLUA"]
                 evaluated = flua["evalVars"](
-                    self._lua.table_from(var_exprs, recursive=True),
+                    self._lua.table_from(exprs, recursive=True),
                     self._lua.table_from(qa_config, recursive=True),
                 )
                 variables = lua_to_python(evaluated, self._lua)
                 if isinstance(variables, dict) and variables:
                     device_properties["quickAppVariables"] = [
-                        {"name": str(var_name), "value": value, "isHidden": False}
+                        {
+                            "name": str(var_name),
+                            "value": value,
+                            "isHidden": False,
+                            **(
+                                {"type": "password"}
+                                if isinstance(svar_exprs, dict) and var_name in svar_exprs
+                                else {}
+                            ),
+                        }
                         for var_name, value in variables.items()
                     ]
             except Exception:
-                # faulty --%%var expressions are reported by the QA's own
-                # bootstrap (which exits the QA) — seeding is best-effort
-                logger.warning("could not evaluate --%%var for QA %s: %s", name, qa_id)
+                # faulty --%%var/--%%svar expressions are reported by the
+                # QA's own bootstrap (which exits the QA) — seeding is
+                # best-effort
+                logger.warning("could not evaluate --%%var/--%%svar for QA %s: %s", name, qa_id)
         # Register the QA as a device before its code runs: on the HC3 the
         # plugin device exists before onInit executes, and onInit's own api
         # calls (internalStorage, updateProperty) must find it.
