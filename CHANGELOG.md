@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.105] - 2026-10-30
+
+### Added
+- accept legacy directive spellings for compatibility in plua migration
+- add support for old-style directive spelling in checks and migrations
+
 ## [0.1.104] - 2026-10-29
 
 ### Added
