@@ -201,13 +201,22 @@ class WsClient:
 
     def run(self) -> None:
         try:
-            # the 0.5s recv poll wakes the loop periodically (to notice
-            # close()); set it ONCE — re-setting it every iteration would
-            # mutate the socket's blocking state under the writers' in-flight
-            # sendall calls, and their ssl writes then see EAGAIN (Errno 35)
-            # as a fatal read error and tear the connection down
             if self._sock is not None:
-                self._sock.settimeout(0.5)
+                # Blocking reads: a recv poll via settimeout() can land
+                # mid-TLS-record (CPython's ssl object then cannot resume the
+                # read and the next call fails fatally — the "EOF occurred in
+                # violation of protocol" / EAGAIN teardown). Instead the
+                # receiver blocks until data or close(): close() wakes it
+                # with shutdown(). Sends keep a cap via SO_SNDTIMEO (the
+                # ssl layer stays in blocking mode, so the kernel enforces
+                # it) — a stalled peer cannot hang a wsSend thread forever.
+                self._sock.settimeout(None)
+                if self._timeout:
+                    sec = int(self._timeout)
+                    usec = int((self._timeout - sec) * 1e6)
+                    self._sock.setsockopt(
+                        socket.SOL_SOCKET, socket.SO_SNDTIMEO, struct.pack("ll", sec, usec)
+                    )
             while not self._stop.is_set() and self._sock is not None:
                 # Frames may already sit in the buffer from the handshake read
                 # (a server can send data in the same segment as its 101
@@ -220,8 +229,6 @@ class WsClient:
                         break
                 try:
                     chunk = self._sock.recv(4096)
-                except TimeoutError:
-                    continue
                 except (OSError, ssl.SSLError) as exc:
                     if not self._stop.is_set():
                         self._emit_disconnected(str(exc))
@@ -341,12 +348,11 @@ class WsClient:
                     # by the receive loop must not be repeated by close().
                     return
                 self._close_sent = True
-            # NOTE: the receiver's 0.5s recv-poll timeout is socket-wide, so
-            # sends inherit it — a large sendBinary on a stalled peer can
-            # fail after 0.5s. That is a known trade-off: writers must NOT
-            # call settimeout() to raise it, because mutating the SSLSocket's
-            # timeout concurrently with the receiver's in-flight read makes
-            # the read fail with EAGAIN and tears the connection down.
+            # NOTE: SO_SNDTIMEO caps writes at self._timeout (set in run()),
+            # so a stalled peer fails the send instead of hanging the writer
+            # thread forever. Writers never touch settimeout() themselves:
+            # mutating the SSLSocket's timeout state concurrently with the
+            # receiver's in-flight read breaks the read (EAGAIN teardown).
             sock.sendall(bytes(header) + mask + bytes(masked))
 
     def send(self, data: str) -> None:
