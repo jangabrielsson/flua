@@ -74,6 +74,16 @@ def _scan_file(path: Path) -> list[dict[str, str]]:
                     )
                 )
                 continue
+            if re.match(r"^--%%[A-Za-z_][A-Za-z0-9_-]*=", line):
+                findings.append(
+                    _finding(
+                        path,
+                        lineno,
+                        "old-style directive spelling (--%%name=...): flua parses "
+                        "'--%%name:...' with a colon — this line is ignored",
+                    )
+                )
+                continue
             match = re.match(r"^--%%([A-Za-z_]+):", line)
             if match and match.group(1) in _PLUA_DIRECTIVES:
                 name = match.group(1)

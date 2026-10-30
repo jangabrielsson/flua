@@ -103,7 +103,7 @@ def test_plua_spelling_warns_in_check(tmp_path) -> None:
     # plua-era "-- %%save" (space before %%) is silently ignored by the
     # parser — --check names it so stale plua directives surface on migration
     script = tmp_path / "pluaspell.lua"
-    script.write_text('-- %%save:state.json\n-- %%desktop:true\nprint("x")\n')
+    script.write_text('-- %%save:state.json\n-- %%desktop:true\n--%%name=OldStyle\nprint("x")\n')
     result = subprocess.run(
         [sys.executable, "-m", "flua", "--check", str(script)],
         cwd=REPO_ROOT,
@@ -113,6 +113,8 @@ def test_plua_spelling_warns_in_check(tmp_path) -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "plua-style directive spelling" in result.stdout
+    # the even older pre-plua '=' syntax (--%%name=value) is named too
+    assert "old-style directive spelling (--%%name=...)" in result.stdout
     assert "line 1" in result.stdout
     assert "line 2" in result.stdout
 

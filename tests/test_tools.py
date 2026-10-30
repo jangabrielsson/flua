@@ -1134,6 +1134,7 @@ def test_migrate_tool_scans_a_project(tmp_path, capsys) -> None:
         "-- %%save:Old.fqa\n"
         "--%%headers:defaults.lua\n"
         '--%%var:IP="192.168.50.165"\n'
+        "--%%name=OldStyle\n"
         "print('hi')\n"
     )
     (tmp_path / "dist").mkdir()
@@ -1149,10 +1150,11 @@ def test_migrate_tool_scans_a_project(tmp_path, capsys) -> None:
     assert "space before %%" in out
     assert "--%%include" in out  # the headers replacement
     assert "bakes a literal IP" in out
+    assert "old-style directive spelling" in out
     assert "plua binary invocation" in out
     assert "pre-flua-format package" in out
     assert "stale package" in out
-    assert "6 finding(s)" in out
+    assert "7 finding(s)" in out
 
 
 def test_migrate_tool_clean_project_exits_zero(tmp_path, capsys) -> None:
