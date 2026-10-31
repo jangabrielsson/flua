@@ -4,6 +4,14 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.113] - 2026-10-31
+
+### Added
+- add response document for GPTAstra feedback on Fibaro QuickApps
+
+### Changed
+- Enhance documentation and testing for flua
+
 ## [0.1.112] - 2026-10-31
 
 ### Added
