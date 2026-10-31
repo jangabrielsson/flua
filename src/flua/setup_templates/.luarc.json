@@ -51,7 +51,8 @@
       "WARNING",
       "DEBUG",
       "TRACE",
-      "LOG_LEVEL"
+      "LOG_LEVEL",
+      "COND"
     ]
   },
   "workspace": {
