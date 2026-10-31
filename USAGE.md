@@ -55,8 +55,11 @@ flua --version
 ```
 
 `flua --version --machine` prints one JSON line instead
-(`{"version", "lua", "python"}`) — the stable capability probe for agents,
-installers, and scripts.
+(`{"version", "lua", "lupa", "python", "integerBytes", "locale"}`) — the
+stable capability probe for agents, installers, and scripts. The wider
+probe is `flua --capabilities-json`: runtime metadata plus the
+compatibility surface table (implemented/partial/unsupported per category
+— QA methods, net.*, the REST sim, runtime modes, tooling).
 
 ## Your first QuickApp
 

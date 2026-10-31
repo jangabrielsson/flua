@@ -399,7 +399,8 @@ async def test_device_property_put_restarts_qa(tmp_path, capsys) -> None:
         await wait_until(lambda: not engine.has_pending_work())
         out = capsys.readouterr().out
         assert "BOOT 1" in out and "BOOT 2" in out and "BOOT 3" not in out
-        assert engine.api.dispatch("GET", "/devices/5000/properties/value") == (True, 200)
+        data, status = engine.api.dispatch("GET", "/devices/5000/properties/value")
+        assert status == 200 and data["value"] is True  # the HC3 envelope
         # /plugins/updateProperty: updates WITHOUT a restart
         engine.api.dispatch(
             "POST",
@@ -409,7 +410,8 @@ async def test_device_property_put_restarts_qa(tmp_path, capsys) -> None:
         await wait_until(lambda: not engine.has_pending_work())
         out = capsys.readouterr().out
         assert "BOOT 3" not in out
-        assert engine.api.dispatch("GET", "/devices/5000/properties/value") == (False, 200)
+        data, status = engine.api.dispatch("GET", "/devices/5000/properties/value")
+        assert status == 200 and data["value"] is False
         # the device PUT merges properties and restarts (a real change)
         engine.api.dispatch(
             "PUT", "/devices/5000", {"properties": {"value": 7, "extra": 5}}
@@ -417,8 +419,10 @@ async def test_device_property_put_restarts_qa(tmp_path, capsys) -> None:
         await wait_until(lambda: not engine.has_pending_work())
         out = capsys.readouterr().out
         assert "BOOT 3" in out and "BOOT 4" not in out
-        assert engine.api.dispatch("GET", "/devices/5000/properties/value") == (7, 200)
-        assert engine.api.dispatch("GET", "/devices/5000/properties/extra") == (5, 200)
+        data, status = engine.api.dispatch("GET", "/devices/5000/properties/value")
+        assert status == 200 and data["value"] == 7
+        data, status = engine.api.dispatch("GET", "/devices/5000/properties/extra")
+        assert status == 200 and data["value"] == 5
     finally:
         await engine.stop()
 

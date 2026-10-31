@@ -42,8 +42,8 @@ HC3_PASSWORD=your-password
 HC3_PIN=1111
 ```
 
-`HC3_URL` (or `HC3_HOST`) is required for online mode — which is the
-**default** (see Modes below). A missing `HC3_URL` is a loud startup error,
+`HC3_URL` (or `HC3_HOST`) is required for online mode, which is
+**opt-in** (offline — the simulated HC3 — is the default; see Modes below). A missing `HC3_URL` is a loud startup error,
 and wrong credentials abort immediately (the HC3 locks itself after 4
 failed attempts, so flua never retries a 401/403).
 
@@ -101,7 +101,7 @@ The repo ships `.vscode/launch.json` with five configurations:
 - **Flua: Debug Current File (UI+mobdebug)** — debugger and viewer together.
 
 **Lua Language Server**: `flua --tool setup` also writes a `.luarc.json`
-(Lua 5.5, HC3 globals) and the **`.luals/` type library** — LuaLS definitions
+(Lua 5.4, HC3 globals) and the **`.luals/` type library** — LuaLS definitions
 for `QuickApp`, `fibaro`, `api` and `json` — so scaffolded projects get
 autocomplete and parameter hints on QA code. The repo carries the same
 configuration for contributors.

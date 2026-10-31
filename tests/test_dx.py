@@ -759,3 +759,24 @@ def test_result_json_statuses(tmp_path) -> None:
     assert record["status"] == "timeout" and record["exitCode"] == 1
     # atomic write: no .tmp litter after completion
     assert not (tmp_path / "hang.json.tmp").exists()
+
+
+def test_capabilities_json_table() -> None:
+    # --capabilities-json: the compatibility surface table agents/porters
+    # probe. Unsupported/partial entries must be stated, never omitted —
+    # the forum feedback's demand.
+    result = _run("--capabilities-json")
+    assert result.returncode == 0, result.stdout + result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["schemaVersion"] == 1
+    assert payload["runtime"]["version"].count(".") >= 2
+    caps = payload["capabilities"]
+    by_name = {
+        entry["name"]: entry
+        for category in caps.values()
+        for entry in category
+    }
+    assert by_name["removeChildDevice"]["status"] == "implemented"
+    assert by_name["simulated HC3 REST"]["status"] == "partial"  # shape-only stubs exist
+    assert by_name["numeric32 emulation"]["status"] == "unsupported"
+    assert by_name["--strict-tests / --result-json"]["status"] == "implemented"

@@ -22,7 +22,9 @@ chain (local `.env` > `~/.env` > shell) has no `HC3_URL`/`HC3_HOST`.
 **Fix:**
 - Add the credentials to your `.env` (see flua-setup), or
 - run offline explicitly: `--api local`, `--%%mode:offline` in the QA
-  header, or a `--%%mode:offline` default in a `.directives` file.
+  header, or a `--%%mode:offline` default in a `.flua-directives` file
+  (next to the main QA file — the file-based `-D` spelling; see
+  flua-setup).
 
 Offline is always the default; online is opt-in (`--api remote`, or
 `--%%mode:online|proxy` on the main QA).
@@ -183,6 +185,6 @@ it to the invariant flua violated:
    flua itself, follow the repo's conventions (pinning tests).
 
 **Hygiene after instrumenting an installed flua:** find the live copy with
-`pip show flua`, and reset it with `pip install --force-reinstall
-fibaro-flua==<version>` — site-packages edits outlive the session and
-poison later runs.
+`python -m pip show fibaro-flua`, and reset it with
+`python -m pip install --force-reinstall fibaro-flua==<version>` —
+site-packages edits outlive the session and poison later runs.

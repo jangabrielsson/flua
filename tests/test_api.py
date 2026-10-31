@@ -161,7 +161,8 @@ def test_device_property_put(api: Api) -> None:
         None,
         204,
     )
-    assert api.dispatch("GET", "/devices/10/properties/value") == (True, 200)
+    data, status = api.dispatch("GET", "/devices/10/properties/value")
+    assert status == 200 and data["value"] is True and isinstance(data["modified"], int)
     assert api.dispatch("PUT", "/devices/10/properties/value", {"nope": 1}) == (None, 400)
     assert api.dispatch("PUT", "/devices/99/properties/value", {"value": 1}) == (None, 404)
 
@@ -173,7 +174,11 @@ def test_device_delete(api: Api) -> None:
 
 
 def test_device_property_get(api: Api) -> None:
-    assert api.dispatch("GET", "/devices/10/properties/value") == (False, 200)
+    # the HC3 envelope — pinned by a live capture:
+    # docs/feedback/hc3_property_endpoint_capture.md — scalars AND objects
+    # come back as {value, modified}; a missing property is 404/null
+    data, status = api.dispatch("GET", "/devices/10/properties/value")
+    assert status == 200 and data["value"] is False and isinstance(data["modified"], int)
     assert api.dispatch("GET", "/devices/10/properties/nope") == (None, 404)
     assert api.dispatch("GET", "/devices/99/properties/value") == (None, 404)
 

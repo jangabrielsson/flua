@@ -55,11 +55,14 @@ warnings are the migration map. Then walk this checklist.
 - **Path rules**: `--%%include`/`--%%file` anchor to the declaring file;
   `io.open`/`dofile` inside QA code stay cwd-relative (start flua from the
   project root).
-- **Virtual time**: `--instant` is unsafe for `os.time()`-relative delay
-  logic; `--step` is the deterministic fast mode (plua `speedTime`
-  semantics); `--run-for N` exits 1 when the wall cap cuts work short;
-  tag perpetual housekeeping loops `_FLUA.background(fn)` so they fire
-  while the run lives but never keep it alive.
+- **Virtual time**: `--instant` and `--step` are both deadline-ordered
+  fast-forward — each callback observes its own deadline in `os.time()`
+  (0.1.111 made instant deadline-ordered; the old "instant is unsafe for
+  os.time()-relative logic" caveat no longer applies). `--speed N` is the
+  continuous clock (virtual time also passes while code executes).
+  `--run-for N` exits 1 when the wall cap cuts work short; tag perpetual
+  housekeeping loops `_FLUA.background(fn)` so they fire while the run
+  lives but never keep it alive.
 
 ## Migration checklist
 

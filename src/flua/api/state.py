@@ -112,6 +112,10 @@ class SimState:
         # Appended from the pump and worker threads (deque.append is atomic).
         self.debug_messages: deque[dict[str, Any]] = deque(maxlen=_DEBUG_MESSAGES_MAX)
         self._debug_seq = 0
+        # per-device last-change time (epoch seconds) for the /devices/{id}/
+        # properties/{name} envelope — set on every property change, lazily
+        # initialized to first-read time before the first change
+        self.device_modified: dict[int, int] = {}
         # systemLog (flua-only, GET /flua/systemLog): structured engine
         # lifecycle + crash events — the machine-readable log the real HC3
         # lacks. {id, time, event, qa, tag, code, detail}, newest last.
@@ -355,6 +359,7 @@ class SimState:
         if _lua_equal(new_value, old_value):
             return None  # no state change, no event (Lua semantics: true ~= 1)
         self._refresh_seq += 1
+        self.device_modified[int(device_id)] = int(now)
         self.events.append(
             (
                 self._refresh_seq,

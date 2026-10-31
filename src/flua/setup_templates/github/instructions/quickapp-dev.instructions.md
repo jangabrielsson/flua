@@ -10,7 +10,7 @@ You are helping develop Fibaro HC3 QuickApps run under **flua** (a Lua engine fo
 ```lua
 --%%name:My QuickApp          -- device display name
 --%%type:com.fibaro.binarySwitch  -- Fibaro device type
---%%mode:offline              -- offline | online (default) | proxy
+--%%mode:offline              -- offline (default) | online | proxy
 --%%var:myKey="myValue"       -- QuickApp variable (value is Lua: strings need quotes)
 --%%var:count=10              -- numbers work without quotes
 --%%u:{label="lbl",text="Status"}  -- UI element (one per row)

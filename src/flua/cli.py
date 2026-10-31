@@ -279,6 +279,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "integerBytes, locale) for agents/installers",
     )
     parser.add_argument(
+        "--capabilities-json",
+        action="store_true",
+        help="print the compatibility surface table as one JSON document and "
+        "exit (runtime metadata + implemented/partial/unsupported per category)",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="with --check: machine-readable findings (JSON on stdout)",
@@ -977,27 +983,28 @@ def main(argv: list[str] | None = None) -> int:
         return _tool_main(raw)
     parser = _build_parser()
     args = parser.parse_args(_normalize_debugger_argv(raw))
-    if args.version:
-        if args.machine:
+    if args.version or args.capabilities_json:
+        import lupa
+
+        engine = LuaEngine()
+        runtime = {
+            "version": __version__,
+            "lua": engine.lua_version(),
+            "lupa": lupa.__version__,
+            "python": sys.version.split()[0],
+            # native Lua integer width (HC3 Lua: 8 bytes); the
+            # locale drives os.date/UTF-8 pattern behavior
+            "integerBytes": engine._lua.eval("#string.pack('j', 0)"),
+            "locale": locale.setlocale(locale.LC_ALL, None),
+        }
+        if args.capabilities_json:
+            from .capabilities import report
+
+            print(json.dumps(report(engine, runtime), indent=2))
+        elif args.machine:
             # one JSON line: a stable capability probe (agents, installers,
             # the future MCP layer) — no prose to parse
-            import lupa
-
-            engine = LuaEngine()
-            print(
-                json.dumps(
-                    {
-                        "version": __version__,
-                        "lua": engine.lua_version(),
-                        "lupa": lupa.__version__,
-                        "python": sys.version.split()[0],
-                        # native Lua integer width (HC3 Lua: 8 bytes); the
-                        # locale drives os.date/UTF-8 pattern behavior
-                        "integerBytes": engine._lua.eval("#string.pack('j', 0)"),
-                        "locale": locale.setlocale(locale.LC_ALL, None),
-                    }
-                )
-            )
+            print(json.dumps(runtime))
         else:
             print(f"flua {__version__}")
         return 0

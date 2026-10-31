@@ -242,6 +242,7 @@ def device_delete(state: SimState, req: ApiRequest) -> tuple[Any, int]:
         return None, 404
     device_id = int(req.path_params["id"])
     del state.devices[device_id]
+    state.device_modified.pop(device_id, None)
     if state.is_proxy(device_id):
         # the HC3 owns the device; its own events come back via the poll
         return None, 204
@@ -261,11 +262,22 @@ def device_property_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
         "sunsetHour",
     ):
         # the HC3's own device: computed for the virtual clock's date
-        return public(state.sun_times(req.clock.time)[name]), 200
-    value = (dev.get("properties") or {}).get(name)
-    if value is None:
-        return None, 404
-    return public(value), 200
+        value = state.sun_times(req.clock.time)[name]
+    else:
+        value = (dev.get("properties") or {}).get(name)
+        if value is None:
+            return None, 404
+    # the HC3 envelope (pinned by a live capture —
+    # docs/feedback/hc3_property_endpoint_capture.md):
+    #   {"value": <v>, "modified": <epoch seconds>} — scalars AND objects
+    #   alike; a missing property is 404 with a null body.
+    device_id = int(dev["id"])
+    modified = state.device_modified.get(device_id)
+    if modified is None:
+        # first read before any change: the creation/registration time
+        modified = int(req.clock.time) if req.clock is not None else int(time.time())
+        state.device_modified[device_id] = modified
+    return {"value": public(value), "modified": modified}, 200
 
 
 def device_property_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
