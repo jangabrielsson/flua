@@ -678,7 +678,9 @@ def merge_annotations(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, 
     """
     merged = dict(base)
     for key, value in extra.items():
-        if key in ("var", "svar", "property", "varPkg", "svarPkg", "clobber"):
+        if key in ("var", "svar", "property", "varPkg", "svarPkg", "clobber", "debug"):
+            # debug merges per channel: turning on one channel from the CLI
+            # (-D debug:ws=true / --debug ws) must not disable the QA's own
             sub = dict(merged.get(key) or {})
             sub.update(value or {})
             merged[key] = sub

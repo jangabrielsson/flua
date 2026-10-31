@@ -39,6 +39,7 @@ def test_registry_discovers_all_tools() -> None:
         "uploadFQA",
         "uploadFile",
         "uploadQA",
+        "ws",
     ]
     for name in tools.tool_names():
         module = tools._TOOLS[name]
@@ -1189,3 +1190,13 @@ def test_migrate_tool_clean_project_exits_zero(tmp_path, capsys) -> None:
     (tmp_path / "qa.lua").write_text("--%%name:Clean\nprint('hi')\n")
     assert tools.run_tool("migrate", ["--json", str(tmp_path)]) == 0
     assert capsys.readouterr().out == ""
+
+
+def test_migrate_tool_flags_legacy_file_colon_form(tmp_path, capsys) -> None:
+    # --%%file:path:name is the pre-plua spelling — flua reads path,name, so
+    # the whole value becomes the path; say so with a migration hint
+    (tmp_path / "qa.lua").write_text("--%%file:lib.lua:Lib\n")
+    assert tools.run_tool("migrate", [str(tmp_path)]) == 1
+    out = capsys.readouterr().out
+    assert "legacy --%%file:path:name spelling" in out
+    assert "--%%file:path,name" in out

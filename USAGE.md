@@ -470,6 +470,38 @@ it). `--%%debug:true` is shorthand for all channels on:
   size, a short preview), close codes and reasons, and disconnects.
   Credential-ish values (`auth`, `token`, `password`, ...) are masked in the
   previews.
+  With several connections open each line is labeled with its connection
+  and host — `ws[c3 192.168.50.223] tx binary 2059b …` (c3 = the QA's third
+  socket). The same stream exists structured for agents: `--log json` /
+  the timeline carry `net` trace events (`wsConnect` with url/ok/error,
+  `wsEvent` with event/binary/bytes).
+
+The `ws` channel (and any other) can be turned on from the CLI without
+editing the QA's header: `flua --debug ws script.lua` (comma-separated
+channels, e.g. `--debug ws,api`) — shorthand for `-D debug:ws=true`.
+
+### Debugging real device communications
+
+flua's offline mode is **a simulated HC3 with real network**: `api.*` calls
+hit the sim's house state, while `net.*` (HTTP/WebSocket/MQTT clients) go
+to the real LAN. A QA under test therefore talks to the real device over
+the exact HC3 code path — without the HC3. The combination that made
+debugging a Sonos player straightforward:
+
+```bash
+flua --run-for 30 --debug ws SonosPlayer.lua     # sim HC3, real player,
+                                                # byte-level ws trace
+```
+
+- **The ws trace** shows every handshake and frame (see the debug section
+  above) — with per-connection labels when several sockets are open.
+- **Bounded repro runs**: `--run-for N` caps the wall clock; a watchdog
+  timer in the QA (`setTimeout(function() _FLUA.exit(0) end, 10000)`)
+  exits cleanly once the scenario played out — the pair makes a repro QA
+  terminate deterministically.
+- **`flua --version` includes the Python interpreter** (e.g. 3.14.3) —
+  worth pasting into bug reports for `net.*` problems, since TLS behavior
+  is version-dependent.
 
 `--%%loglength:120` caps the debug line length (default 120; a cut line ends
 with `...`).

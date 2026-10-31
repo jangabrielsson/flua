@@ -98,6 +98,19 @@ def test_check_flags_var_svar_conflict() -> None:
         assert "both --%%var and --%%svar declare 'x'" in result.stdout
 
 
+def test_check_legacy_file_colon_form_hints() -> None:
+    # --%%file:path:name is the legacy plua spelling — the error must say so,
+    # not just show a doubled path
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        script = Path(d) / "legacy.lua"
+        script.write_text("--%%file:lib.lua:Lib\n")
+        result = _run("--check", str(script))
+        assert result.returncode == 1  # missing files are error findings
+        assert "legacy --%%file:path:name spelling" in result.stdout
+
+
 def test_check_flags_deprecated_api() -> None:
     import tempfile
 

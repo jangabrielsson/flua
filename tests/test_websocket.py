@@ -409,10 +409,13 @@ async def test_websocket_debug_trace_logs_frames(capsys) -> None:
     assert "rx text" in seen  # the frame that rode the handshake segment
     # the trace preview masks credential-ish values (the QA's own dataReceived
     # event still gets the real payload — masking is a trace concern only)
-    ws_lines = [line for line in seen.splitlines() if line.startswith("ws ")]
+    ws_lines = [line for line in seen.splitlines() if line.startswith("ws[c")]
     assert any('"token":"***"' in line for line in ws_lines)
     assert not any("s3cret" in line for line in ws_lines)
     assert "tx close" in seen  # the QA's close handshake
+    # every line carries the connection + host label (several sockets would
+    # otherwise be an unreadable flat stream)
+    assert all("ws[c1 127.0.0.1]" in line for line in ws_lines)
 
 
 @pytest.mark.asyncio
@@ -666,3 +669,104 @@ def test_server_initiated_close_sends_exactly_one_close_frame() -> None:
     time.sleep(0.3)
     closes = [payload for opcode, payload in server.seen_frames if opcode == 0x8]
     assert closes == [b"\x03\xe8"]  # one echo of the server's close, nothing after
+
+
+def test_cli_debug_flag_enables_ws_trace(tmp_path) -> None:
+    # the agent-feedback ask: turn on --%%debug channels without editing the
+    # QA's header — --debug ws is shorthand for -D debug:ws=true
+    server = EchoWsServer()
+    script = tmp_path / "trace.lua"
+    script.write_text(
+        "function QuickApp:onInit()\n"
+        "  local ws = net.WebSocketClient({timeout = 2000})\n"
+        "  ws:addEventListener('connected', function() ws:send('hi') end)\n"
+        "  ws:addEventListener('dataReceived', function() ws:close(); exit(0) end)\n"
+        f"  ws:connect('ws://127.0.0.1:{server.port}/')\n"
+        "end\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--nogreet", "--debug", "ws", str(script)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    # labeled byte-level trace: connection id + host on every line
+    assert "ws[c1 127.0.0.1]" in result.stdout
+    assert "tx text" in result.stdout and "rx text" in result.stdout
+
+
+def test_ws_send_error_includes_masked_frame_preview() -> None:
+    # the QA's error event for a failed send names the frame (masked), so a
+    # burst failure can be attributed without leaking secrets
+    from flua.websocket import WebSocketPool
+
+    pool = WebSocketPool(lambda *args: None)
+    slot = pool.new_slot(5000)
+
+    class _Boom:
+        def is_open(self) -> bool:
+            return True
+
+        def send(self, data: str) -> None:
+            raise OSError("boom")
+
+        def send_binary(self, data: bytes) -> None:
+            raise OSError("boom")
+
+    pool._entries[slot]["client"] = _Boom()
+    ok, err = pool.send(slot, '{"token":"s3cret"}')
+    assert not ok
+    assert err is not None
+    assert "boom" in err and "frame:" in err
+    assert '"token":"***"' in err and "s3cret" not in err
+
+
+def test_ws_probe_tool_echo_and_soak() -> None:
+    # --tool ws drives the same WsClient the emulator uses: handshake, a
+    # text frame, a read window, and a liveness soak — exit 0 when the
+    # connection survives the whole script
+    from flua import tools
+
+    server = EchoWsServer()
+    assert (
+        tools.run_tool(
+            "ws",
+            [
+                f"ws://127.0.0.1:{server.port}/",
+                "--send",
+                "hi",
+                "--wait",
+                "1",
+                "--soak",
+                "1",
+            ],
+        )
+        == 0
+    )
+
+
+def test_ws_probe_tool_detects_a_drop_during_soak(capsys) -> None:
+    # a server-initiated close mid-soak must fail the probe (exit 2) — the
+    # "is it the device or the emulator?" answer when the DEVICE is the one
+    # dropping
+    from flua import tools
+
+    server = EchoWsServer(close_after=0.3)
+    assert (
+        tools.run_tool(
+            "ws", [f"ws://127.0.0.1:{server.port}/", "--wait", "0", "--soak", "2"]
+        )
+        == 2
+    )
+    assert "during the soak" in capsys.readouterr().out
+
+
+def test_ws_probe_tool_handshake_failure() -> None:
+    from flua import tools
+
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    assert tools.run_tool("ws", [f"ws://127.0.0.1:{port}/", "--wait", "0"]) == 1

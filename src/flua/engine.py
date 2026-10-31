@@ -2227,9 +2227,11 @@ class LuaEngine:
 
     def _ws_trace(self, text: str) -> None:
         """Byte-level websocket client trace (--%%debug:ws=true): handshake
-        leftovers, per-frame rx/tx lines with masked previews, close codes."""
+        leftovers, per-frame rx/tx lines with masked previews, close codes.
+        Each line is already labeled with its connection and host by the
+        pool (ws[c3 192.168.50.223] …)."""
         if debug_flag(self.config, "ws"):
-            self.debug_log(f"ws {text}")
+            self.debug_log(text)
 
     def _on_ws_event(self, conn: int, event: str, data: Any, is_binary: bool = False) -> None:
         """Event sink for WsClient receiver threads (any thread)."""

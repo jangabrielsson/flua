@@ -112,7 +112,12 @@ def check_file(path: str, lua: Any) -> list[str]:
         else:
             target = base / raw
         if not target.is_file():
-            findings.append(f"{path}: error: --%%file:{raw},{name}: no such file: {target}")
+            hint = ""
+            if name == raw and ":" in raw:
+                # --%%file:path:name is the legacy plua spelling — flua reads
+                # path,name, so the whole value became the path
+                hint = " — legacy --%%file:path:name spelling? flua expects --%%file:path,name"
+            findings.append(f"{path}: error: --%%file:{raw},{name}: no such file: {target}{hint}")
             continue
         resolved = target.resolve()
         if resolved in seen:

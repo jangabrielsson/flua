@@ -98,6 +98,15 @@ def test_svar_merges_per_variable_like_var() -> None:
     assert merged["var"] == {"b": "1"}
 
 
+def test_debug_merges_per_channel() -> None:
+    # --debug ws (or -D debug:ws=true) must ADD to the QA's own debug
+    # channels, not replace them wholesale
+    base = parse_annotations("--%%debug:ws=true\n")
+    extra = parse_annotations("--%%debug:api=true\n")
+    merged = merge_annotations(base, extra)
+    assert merged["debug"] == {"ws": True, "api": True}
+
+
 def test_var_package_value_splits_at_top_level_comma() -> None:
     # --%%var:name=expr,"<placeholder>" — the trailing quoted string after
     # the LAST top-level comma is the distribution package value; commas

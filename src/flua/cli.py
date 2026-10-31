@@ -83,6 +83,15 @@ def _build_parser() -> argparse.ArgumentParser:
         "foreign code without editing it",
     )
     parser.add_argument(
+        "--debug",
+        action="append",
+        default=[],
+        metavar="CHANNELS",
+        help="enable --%%debug channels from the CLI without editing the QA's "
+        "header (comma-separated; e.g. --debug ws or --debug ws,api) — shorthand "
+        "for -D debug:<channel>=true",
+    )
+    parser.add_argument(
         "-e",
         "--execute",
         dest="code",
@@ -318,6 +327,12 @@ def _load_qas(
         if not isinstance(entry, str) or not entry.strip():
             parser.error("-D needs a directive string, e.g. -D mode:online")
         annotations = parse_annotations("--%%" + entry)
+        injected = annotations if injected is None else merge_annotations(injected, annotations)
+    for channels in args.debug:
+        if not isinstance(channels, str) or not channels.strip():
+            parser.error("--debug needs a channel list, e.g. --debug ws,api")
+        pairs = [f"{channel.strip()}=true" for channel in channels.split(",") if channel.strip()]
+        annotations = parse_annotations("--%%debug:" + ",".join(pairs))
         injected = annotations if injected is None else merge_annotations(injected, annotations)
     if args.code is not None:
         annotations = parse_annotations(args.code)

@@ -445,7 +445,12 @@ class WebSocketPool:
             lambda event, data, is_binary=False: self._emit(conn, event, data, is_binary),
             headers,
             check_certificate,
-            self._trace,
+            # label every trace line with the connection: with 2-4 concurrent
+            # sockets (Sonos: household + per-player) a flat tx/rx stream is
+            # unreadable — ws[c3 192.168.50.223] tx … identifies the socket
+            (lambda line: self._trace(f"ws[c{conn} {urlparse(url).hostname or ''}] {line}"))
+            if self._trace is not None
+            else None,
         )
         try:
             client.connect()
@@ -476,14 +481,22 @@ class WebSocketPool:
         client = entry["client"] if entry else None
         if client is None or not client.is_open():
             return False, "socket not open"
+        if binary:
+            payload = data if isinstance(data, bytes) else str(data).encode("utf-8")
+            opcode = _OP_BINARY
+        else:
+            payload = str(data).encode("utf-8")
+            opcode = _OP_TEXT
         try:
             if binary:
-                client.send_binary(data if isinstance(data, bytes) else str(data).encode("utf-8"))
+                client.send_binary(payload)
             else:
-                client.send(data)
+                client.send(str(data))
             return True, None
         except Exception as exc:
-            return False, str(exc)
+            # the QA's error event names the failed frame (masked preview),
+            # so a burst failure can be attributed without leaking secrets
+            return False, f"{exc} (frame: {_trace_preview(opcode, payload)})"
 
     def is_open(self, conn: int) -> bool:
         entry = self._entry(conn)

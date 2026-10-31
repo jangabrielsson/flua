@@ -85,6 +85,21 @@ def _scan_file(path: Path) -> list[dict[str, str]]:
                 )
                 continue
             match = re.match(r"^--%%([A-Za-z_]+):", line)
+            if (
+                match
+                and match.group(1) == "file"
+                and "," not in line
+                and ":" in line[len("--%%file:") :]
+            ):
+                findings.append(
+                    _finding(
+                        path,
+                        lineno,
+                        "legacy --%%file:path:name spelling — flua expects "
+                        "--%%file:path,name (the colon form treats the whole value as the path)",
+                    )
+                )
+                continue
             if match and match.group(1) in _PLUA_DIRECTIVES:
                 name = match.group(1)
                 replacement = _PLUA_DIRECTIVES[name]
