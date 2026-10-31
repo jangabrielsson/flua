@@ -4,6 +4,19 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.115] - 2026-10-31
+
+### Added
+- add feedback issue template and documentation for user feedback process
+- add UI interaction test and JSON fixture for self-asserting pattern
+
+### Changed
+- Add response to additional Flua proposals and update rainy day todos
+
+### Fixed
+- add "COND" to the list of log levels in .luarc.json
+- improve error handling in QuickAppBase and enhance test coverage for UI callback failures
+
 ## [0.1.114] - 2026-10-31
 
 ### Added
