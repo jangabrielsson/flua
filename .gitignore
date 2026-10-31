@@ -21,7 +21,6 @@ tmp/
 .directives
 forum\ posts/
 
-# agent tooling state
-.deepseek/state/
-.codewhale/state/
-.codewhale/workflow-runs.jsonl
+# agent tooling state (auto-generated; repo guidance lives in .github/)
+.codewhale/
+.deepseek/
