@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.112] - 2026-10-31
+
+### Added
+- implement --strict-tests and --result-json options for improved error handling and reporting
+
 ## [0.1.111] - 2026-10-31
 
 ### Added
