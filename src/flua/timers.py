@@ -114,17 +114,19 @@ class TimerManager:
     def fire_due(self) -> int:
         """Fire due timers; returns the count.
 
-        In instant mode virtual time stands still between timers, so the
-        manager advances it to each deadline as the timer fires — the
-        "waiting period" is added to virtual time.
+        Deadline-ordered modes (step AND instant) fire only the EARLIEST
+        timer per call, and the clock advances to its deadline first: one
+        deadline at a time, ``os.time()`` equals the fired deadline inside
+        the callback, so ``os.time()``-relative re-scheduling (event engines
+        like EventRunner) stays coherent. The old instant-mode sweep
+        advanced the clock across ALL due timers before the pump delivered
+        any callback — a 1 s timer observed 2 s because a 2 s timer was
+        also queued.
 
-        In step mode (the deterministic plua speedTime semantics) only the
-        EARLIEST timer fires per call, and the clock advances to its
-        deadline first: one deadline at a time, ``os.time()`` equals the
-        fired deadline inside the callback, so ``os.time()``-relative
-        re-scheduling (event engines like EventRunner) stays coherent.
+        Realtime/speed modes fire everything currently due in one pass (the
+        clock moves continuously there, so no deadline jump is involved).
         """
-        if self._clock.step:
+        if self._clock.deadline_ordered:
             while self._heap:
                 deadline, timer_id = self._heap[0]
                 if self._deadlines.get(timer_id) != deadline:
@@ -154,12 +156,10 @@ class TimerManager:
                 continue
             if self._horizon is not None and deadline > self._horizon:
                 break  # beyond the run horizon (fixed --run-for / maxhours)
-            if not self._clock.instant and deadline > self._clock.time:
+            if deadline > self._clock.time:
                 break  # realtime/speed modes: only fire what is due
             heapq.heappop(self._heap)
             del self._deadlines[timer_id]
-            if self._clock.time < deadline:
-                self._clock.time = deadline  # instant mode: add the wait to V
             try:
                 self._on_fire(timer_id)
             except Exception:

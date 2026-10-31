@@ -170,3 +170,36 @@ def test_run_for_negative_realtime_still_wall_seconds() -> None:
     result = _run_cli("--color", "never", "--run-for", "-1", "-e", "print('HI')")
     assert result.returncode == 0, result.stdout + result.stderr
     assert 0.8 <= time.monotonic() - start < 3.0
+
+
+def test_instant_callbacks_observe_their_own_deadlines(tmp_path) -> None:
+    # the forum report: a 1 s timer must not observe 2 s just because a 2 s
+    # timer is also queued. Instant mode is deadline-ordered like --step —
+    # the old heap sweep advanced the clock across ALL due timers before
+    # the pump delivered any callback. Also pins nested-timer ordering:
+    # a timer scheduled from a callback lands between the remaining ones.
+    script = tmp_path / "deadlines.lua"
+    script.write_text(
+        "--%%mode:offline\n"
+        "function QuickApp:onInit()\n"
+        "  local start = os.time()\n"
+        "  local seen = {}\n"
+        "  setTimeout(function()\n"
+        "    seen[1] = os.time() - start\n"
+        "    -- nested at +1s: deadline t=2, must fire BEFORE the t=3 timer\n"
+        "    setTimeout(function() seen[2] = os.time() - start end, 1000)\n"
+        "  end, 1000)\n"
+        "  setTimeout(function()\n"
+        "    seen[3] = os.time() - start\n"
+        "    assert(seen[1] == 1, 'FIRST_TIMER_TIME_JUMPED ' .. tostring(seen[1]))\n"
+        "    assert(seen[2] == 2, 'NESTED_TIMER_TIME_JUMPED ' .. tostring(seen[2]))\n"
+        "    assert(seen[3] == 3, 'SECOND_TIMER_TIME_JUMPED ' .. tostring(seen[3]))\n"
+        "    print('DEADLINES_OK')\n"
+        "    _FLUA.exit(0)\n"
+        "  end, 3000)\n"
+        "end\n"
+    )
+    for flag in ("--instant", "--step"):
+        result = _run_cli(flag, "--run-for", "-4", str(script))
+        assert result.returncode == 0, flag + "\n" + result.stdout + result.stderr
+        assert "DEADLINES_OK" in result.stdout

@@ -128,6 +128,9 @@ def test_version_machine_json() -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     payload = json.loads(result.stdout)
     assert payload["version"].count(".") >= 2
+    assert payload["integerBytes"] == 8  # native Lua integer width (HC3: 8)
+    assert isinstance(payload["locale"], str) and payload["locale"]
+    assert payload["lupa"] and payload["lua"].startswith("Lua")
     assert payload["lua"].startswith("Lua 5")
     assert payload["python"].count(".") == 2
     # the plain form stays human text

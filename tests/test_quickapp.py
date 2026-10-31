@@ -851,3 +851,69 @@ async def test_plugin_restart_aborts_the_current_turn(capsys) -> None:
     assert "BOOT 0" in out
     assert "BOOT 1" in out  # the restart booted the new instance
     assert "AFTER" not in out  # the turn aborted at plugin.restart()
+
+
+@pytest.mark.asyncio
+async def test_remove_child_device_rest_inventory_consistency(capsys) -> None:
+    # QuickApp:removeChildDevice delegates to the simulated REST deletion —
+    # parent registry and REST inventory must agree (the forum report found
+    # the convenience method missing while the route worked)
+    out = await _run_qas(
+        {
+            "main.lua": (
+                "function QuickApp:onInit()\n"
+                "  local child = self:createChildDevice({"
+                "    name='kid', type='com.fibaro.binarySwitch'})\n"
+                "  print('KID', child.id)\n"
+                "  local data, status = self:removeChildDevice(child.id)\n"
+                "  print('REMOVED', status)\n"
+                "  local gone = api.get('/devices/' .. child.id)\n"
+                "  print('GONE', gone == nil)\n"
+                "  local _, again = self:removeChildDevice(child.id)\n"
+                "  print('AGAIN', again)\n"
+                "  exit(0)\n"
+                "end\n"
+            ),
+        },
+        sleep=0.8,
+        capsys=capsys,
+    )
+    assert "KID 900001" in out
+    assert "REMOVED 204" in out
+    assert "GONE true" in out
+    assert "AGAIN nil" in out  # the local entry was cleared: the guard returns nothing
+
+
+@pytest.mark.asyncio
+async def test_remove_child_device_guards_foreign_children(capsys) -> None:
+    # a QA can only remove its OWN children: the method returns nothing for
+    # a foreign id and the child stays in the REST inventory
+    out = await _run_qas(
+        {
+            "main.lua": (
+                "function QuickApp:onInit()\n"
+                "  self:createChildDevice({name='kid', type='com.fibaro.binarySwitch'})\n"
+                "  print('MADE')\n"
+                "  setTimeout(function() exit(0) end, 400)\n"
+                "end\n"
+            ),
+            "other.lua": (
+                "function QuickApp:onInit()\n"
+                "  local tries = 0\n"
+                "  local function probe()\n"
+                "    tries = tries + 1\n"
+                "    local foreign = api.get('/devices/900001')\n"
+                "    if foreign == nil and tries < 50 then setTimeout(probe, 20) return end\n"
+                "    local res = self:removeChildDevice(900001)\n"
+                "    local after = api.get('/devices/900001')\n"
+                "    print('FOREIGN', foreign ~= nil, res == nil, after ~= nil)\n"
+                "    exit(0)\n"
+                "  end\n"
+                "  setTimeout(probe, 20)\n"
+                "end\n"
+            ),
+        },
+        sleep=0.8,
+        capsys=capsys,
+    )
+    assert "FOREIGN true true true" in out  # exists, no result, still there

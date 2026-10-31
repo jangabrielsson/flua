@@ -117,21 +117,23 @@ an interval firing once per simulated second fires exactly five times):
 
 ```bash
 .venv/bin/flua --speed 60 script.lua    # 60x faster
-.venv/bin/flua --instant script.lua     # timers fire now, os.time() jumps ahead
-.venv/bin/flua --step script.lua        # deadline-ordered fast-forward (plua speedTime):
-                                        # the clock jumps to each timer's deadline before
-                                        # its callback runs, one at a time — fast AND
-                                        # os.time()-coherent (event engines, @@ rules)
+.venv/bin/flua --instant script.lua     # deadline-ordered fast-forward: the clock jumps
+                                        # to each timer's deadline before its callback runs,
+                                        # one at a time — instant AND os.time()-coherent
+.venv/bin/flua --step script.lua        # the same deadline-ordered fast-forward under
+                                        # its plua speedTime name
 ```
 
-`--instant` collapses the whole timer heap into one pass — safe only for
-QAs that never compute delays from `os.time()`/`os.date()` (pure
-`setTimeout` chains). Event engines with `@@`-rules/daily timers and any
-`os.time()`-relative scheduling need a clock that *flows*: `--speed` for
-realtime pacing, or `--step` for the deterministic fast mode. Note that
-`--speed` runs the clock continuously — virtual time also passes *while
-your code executes* (a slow boot becomes virtual time at high speeds), so
-time-sensitive tests should assert ranges or pin deadlines with `--step`.
+`--instant` and `--step` are the same discipline: each callback observes
+its own deadline in `os.time()`/`os.date()`, timers a callback schedules
+are ordered against the queue, and days of simulated time complete in
+seconds. (`--instant` used to collapse the whole timer heap into one pass
+— a 1 s callback observed 2 s when a 2 s timer was also queued; that is
+fixed.) Event engines with `@@`-rules/daily timers and any
+`os.time()`-relative scheduling work under both; `--speed` is the
+*continuous* clock — virtual time also passes *while your code executes*
+(a slow boot becomes virtual time at high speeds), so time-sensitive tests
+should assert ranges or pin deadlines with `--instant`/`--step`.
 Engines with a perpetual housekeeping loop (EventRunner's midnight
 scheduler) should tag it `_FLUA.background(fn)`: tagged timers still fire
 while the run lives but never keep it alive, so `--step --run-for -N`
@@ -808,9 +810,10 @@ respell both when convenient. The remaining renames:
 - tools: `plua -t pack SRC OUT` → `flua --tool pack SRC -o OUT -f`; the
   uploadQA/updateQA/downloadQA/uploadFile names carry over
 - behavior: `--api remote` overrides the main QA's `--%%mode:offline`;
-  `plugin.restart()` aborts the current turn like the HC3; `--instant` is
-  unsafe for `os.time()`-relative logic (`--step` is the deterministic fast
-  mode); tag perpetual housekeeping loops `_FLUA.background(fn)`
+  `plugin.restart()` aborts the current turn like the HC3; `--instant` and
+  `--step` are both deadline-ordered fast-forward (each callback observes
+  its own deadline in `os.time()`); tag perpetual housekeeping loops
+  `_FLUA.background(fn)`
 
 The full checklist, the verified emulated-surface matrix, and the gotchas
 from real migrations live in the `plua-migration` skill

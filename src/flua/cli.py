@@ -18,6 +18,7 @@ import asyncio
 import contextlib
 import io
 import json
+import locale
 import logging
 import os
 import shutil
@@ -259,7 +260,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--machine",
         action="store_true",
-        help="with --version: one JSON line (version, lua, python) for agents/installers",
+        help="with --version: one JSON line (version, lua, lupa, python, "
+        "integerBytes, locale) for agents/installers",
     )
     parser.add_argument(
         "--json",
@@ -921,13 +923,20 @@ def main(argv: list[str] | None = None) -> int:
         if args.machine:
             # one JSON line: a stable capability probe (agents, installers,
             # the future MCP layer) — no prose to parse
+            import lupa
+
             engine = LuaEngine()
             print(
                 json.dumps(
                     {
                         "version": __version__,
                         "lua": engine.lua_version(),
+                        "lupa": lupa.__version__,
                         "python": sys.version.split()[0],
+                        # native Lua integer width (HC3 Lua: 8 bytes); the
+                        # locale drives os.date/UTF-8 pattern behavior
+                        "integerBytes": engine._lua.eval("#string.pack('j', 0)"),
+                        "locale": locale.setlocale(locale.LC_ALL, None),
                     }
                 )
             )

@@ -6,15 +6,16 @@ consistent with timer execution in every mode:
 - ``speed = 1``        realtime; virtual time tracks the wall clock
 - ``speed = N > 0``    accelerated: virtual time runs N times faster
 - ``speed = inf``      instant: real time does not advance virtual time at
-                       all; the timer manager jumps virtual time to each
-                       timer's deadline when it fires, so scripts that wait
+                       all; timers fire one deadline at a time (like step
+                       mode) — the clock advances to a timer's deadline
+                       right before its callback runs, so scripts that wait
                        for hours/days of simulated time complete instantly
-- ``step = True``      deterministic deadline-ordered fast-forward (plua
-                       speedTime): the clock only moves to the next timer's
-                       deadline right before that timer's callback runs, one
-                       timer at a time — ``os.time()``-relative delay math
-                       (event engines like EventRunner) stays coherent while
-                       the run still completes at CPU speed
+                       AND ``os.time()`` reads the callback's own deadline
+- ``step = True``      deadline-ordered fast-forward (plua speedTime), one
+                       timer per pump pass — ``os.time()``-relative delay
+                       math (event engines like EventRunner) stays coherent
+                       while the run still completes at CPU speed. Instant
+                       mode uses the same discipline.
 
 Debugger pauses: the debugger blocks the main thread while waiting for IDE
 commands. mobdebug's yield callback calls :meth:`note_pause`, which makes the
@@ -39,6 +40,16 @@ class VirtualClock:
     @property
     def instant(self) -> bool:
         return math.isinf(self.speed)
+
+    @property
+    def deadline_ordered(self) -> bool:
+        """Deadline-ordered fast-forward: instant and step modes. Only the
+        earliest timer fires per pump pass, and the clock advances to its
+        deadline just before its callback runs — os.time() inside a callback
+        reads the callback's own deadline (the forum-reported instant-mode
+        bug: a heap sweep advanced the clock to the LAST deadline before
+        any callback ran)."""
+        return self.step or math.isinf(self.speed)
 
     def tick(self, now_monotonic: float) -> None:
         """Advance virtual time by the real time since the previous tick.

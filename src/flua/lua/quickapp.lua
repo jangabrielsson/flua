@@ -67,6 +67,16 @@ function plugin.restart(id)
   return result
 end
 
+NONE = 0;
+ERROR = 1;
+WARNING = 2;
+DEBUG = 3;
+TRACE = 4;
+
+-- default: everything logs (the HC3 behavior) — a QA may lower this to
+-- silence self:debug/trace/warning/error below a level
+LOG_LEVEL = TRACE+1;
+
 class 'QuickAppBase'
 -- Constructor for QuickAppBase class
 -- @param dev - Device object containing device properties and metadata
@@ -85,19 +95,31 @@ end
 
 -- Logs a debug message with the device tag
 -- @param ... - Arguments to be logged
-function QuickAppBase:debug(...) fibaro.debug(__TAG,...) end
+function QuickAppBase:debug(...) 
+  if LOG_LEVEL < DEBUG then return end
+  fibaro.debug(__TAG,...)
+end
 
 -- Logs a trace message with the device tag
 -- @param ... - Arguments to be logged
-function QuickAppBase:trace(...) fibaro.trace(__TAG,...) end
+function QuickAppBase:trace(...) 
+  if LOG_LEVEL < TRACE then return end
+  fibaro.trace(__TAG,...)
+end
 
 -- Logs a warning message with the device tag
 -- @param ... - Arguments to be logged
-function QuickAppBase:warning(...) fibaro.warning(__TAG,...) end
+function QuickAppBase:warning(...) 
+  if LOG_LEVEL < WARNING then return end
+  fibaro.warning(__TAG,...)
+end
 
 -- Logs an error message with the device tag
 -- @param ... - Arguments to be logged
-function QuickAppBase:error(...) fibaro.error(__TAG,...) end
+function QuickAppBase:error(...) 
+  if LOG_LEVEL < ERROR then return end
+  fibaro.error(__TAG,...)
+end
 
 -- Registers a UI callback function for a specific element and event type
 -- @param elm - The UI element name
@@ -360,6 +382,17 @@ function QuickApp:createChildDevice(options, classRepresentation)
   return self.childDevices[child.id]
 end
 
+-- Removes a child device of this QuickApp
+-- @param id - The device id of the child to remove
+-- @return The api.delete result (data, status)
+function QuickApp:removeChildDevice(id)
+  if self.childDevices[id] then
+    local res,code = api.delete("/plugins/removeChildDevice/" .. id)
+    self.childDevices[id] = nil
+    return res,code
+  end
+end
+
 class 'QuickAppChild'(QuickAppBase)
 -- Constructor for QuickAppChild class (child device of a QuickApp)
 -- @param dev - Device object containing device properties and metadata
@@ -375,6 +408,7 @@ end
 -- @param event - Event object containing action details
 function onAction(id,event) -- { deviceID = 1234, actionName = "test", args = {1,2,3} }
   --if Emu:DBGFLAG('onAction') then print("onAction: ", json.encode(event)) end
+  -- if quickApp then quickApp:trace("onAction: ", json.encode(event)) end
   setTimeout(function()
   local self = plugin.mainQA
   ---@diagnostic disable-next-line: undefined-field
@@ -495,7 +529,7 @@ function RefreshStateSubscriber:stop()
   _FLUA.refreshStateListeners[self.handle] = nil
 end
 
--- code for handling icons upload
+-- icon providers and device icon type mapping
 QuickAppBase.iconProviders = {
     single = {
         info = "One icon is required for this device type",
@@ -515,19 +549,16 @@ QuickAppBase.iconProviders = {
     }
 }
 
+-- Mapping of device types to their corresponding icon providers
 QuickAppBase.deviceIconTypeMapping = {
-    -- single icon sensors/meters
-    ["com.fibaro.energyMeter"] = QuickAppBase.iconProviders.single,
     ["com.fibaro.humiditySensor"] = QuickAppBase.iconProviders.single,
     ["com.fibaro.powerSensor"] = QuickAppBase.iconProviders.single,
     ["com.fibaro.energyMeter"] = QuickAppBase.iconProviders.single,
     ["com.fibaro.temperatureSensor"] = QuickAppBase.iconProviders.single,
     ["com.fibaro.windSensor"] = QuickAppBase.iconProviders.single,
     ["com.fibaro.multilevelSensor"] = QuickAppBase.iconProviders.single,
-    -- binary actors
     ["com.fibaro.binarySwitch"] = QuickAppBase.iconProviders.binary,
     ["com.fibaro.doorLock"] = QuickAppBase.iconProviders.binary,
-    -- binary sensors
     ["com.fibaro.binarySensor"] = QuickAppBase.iconProviders.binary,
     ["com.fibaro.doorSensor"] = QuickAppBase.iconProviders.binary,
     ["com.fibaro.floodSensor"] = QuickAppBase.iconProviders.binary,
@@ -539,12 +570,9 @@ QuickAppBase.deviceIconTypeMapping = {
     ["com.fibaro.gasDetector"] = QuickAppBase.iconProviders.binary,
     ["com.fibaro.coDetector"] = QuickAppBase.iconProviders.binary,
     ["com.fibaro.fireDetector"] = QuickAppBase.iconProviders.binary,
-    -- multilevel actors 
     ["com.fibaro.multilevelSwitch"] = QuickAppBase.iconProviders.multilevel,
     ["com.fibaro.rollerShutter"] = QuickAppBase.iconProviders.multilevel,
-    -- base shutter
     ["com.fibaro.baseShutter"] = QuickAppBase.iconProviders.baseShutter,
-    -- other
     ["com.fibaro.deviceController"] = QuickAppBase.iconProviders.single,
     ["com.fibaro.genericDevice"] = QuickAppBase.iconProviders.single,
     ["com.fibaro.player"] = QuickAppBase.iconProviders.single,

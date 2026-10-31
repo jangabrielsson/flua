@@ -11,6 +11,10 @@ class FakeClock:
         self.instant = False
         self.step = False
 
+    @property
+    def deadline_ordered(self) -> bool:
+        return self.step or self.instant
+
 
 def make_manager(clock: FakeClock, fired: list[int]) -> TimerManager:
     return TimerManager(clock, lambda timer_id: fired.append(timer_id))
@@ -66,16 +70,23 @@ def test_negative_delay_clamps_to_zero() -> None:
     assert fired == [5]
 
 
-def test_instant_mode_jumps_virtual_time() -> None:
-    """In instant mode, firing advances V to each timer's deadline."""
+def test_instant_mode_fires_one_deadline_at_a_time() -> None:
+    """Instant mode uses the deadline-ordered discipline: each fire_due
+    pops only the EARLIEST timer and advances V to its deadline — the old
+    heap sweep advanced the clock across all due timers before any callback
+    ran, so a 1 s callback observed 2 s when a 2 s timer was also queued."""
     clock, fired = FakeClock(), []
     clock.instant = True
     tm = make_manager(clock, fired)
     tm.set_timeout(1, 10_000)  # deadline 1010
     tm.set_timeout(2, 20_000)  # deadline 1020
-    assert tm.fire_due() == 2
+    assert tm.fire_due() == 1
+    assert fired == [1]
+    assert clock.time == 1010.0
+    assert tm.fire_due() == 1
     assert fired == [1, 2]
-    assert clock.time == 1020.0  # the waiting periods were added to V
+    assert clock.time == 1020.0
+    assert tm.fire_due() == 0
 
 
 def test_step_mode_fires_one_deadline_at_a_time() -> None:

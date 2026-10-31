@@ -45,7 +45,13 @@
       "__fibaro_add_debug_message",
       "__assert_type",
       "urlencode",
-      "_FLUA"
+      "_FLUA",
+      "NONE",
+      "ERROR",
+      "WARNING",
+      "DEBUG",
+      "TRACE",
+      "LOG_LEVEL"
     ]
   },
   "workspace": {

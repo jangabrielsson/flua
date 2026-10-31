@@ -1790,9 +1790,9 @@ class LuaEngine:
     async def _pump(self) -> None:
         while self._running:
             self.clock.tick(time.monotonic())
-            if self.clock.step:
-                # step mode: process the previous callback's messages (its
-                # timer re-scheduling) BEFORE the next deadline jump — a
+            if self.clock.deadline_ordered:
+                # step/instant mode: process the previous callback's messages
+                # (its timer re-scheduling) BEFORE the next deadline jump — a
                 # setTimeout posted by the fired callback must be scheduled
                 # while the clock still reads the deadline that just fired,
                 # or the next fire_due would jump the clock first and the
@@ -1822,7 +1822,7 @@ class LuaEngine:
                 batch.append(self._outbound.get_nowait())
             self._deliver_to_lua(batch)
             self._replay_delivered = True
-            if self.clock.step:
+            if self.clock.deadline_ordered:
                 # the delivered callback may have posted messages (its own
                 # re-scheduling): process them BEFORE yielding, so the
                 # pending-work check sees the SCHEDULED background timer,

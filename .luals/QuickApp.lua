@@ -236,6 +236,13 @@ function QuickApp:initChildDevices(map) end
 ---@return QuickAppChild child The created child device instance
 function QuickApp:createChildDevice(options, classRepresentation) end
 
+---Removes a child device of this QuickApp (own children only; returns
+---nothing for unknown/foreign ids)
+---@param id number The device id of the child to remove
+---@return any data
+---@return number|nil status
+function QuickApp:removeChildDevice(id) end
+
 ---Constructor for QuickAppChild class (child device of a QuickApp)
 ---@param dev table Device object containing device properties and metadata
 ---@return nil
