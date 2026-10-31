@@ -326,6 +326,7 @@ local wakeTimers = {}  -- timer ids that end a sleep (never deferred)
 local workQueues = {}  -- qaId -> FIFO of messages deferred during the sleep
 local pendingApi = {}  -- qaId -> suspended coroutine awaiting an apiResult
 local qaRunners = {}  -- qaId -> the QA callback coroutine currently running (nil while none)
+local callbackKinds = {}  -- coroutine -> dispatch kind (timer/ui/net/...) for --strict-tests records
 
 -- forward slots: handlers, qaInstances and the mutually recursive runners
 -- are declared later in this chunk
@@ -381,8 +382,11 @@ resumeQa = function(qaId, co, ...)
       return
     end
     -- a callback crash: record it in the system log (flua's structured
-    -- crash feed) in addition to the console traceback
+    -- crash feed) in addition to the console traceback. Under --strict-tests
+    -- the record is sticky and fails the run even if a later callback
+    -- exits 0 (engine.exit_code applies the override).
     _PY.system_event("crash", qaId, tostring(res))
+    _PY.record_callback_failure(qaId, callbackKinds[co] or "callback", tostring(res))
     postLog("error", tostring(res))
     postLog("error", debug.traceback(co, nil, 2))
     if qaRunners[qaId] == co then qaRunners[qaId] = nil end
@@ -390,6 +394,7 @@ resumeQa = function(qaId, co, ...)
   end
   if coroutine.status(co) == "dead" then
     if qaRunners[qaId] == co then qaRunners[qaId] = nil end
+    callbackKinds[co] = nil
     return
   end
   if coroutine.status(co) == "suspended" then
@@ -427,14 +432,16 @@ end
 
 -- Every QA callback entry point goes through here. qaId == nil means a
 -- runtime (main-state) timer: run it plain, like before — fibaro.sleep
--- cannot work there and errors clearly.
-runInQa = function(qaId, fn, ...)
+-- cannot work there and errors clearly. ``kind`` labels the dispatch
+-- boundary for --strict-tests failure records (timer/ui/net/...).
+runInQa = function(qaId, fn, kind, ...)
   if qaId == nil then
     xpcall(fn, traceback)
     return
   end
   local co = coroutine.create(fn)
   qaRunners[qaId] = co
+  callbackKinds[co] = kind or "callback"
   -- Lua 5.5 does not inherit debug hooks into new coroutines: mirror the
   -- current thread's hook (mobdebug breakpoints/stepping) onto the callback
   -- coroutine, so debugged QAs behave like they ran on the main thread.
@@ -1162,7 +1169,7 @@ handlers.timerExpired = function(msg)
       return
     end
     callbacks[msg.id] = nil -- one-shot
-    runInQa(qaId, fn)
+    runInQa(qaId, fn, "timer")
   else
     _PY.flua_log("warning", nil, "timerExpired for unknown id " .. tostring(msg.id))
   end
@@ -1234,7 +1241,7 @@ handlers.uiEvent = function(msg)
       -- event.values = {list} after UIAction's wrap
       runInQa(qaId, function()
         qa:UIAction(msg.eventType, msg.elementName, value)
-      end)
+      end, "ui")
     elseif value and isMultiSelect(qa, msg.elementName) then
       -- multi selects arrive as a comma-joined list through the single value
       -- param (the real HC3 contract); restore the list so the QA sees
@@ -1245,11 +1252,11 @@ handlers.uiEvent = function(msg)
       end
       runInQa(qaId, function()
         qa:UIAction(msg.eventType, msg.elementName, values)
-      end)
+      end, "ui")
     else
       runInQa(qaId, function()
         qa:UIAction(msg.eventType, msg.elementName, value)
-      end)
+      end, "ui")
     end
   elseif qa == nil then
     _PY.flua_log("warning", nil, "uiEvent for unknown device " .. tostring(msg.deviceId))
@@ -1314,7 +1321,7 @@ handlers.httpResult = function(msg)
   local h = _FLUA.netHandlers[msg.qa]
   if h then
     if sleeping[msg.qa] then queueFor(msg.qa, msg) return end
-    runInQa(msg.qa, function() h(msg) end)
+    runInQa(msg.qa, function() h(msg) end, "net")
   end
 end
 
@@ -1322,7 +1329,7 @@ handlers.tcpResult = function(msg)
   local h = _FLUA.netHandlers[msg.qa]
   if h then
     if sleeping[msg.qa] then queueFor(msg.qa, msg) return end
-    runInQa(msg.qa, function() h(msg) end)
+    runInQa(msg.qa, function() h(msg) end, "net")
   end
 end
 
@@ -1330,7 +1337,7 @@ handlers.udpResult = function(msg)
   local h = _FLUA.netHandlers[msg.qa]
   if h then
     if sleeping[msg.qa] then queueFor(msg.qa, msg) return end
-    runInQa(msg.qa, function() h(msg) end)
+    runInQa(msg.qa, function() h(msg) end, "net")
   end
 end
 
@@ -1338,7 +1345,7 @@ handlers.wsEvent = function(msg)
   local h = _FLUA.netHandlers[msg.qa]
   if h then
     if sleeping[msg.qa] then queueFor(msg.qa, msg) return end
-    runInQa(msg.qa, function() h(msg) end)
+    runInQa(msg.qa, function() h(msg) end, "net")
   end
 end
 
@@ -1379,7 +1386,7 @@ handlers.mqttEvent = function(msg)
   local h = _FLUA.mqttHandlers[msg.qa]
   if h then
     if sleeping[msg.qa] then queueFor(msg.qa, msg) return end
-    runInQa(msg.qa, function() h(msg) end)
+    runInQa(msg.qa, function() h(msg) end, "net")
   end
 end
 

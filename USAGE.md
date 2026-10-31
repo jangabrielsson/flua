@@ -103,6 +103,18 @@ makes flua exit; QAs with timers or open connections keep running.
                                         # the QA's header — test foreign code
                                         # without editing it (repeatable; the
                                         # injected lines win over the file's)
+.venv/bin/flua --strict-tests script.lua
+                                        # CI mode: an unhandled callback error
+                                        # (timer/UI/net) fails the run with exit
+                                        # 1 — sticky: a later callback's
+                                        # _FLUA.exit(0) cannot clear it
+.venv/bin/flua --result-json result.json script.lua
+                                        # one machine-readable final record
+                                        # (schemaVersion, status passed/failed/
+                                        # timeout, exitCode, runtime, clockMode,
+                                        # wall/virtual seconds, failures) —
+                                        # written atomically; a missing file
+                                        # after a kill is incomplete, never a pass
 ```
 
 `.flua-directives`, a file in the main QA's directory, is the file-based
@@ -304,6 +316,7 @@ Parsing stops at the end-of-header marker:
 | `--%%warn:true` | extra runtime warnings for things the HC3 stays silent about (global) |
 | `--%%trace:api,ui` | the `--trace` categories (api, ui, net, timer, `all`) as a directive (global) |
 | `--%%syslog:run.json` | the `--syslog` file — one JSON line per system/trace event (global) |
+| `--%%strict-tests:true` | the `--strict-tests` CI mode as a directive (global): unhandled callback errors fail the run with exit 1, sticky |
 | `--%%db:house.json` | seed the simulated HC3 from a JSON file (devices, rooms, scenes, globalVariables, alarms, profiles) |
 | `--%%replay:house.json` | replay a recorded house session (`flua record`): seeds the sim with its devices and fires its refreshState events on the virtual timeline |
 | `--%%db:+house.json` | seed **and** persist emulator state back to the file (see below) |

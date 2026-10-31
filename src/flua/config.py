@@ -598,6 +598,7 @@ GLOBAL_PARAMS = frozenset(
         "warn",
         "trace",
         "syslog",
+        "strict-tests",
     }
 )
 
@@ -625,6 +626,7 @@ KNOWN_DIRECTIVES = frozenset(
         "offline",  # legacy alias for --%%mode:offline
         "proxy",  # legacy alias for --%%mode:proxy
         "debug",  # --%%debug:refreshState=true,api=true,http=true
+        "strict-tests",  # --%%strict-tests:true — unhandled callback errors fail the run
         "loglength",  # --%%loglength:120 — debug line length
         "warn",  # --%%warn:true — extra runtime warnings
         "db",  # --%%db:file.json — seed data; +file.json also persists

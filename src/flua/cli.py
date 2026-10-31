@@ -20,6 +20,7 @@ import io
 import json
 import locale
 import logging
+import math
 import os
 import shutil
 import sys
@@ -149,6 +150,20 @@ def _build_parser() -> argparse.ArgumentParser:
         "the clock advances to each timer's deadline before its callback "
         "runs, one timer at a time — os.time()-relative delay math (event "
         "engines) stays coherent, and the run completes at CPU speed",
+    )
+    parser.add_argument(
+        "--strict-tests",
+        action="store_true",
+        help="unhandled callback errors (timer/UI/net) fail the run with exit 1, "
+        "even when a later callback exits 0 — sticky, for CI",
+    )
+    parser.add_argument(
+        "--result-json",
+        metavar="FILE",
+        default=None,
+        help="write one machine-readable final result to FILE (atomic): "
+        "schemaVersion, status (passed/failed/timeout), exitCode, runtime, "
+        "clockMode, wall/virtual seconds, failures, cleanupComplete",
     )
     parser.add_argument(
         "--start",
@@ -496,6 +511,41 @@ def _keep_running(
     return virtual < -run_for and wall < -run_for
 
 
+def _write_result_json(
+    engine: "LuaEngine", path: str, code: int, timed_out: bool, wall_seconds: float
+) -> None:
+    """--result-json's final record, written atomically (tmp + rename). A
+    missing file after a forceful kill is incomplete — consumers must never
+    read a missing record as a pass."""
+    clock = engine.clock
+    if clock.step:
+        clock_mode = "step"
+    elif math.isinf(clock.speed):
+        clock_mode = "instant"
+    elif clock.speed == 1:
+        clock_mode = "realtime"
+    else:
+        clock_mode = f"speed:{clock.speed:g}"
+    record = {
+        "schemaVersion": 1,
+        "status": "timeout" if timed_out else ("failed" if code != 0 else "passed"),
+        "exitCode": code,
+        "runtime": {
+            "flua": __version__,
+            "lua": engine.lua_version(),
+            "python": sys.version.split()[0],
+        },
+        "clockMode": clock_mode,
+        "wallSeconds": round(wall_seconds, 3),
+        "virtualSeconds": round(clock.elapsed(), 3),
+        "failures": engine.callback_failures,
+        "cleanupComplete": True,
+    }
+    tmp = f"{path}.tmp"
+    Path(tmp).write_text(json.dumps(record, indent=2), encoding="utf-8")
+    os.replace(tmp, path)
+
+
 async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     if args.check:
         # static checks only: skip the QA load entirely (its annotation parse
@@ -580,6 +630,8 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
                 break
         if api_mode is None:
             api_mode = "local"  # default: offline (the sim) — online is opt-in
+        if args.strict_tests:
+            global_config["strict-tests"] = True  # the CLI flag wins over any directive
         engine = LuaEngine(
             start=start_epoch,
             speed=speed,
@@ -765,13 +817,19 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         message = f"--run-for {args.run_for}s wall cap reached with work pending"
         engine.post_log("warning", "flua: " + message)
         print(f"flua: {message} (exit 1)", file=sys.stderr)
-        return 1
+        code, timed_out = 1, True
+    else:
+        # engine.exit_code applies the --strict-tests override: a recorded
+        # callback failure turns a clean exit into 1 (sticky)
+        code, timed_out = engine.exit_code, False
     if max_virtual_seconds is not None and engine.clock.elapsed() >= max_virtual_seconds:
         print(f"flua: virtual time limit reached ({max_hours}h)", file=sys.stderr)
-    for qa_id, name, code in engine.failed_qas():
+    for qa_id, name, qa_code in engine.failed_qas():
         # the final verdict: agents read stderr to attribute a bare exit code
-        print(f"flua: QA {name} ({qa_id}) exited with code {code}", file=sys.stderr)
-    return engine.exit_code
+        print(f"flua: QA {name} ({qa_id}) exited with code {qa_code}", file=sys.stderr)
+    if args.result_json:
+        _write_result_json(engine, args.result_json, code, timed_out, wall)
+    return code
 
 
 def _check_cli(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:

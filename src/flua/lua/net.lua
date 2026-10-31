@@ -13,6 +13,9 @@ local nextId = 0
 
 local function callbackErr(err)
   print("[net] callback error: " .. tostring(err))
+  -- user callbacks are caught HERE (inside the handler), not at the
+  -- coroutine boundary — record the failure for --strict-tests
+  _PY.record_callback_failure(qaId, "net", tostring(err))
 end
 
 -- ------------------------------------------------------------------ HTTP

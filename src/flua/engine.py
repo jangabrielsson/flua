@@ -242,6 +242,12 @@ class LuaEngine:
         self.sync_sockets = SyncTCPSockets()
         self._running = False
         self._exit_code = 0
+        # --strict-tests: unhandled callback errors are recorded at the
+        # dispatch boundaries (timer/UI/net) and fail the run even if a
+        # later callback exits 0 — sticky, never cleared
+        self._callback_failures: list[dict[str, Any]] = []
+        self._callback_failures_truncated = False
+        self._strict_tests = bool((config or {}).get("strict-tests"))
         self._log_json = False  # --log json: QA log lines as JSON
         self._logfile: Any = None  # --logfile FILE: log copy (ANSI stripped)
         self._syslog: Any = None  # --syslog FILE: system events, one JSON line each
@@ -1756,8 +1762,43 @@ class LuaEngine:
 
     @property
     def exit_code(self) -> int:
-        """Exit code requested by Lua via the ``exit`` message (0 = none yet)."""
+        """Exit code requested by Lua via the ``exit`` message (0 = none yet).
+        Under --strict-tests a recorded callback failure turns a clean exit
+        into 1 — sticky: a later successful callback or exit(0) cannot
+        clear it."""
+        if self._strict_tests and self._callback_failures and self._exit_code == 0:
+            return 1
         return self._exit_code
+
+    def record_callback_failure(self, qa: int | None, kind: str, message: str) -> None:
+        """Record one unhandled Lua callback error (called from the runtime's
+        dispatch boundaries — timer coroutines, UI events, net callbacks).
+        The record is sticky: nothing clears it. Bounded at 100 entries;
+        later failures are dropped with a ``truncated`` marker. """
+        if len(self._callback_failures) >= 100:
+            self._callback_failures_truncated = True
+            return
+        self._callback_failures.append(
+            {
+                "kind": "callback_error",
+                "callbackKind": str(kind or "callback"),
+                "qa": qa,
+                "error": str(message)[:500],
+            }
+        )
+
+    @property
+    def callback_failures(self) -> list[dict[str, Any]]:
+        """The recorded unhandled callback errors (see
+        :meth:`record_callback_failure`)."""
+        failures = list(self._callback_failures)
+        if self._callback_failures_truncated:
+            failures.append({"kind": "callback_error", "callbackKind": "...", "truncated": True})
+        return failures
+
+    @property
+    def strict_tests(self) -> bool:
+        return self._strict_tests
 
     def failed_qas(self) -> list[tuple[int, str, int]]:
         """QAs that exited nonzero, as (id, name, code) — the CLI prints

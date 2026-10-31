@@ -6,6 +6,7 @@ import subprocess
 import sys
 import threading
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
@@ -589,3 +590,172 @@ def test_os_time_returns_whole_seconds(tmp_path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     assert "INT true number" in result.stdout
     assert "INT2 true" in result.stdout
+
+
+class _StrictHttpHandler(BaseHTTPRequestHandler):
+    """One 200 response for the strict-tests net-callback fixture."""
+
+    def do_GET(self):
+        body = b"ok"
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args) -> None:
+        pass
+
+
+@pytest.fixture
+def strict_http_server() -> str:
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _StrictHttpHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{server.server_port}/"
+    server.shutdown()
+
+
+def _sticky_qa(tmp_path: Path) -> Path:
+    script = tmp_path / "sticky.lua"
+    script.write_text(
+        "function QuickApp:onInit()\n"
+        "  setTimeout(function() error('EXPECTED_CALLBACK_FAILURE') end, 10)\n"
+        "  setTimeout(function() print('LATER OK'); _FLUA.exit(0) end, 50)\n"
+        "end\n"
+    )
+    return script
+
+
+def test_strict_tests_sticky_callback_failure(tmp_path) -> None:
+    # the forum's P0 acceptance: a timer assertion fails, a later callback
+    # prints success and exits 0 — the final status is still failure. The
+    # flag is opt-in: without it the legacy exit-0 behavior holds, and a
+    # CAUGHT expected error still passes.
+    script = _sticky_qa(tmp_path)
+    strict = _run("--api", "local", "--color", "never", "--strict-tests", str(script))
+    assert strict.returncode == 1, strict.stdout + strict.stderr
+    assert "LATER OK" in strict.stdout  # the later callback DID run and exit 0
+    legacy = _run("--api", "local", "--color", "never", str(script))
+    assert legacy.returncode == 0  # legacy mode unchanged
+    # the --%%strict-tests directive is the declarative spelling
+    directive = _run(
+        "--api", "local", "--color", "never", "-D", "strict-tests:true", str(script)
+    )
+    assert directive.returncode == 1
+    # an error the QA code catches itself is not an unhandled callback error
+    caught = tmp_path / "caught.lua"
+    caught.write_text(
+        "function QuickApp:onInit()\n"
+        "  setTimeout(function()\n"
+        "    local ok = pcall(function() error('EXPECTED') end)\n"
+        "    print('CAUGHT', ok)\n"
+        "    _FLUA.exit(0)\n"
+        "  end, 10)\n"
+        "end\n"
+    )
+    result = _run("--api", "local", "--color", "never", "--strict-tests", str(caught))
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_strict_tests_covers_ui_callbacks(tmp_path) -> None:
+    script = tmp_path / "ui.lua"
+    script.write_text(
+        "--%%u:{button='B1',text='Press me',onReleased='go'}\n"
+        "function QuickApp:UIAction(el, ev, v) error('UI_BOOM') end\n"
+        "function QuickApp:onInit()\n"
+        "  setTimeout(function()\n"
+        "    _FLUA.uiEvent('B1', 'onReleased')\n"
+        "    setTimeout(function() _FLUA.exit(0) end, 100)\n"
+        "  end, 20)\n"
+        "end\n"
+    )
+    result = _run(
+        "--api",
+        "local",
+        "--color",
+        "never",
+        "--strict-tests",
+        "--result-json",
+        str(tmp_path / "r.json"),
+        str(script),
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    record = json.loads((tmp_path / "r.json").read_text())
+    assert record["status"] == "failed" and record["exitCode"] == 1
+    kinds = [f["callbackKind"] for f in record["failures"]]
+    assert "ui" in kinds
+
+
+def test_strict_tests_covers_net_callbacks(tmp_path, strict_http_server) -> None:
+    script = tmp_path / "net.lua"
+    script.write_text(
+        "function QuickApp:onInit()\n"
+        "  local cl = net.HTTPClient({timeout=2000})\n"
+        "  cl:request("
+        + repr(strict_http_server)
+        + ", {\n"
+        "    success = function() error('NET_BOOM') end,\n"
+        "    error = function() _FLUA.exit(0) end,\n"
+        "  })\n"
+        "  setTimeout(function() _FLUA.exit(0) end, 3000)\n"
+        "end\n"
+    )
+    result = _run(
+        "--api",
+        "local",
+        "--color",
+        "never",
+        "--strict-tests",
+        "--result-json",
+        str(tmp_path / "r.json"),
+        str(script),
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    record = json.loads((tmp_path / "r.json").read_text())
+    kinds = [f["callbackKind"] for f in record["failures"]]
+    assert "net" in kinds
+
+
+def test_result_json_statuses(tmp_path) -> None:
+    # passed: a clean instant run; timeout: the wall cap cut a pending run
+    clean = tmp_path / "clean.lua"
+    clean.write_text(
+        "setTimeout(function() _FLUA.exit(0) end, 1000)\n"
+    )
+    passed = _run(
+        "--api",
+        "local",
+        "--color",
+        "never",
+        "--instant",
+        "--run-for",
+        "-2",
+        "--result-json",
+        str(tmp_path / "clean.json"),
+        str(clean),
+    )
+    assert passed.returncode == 0
+    record = json.loads((tmp_path / "clean.json").read_text())
+    assert record["schemaVersion"] == 1
+    assert record["status"] == "passed" and record["exitCode"] == 0
+    assert record["clockMode"] == "instant"
+    assert record["virtualSeconds"] == 1.0
+    assert record["cleanupComplete"] is True
+    assert record["failures"] == []
+    hang = tmp_path / "hang.lua"
+    hang.write_text("setInterval(function() end, 1000)\n")
+    timed_out = _run(
+        "--api",
+        "local",
+        "--color",
+        "never",
+        "--run-for",
+        "1",
+        "--result-json",
+        str(tmp_path / "hang.json"),
+        str(hang),
+    )
+    assert timed_out.returncode == 1
+    record = json.loads((tmp_path / "hang.json").read_text())
+    assert record["status"] == "timeout" and record["exitCode"] == 1
+    # atomic write: no .tmp litter after completion
+    assert not (tmp_path / "hang.json.tmp").exists()

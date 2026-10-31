@@ -105,6 +105,15 @@ model) and ARCHITECTURE.md (components).
   HC3 too.
   *Pinned by:* `tests/test_qa.py::test_svar_seeds_password_typed_variable`,
   `tests/test_tools.py::test_build_fqa_svar_bakes_password_type`
+- **`--strict-tests` failures are sticky**: an unhandled callback error at
+  the timer/UI/net dispatch boundaries is recorded (never cleared), and the
+  final exit code becomes 1 even when a later callback calls
+  `_FLUA.exit(0)` — opt-in, so the default keeps the HC3 behavior where
+  callback errors only log. `--result-json` writes the verdict atomically
+  (a missing file after a kill is incomplete, never a pass).
+  *Pinned by:* `tests/test_dx.py::test_strict_tests_sticky_callback_failure`,
+  `test_strict_tests_covers_ui_callbacks`, `test_strict_tests_covers_net_callbacks`,
+  `test_result_json_statuses`
 - **HC3 string extensions exist**: `string.split`, `string.starts`,
   `string.ends` behave like the HC3's.
   *Pinned by:* `tests/test_modbus_mock.py::test_string_starts_and_ends`
