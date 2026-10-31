@@ -15,7 +15,11 @@ from typing import Any
 from .common import build_fqa
 
 NAME = "ui"
-HELP = "print a QA's UI as text (elements, callbacks, options) — no browser needed"
+HELP = (
+    "print a QA's DECLARED UI as text (elements, callbacks, options) — static, "
+    "not live state; for post-init values and callback behavior see "
+    "examples/ui-interaction-test.lua"
+)
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:

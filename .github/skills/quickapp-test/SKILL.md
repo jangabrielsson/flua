@@ -130,7 +130,32 @@ local view = self:getView()                                  -- current viewLayo
 
 The callback fires asynchronously after the call returns — assert on the
 callback's effects. `flua --tool ui qa.lua` prints the whole UI as text
-(elements, callbacks, options) for a quick eyeball check.
+(elements, callbacks, options) for a quick eyeball check — **declared**
+elements only, not post-init values or callback behavior; for live state
+use `self:getView()` or the viewer.
+
+### A complete interaction test (copy-paste)
+
+The runnable `examples/ui-interaction-test.lua` chains the whole pattern
+— fixture-backed, clock-pinnable, self-asserting, exit code = verdict:
+
+```bash
+flua --api local examples/ui-interaction-test.lua
+flua --start 2027-01-04 examples/ui-interaction-test.lua   # pin os.date
+```
+
+It loads a JSON fixture, injects a button release and a select change via
+`_FLUA.uiEvent`, **waits for each asynchronous callback**, asserts both
+`self:getView()` (the rendered `$jason` view tree) and the simulator state
+(`self.properties` / `api.get("/devices/<id>")`), prints PASS/FAIL lines
+and exits with the failure count. The data-driven variant — a table of
+`{element, eventType, value, expected}` and one loop — scales the same
+pattern to a whole UI (44 buttons, no manual clicking).
+
+**Fixture paths**: `io.open` resolves against the process CWD, not the QA
+file — run flua from the fixture's directory, or pass an absolute path
+(`-D 'var:fixture=/abs/path/data.json'`). The example's loader errors with
+exactly that explanation when the file is missing.
 
 ## Machine-readable logs
 

@@ -843,3 +843,24 @@ def test_strict_tests_covers_mapped_ui_callbacks(tmp_path) -> None:
     assert result.returncode == 1, result.stdout + result.stderr
     record = json.loads((tmp_path / "d.json").read_text())
     assert [f["callbackKind"] for f in record["failures"]] == ["ui"]
+
+
+def test_example_ui_interaction_test() -> None:
+    # the self-asserting UI-interaction pattern: fixture -> inject events ->
+    # wait for async callbacks -> assert view + sim state -> exit = verdict
+    result = _run("--api", "local", "--color", "never", "examples/ui-interaction-test.lua")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "VERDICT: all checks passed" in result.stdout
+    assert "PASS button changed the view" in result.stdout
+    # a missing fixture explains the CWD rule instead of a bare error
+    bad = _run(
+        "--api",
+        "local",
+        "--color",
+        "never",
+        "-D",
+        'var:fixture="nope.json"',
+        "examples/ui-interaction-test.lua",
+    )
+    assert bad.returncode == 1
+    assert "process CWD" in bad.stdout
