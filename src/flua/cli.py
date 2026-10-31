@@ -992,10 +992,14 @@ def main(argv: list[str] | None = None) -> int:
             "lua": engine.lua_version(),
             "lupa": lupa.__version__,
             "python": sys.version.split()[0],
-            # native Lua integer width (HC3 Lua: 8 bytes); the
-            # locale drives os.date/UTF-8 pattern behavior
+            # native Lua integer width (HC3 Lua: 8 bytes); the locale drives
+            # os.date/UTF-8 pattern behavior — the engine forces LC_CTYPE=C
+            # before the Lua runtime exists (Lua's pattern classes are libc
+            # ctype lookups), so 'ctype' is the effective, locale-independent
+            # value while 'locale' is the user's environment
             "integerBytes": engine._lua.eval("#string.pack('j', 0)"),
             "locale": locale.setlocale(locale.LC_ALL, None),
+            "ctype": locale.setlocale(locale.LC_CTYPE, None),
         }
         if args.capabilities_json:
             from .capabilities import report

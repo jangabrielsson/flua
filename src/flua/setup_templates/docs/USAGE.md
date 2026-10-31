@@ -55,8 +55,15 @@ flua --version
 ```
 
 `flua --version --machine` prints one JSON line instead
-(`{"version", "lua", "lupa", "python", "integerBytes", "locale"}`) — the
-stable capability probe for agents, installers, and scripts. The wider
+(`{"version", "lua", "lupa", "python", "integerBytes", "locale", "ctype"}`) — the
+stable capability probe for agents, installers, and scripts. `locale` is
+your environment; `ctype` is the effective character-classification
+locale the engine forced (`C.UTF-8`, falling back to `C`) before the Lua
+runtime exists — Lua's pattern classes `%s`/`%a`/`%d` are libc ctype
+lookups, and on Polish/Windows locales `%S+` splits multibyte characters
+mid-byte (the plua 1.2.79 fix). Known platform limit: macOS's `C.UTF-8`
+still classifies high bytes as `%a`; Linux/Windows get strict-ASCII
+classes. The wider
 probe is `flua --capabilities-json`: runtime metadata plus the
 compatibility surface table (implemented/partial/unsupported per category
 — QA methods, net.*, the REST sim, runtime modes, tooling).

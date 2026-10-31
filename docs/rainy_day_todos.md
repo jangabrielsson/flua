@@ -45,9 +45,16 @@ Parked 2026-10-31, from the forum feedback triage (docs/feedback/):
 
 ## Documentation asks from the pt report
 
-- **Windows/locale guide**: Lua byte-pattern classification, encoding,
-  interpreter/locale details in diagnostic output; the guarded-name probe
-  passes but the unguarded case is not established.
+- **Windows/locale guide**: largely resolved — the engine now forces
+  `LC_CTYPE=C.UTF-8` (falling back to `C`) before the Lua runtime exists
+  (the plua 1.2.79 fix: Lua's pattern classes are libc ctype lookups, so
+  Polish/Windows locales split multibyte characters in `%S+`; C.UTF-8
+  rather than plain C so embedders keep `locale.getencoding()=UTF-8`);
+  `--version --machine` reports both `locale` and the effective `ctype`.
+  Known platform limit, documented: macOS's C.UTF-8 still classifies
+  high bytes as `%a`. Remaining: a short doc on byte-pattern
+  classification and UTF-8 handling on Windows (interpreter selection,
+  `-X utf8` for the MCP setup subprocess).
 - **UI/export fidelity guide**: what simulated UI events and string values
   can and cannot establish about real HC3/browser/mobile rendering; legacy
   vs newer UI export; select defaults.

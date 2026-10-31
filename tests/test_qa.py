@@ -1602,3 +1602,30 @@ def test_watch_survives_boot_errors_and_recovers(tmp_path) -> None:
             proc.wait(timeout=10)
         except subprocess.TimeoutExpired:
             proc.kill()
+
+
+def test_engine_forces_c_locale_for_lua_patterns() -> None:
+    # plua 1.2.79's fix, adopted: Lua's pattern classes (%s/%a/%d) are
+    # libc ctype lookups — on Polish/UTF-8 locales isspace(0x85) is true,
+    # and 0x85 is the second byte of UTF-8 'ą' (U+0105), so %S+ splits
+    # multibyte characters mid-byte. The engine forces LC_CTYPE=C before
+    # the Lua runtime exists, on every platform.
+    import locale as _locale
+
+    try:
+        _locale.setlocale(_locale.LC_CTYPE, "en_US.UTF-8")
+    except _locale.Error:
+        pytest.skip("no en_US.UTF-8 locale available")
+    engine = LuaEngine()
+    assert _locale.setlocale(_locale.LC_CTYPE, None) in ("C", "C.UTF-8")  # forced
+    # embedders keep UTF-8 text handling: a plain "C" locale on Python
+    # <= 3.14 flips locale.getencoding() to ASCII and breaks
+    # subprocess(text=True) decode — hence C.UTF-8 where available
+    assert _locale.getencoding().lower() in ("utf-8", "utf8")
+    lua = engine._lua
+    # the reported symptom (pl_PL/Windows): 0x85 is the second byte of
+    # UTF-8 'ą' — %s must not eat it, %S+ must not split mid-byte.
+    # (macOS's C.UTF-8 still classifies high bytes as %a — a documented
+    # platform limit, not asserted here.)
+    assert lua.eval("('ą'):match('%s')") is None  # neither byte is a space
+    assert lua.eval("('ą'):match('%S+') == 'ą'") is True  # no mid-byte split

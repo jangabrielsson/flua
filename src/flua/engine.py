@@ -22,6 +22,7 @@ import asyncio
 import base64
 import contextlib
 import json
+import locale
 import logging
 import os
 import re
@@ -168,6 +169,24 @@ class LuaEngine:
         # net, timer; "all"). Off by default — every trace lands in the
         # syslog file / systemLog buffer as an "event: trace" entry.
         self._trace = _parse_trace(trace)
+        # plua 1.2.79's locale fix, adopted — with one refinement: Lua's
+        # pattern classes (%s/%a/%d/...) are libc ctype lookups, so they
+        # are locale-dependent. On pl_PL.UTF-8 and Windows-Polish locales
+        # isspace(0x85) is true, and 0x85 is the second byte of UTF-8 'ą'
+        # (U+0105), so %S+ splits multibyte characters mid-byte. Forcing an
+        # ASCII-only LC_CTYPE makes the classes identical everywhere. Use
+        # C.UTF-8 rather than C when available: same ASCII ctype, but the
+        # UTF-8 codeset keeps Python's locale.getencoding() at UTF-8 — a
+        # plain "C" would silently switch subprocess(text=True) decoding
+        # to ASCII and break the embedders (MCP, tools, the test suite).
+        # LC_CTYPE only — date/time names (LC_TIME) keep the user's locale.
+        try:
+            locale.setlocale(locale.LC_CTYPE, "C.UTF-8")
+        except locale.Error:
+            try:
+                locale.setlocale(locale.LC_CTYPE, "C")
+            except locale.Error:
+                pass  # a platform with neither: run with what we have
         self._lua = lupa.LuaRuntime(unpack_returned_tuples=True, encoding="UTF-8")
         self._inbound: deque[dict[str, Any]] = deque()
         self._outbound: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
