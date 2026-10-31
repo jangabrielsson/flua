@@ -152,7 +152,7 @@ function QuickAppBase:callAction(name, ...)
   local stat,res = xpcall(function()
     if (type(self[name]) == 'function') then return self[name](self, table.unpack(args))
     else print(fmt("[WARNING] Class does not have '%s' function defined - action ignored",tostring(name))) end
-  end,printErr)
+  end,function(e) printErr(e) return e end)  -- print AND return: the strict-failure record needs the original error
   if not stat then
     self:error(fmt("Error calling action %s: %s",name,res))
     -- --strict-tests: the framework catches action errors HERE (the outer

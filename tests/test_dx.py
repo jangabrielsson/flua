@@ -818,7 +818,12 @@ def test_strict_tests_covers_mapped_ui_callbacks(tmp_path) -> None:
     assert "LATER OK" in result.stdout
     record = json.loads((tmp_path / "r.json").read_text())
     assert record["status"] == "failed" and record["exitCode"] == 1
-    assert [f["callbackKind"] for f in record["failures"]] == ["ui"]
+    failures = record["failures"]
+    assert [f["callbackKind"] for f in failures] == ["ui"]
+    # the ORIGINAL exception survives into the record (the pt finding: the
+    # framework xpcall handler printed the error without returning it)
+    assert len(failures) == 1
+    assert "EXPECTED_UI_CALLBACK_FAILURE" in failures[0]["error"]
     # the equivalent direct self:UIAction spelling rides the same path
     direct = tmp_path / "direct.lua"
     direct.write_text(script.read_text().replace(
