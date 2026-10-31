@@ -113,3 +113,26 @@ Please re-run your suite on 0.1.112 — in particular the
 Any findings get the same treatment as before.
 
 — flua maintainers
+
+---
+
+## Follow-up: Batch B verification results and one fix
+
+The authors ran their 32-check suite plus nine strict/result acceptance
+cases on 0.1.112 (Windows, Python 3.12.10): **seven passed, two failed** —
+both failures were the same gap: an error thrown by a **mapped button
+callback** (invoked through `UIAction` or `_FLUA.uiEvent`) was logged but
+not recorded, so strict mode exited 0 with an empty failures list.
+
+Their diagnosis was exact: `onUIEvent` schedules the mapped callback via
+`callAction`, whose own `xpcall` catches the action error before the outer
+coroutine dispatch can see it. Fixed: `callAction`'s framework catch
+boundary now records the failure (`kind: "ui"`) while keeping the legacy
+log-and-continue behavior and application-owned `pcall` untouched. Their
+minimal repro now exits 1 with `status: "failed"` and one `ui` failure
+record; both the `_FLUA.uiEvent` and direct `self:UIAction` spellings are
+pinned by `tests/test_dx.py::test_strict_tests_covers_mapped_ui_callbacks`.
+
+Their two remaining coverage suggestions (child UI dispatch, ordinary
+device actions) are on the list but not yet pinned — flagged honestly
+rather than claimed.

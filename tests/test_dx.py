@@ -780,3 +780,61 @@ def test_capabilities_json_table() -> None:
     assert by_name["simulated HC3 REST"]["status"] == "partial"  # shape-only stubs exist
     assert by_name["numeric32 emulation"]["status"] == "unsupported"
     assert by_name["--strict-tests / --result-json"]["status"] == "implemented"
+
+
+def test_strict_tests_covers_mapped_ui_callbacks(tmp_path) -> None:
+    # the pt Batch-B verification finding: a MAPPED button callback's error
+    # is caught by the framework's callAction xpcall (onUIEvent -> timer ->
+    # callAction), so the outer coroutine dispatch never saw it and strict
+    # mode missed it. The framework catch boundary must record the failure.
+    script = tmp_path / "mapped.lua"
+    script.write_text(
+        "--%%mode:offline\n"
+        "--%%u:{button='btnFailure',text='Test',onReleased='failUi'}\n"
+        "function QuickApp:failUi()\n"
+        "  error('EXPECTED_UI_CALLBACK_FAILURE')\n"
+        "end\n"
+        "function QuickApp:onInit()\n"
+        "  setTimeout(function()\n"
+        "    _FLUA.uiEvent('btnFailure', 'onReleased')\n"
+        "  end, 10)\n"
+        "  setTimeout(function()\n"
+        "    print('LATER OK')\n"
+        "    _FLUA.exit(0)\n"
+        "  end, 500)\n"
+        "end\n"
+    )
+    result = _run(
+        "--api",
+        "local",
+        "--strict-tests",
+        "--result-json",
+        str(tmp_path / "r.json"),
+        "--run-for",
+        "-2",
+        str(script),
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "LATER OK" in result.stdout
+    record = json.loads((tmp_path / "r.json").read_text())
+    assert record["status"] == "failed" and record["exitCode"] == 1
+    assert [f["callbackKind"] for f in record["failures"]] == ["ui"]
+    # the equivalent direct self:UIAction spelling rides the same path
+    direct = tmp_path / "direct.lua"
+    direct.write_text(script.read_text().replace(
+        "_FLUA.uiEvent('btnFailure', 'onReleased')",
+        "self:UIAction('onReleased', 'btnFailure')",
+    ))
+    result = _run(
+        "--api",
+        "local",
+        "--strict-tests",
+        "--result-json",
+        str(tmp_path / "d.json"),
+        "--run-for",
+        "-2",
+        str(direct),
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    record = json.loads((tmp_path / "d.json").read_text())
+    assert [f["callbackKind"] for f in record["failures"]] == ["ui"]

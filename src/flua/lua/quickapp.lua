@@ -155,6 +155,12 @@ function QuickAppBase:callAction(name, ...)
   end,printErr)
   if not stat then
     self:error(fmt("Error calling action %s: %s",name,res))
+    -- --strict-tests: the framework catches action errors HERE (the outer
+    -- coroutine dispatch never sees them — the mapped-callback path
+    -- onUIEvent -> timer -> callAction swallows the error in this xpcall).
+    -- Record it so a mapped UI/action callback error stays sticky, like
+    -- timer/net errors. Application-owned pcall never reaches this branch.
+    _PY.record_callback_failure(_FLUA.qaId, "ui", tostring(res))
   end
 end
 
