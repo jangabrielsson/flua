@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.114] - 2026-10-31
+
+### Added
+- add Batch B verification results and fix for mapped UI callback errors
+
 ## [0.1.113] - 2026-10-31
 
 ### Added
