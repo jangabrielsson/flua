@@ -80,6 +80,8 @@
   button.ctl:disabled {
     opacity: .45; cursor: default; background: var(--blue); transform: none;
   }
+  .ctl-icon svg { width: 18px; height: 18px; vertical-align: -4px; margin-right: 6px; }
+  button.ctl:has(.ctl-icon) { display: inline-flex; align-items: center; justify-content: center; gap: 2px; }
   button.ctl.ghost {
     background: #fff; color: var(--blue); border: 1px solid var(--blue);
     box-shadow: none; padding: 6px 10px; font-size: 13px;
@@ -334,6 +336,78 @@ function eventFor(component) {
   return null;
 }
 
+// the HC3's named button/switch icons (5.221 image property) — a curated
+// inline-SVG map; unknown names render text-only
+const ICONS = {
+  chevrondown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  chevronup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
+  caretdown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  caretup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
+  dashedup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="3 3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
+  dasheddown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="3 3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  stop: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>',
+  stopredesign: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.5l2.7 5.6 6.1.8-4.5 4.3 1.2 6L12 17.3l-5.5 2.9 1.2-6L3.2 9.9l6.1-.8z"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>',
+  playcircle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><path d="M10 8.5l6 3.5-6 3.5z" fill="currentColor" stroke="none"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="5" width="3.5" height="14" rx="1"/><rect x="13.5" y="5" width="3.5" height="14" rx="1"/></svg>',
+  power: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 3.5v4"/></svg>',
+  house: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 11.5L12 4.5l8 7V19a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 19z"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 7h14M5 12h14M5 17h14"/></svg>',
+  arrowleft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>',
+  arrowright: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+  rewind: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 6L5 12l6 6V6zm8 0l-6 6 6 6V6z"/></svg>',
+  fastforward: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 6l6 6-6 6V6zM5 6l6 6-6 6V6z"/></svg>',
+  slidershorizontal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2" fill="currentColor" stroke="none"/><circle cx="8" cy="17" r="2" fill="currentColor" stroke="none"/></svg>',
+  speakersimplehigh: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 9v6h4l6 4.5V4.5L8 9H4z"/></svg>',
+  speakersimpleslash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 9v6h4l6 4.5V4.5L8 9H4z" fill="currentColor" stroke="none"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>',
+  dotsnine: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="7" cy="7" r="1.6"/><circle cx="12" cy="7" r="1.6"/><circle cx="17" cy="7" r="1.6"/><circle cx="7" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="17" cy="12" r="1.6"/><circle cx="7" cy="17" r="1.6"/><circle cx="12" cy="17" r="1.6"/><circle cx="17" cy="17" r="1.6"/></svg>',
+};
+
+function iconSvg(name) {
+  if (!name) return null;
+  return ICONS[String(name).toLowerCase()] || null;
+}
+
+// prepend the named icon (the 5.221 image property) to a button/switch
+function withIcon(btn, name) {
+  const svg = iconSvg(name);
+  if (!svg) return;
+  const span = document.createElement("span");
+  span.className = "ctl-icon";
+  span.innerHTML = svg;
+  btn.insertBefore(span, btn.firstChild);
+}
+
+// press-and-hold: the 5.221 onLongPressDown/onLongPressReleased events
+// (custom components only — embedded controls keep click-to-action)
+function wireLongPress(btn, deviceId, name) {
+  let timer = null, longPressed = false;
+  const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  const start = () => {
+    cancel();
+    longPressed = false;
+    timer = setTimeout(() => {
+      timer = null;
+      longPressed = true;
+      uiEvent(deviceId, name, "onLongPressDown");
+    }, 500);
+  };
+  const end = () => {
+    cancel();
+    if (longPressed) {
+      longPressed = false;
+      uiEvent(deviceId, name, "onLongPressReleased");
+    }
+  };
+  btn.addEventListener("pointerdown", start);
+  btn.addEventListener("pointerup", end);
+  btn.addEventListener("pointerleave", () => { if (!longPressed) cancel(); });
+  btn.addEventListener("pointercancel", cancel);
+  btn._longPressed = () => longPressed;
+}
+
 function liveState(device, component) {
   // device.view (QuickApp:updateView) wins over the embedded view values
   // (GET /flua/embeddedUI), the local viewer override wins over both
@@ -407,7 +481,10 @@ function renderComponent(device, component, row) {
   // embedded controls (component.action) invoke the device action, like the
   // HC3 client; custom components go through callUIEvent instead
   const action = component.action;
-  if (component.visible === false) {
+  // the HC3's visible property: the declared value, overridden live by
+  // updateView(el, "visible", false) — hidden elements take no row space
+  const visible = live.visible !== undefined ? live.visible : component.visible;
+  if (visible === false) {
     row.removeChild(name);
     return;
   }
@@ -424,8 +501,12 @@ function renderComponent(device, component, row) {
     const btn = document.createElement("button");
     btn.className = "ctl";
     btn.textContent = text ?? component.name;
+    withIcon(btn, component.image);
     if (component.disabled) btn.disabled = true;
+    if (!action && event) wireLongPress(btn, device.id, component.name);
     btn.onclick = () => {
+      // a long press already sent onLongPressReleased — don't double-fire
+      if (btn._longPressed && btn._longPressed()) return;
       // a fixed component value rides along as the action's single argument
       // (the embedded mute/unmute buttons pass 0/1 to setMute)
       if (action) deviceAction(device.id, action, component.value);
@@ -498,6 +579,7 @@ function renderComponent(device, component, row) {
     btn.type = "button";
     btn.className = "ctl toggle";
     btn.textContent = text || component.name;
+    withIcon(btn, component.image);
     const paint = () => {
       btn.classList.toggle("on", String(componentValue(device, component)) === "true");
     };
@@ -506,7 +588,14 @@ function renderComponent(device, component, row) {
       const v = btn.classList.contains("on") ? "false" : "true";
       setComponentValue(device, component, v);
       if (action) deviceAction(device.id, action, v);
-      else if (event) uiEvent(device.id, component.name, event, v);
+      // the 5.221 split toggle events REPLACE the legacy event when
+      // declared — send exactly one of them per flip
+      const eb = component.eventBinding || {};
+      if (!action && (eb.onToggleOn || eb.onToggleOff)) {
+        uiEvent(device.id, component.name, v === "true" ? "onToggleOn" : "onToggleOff", v);
+      } else if (event) {
+        uiEvent(device.id, component.name, event, v);
+      }
       paint();
       btn.blur();  // same as the button: don't hold the panel's value refresh hostage
     };

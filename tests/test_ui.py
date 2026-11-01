@@ -186,7 +186,7 @@ def test_select_with_options() -> None:
     ui = compile_ui(rows, 5000)
     component = ui["uiView"][0]["components"][0]
     assert component["type"] == "select" and component["selectionType"] == "single"
-    assert component["value"] == "2"
+    assert component["values"] == ["2"]  # the 5.221 schema: values array
     assert [o["value"] for o in component["options"]] == ["1", "2"]
     assert component["eventBinding"]["onToggled"][0]["params"]["args"] == [
         "onToggled",
@@ -382,3 +382,82 @@ async def test_multi_ui_event_delivers_value_list(tmp_path, capsys) -> None:
         assert "MULTI 1 table 11 12" in capsys.readouterr().out
     finally:
         await engine.stop()
+
+
+def test_switch_split_toggle_events_and_image_passthrough() -> None:
+    # the 5.221 schema: switches get onToggleOn/onToggleOff callbacks +
+    # event bindings, and the new element properties (image/unit/hint/
+    # disabled) pass through to the compiled uiView
+    ui = compile_ui(
+        [
+            {
+                "switch": "s1",
+                "text": "S",
+                "onToggleOn": "on",
+                "onToggleOff": "off",
+                "image": "chevronDown",
+                "hint": "flip me",
+                "disabled": True,
+            },
+            {"slider": "sl", "unit": "%", "image": "slidersHorizontal"},
+        ],
+        5000,
+    )
+    callbacks = {c["eventType"]: c["callback"] for c in ui["uiCallbacks"]}
+    assert callbacks["onToggleOn"] == "on"
+    assert callbacks["onToggleOff"] == "off"
+    components = [c for row in ui["uiView"] for c in row["components"]]
+    switch = next(c for c in components if c["name"] == "s1")
+    assert switch["eventBinding"]["onToggleOn"] and switch["eventBinding"]["onToggleOff"]
+    assert switch["image"] == "chevronDown"
+    assert switch["hint"] == "flip me"
+    assert switch["disabled"] is True
+    slider = next(c for c in components if c["name"] == "sl")
+    assert slider["unit"] == "%"
+    assert slider["image"] == "slidersHorizontal"
+
+
+def test_visible_property_declared_and_defaulted() -> None:
+    # the HC3's visible property: declared false passes through both
+    # formats (viewLayout $jason + uiView), undeclared defaults to true
+    ui = compile_ui(
+        [
+            {"button": "b1", "text": "hidden", "visible": False},
+            {"label": "l1", "text": "shown"},
+        ],
+        5000,
+    )
+    layout = ui["viewLayout"]["$jason"]["body"]["sections"]["items"]
+    components = []
+    for item in layout:
+        for c in item.get("components") or []:
+            if c.get("components"):  # a horizontal row's inner components
+                components.extend(c["components"])
+            elif c.get("name"):
+                components.append(c)
+    by_name = {c["name"]: c for c in components}
+    assert by_name["b1"]["visible"] is False
+    assert by_name["l1"]["visible"] is True
+    ui_components = [c for row in ui["uiView"] for c in row["components"]]
+    by_name2 = {c["name"]: c for c in ui_components}
+    assert by_name2["b1"]["visible"] is False
+    assert by_name2["l1"]["visible"] is True
+
+
+def test_select_ui_view_carries_values_array() -> None:
+    # the 5.221 schema: the current selection lives in `values` (an array)
+    # for BOTH select modes — single selects carry their one value in it
+    ui = compile_ui(
+        [
+            {
+                "select": "sel",
+                "value": "2",
+                "options": [{"type": "option", "text": "T", "value": "2"}],
+            }
+        ],
+        5000,
+    )
+    component = [c for row in ui["uiView"] for c in row["components"]][0]
+    assert component["selectionType"] == "single"
+    assert component["values"] == ["2"]
+    assert "value" not in component  # the scalar spelling is gone from the uiView

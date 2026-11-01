@@ -119,9 +119,12 @@ and every plugin boundary risks it.
 - **`--tool` plugin directory** — auto-discover tool modules from a user
   directory alongside the in-package registry (the registry already
   auto-discovers; pointing it at an extra path is trivial).
-- **Custom REST route registration on the sim `Api`** — e.g.
-  `api.add_route(method, pattern, handler)` for vendor-specific endpoints;
-  the natural server-side home for scripted transports.
+- **Custom REST route registration** — SHIPPED (2026-10-31):
+  `api.registerEndpoint(method, pattern, handler[, override])` with
+  built-in override and cross-QA routing (a mock panel deployed as a QA
+  answers every QA's calls). What remains deferred from this item:
+  transport/server-kind registration (new `net.*Server` protocols — the
+  engine's server dispatch is hardcoded).
 - **Lua `require` path/preload injection** — a plugin dir on the QA's
   `package.path`/preload registry, so shared Lua libraries come from a
   plugin instead of per-project copies.

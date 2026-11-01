@@ -69,6 +69,8 @@ def _apply_defaults(rows: list[list[dict[str, Any]]]) -> None:
             elif typ == "switch":
                 el.setdefault("value", "false")
                 el.setdefault("onReleased", "")
+                el.setdefault("onToggleOn", "")  # the 5.221 split toggle events
+                el.setdefault("onToggleOff", "")
                 el.setdefault("visible", True)
             elif typ == "slider":
                 el.setdefault("onChanged", "")
@@ -98,7 +100,10 @@ def _callbacks(rows: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
         for el in row:
             typ, name = el["type"], el["id"]
             if typ in ("button", "switch"):
-                for event in ("onReleased", "onLongPressDown", "onLongPressReleased"):
+                events = ("onReleased", "onLongPressDown", "onLongPressReleased")
+                if typ == "switch":
+                    events = (*events, "onToggleOn", "onToggleOff")
+                for event in events:
                     callbacks.append(
                         {"callback": el.get(event, ""), "eventType": event, "name": name}
                     )
@@ -124,7 +129,7 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
     if typ == "button":
         return {
             "name": name,
-            "visible": True,
+            "visible": el.get("visible", True),
             "style": {"weight": style_weight},
             "text": el["text"],
             "type": "button",
@@ -142,7 +147,7 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
             "style": {"weight": style_weight},
             "text": el["text"],
             "type": "select",
-            "visible": True,
+            "visible": el.get("visible", True),
             "selectionType": "single" if typ == "select" else "multi",
             "options": _options(el),
             "values": values,
@@ -150,7 +155,7 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
     if typ == "switch":
         return {
             "name": name,
-            "visible": True,
+            "visible": el.get("visible", True),
             "style": {"weight": style_weight},
             "text": el["text"],
             "type": "switch",
@@ -159,7 +164,7 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
     if typ == "slider":
         return {
             "name": name,
-            "visible": True,
+            "visible": el.get("visible", True),
             "step": el["step"],
             "value": el["value"],
             "max": el["max"],
@@ -171,7 +176,7 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
     # label
     return {
         "name": name,
-        "visible": True,
+        "visible": el.get("visible", True),
         "style": {"weight": style_weight},
         "text": el["text"],
         "type": "label",
@@ -236,6 +241,9 @@ def _ui_view(rows: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
             if typ in ("button", "switch"):
                 for event in ("onReleased", "onLongPressDown", "onLongPressReleased"):
                     event_binding[event] = _binding(event, name, binding_value)
+                if typ == "switch":
+                    event_binding["onToggleOn"] = _binding("onToggleOn", name, "$event.value")
+                    event_binding["onToggleOff"] = _binding("onToggleOff", name, "$event.value")
             elif typ in ("select", "multi"):
                 event_binding["onToggled"] = _binding("onToggled", name, binding_value)
             elif typ == "slider":
@@ -246,7 +254,7 @@ def _ui_view(rows: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
                 "style": {"weight": weight},
                 "text": el["text"],
                 "type": "select" if typ == "multi" else typ,
-                "visible": True,
+                "visible": el.get("visible", True),
             }
             if typ == "slider":
                 component["max"] = el["max"]
@@ -255,13 +263,23 @@ def _ui_view(rows: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
                 component["value"] = el["value"]
             if typ in ("select", "multi"):
                 component["options"] = list(el.get("options") or [])
-                if typ == "select" and el.get("value"):  # "" value is omitted
-                    component["value"] = el["value"]
+                # the 5.221 schema: the current selection lives in `values`
+                # (an array) for BOTH modes — a single select carries its
+                # one value in it
+                if typ == "select" and el.get("value"):
+                    component["values"] = [el["value"]]
                 if typ == "multi":
                     component["values"] = list(el.get("values") or [])
                 component["selectionType"] = "single" if typ == "select" else "multi"
             if typ == "switch":
                 component["value"] = el["value"]
+            # the 5.221 element properties the viewer renders: named icons,
+            # switch hints, disabled state, slider units
+            for key in ("image", "hint", "disabled"):
+                if el.get(key) is not None:
+                    component[key] = el[key]
+            if typ == "slider" and el.get("unit"):
+                component["unit"] = el["unit"]
             components.append(component)
         out.append({"style": {"weight": "1.0"}, "type": "horizontal", "components": components})
     return out
@@ -348,13 +366,8 @@ def _element(component: dict[str, Any], callbacks: dict[str, dict[str, str]]) ->
             if isinstance(option, dict)
         ]
         element = {key: name, "text": text, "options": options}
-        if multi:
-            element["values"] = [str(value) for value in (component.get("values") or [])]
-        elif component.get("value"):
-            element["value"] = str(component["value"])
-        element = {key: name, "text": text, "options": options}
-        # the selection comes back too: legacy format carries it in
-        # "values" (single select's first entry), uiView in "value"
+        # the selection comes back too: the 5.221 schema carries it in
+        # "values" (single select's first entry)
         if multi:
             if isinstance(component.get("values"), list):
                 element["values"] = list(component["values"])

@@ -138,6 +138,12 @@ CAPABILITIES: dict[str, list[dict[str, str]]] = {
             "status": "implemented",
             "note": "pinned by tests/test_api.py",
         },
+        {
+            "name": "registered endpoints (api.registerEndpoint)",
+            "status": "implemented",
+            "note": "emulate/override REST endpoints from Lua, incl. cross-QA routing; "
+            "pinned by tests/test_user_routes.py",
+        },
     ],
     "runtime": [
         {

@@ -218,6 +218,8 @@ def install_bindings(engine: "LuaEngine") -> None:
     py["log"] = engine.log_line
     py["log_structured"] = engine.log_structured
     py["record_callback_failure"] = engine.record_callback_failure
+    py["register_user_route"] = engine.register_user_route
+    py["user_route_match"] = engine.user_route_match
 
     def debug_message(level: object, tag: object, qaid: object, msg: object) -> None:
         # QA console lines (lua formatLogLine): qaid is implied by the tag

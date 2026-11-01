@@ -864,3 +864,13 @@ def test_example_ui_interaction_test() -> None:
     )
     assert bad.returncode == 1
     assert "process CWD" in bad.stdout
+
+
+def test_example_ui_interaction_suite() -> None:
+    # the data-driven variant: a table of cases, one loop — a whole UI in
+    # one run, exit code = the failure count
+    result = _run("--api", "local", "--color", "never", "examples/ui-interaction-suite.lua")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASS btnA -> A" in result.stdout
+    assert "PASS btnC -> C" in result.stdout
+    assert "VERDICT: all passed" in result.stdout

@@ -1548,6 +1548,44 @@ when regenerating the reference:
 .venv/bin/python scripts/extract_hc3_api.py
 ```
 
+### Registered endpoints (`api.registerEndpoint`)
+
+Emulate a missing HC3 endpoint from Lua — modules can bring whole panels
+alive in the offline sim (`examples/mock-panels.lua` is one, required from
+`examples/uses-mock-panels.lua`):
+
+```lua
+api.registerEndpoint("GET", "/panels/sprinklers/{id}", function(req)
+  return { id = tonumber(req.params.id) }, 200   -- (data, status)
+end)
+```
+
+- **Built-in routes always win over normal routes**; a registered route
+  answers ANY QA's `api.*` calls when nothing built-in matches, before
+  the 404/remote fallback. A QA's own routes are consulted first, then
+  every other QA's in registration order — a mock-panel QA deployed in the
+  same run (with its own UI and device) answers other QAs' calls.
+- **`override=true` inverts that**: an override route REPLACES the
+  built-in's behavior — the pattern for prototyping panel logic in Lua
+  (delayed state transitions via `setTimeout`, events via
+  `_FLUA.postRefreshEvent`) before promoting it to a Python built-in once
+  the contract is understood. `examples/alarm-logic.lua` (the module) +
+  `examples/alarm-panel.lua` (deployed as a QA with arm/disarm UI) +
+  `examples/uses-alarm-panel.lua` (a consumer QA) demonstrate the whole
+  loop. Precedence: override (any QA's) > built-in > normal registered
+  (any QA's) > 404/remote; among several matches, the earliest
+  registration wins.
+- `req` = `{method, path, params, query, body}` — `{name}` segments become
+  string params, the query arrives parsed, the body as sent.
+- The handler runs as a QA callback on the pump: the full api surface
+  works inside it (including `_FLUA.postRefreshEvent`). A handler crash
+  completes the call with 500; a handler calling its own endpoint gets 404
+  (no recursion).
+- Routes die with the QA — exit/restart clears them; a restart's onInit
+  re-registers.
+- Offline-sim feature: in remote mode the real HC3 owns the house and
+  registered routes never apply.
+
 ## flua extensions (`_FLUA`)
 
 Everything HC3-compatible is a plain global (`QuickApp`, `fibaro`, `api`,

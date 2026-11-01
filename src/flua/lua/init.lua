@@ -326,7 +326,10 @@ local wakeTimers = {}  -- timer ids that end a sleep (never deferred)
 local workQueues = {}  -- qaId -> FIFO of messages deferred during the sleep
 local pendingApi = {}  -- qaId -> suspended coroutine awaiting an apiResult
 local qaRunners = {}  -- qaId -> the QA callback coroutine currently running (nil while none)
+local qaCoroutines = {}  -- coroutine -> qaId: ownership across suspend/resume (a resumed callback's running() must still pre-check as its QA's)
 local callbackKinds = {}  -- coroutine -> dispatch kind (timer/ui/net/...) for --strict-tests records
+local userRouteHandlers = {}  -- route id -> handler fn (api.registerEndpoint)
+local pendingUserCalls = {}  -- qaId -> true while its registered handler runs
 
 -- forward slots: handlers, qaInstances and the mutually recursive runners
 -- are declared later in this chunk
@@ -387,13 +390,23 @@ resumeQa = function(qaId, co, ...)
     -- exits 0 (engine.exit_code applies the override).
     _PY.system_event("crash", qaId, tostring(res))
     _PY.record_callback_failure(qaId, callbackKinds[co] or "callback", tostring(res))
+    if pendingUserCalls[qaId] then
+      -- a registered endpoint handler crashed: complete the suspended
+      -- CALLER's api.* call with a 500 instead of leaving it hanging
+      local caller = pendingUserCalls[qaId]
+      pendingUserCalls[qaId] = nil
+      _PY.post{ type = "userApiResult", qa = caller, status = 500, error = tostring(res) }
+    end
     postLog("error", tostring(res))
     postLog("error", debug.traceback(co, nil, 2))
     if qaRunners[qaId] == co then qaRunners[qaId] = nil end
+    qaCoroutines[co] = nil
+    callbackKinds[co] = nil
     return
   end
   if coroutine.status(co) == "dead" then
     if qaRunners[qaId] == co then qaRunners[qaId] = nil end
+    qaCoroutines[co] = nil
     callbackKinds[co] = nil
     return
   end
@@ -441,6 +454,7 @@ runInQa = function(qaId, fn, kind, ...)
   end
   local co = coroutine.create(fn)
   qaRunners[qaId] = co
+  qaCoroutines[co] = qaId
   callbackKinds[co] = kind or "callback"
   -- Lua 5.5 does not inherit debug hooks into new coroutines: mirror the
   -- current thread's hook (mobdebug breakpoints/stepping) onto the callback
@@ -701,7 +715,11 @@ local function installQaGlobals(env)
   local function apiCall(method)
     return function(url, body)
       local qaId = env._FLUA.qaId
-      if _PY.api_remote_mode() and coroutine.running() == qaRunners[qaId] then
+      local urm = _PY.user_route_match(qaId, method, tostring(url))
+      if
+        (_PY.api_remote_mode() or urm)
+        and qaCoroutines[coroutine.running()] == qaId
+      then
         return coroutine.yield{
           type = "apiCall",
           method = method,
@@ -718,6 +736,21 @@ local function installQaGlobals(env)
     post = apiCall("POST"),
     put = apiCall("PUT"),
     delete = apiCall("DELETE"),
+    -- registerEndpoint(method, pattern, handler[, override]): emulate a
+    -- missing HC3 endpoint from Lua — or, with override=true, REPLACE a
+    -- built-in's shallow behavior with real logic (prototype the panel in
+    -- Lua; promote to a Python built-in once the contract is understood).
+    -- Override routes win over built-ins, built-ins win over normal
+    -- routes. The handler runs as a QA callback on the pump and returns
+    -- (data, status) — the full api surface works inside it (setTimeout
+    -- for delayed state transitions, _FLUA.postRefreshEvent for events).
+    -- Routes die with the QA (exit/restart). Offline-sim feature.
+    registerEndpoint = function(method, pattern, handler, override)
+      local qaId = env._FLUA.qaId
+      local routeId = _PY.register_user_route(qaId, method, pattern, override)
+      userRouteHandlers[routeId] = handler
+      return routeId
+    end,
   }
   -- api.hc3: the direct-HC3 namespace (fibaro.callhc3). Offline it is the
   -- same simulated HC3 as api; with --api remote it bypasses the hybrid
@@ -726,7 +759,7 @@ local function installQaGlobals(env)
   local function apiCallHC3(method)
     return function(url, body)
       local qaId = env._FLUA.qaId
-      if _PY.api_remote_mode() and coroutine.running() == qaRunners[qaId] then
+      if _PY.api_remote_mode() and qaCoroutines[coroutine.running()] == qaId then
         return coroutine.yield{
           type = "apiCall",
           method = method,
@@ -1363,6 +1396,33 @@ handlers.log = function(msg)
   -- engine-side notices (e.g. the sim's ?name= '&' quirk warning) print
   -- through the pump like QA logs, untagged
   postLog(msg.level or "info", tostring(msg.text or ""))
+end
+
+handlers.userApiCall = function(msg)
+  -- msg.qa = the route's OWNER (whose handler + coroutine context runs);
+  -- msg.caller = the QA whose api.* call is suspended (the answer resumes it)
+  local fn = userRouteHandlers[msg.route]
+  if not fn then
+    _PY.post{ type = "userApiResult", qa = msg.caller, status = 500, error = "registered endpoint handler is gone" }
+    return
+  end
+  local req = {
+    method = msg.method,
+    path = msg.path,
+    params = msg.params or {},
+    query = msg.query or {},
+    body = msg.body,
+  }
+  -- defer only a genuinely sleeping OWNER: the caller's own apiCall
+  -- suspension ALSO sets the sleeping marker (owner == caller there), and
+  -- its handler must run now — that is the whole mechanism
+  if sleeping[msg.qa] and msg.qa ~= msg.caller then queueFor(msg.qa, msg) return end
+  pendingUserCalls[msg.qa] = msg.caller
+  runInQa(msg.qa, function()
+    local data, status = fn(req)
+    pendingUserCalls[msg.qa] = nil
+    _PY.post{ type = "userApiResult", qa = msg.caller, data = data, status = status or 200 }
+  end, "api")
 end
 
 handlers.apiResult = function(msg)

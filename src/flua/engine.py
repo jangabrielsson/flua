@@ -267,6 +267,15 @@ class LuaEngine:
         self._callback_failures: list[dict[str, Any]] = []
         self._callback_failures_truncated = False
         self._strict_tests = bool((config or {}).get("strict-tests"))
+        # api.registerEndpoint: QA-registered endpoint handlers (offline-sim
+        # feature — modules/QAs can emulate missing HC3 panels, or override
+        # built-in behavior). qa -> route_id -> (method, regex, params,
+        # override); earliest route id wins on pattern collisions.
+        self._user_routes: dict[
+            int, dict[int, tuple[str, re.Pattern[str], dict[str, int], bool]]
+        ] = {}
+        self._user_route_seq = 0
+        self._pending_user_api: dict[int, int] = {}  # suspended CALLER qa -> OWNER qa
         self._log_json = False  # --log json: QA log lines as JSON
         self._logfile: Any = None  # --logfile FILE: log copy (ANSI stripped)
         self._syslog: Any = None  # --syslog FILE: system events, one JSON line each
@@ -323,6 +332,7 @@ class LuaEngine:
             messages.MQTT_DISCONNECT: self._handle_mqtt_disconnect,
             messages.CLEAR_TIMEOUT: self._handle_clear_timeout,
             messages.API_CALL: self._handle_api_call,
+            messages.USER_API_RESULT: self._handle_user_api_result,
             messages.POST_REFRESH_EVENT: self._handle_post_refresh_event,
             messages.QA_VARS: self._handle_qa_vars,
             messages.LOG: self._handle_log,
@@ -1317,6 +1327,7 @@ class LuaEngine:
         info["files"] = self._build_files(info["path"], info["code"], info["config"])
         info["exited"] = None  # revive: the new code's timers must not be refused
         self._timers.cancel_qa(int(qa_id))
+        self.clear_user_routes(int(qa_id))  # onInit re-registers on boot
         self.server_host.close_qa(int(qa_id))  # old code's mock servers die too
         self.enqueue_outbound(
             messages.restart_qa_msg(
@@ -1815,6 +1826,88 @@ class LuaEngine:
             failures.append({"kind": "callback_error", "callbackKind": "...", "truncated": True})
         return failures
 
+    def register_user_route(
+        self, qa: int, method: str, pattern: str, override: bool = False
+    ) -> int:
+        """Register a QA endpoint handler (api.registerEndpoint): returns the
+        route id the Lua side binds the handler function to. ``override``
+        routes win over BUILT-IN routes (prototype a panel's logic in Lua;
+        promote to a Python built-in once the contract is understood)."""
+        from .api import compile_pattern
+
+        regex, params = compile_pattern(pattern)
+        self._user_route_seq += 1
+        route_id = self._user_route_seq
+        self._user_routes.setdefault(int(qa), {})[route_id] = (
+            method.upper(),
+            regex,
+            params,
+            bool(override),
+        )
+        return route_id
+
+    def clear_user_routes(self, qa: int) -> None:
+        """Routes die with the QA: exit/restart clears them (restart re-runs
+        onInit, which re-registers). Callers suspended on a dying owner
+        complete with 500 instead of hanging."""
+        self._user_routes.pop(int(qa), None)
+        self._pending_user_api.pop(int(qa), None)
+        for caller, owner in list(self._pending_user_api.items()):
+            if owner == int(qa):
+                self._pending_user_api.pop(caller, None)
+                self._api_calls_inflight -= 1
+                self.enqueue_outbound(messages.api_result(caller, None, 500))
+
+    def user_route_match(self, qa: int, method: str, url: str) -> bool:
+        """The api.* pre-check: would this call resolve to a registered
+        endpoint (offline sim)? Override routes win over built-ins, built-ins
+        win over normal routes; a QA's OWN routes are consulted first, then
+        every other QA's in registration order (a deployed mock-panel QA
+        answers other QAs' calls). A caller suspended in a handler, or an
+        owner with a handler in flight, matches nothing — no recursion."""
+        caller = int(qa)
+        if caller in self._pending_user_api or caller in self._pending_user_api.values():
+            return False
+        from .api import parse_url, route_match
+
+        segments, _query = parse_url(url)
+        path = "/" + "/".join(segments)
+        if self._match_user_route(caller, method, path, override_only=True) is not None:
+            return True  # an override route owns this URL
+        if route_match(method, path):
+            return False  # a built-in owns this URL
+        return self._match_user_route(caller, method, path) is not None
+
+    def _match_user_route(
+        self, caller: int, method: str, path: str, override_only: bool = False
+    ) -> tuple[int, int, dict[str, str]] | None:
+        """First registered-route match: the caller's own routes first, then
+        every other QA's in route-id order. Returns (owner, route_id, params)."""
+        qas = [int(caller)] + [q for q in self._user_routes if q != int(caller)]
+        for owner in qas:
+            for route_id, (r_method, regex, params, override) in self._user_routes.get(
+                owner, {}
+            ).items():
+                if override_only and not override:
+                    continue
+                if r_method != method.upper():
+                    continue
+                match = regex.match(path)
+                if match:
+                    return owner, route_id, {
+                        name: match.group(index) for name, index in params.items()
+                    }
+        return None
+
+    def _handle_user_api_result(self, msg: dict[str, Any]) -> None:
+        """The registered handler's answer: resume the suspended CALLER with
+        (data, status) — an error marker becomes a 500."""
+        caller = int(msg.get("qa") or 0)
+        self._pending_user_api.pop(caller, None)
+        self._api_calls_inflight -= 1
+        status = int(msg.get("status") or (500 if msg.get("error") else 200))
+        self.enqueue_outbound(messages.api_result(caller, msg.get("data"), status))
+
     @property
     def strict_tests(self) -> bool:
         return self._strict_tests
@@ -2048,6 +2141,35 @@ class LuaEngine:
         url = str(msg.get("url") or "")
         body = msg.get("body")
         hc3_direct = bool(msg.get("hc3"))
+        # api.registerEndpoint: an offline-sim feature — the QA's own
+        # registered endpoints answer its api.* calls (built-ins were
+        # already excluded by the caller's pre-check; in remote mode the
+        # real HC3 owns the house, so user routes never apply there).
+        # Deliver to the handler on the pump; the handler's answer resumes
+        # the suspended call via USER_API_RESULT -> apiResult.
+        if self.hc3 is None and not hc3_direct and qa not in self._pending_user_api:
+            from .api import parse_url
+
+            # match on the PATH only — the query string must not pollute
+            # {params} (the handler receives them separately)
+            segments, query = parse_url(url)
+            path = "/" + "/".join(segments)
+            route = self._match_user_route(qa, method, path, override_only=True)
+            if route is None:
+                route = self._match_user_route(qa, method, path)
+            if route is not None:
+                owner, route_id, params = route
+                self._pending_user_api[qa] = owner
+                # a suspended call is pending work, exactly like the remote
+                # dispatch path counts it — without this the run drains and
+                # the suspended caller dies silently
+                self._api_calls_inflight += 1
+                self.enqueue_outbound(
+                    messages.user_api_call(
+                        owner, route_id, method, path, params, query, body, caller=qa
+                    )
+                )
+                return
         if debug_flag(self.config, "api"):
             self.debug_log(f"api {method} {url}")
         self._api_calls_inflight += 1  # counted before start: no exit window
@@ -2537,6 +2659,7 @@ class LuaEngine:
             # is left.
             qa_id = int(msg["qa"])
             self._timers.cancel_qa(qa_id)
+            self.clear_user_routes(qa_id)
             self.server_host.close_qa(qa_id)  # mock servers die with their QA
             # in-flight HTTP/SSE requests die with their QA too — an open
             # SSE stream would otherwise keep the run alive until its socket

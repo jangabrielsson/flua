@@ -86,6 +86,8 @@ QA_VARS = "qaVars"  # {"id": int, "vars": {name: value}}  evaluated --%%var valu
 DEVICE_ACTION = "deviceAction"  # {"id": int, "action": str, "args": list}
 UI_EVENT = "uiEvent"  # {"deviceId": int, "elementName": str, "eventType": str, "value"?: str}
 CUSTOM_EVENT = "customEvent"  # {"name": str}
+USER_API_CALL = "userApiCall"  # engine -> QA: run a registered endpoint handler
+USER_API_RESULT = "userApiResult"  # QA -> engine: the handler's (data, status)
 
 
 def set_timeout(timer_id: int, delay_ms: int, qa: int | None = None) -> dict[str, Any]:
@@ -258,6 +260,44 @@ def api_result(qa: int, data: Any, status: int) -> dict[str, Any]:
     if data is not None:
         msg["data"] = data
     msg["status"] = int(status)
+    return msg
+
+
+def user_api_call(
+    qa: int,
+    route_id: int,
+    method: str,
+    path: str,
+    params: dict[str, str],
+    query: dict[str, list[str]],
+    body: Any,
+    caller: int,
+) -> dict[str, Any]:
+    """Deliver a suspended api.* call to the OWNER QA's registered endpoint
+    handler (``qa`` = the route's owner, ``caller`` = the QA whose api.*
+    call is suspended — the handler's answer resumes the caller)."""
+    return {
+        "type": USER_API_CALL,
+        "qa": int(qa),
+        "caller": int(caller),
+        "route": int(route_id),
+        "method": method,
+        "path": path,
+        "params": params,
+        "query": query,
+        "body": body,
+    }
+
+
+def user_api_result(qa: int, data: Any, status: int, error: str | None = None) -> dict[str, Any]:
+    """The handler's answer: (data, status), or an error marker when the
+    handler crashed."""
+    msg: dict[str, Any] = {"type": USER_API_RESULT, "qa": int(qa)}
+    if data is not None:
+        msg["data"] = data
+    msg["status"] = int(status)
+    if error:
+        msg["error"] = error
     return msg
 
 

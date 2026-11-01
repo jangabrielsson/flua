@@ -31,21 +31,30 @@ logger = logging.getLogger(__name__)
 Handler = Callable[[SimState, ApiRequest], tuple[Any, int]]
 
 
+def compile_pattern(pattern: str) -> tuple[re.Pattern[str], dict[str, int]]:
+    """One route pattern -> (regex, params): ``{name}`` segments become
+    capture groups (match any non-slash segment), everything else is
+    literal. Shared by the built-in route table and user-registered
+    endpoints (``api.registerEndpoint``)."""
+    params: dict[str, int] = {}
+    parts = [seg for seg in pattern.split("/") if seg]
+    regex_parts: list[str] = []
+    group_index = 1
+    for seg in parts:
+        if seg.startswith("{") and seg.endswith("}"):
+            params[seg[1:-1]] = group_index
+            group_index += 1
+            regex_parts.append("([^/]+)")
+        else:
+            regex_parts.append(re.escape(seg))
+    return re.compile("^/" + "/".join(regex_parts) + "/?$"), params
+
+
 def _compile_routes() -> list[tuple[str, re.Pattern[str], dict[str, int], Handler]]:
     compiled: list[tuple[str, re.Pattern[str], dict[str, int], Handler]] = []
     for method, pattern, handler in routes.ROUTES:
-        params: dict[str, int] = {}
-        parts = [seg for seg in pattern.split("/") if seg]
-        regex_parts: list[str] = []
-        group_index = 1
-        for seg in parts:
-            if seg.startswith("{") and seg.endswith("}"):
-                params[seg[1:-1]] = group_index
-                group_index += 1
-                regex_parts.append("([^/]+)")
-            else:
-                regex_parts.append(re.escape(seg))
-        compiled.append((method, re.compile("^/" + "/".join(regex_parts) + "/?$"), params, handler))
+        regex, params = compile_pattern(pattern)
+        compiled.append((method, regex, params, handler))
     return compiled
 
 
