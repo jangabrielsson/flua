@@ -153,6 +153,28 @@ end
 
 ## HC3 Firmware / Platform Differences
 
+### The QA Lua sandbox: nilled globals on the real HC3
+
+A QA on the HC3 runs in a restricted Lua environment (the HC3's QA template
+nils them; verified on firmware 5.221):
+
+- `coroutine` — QAs are **callback-only** (`setTimeout`, `net.*` callbacks,
+  `RefreshStateSubscriber`). `fibaro.sleep` and coroutine-based code are
+  flua-only — guard them with `if _FLUA then ... end`.
+- `require` — absent entirely, so QAs cannot load Lua modules on the HC3
+  (flua's QA `require` — files next to the QA, `$` bundled libraries — is
+  emulator-only).
+- `load` / `loadfile` / `loadstring` / `dofile` / `module`, `getfenv` /
+  `setfenv`, `debug`, `file`, `io`, `package`, `rawequal` / `rawget` /
+  `rawset`
+- `os.execute` / `os.getenv` / `os.remove` / `os.rename` /
+  `os.setlocale` / `os.tmpname` — the rest of `os` (`time`, `date`,
+  `clock`, `difftime`) is available.
+
+flua does not sandbox QAs; the compatibility contract is that a QA staying
+inside the HC3's surface runs identically in flua, while flua-only
+conveniences must be guarded.
+
 ### `fibaro.call()` vs `api.post()` action timing
 
 **Symptom:** `fibaro.call(id, "turnOn")` appears to have no effect when called immediately after creating a child device.

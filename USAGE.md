@@ -1277,6 +1277,34 @@ properties, UI rows, and `--%%file` extras all come back out of the
 package. The QA's own `--%%` header rides along too, so a downloaded QA's
 `--%%mode`/`--%%var` directives behave like they would unpacked.
 
+### The HC3 QA sandbox
+
+A QA on the real HC3 runs in a restricted Lua environment: the HC3's QA
+template (`quickApp.lua`, loaded for every QA) nils the following globals
+after its own `require`s — verified on a live HC3 5.221:
+
+- `coroutine` — QAs are **callback-only**: `setTimeout`/`setInterval`,
+  `net.*` callbacks, `RefreshStateSubscriber`. flua's coroutine model
+  (`fibaro.sleep`, per-QA coroutines, the async pump) is an emulator
+  extension — guard it with `if _FLUA then ... end` when the QA must also
+  run on the HC3.
+- `require` — gone too (removed by the plugin runner, not the template),
+  so QAs cannot load Lua modules on the HC3; neither `--%%file` includes
+  nor flua's bundled `$` libraries exist there.
+- `load`, `loadfile`, `loadstring`, `dofile`, `module`, `getfenv`,
+  `setfenv`, `debug`, `file`, `io`, `package`, `rawequal`, `rawget`,
+  `rawset`
+- `os.execute`, `os.getenv`, `os.remove`, `os.rename`, `os.setlocale`,
+  `os.tmpname` — the rest of `os` (`time`, `date`, `clock`, `difftime`)
+  stays available.
+
+Scenes run under a separate whitelist environment that is at least as
+restricted (no `require`, `io`, `package`, `coroutine` either). flua does
+not sandbox QAs — the emulator is a development tool. The compatibility
+contract is therefore the reverse one: a QA that stays inside the HC3's
+sandbox surface runs the same in flua; flua-only conveniences must be
+guarded, or the QA stays emulator-bound.
+
 Or let flua talk to the HC3 directly with the `--tool` (alias `-t`)
 commands — they package/unpack for you, so you develop in the unpacked
 format (individual `.lua` files) and only the HC3 sees `.fqa`:
