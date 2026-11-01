@@ -4,6 +4,14 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.117] - 2026-11-01
+
+### Added
+- implement custom REST route registration with enhanced capabilities
+
+### Changed
+- remove outdated HC3 views documentation
+
 ## [0.1.116] - 2026-10-31
 
 ### Added
