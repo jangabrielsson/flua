@@ -1001,6 +1001,14 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
       end
       return env.api.get(url)
     end,
+    -- keepAlive(): keep this QA (and with it the run) alive past idle — no
+    -- setInterval hack needed. The engine counts the flag in its
+    -- pending-work check until the QA exits. Simulated devices and test
+    -- servers call it in onInit. Per-QA closure: the shared _FLUA has no
+    -- qaId.
+    keepAlive = function()
+      _PY.keep_alive(qaId)
+    end,
   }, { __index = _FLUA })
   -- merge the Lua config file (.flua.lua) into this QA's config: the file
   -- is the base, --%% annotations win
@@ -1165,6 +1173,18 @@ end
 function _FLUA.loadQAfromString(code, directives)
   local path = _PY.qa_temp_file(code)
   return _FLUA.loadQAfromFile(path, directives)
+end
+
+-- Load a simulated device BUNDLED with flua (src/flua/simdevices, shipped
+-- in the wheel, so pip-only installs have them too):
+--   local temp = _FLUA.loadSimDevice("temperatureSensor")
+--   fibaro.call(temp, "setValue", 21.5, "C")
+-- Resolves <name>.lua, then <name>.fqa. Returns the device id, or THROWS
+-- an error naming the bundled devices when the name is unknown.
+function _FLUA.loadSimDevice(name)
+  local id, err = _PY.load_sim_device(name)
+  if id then return id end
+  error("loadSimDevice: " .. tostring(err), 2)
 end
 
 -- ----------------------------------------------------------------- dispatch

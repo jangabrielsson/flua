@@ -95,8 +95,8 @@ Each `--%%u:` line defines one row. Use `{{...},{...}}` for multiple elements on
 
 ### Switch (toggle)
 ```lua
---%%u:{switch="autoSwitch",text="Auto Mode",value="false",onToggled="handleSwitch"}
--- event.values[1] == true/false (boolean)
+--%%u:{switch="autoSwitch",text="Auto Mode",value="false",onToggleOn="handleOn",onToggleOff="handleOff"}
+-- 5.221 split events (also onReleased); event.values[1] == "true"/"false" (string)
 ```
 
 ### Slider

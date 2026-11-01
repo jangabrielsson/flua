@@ -76,6 +76,8 @@ packages = [
 flua = [
     "lua/*.lua",
     "lua/lib/*.lua",
+    "simdevices/*.lua",
+    "simdevices/*.fqa",
     "devices/*.json",
     "setup_templates/**/*",
     # globs don't match dotfiles — .luarc.json would be dropped from the wheel

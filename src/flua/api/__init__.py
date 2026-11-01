@@ -60,16 +60,39 @@ def _compile_routes() -> list[tuple[str, re.Pattern[str], dict[str, int], Handle
 
 _COMPILED = _compile_routes()
 
+# /quickApp/* is engine-backed (Api._dispatch routes it before the route
+# table) — the audit classifier and the user-route pre-check must still
+# count these paths as built-in/simulated. Mirrors Api._quickapp.
+_QUICKAPP_ROUTES = (
+    ("POST", "/quickApp"),
+    ("GET", "/quickApp/availableTypes"),
+    ("GET", "/quickApp/export/{deviceId}"),
+    ("POST", "/quickApp/export/{deviceId}"),
+    ("POST", "/quickApp/import"),
+    ("GET", "/quickApp/{deviceId}/files"),
+    ("POST", "/quickApp/{deviceId}/files"),
+    ("PUT", "/quickApp/{deviceId}/files"),
+    ("DELETE", "/quickApp/{deviceId}/files/{fileName}"),
+    ("GET", "/quickApp/{deviceId}/files/{fileName}"),
+    ("PUT", "/quickApp/{deviceId}/files/{fileName}"),
+)
+_QUICKAPP_COMPILED = [
+    (method, compile_pattern(pattern)[0]) for method, pattern in _QUICKAPP_ROUTES
+]
+
 
 def route_match(method: str, path: str) -> bool:
     """Whether the sim implements (method, path) — the coverage audit's
-    classifier (``flua audit``). ``path`` may use ``{param}`` placeholders
-    (a placeholder matches any non-slash segment); query strings are not
-    part of the route."""
+    classifier (``flua audit``) and the registered-endpoint pre-check.
+    ``path`` may use ``{param}`` placeholders (a placeholder matches any
+    non-slash segment); query strings are not part of the route."""
     path = path.split("?", 1)[0]
     if "{" in path:
         path = re.sub(r"\{[^/{}]*\}", "x", path)
     for route_method, pattern, _params, _handler in _COMPILED:
+        if route_method == method.upper() and pattern.match(path):
+            return True
+    for route_method, pattern in _QUICKAPP_COMPILED:
         if route_method == method.upper() and pattern.match(path):
             return True
     return False

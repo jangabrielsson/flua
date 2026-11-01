@@ -776,8 +776,11 @@ also renames device 1), `/home` (scalar fields + `defaultSensors`/
 `notificationClient` wholesale), and `/panels/location/{id}` (name/radius/
 address/home). The virtual-clock fields (sun times, `date`, `timestamp`,
 `serverStatus`) stay computed and ignore PUTs. `PUT /weather` is a flua
-extension (the HC3's weather is provider-owned): it overrides any weather
-field, so scene logic can react to a fixed forecast.
+extension (the HC3's weather is provider-owned): it merges into the fake
+weather record — only the fields in the body change — and each field that
+actually changes emits one `WeatherChangedEvent` (`change`/`newValue`/
+`oldValue`) on the refreshStates feed, so scene logic can react to a fixed
+forecast; re-PUTting the same value emits nothing.
 
 `os.getenv(name)` reads through flua's environment chain: the shell
 environment first (so explicit per-run settings like CLI flags win), then
@@ -1141,6 +1144,30 @@ appended to the loaded QA's `--%%` header: `var`/`property` merge per key
 (the QA's own variables survive), `u`/`file` append, everything else
 overrides. Both functions return the new QA id (or `nil, error`).
 `examples/dynamic.lua` demos it.
+
+Simulated devices ship *inside* flua — `src/flua/simdevices`, bundled in the
+wheel, so pip-only installs have them too — and load by bare name:
+
+```lua
+local temp = _FLUA.loadSimDevice("temperatureSensor")  -- throws on unknown name
+fibaro.call(temp, "setValue", 21.5, "C")
+local motion = _FLUA.loadSimDevice("motionSensor")
+fibaro.call(motion, "breach")
+```
+
+The bundled set mirrors the `quickapp-types` device templates
+(`temperatureSensor`, `humiditySensor`, `motionSensor`, `doorSensor`,
+`windowSensor`, `smokeSensor`, `floodSensor`, `binarySwitch`,
+`multilevelSwitch`, `colorController`, the HVAC trio, `alarmPartition`,
+`weather`, `player`, … — the full template set). Every sim
+device keeps itself alive for the whole run and answers `fibaro.call`:
+value sensors take `setValue(value, unit?)` and `setUnit(unit)`; breach
+sensors take `setValue(bool)`, `breach()`, `clearBreach()` (the sensor's
+`value` IS the breach state — there is no separate `breached` property on
+sensors); switches take `turnOn`/`turnOff`/`setValue`; controllers keep
+their stock actions (`arm`/`disarm`/`setArmed`, `setThermostatMode`,
+`setHeatingThermostatSetpoint`, `setColor`, `createChild`, …). Drive one and
+watch scenes and reacting QAs fire like on a real device.
 
 ## Network clients
 
@@ -1601,11 +1628,19 @@ live on `_FLUA` so your code stays portable:
   run)
 - `_FLUA.arg` — the file path / `-e` marker
 - `_FLUA.exit(code)` — stop the engine (vs `exit(code)` / `os.exit()` in a QA, which stop only that QA — `os.exit()` is the name real HC3 QAs use)
+- `_FLUA.keepAlive()` — keep this QA (and with it the run) alive past idle,
+  like `--%%keep-alive:true` but at runtime and in every mode; the QA's
+  exit clears it. The bundled sim devices call it in `onInit` (no
+  `setInterval` hack needed)
 - `_FLUA.qa(id)` — another QA's QuickApp instance (lupa proxy)
 - `_FLUA.loadQAfromFile(path, directives?)` / `_FLUA.loadQAfromString(code, directives?)` — dynamic QA loading; `directives` is an optional table of directive strings added to the loaded QA's config
 - `_FLUA.loadFQAfromFile(path, directives?)` — like `loadQAfromFile` for a
   `.fqa` package: unpacks it to a temp dir first (the CLI's pipeline),
   name/type/UI come from the package header
+- `_FLUA.loadSimDevice(name)` — load a simulated device bundled with flua
+  (`src/flua/simdevices`, shipped in the wheel): the file name without
+  suffix (`.lua` then `.fqa`), e.g. `"temperatureSensor"`. Returns the
+  device id, or throws an error naming the bundled set
 - `_FLUA.async.run(fn)` / `_FLUA.async.await(worker)` / `_FLUA.async.wait(ms)` — coroutine awaits
 - `_FLUA.millitime()` — virtual time in whole milliseconds (sub-second timing; `os.time()` is whole seconds, `os.clock()` is real CPU time)
 - `_FLUA.postRefreshEvent(event)` — inject a fake refreshStates event

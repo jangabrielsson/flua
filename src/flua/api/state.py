@@ -574,6 +574,25 @@ class SimState:
             "GlobalVariableRemovedEvent", {"variableName": name}, now
         )
 
+    def record_weather_changed(
+        self, name: str, new_value: Any, old_value: Any, now: float
+    ) -> dict[str, Any] | None:
+        """WeatherChangedEvent — one per weather property that actually
+        changed (Lua equality, like the global-variable events). Carries
+        the HC3's light system envelope and change/newValue/oldValue data."""
+        if _lua_equal(new_value, old_value):
+            return None
+        self._refresh_seq += 1
+        entry = {
+            "type": "WeatherChangedEvent",
+            "created": int(now),
+            "createdMillis": int(now * 1000),
+            "sourceType": "system",
+            "data": {"change": name, "oldValue": old_value, "newValue": new_value},
+        }
+        self.events.append((self._refresh_seq, entry))
+        return entry
+
     # -- QA registration --------------------------------------------------------
 
     def register_qa(

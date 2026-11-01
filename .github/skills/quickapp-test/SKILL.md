@@ -134,6 +134,30 @@ callback's effects. `flua --tool ui qa.lua` prints the whole UI as text
 elements only, not post-init values or callback behavior; for live state
 use `self:getView()` or the viewer.
 
+### Simulated devices (bundled)
+
+When the QA under test reacts to *other* devices (sensors, switches,
+climate, alarm), load the matching simulated device — bundled with flua,
+no files needed:
+
+```lua
+local temp = _FLUA.loadSimDevice("temperatureSensor")  -- throws on unknown name
+fibaro.call(temp, "setValue", 21.5, "C")               -- value + optional unit
+local motion = _FLUA.loadSimDevice("motionSensor")
+fibaro.call(motion, "breach")       -- value = true (the sensor's breach state)
+fibaro.call(motion, "clearBreach") -- value = false
+```
+
+The bundled set mirrors the `quickapp-types` device templates (30 types):
+value sensors take `setValue(value, unit?)`/`setUnit(unit)`, breach sensors
+`setValue(bool)`/`breach()`/`clearBreach()` (the sensor's `value` IS the
+breach state — no separate `breached` property on sensors; that is alarm
+partitions), switches `turnOn`/`turnOff`/
+`setValue`, controllers their stock actions (`arm`/`disarm`/`setArmed`,
+`setThermostatMode`, `setColor`, `createChild`, …). Each device calls
+`_FLUA.keepAlive()` in `onInit` (stays up for the whole run); the loader can
+end it with `_FLUA.exit(0)`.
+
 ### A complete interaction test (copy-paste)
 
 The runnable `examples/ui-interaction-test.lua` chains the whole pattern

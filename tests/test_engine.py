@@ -84,6 +84,39 @@ async def test_exit_message_sets_exit_code() -> None:
 
 
 @pytest.mark.asyncio
+async def test_flua_keep_alive_counts_without_timers() -> None:
+    # _FLUA.keepAlive(): the flag alone (no timers) keeps the run alive in
+    # every mode — the mechanism behind the bundled sim devices
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(None, "_FLUA.keepAlive()\n", {}, "keeper")
+        await asyncio.sleep(0.1)
+        assert engine.has_pending_work()  # no timers at all: the flag counts
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_flua_keep_alive_clears_on_qa_exit(capsys) -> None:
+    # the QA's own exit clears its keep-alive flag, so the run can drain
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(
+            None,
+            "_FLUA.keepAlive()\n"
+            "setTimeout(function() print('EXITING'); os.exit() end, 20)\n",
+            {},
+            "keeper",
+        )
+        await wait_until(lambda: not engine.has_pending_work())
+    finally:
+        await engine.stop()
+    assert "EXITING" in capsys.readouterr().out
+
+
+@pytest.mark.asyncio
 async def test_error_in_callback_does_not_kill_engine(capsys) -> None:
     engine = LuaEngine()
     await engine.start()

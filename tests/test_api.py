@@ -862,6 +862,34 @@ def test_put_configures_sim_world_values() -> None:
     assert weather["Humidity"] == 62.0  # untouched fields keep the defaults
 
 
+def test_put_weather_merges_and_emits_changed_events() -> None:
+    # PUT /weather merges: only the fields in the body change, and each
+    # actually-changed field emits one WeatherChangedEvent with
+    # change/newValue/oldValue on the refreshStates feed — re-PUTting the
+    # same value emits nothing
+    api = Api()
+    api.dispatch("PUT", "/weather", {"Humidity": 99})
+    weather, _ = api.dispatch("GET", "/weather")
+    assert weather["Humidity"] == 99
+    assert weather["Temperature"] == 12.5  # untouched fields keep the defaults
+    events = [entry for _, entry in api.state.events]
+    assert [e["type"] for e in events] == ["WeatherChangedEvent"]
+    assert events[0]["data"] == {"change": "Humidity", "oldValue": 62.0, "newValue": 99}
+    # re-PUT the same value: no state change, no new event
+    api.dispatch("PUT", "/weather", {"Humidity": 99})
+    assert len(api.state.events) == 1
+    # several changed fields -> one event each, only for those that changed
+    api.dispatch("PUT", "/weather", {"Humidity": 80, "Temperature": 12.5, "Wind": 9.0})
+    events = [entry for _, entry in api.state.events]
+    assert [e["data"]["change"] for e in events] == ["Humidity", "Humidity", "Wind"]
+    assert events[-1]["data"] == {"change": "Wind", "oldValue": 4.2, "newValue": 9.0}
+    weather, _ = api.dispatch("GET", "/weather")
+    assert weather["Humidity"] == 80 and weather["Temperature"] == 12.5
+    # the events ride the refreshStates feed
+    feed, _ = api.dispatch("GET", "/refreshStates")
+    assert [e["type"] for e in feed["events"]] == ["WeatherChangedEvent"] * 3
+
+
 def test_seeded_devices_react_to_light_actions() -> None:
     # layer 1 emulation: seeded physical devices behave without a QA
     api = Api(
@@ -961,6 +989,10 @@ def test_sim_world_default_shapes() -> None:
     weather, _ = api.dispatch("GET", "/weather")
     assert weather["Temperature"] is not None
     assert weather["WindUnit"] == "km/h"
+    # raw provider-style name vs the HC3 condition vocabulary in Converted
+    assert weather["WeatherCondition"] == "Partly cloudy"
+    assert weather["WeatherConditionConverted"] == "partlyCloudy"
+    assert weather["ConditionCode"] == 30  # partlyCloudy's code
 
 
 class _ProxyHandler(BaseHTTPRequestHandler):
@@ -1408,6 +1440,27 @@ def test_embedded_ui_light_sensor(api: Api) -> None:
     assert view["values"]["__multisensorValue"]["text"] == "3.142lux"
 
 
+def test_embedded_ui_state_rows_for_breach_alarm_player_weather(api: Api) -> None:
+    # the large panel shows a status line for every sim device type: breach
+    # sensors (value -> TRUE/FALSE), alarm partitions (armed), players
+    # (transport state), weather (condition), value sensors (value + unit)
+    api.state.register_qa(5002, "motion", "com.fibaro.motionSensor", {"value": True})
+    api.state.register_qa(5003, "alarm", "com.fibaro.alarmPartition", {"armed": True})
+    api.state.register_qa(5004, "player", "com.fibaro.player", {"state": "Play"})
+    api.state.register_qa(
+        5005, "weather", "com.fibaro.weather", {"WeatherCondition": "rain"}
+    )
+    api.state.register_qa(
+        5006, "rain", "com.fibaro.rainSensor", {"value": 12.4, "unit": "mm"}
+    )
+    data, _ = api.dispatch("GET", "/flua/embeddedUI")
+    assert "TRUE" in data["5002"]["values"]["__binarysensorValue"]["text"]
+    assert "ARMED" in data["5003"]["values"]["__alarmArmed"]["text"]
+    assert data["5004"]["values"]["__playerState"]["text"] == "Play"
+    assert data["5005"]["values"]["__weatherCondition"]["text"] == "rain"
+    assert data["5006"]["values"]["__multisensorValue"]["text"] == "12.4mm"
+
+
 def test_embedded_ui_strips_insignificant_zeros(api: Api) -> None:
     # the HC3 panel style: 45.00 -> 45, 62.50 -> 62.5, 348.400 -> 348.4
     api.state.register_qa(5005, "temp", "com.fibaro.temperatureSensor", {"value": 45.0})
@@ -1505,15 +1558,18 @@ def test_embedded_ui_player(api: Api) -> None:
     assert status == 200
     view = data["5000"]
     rows = view["uiView"]
-    transport = rows[0]["components"]
+    # the transport state label first, then the media transport buttons
+    state_row = rows[0]["components"]
+    assert state_row[0]["name"] == "__playerState"
+    transport = rows[1]["components"]
     assert [c["name"] for c in transport] == ["__prev", "__pause", "__play", "__stop", "__next"]
     assert [c["action"] for c in transport] == ["prev", "pause", "play", "stop", "next"]
     assert [c["text"] for c in transport] == ["⏮", "⏸", "▶", "⏹", "⏭"]
-    slider = rows[1]["components"][0]
+    slider = rows[2]["components"][0]
     assert slider["type"] == "slider" and slider["action"] == "setVolume"
     assert (slider["min"], slider["max"]) == (0, 100)
     assert view["values"]["__setVolume"]["value"] == "42"  # the volume watch
-    mute_row = rows[2]["components"]
+    mute_row = rows[3]["components"]
     assert mute_row[0]["name"] == "__unmute" and mute_row[0]["value"] == 0
     assert mute_row[1]["name"] == "__mute" and mute_row[1]["value"] == 1
     assert [c["action"] for c in mute_row] == ["setMute", "setMute"]

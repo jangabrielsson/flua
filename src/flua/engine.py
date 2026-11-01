@@ -80,7 +80,10 @@ _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")  # logfile copies carry no colors
 # Libraries bundled with flua (--%%file:$name.lua loads from here). The
 # directory ships in the wheel (pyproject package-data: lua/lib/*.lua).
 BUNDLED_LIB_DIR = Path(__file__).parent / "lua" / "lib"
-
+# Simulated devices bundled with flua (_FLUA.loadSimDevice(name) loads from
+# here, so pip-only installs have them too). Ships in the wheel
+# (pyproject package-data: simdevices/*.lua).
+SIM_DEVICES_DIR = Path(__file__).parent / "simdevices"
 # --%% directives that map directly onto device properties (local per QA)
 _PROPERTY_DIRECTIVES = {
     "uid": "quickAppUuid",
@@ -404,21 +407,29 @@ class LuaEngine:
             return "online"
         return "offline"
 
+    def qa_keep_alive(self, qa_id: int) -> None:
+        """_FLUA.keepAlive(): keep the run alive past idle for this QA's
+        lifetime (simulated devices, servers under test). Counted by
+        has_pending_work in every mode; the QA's exit clears it."""
+        info = self._qas.get(int(qa_id))
+        if info is not None:
+            info["keepAlive"] = True
+
     def _keep_alive_active(self) -> bool:
-        """Any loaded QA with --%%keep-alive:true that hasn't exited keeps the
-        online engine (and the HC3 poller's long poll) alive past idle — like
-        a QA on the real HC3, which runs forever. Proxy-mode QAs (--%%mode:proxy)
-        imply the same: the emulator must stay up to serve the HC3 proxy's
-        callbacks. Offline there is no poller to feed, so the directive has no
-        effect there."""
-        if self.hc3 is None:
-            return False
-        return any(
-            info.get("loaded")
-            and info.get("exited") is None
-            and bool(info.get("config", {}).get("keep-alive") or info.get("proxy"))
-            for info in self._qas.values()
-        )
+        """True while any loaded, not-yet-exited QA asked to stay up:
+        ``_FLUA.keepAlive()`` at runtime (any mode — simulated devices, test
+        servers) or --%%keep-alive:true / proxy mode (online only: those feed
+        the HC3 poller's long poll, which offline does not exist)."""
+        for info in self._qas.values():
+            if not info.get("loaded") or info.get("exited") is not None:
+                continue
+            if info.get("keepAlive"):
+                return True
+            if self.hc3 is not None and bool(
+                info.get("config", {}).get("keep-alive") or info.get("proxy")
+            ):
+                return True
+        return False
 
     @staticmethod
     def _find_lua_config() -> Path | None:
@@ -1126,6 +1137,27 @@ class LuaEngine:
             return None, f"cannot open {path}: {err or 'package has no main file'}"
         self.track_temp_dir(base)
         return self.load_qa_file(main_path, directives)
+
+    def load_sim_device(self, name: str | None) -> tuple[int | None, str | None]:
+        """Load a bundled simulated device by its file name (no suffix):
+        ``_FLUA.loadSimDevice("temperatureSensor")``. Resolves .lua first,
+        then .fqa, inside the simdevices/ directory that ships in the wheel.
+        Returns (qa_id, None) or (None, error) like load_qa_file."""
+        if (
+            not isinstance(name, str)
+            or not name
+            or Path(name).name != name
+            or name in (".", "..")
+        ):
+            return None, f"bad sim device name: {name!r}"
+        for suffix in (".lua", ".fqa"):
+            path = SIM_DEVICES_DIR / f"{name}{suffix}"
+            if path.is_file():
+                return self.load_qa_file(str(path))
+        available = sorted(
+            p.stem for p in SIM_DEVICES_DIR.iterdir() if p.suffix in (".lua", ".fqa")
+        )
+        return None, f"unknown sim device {name!r} (bundled: {', '.join(available)})"
 
     def qa_temp_file(self, code: str) -> str:
         """Write inline QA code to a temp file (deleted once the QA loads)."""
@@ -1924,7 +1956,8 @@ class LuaEngine:
 
     def has_pending_work(self) -> bool:
         """True while timers, message queues, in-flight worker tasks, or a
-        --%%keep-alive QA (online) exist. Timers whose callback is tagged
+        keep-alive exist (``_FLUA.keepAlive()`` at runtime, any mode;
+        --%%keep-alive / proxy QAs, online). Timers whose callback is tagged
         ``_FLUA.background`` (housekeeping loops like EventRunner's midnight
         scheduler) fire while the run lives but never keep it alive."""
         return (

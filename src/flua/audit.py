@@ -54,6 +54,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="machine-readable result (one JSON document)",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="list METHOD /path for every endpoint the sim does not implement "
+        "(added to the JSON as routes.missing when --json is set)",
+    )
 
 
 def spec_endpoints() -> list[dict[str, Any]]:
@@ -161,33 +167,39 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     devices = device_coverage()
     hierarchy = hierarchy_coverage()
     templates = template_coverage()
+    # METHOD /path pairs for the endpoints the sim does not implement
+    missing_entries = sorted(
+        (str(e.get("method") or "").upper(), str(e.get("path") or ""))
+        for e in routes["missing"]
+    )
     if args.json:
-        print(
-            json.dumps(
-                {
-                    "routes": {
-                        "total": routes["total"],
-                        "simulated": len(routes["simulated"]),
-                        "missing": len(routes["missing"]),
-                    },
-                    "devices": {
-                        "total": devices["total"],
-                        "lightModeled": len(devices["lightModeled"]),
-                        "lightActionsWithoutInterface": len(
-                            devices["lightActionsWithoutInterface"]
-                        ),
-                        "otherActions": len(devices["otherActions"]),
-                        "inert": len(devices["inert"]),
-                    },
-                    "hierarchy": hierarchy,
-                    "templates": {
-                        "total": templates["total"],
-                        "resolvable": len(templates["resolvable"]),
-                        "unresolvable": templates["unresolvable"],
-                    },
-                }
-            )
-        )
+        payload = {
+            "routes": {
+                "total": routes["total"],
+                "simulated": len(routes["simulated"]),
+                "missing": len(routes["missing"]),
+            },
+            "devices": {
+                "total": devices["total"],
+                "lightModeled": len(devices["lightModeled"]),
+                "lightActionsWithoutInterface": len(
+                    devices["lightActionsWithoutInterface"]
+                ),
+                "otherActions": len(devices["otherActions"]),
+                "inert": len(devices["inert"]),
+            },
+            "hierarchy": hierarchy,
+            "templates": {
+                "total": templates["total"],
+                "resolvable": len(templates["resolvable"]),
+                "unresolvable": templates["unresolvable"],
+            },
+        }
+        if args.verbose:
+            payload["routes"]["missing"] = [
+                {"method": method, "path": path} for method, path in missing_entries
+            ]
+        print(json.dumps(payload))
         return 0
     total = routes["total"]
     simulated = len(routes["simulated"])
@@ -197,6 +209,10 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     print(f"  {len(routes['missing'])} not simulated (forwarded to the HC3 online)")
     areas = _areas(routes["missing"])
     print("  not simulated by area: " + ", ".join(f"{k} {v}" for k, v in areas.items()))
+    if args.verbose:
+        print("  not simulated endpoints:")
+        for method, path in missing_entries:
+            print(f"    {method} {path}")
     print("Device catalog (src/flua/devices/devices.json)")
     print(
         f"  {devices['total']} types: {len(devices['lightModeled'])} light-modeled, "

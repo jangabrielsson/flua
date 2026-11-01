@@ -70,6 +70,18 @@ def _custom_bin(value: Any, properties: dict[str, Any] | None = None) -> str:
     return BIN_TRUE if value else BIN_FALSE
 
 
+def _armed_text(value: Any, properties: dict[str, Any] | None = None) -> str:
+    """The alarm partition's armed state: green ARMED / red DISARMED."""
+    if value:
+        return "<center><font color='green'>ARMED</font></center>"
+    return "<center><font color='red'>DISARMED</font></center>"
+
+
+def _state_text(value: Any, properties: dict[str, Any] | None = None) -> str:
+    """A plain string state (player state, weather condition) as-is."""
+    return str(value)
+
+
 def _int_value(value: Any, properties: dict[str, Any] | None = None) -> str:
     """A dimmer's value as an integer — the HC3 UI shows no decimals."""
     return str(int(float(value) + 0.5))
@@ -340,6 +352,8 @@ EMBEDDED_UI: dict[
     "com.fibaro.remoteBaseShutter": [_shutter_row()],
     "com.fibaro.remoteRollerShutter": [_shutter_row(), _position_slider_row()],
     "com.fibaro.player": [
+        # the current transport state (play/pause/stop/...)
+        [{"type": "label", "name": "__playerState", "text": "\u2014"}],
         # media transport: previous / pause / play / stop / next
         [
             {"type": "button", "name": "__prev", "text": "⏮", "action": "prev"},
@@ -460,6 +474,45 @@ EMBEDDED_UI: dict[
     "com.fibaro.humiditySensor": [
         [{"type": "label", "name": "__humiditySensor", "text": "0"}],
     ],
+    # value-reading sensors and meters without a dedicated entry share the
+    # multilevel sensor's live value label (value + unit)
+    "com.fibaro.energyMeter": [
+        [{"type": "label", "name": "__multisensorValue", "text": "0"}],
+    ],
+    "com.fibaro.rainSensor": [
+        [{"type": "label", "name": "__multisensorValue", "text": "0"}],
+    ],
+    "com.fibaro.windSensor": [
+        [{"type": "label", "name": "__multisensorValue", "text": "0"}],
+    ],
+    # breach/binary sensors without a dedicated entry: the TRUE/FALSE state
+    "com.fibaro.coDetector": [
+        [{"type": "label", "name": "__binarysensorValue", "text": BIN_FALSE}],
+    ],
+    "com.fibaro.fireDetector": [
+        [{"type": "label", "name": "__binarysensorValue", "text": BIN_FALSE}],
+    ],
+    "com.fibaro.floodSensor": [
+        [{"type": "label", "name": "__binarysensorValue", "text": BIN_FALSE}],
+    ],
+    "com.fibaro.heatDetector": [
+        [{"type": "label", "name": "__binarysensorValue", "text": BIN_FALSE}],
+    ],
+    "com.fibaro.motionSensor": [
+        [{"type": "label", "name": "__binarysensorValue", "text": BIN_FALSE}],
+    ],
+    "com.fibaro.rainDetector": [
+        [{"type": "label", "name": "__binarysensorValue", "text": BIN_FALSE}],
+    ],
+    "com.fibaro.smokeSensor": [
+        [{"type": "label", "name": "__binarysensorValue", "text": BIN_FALSE}],
+    ],
+    "com.fibaro.alarmPartition": [
+        [{"type": "label", "name": "__alarmArmed", "text": "DISARMED"}],
+    ],
+    "com.fibaro.weather": [
+        [{"type": "label", "name": "__weatherCondition", "text": "\u2014"}],
+    ],
 }
 
 EMBEDDED_WATCHES: dict[str, list[dict[str, Any]]] = {
@@ -471,6 +524,7 @@ EMBEDDED_WATCHES: dict[str, list[dict[str, Any]]] = {
     ],
     "com.fibaro.player": [
         {"property": "volume", "id": "__setVolume", "prop": "value", "fmt": _int_value},
+        {"property": "state", "id": "__playerState", "prop": "text", "fmt": _state_text},
     ],
     "com.fibaro.binarySwitch": [
         {"property": "value", "id": "__binarysensorValue", "prop": "text", "fmt": _custom_bin},
@@ -532,6 +586,62 @@ EMBEDDED_WATCHES: dict[str, list[dict[str, Any]]] = {
     ],
     "com.fibaro.humiditySensor": [
         {"property": "value", "id": "__humiditySensor", "prop": "text", "fmt": _humidity_value},
+    ],
+    "com.fibaro.energyMeter": [
+        {
+            "property": "value",
+            "id": "__multisensorValue",
+            "prop": "text",
+            "fmt": _multisensor_value,
+        },
+    ],
+    "com.fibaro.rainSensor": [
+        {
+            "property": "value",
+            "id": "__multisensorValue",
+            "prop": "text",
+            "fmt": _multisensor_value,
+        },
+    ],
+    "com.fibaro.windSensor": [
+        {
+            "property": "value",
+            "id": "__multisensorValue",
+            "prop": "text",
+            "fmt": _multisensor_value,
+        },
+    ],
+    "com.fibaro.coDetector": [
+        {"property": "value", "id": "__binarysensorValue", "prop": "text", "fmt": _custom_bin},
+    ],
+    "com.fibaro.fireDetector": [
+        {"property": "value", "id": "__binarysensorValue", "prop": "text", "fmt": _custom_bin},
+    ],
+    "com.fibaro.floodSensor": [
+        {"property": "value", "id": "__binarysensorValue", "prop": "text", "fmt": _custom_bin},
+    ],
+    "com.fibaro.heatDetector": [
+        {"property": "value", "id": "__binarysensorValue", "prop": "text", "fmt": _custom_bin},
+    ],
+    "com.fibaro.motionSensor": [
+        {"property": "value", "id": "__binarysensorValue", "prop": "text", "fmt": _custom_bin},
+    ],
+    "com.fibaro.rainDetector": [
+        {"property": "value", "id": "__binarysensorValue", "prop": "text", "fmt": _custom_bin},
+    ],
+    "com.fibaro.smokeSensor": [
+        {"property": "value", "id": "__binarysensorValue", "prop": "text", "fmt": _custom_bin},
+    ],
+    "com.fibaro.alarmPartition": [
+        {"property": "armed", "id": "__alarmArmed", "prop": "text", "fmt": _armed_text},
+    ],
+    "com.fibaro.weather": [
+        {
+            "property": "WeatherCondition",
+            "id": "__weatherCondition",
+            "prop": "text",
+            "fmt": _state_text,
+        },
     ],
     "com.fibaro.hvacSystemAuto": [
         # the setpoint label and slider follow the displayed target (the

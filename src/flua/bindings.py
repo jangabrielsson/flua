@@ -350,6 +350,14 @@ def install_bindings(engine: "LuaEngine") -> None:
         qa_id, err = engine.load_fqa_file(path, extra)
         return qa_id, err
 
+    # bundled simulated devices (src/flua/simdevices, shipped in the wheel)
+    def load_sim_device(name: str) -> tuple[object, object]:
+        return engine.load_sim_device(name)
+
+    # _FLUA.keepAlive(): this QA keeps the run alive until it exits
+    def keep_alive(qa_id: object) -> None:
+        engine.qa_keep_alive(int(qa_id))
+
     def qa_temp_file(code: str) -> str:
         return engine.qa_temp_file(code)
 
@@ -369,6 +377,8 @@ def install_bindings(engine: "LuaEngine") -> None:
     py["device_for"] = device_for
     py["load_qa_file"] = load_qa_file
     py["load_fqa_file"] = load_fqa_file
+    py["load_sim_device"] = load_sim_device
+    py["keep_alive"] = keep_alive
     py["qa_temp_file"] = qa_temp_file
     py["udp_open"] = udp_open
     py["udp_close"] = engine.qa_udp.close

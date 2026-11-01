@@ -539,16 +539,19 @@ function renderComponent(device, component, row) {
     slider.value = value ?? slider.min;
     if (component.disabled) slider.disabled = true;
     if (component.color) slider.style.setProperty("--thumb", component.color);
+    // the declared unit (updateView can change it) renders right of the
+    // value — "21 °C"
+    const unit = component.unit ? " " + component.unit : "";
     const val = document.createElement("span");
     val.className = "value";
-    val.textContent = slider.value;
+    val.textContent = slider.value + unit;
     const paint = () => {
       const min = parseFloat(slider.min), max = parseFloat(slider.max);
       const pct = max > min ? ((parseFloat(slider.value) - min) / (max - min)) * 100 : 0;
       slider.style.setProperty("--fill", pct + "%");
     };
     paint();
-    slider.oninput = () => { val.textContent = slider.value; paint(); };
+    slider.oninput = () => { val.textContent = slider.value + unit; paint(); };
     slider.onchange = () => {
       setComponentValue(device, component, slider.value);
       if (component.calls) {
@@ -662,6 +665,7 @@ function renderComponent(device, component, row) {
           setComponentValue(device, component, chosen.slice());
           paintField();
           paintMarks();
+          field.blur();  // see hide(): a focused field blocks poll refreshes
           // send every selected value, comma-joined (the single callUIEvent
           // value param); the sim restores the list for the QA
           if (event) uiEvent(device.id, component.name, event, chosen.join(","));
@@ -687,14 +691,23 @@ function renderComponent(device, component, row) {
       // poll's in-place refresh never rebuilds it mid-interaction
       const devicePanel = row.closest(".device");
       if (devicePanel) {
-        if (wasOpen) delete devicePanel.dataset.open;
-        else devicePanel.dataset.open = "1";
+        if (wasOpen) {
+          delete devicePanel.dataset.open;
+          field.blur();  // see hide(): a focused field blocks poll refreshes
+        } else {
+          devicePanel.dataset.open = "1";
+        }
       }
     };
     const hide = () => {
       panel.style.display = "none";
       const devicePanel = row.closest(".device");
       if (devicePanel) delete devicePanel.dataset.open;
+      // release the field's focus like the button/switch branches: a
+      // focused field makes the poll skip value refreshes (the panel still
+      // contains the active element), so a QA's updateView changes would
+      // stay stale after the dropdown was touched
+      field.blur();
     };
     const close = (e) => {
       if (!control.contains(e.target)) hide();
@@ -901,7 +914,7 @@ function structureKey(device) {
       // that is a structure change, the dropdown must rebuild
       const live = liveState(device, c);
       return [
-        c.type, c.name, c.action, c.value, c.min, c.max, c.step, c.disabled, c.calls,
+        c.type, c.name, c.action, c.value, c.min, c.max, c.step, c.disabled, c.calls, c.unit,
         live.options !== undefined ? live.options : (c.options || null),
       ];
     })

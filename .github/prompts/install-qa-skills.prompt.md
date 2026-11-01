@@ -124,6 +124,7 @@ Type a slash command in Copilot chat for detailed reference:
 
 - `/quickapp-api` — full fibaro.*, QuickApp methods, net.HTTPClient, timers
 - `/quickapp-types` — all 40+ device types, UI headers, starter templates
+- `/quickapp-ui` — updateView per element, UI event contract, viewer semantics
 - `/quickapp-patterns` — timer loops, refreshStates, HTTP, children, state persistence
 - `/hc3-rest-api` — HC3 REST endpoints with examples
 - `/lua-basics` — Lua language reference for non-Lua developers

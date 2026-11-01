@@ -68,7 +68,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "  flua doctor [--no-network] [--json] health-check this workspace\n"
             "  flua record -o house.json       capture the real HC3's state + "
             "refreshState events\n"
-            "  flua audit [--json]              coverage: HC3 routes and device catalog\n"
+            "  flua audit [--json] [--verbose]  coverage: HC3 routes and device catalog\n"
             "  flua --tool NAME ...                HC3 file tools (uploadQA, downloadQA,"
             " pack, unpack, setup, newQA, ...; a bare --tool lists them)"
         ),

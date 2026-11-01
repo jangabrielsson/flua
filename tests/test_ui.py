@@ -170,6 +170,19 @@ def test_slider_defaults_and_strings() -> None:
     assert ui["uiCallbacks"] == [{"callback": "setLevel", "eventType": "onChanged", "name": "dim"}]
 
 
+def test_slider_unit_flows_through() -> None:
+    # the declared unit rides the uiView component (the viewer renders it
+    # right of the value) and the legacy viewLayout (getView consumers)
+    ui = compile_ui([{"slider": "temp", "text": "Temp", "unit": "\u00b0C"}], 5000)
+    component = ui["uiView"][0]["components"][0]
+    assert component["unit"] == "\u00b0C"
+    legacy = ui["viewLayout"]["$jason"]["body"]["sections"]["items"][0]["components"][0]
+    assert legacy["unit"] == "\u00b0C"
+    # the inverse export keeps it (--tool ui, .fqa round trip)
+    back = ui_to_u_rows(view_layout=ui["viewLayout"], ui_callbacks=ui["uiCallbacks"])
+    assert "unit='\u00b0C'" in back[0]
+
+
 def test_select_with_options() -> None:
     rows = [
         {

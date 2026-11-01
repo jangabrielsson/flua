@@ -498,6 +498,57 @@ async def test_dynamic_load_fqa_rejects_non_package(tmp_path, capsys) -> None:
     assert "cannot open" in out
 
 
+@pytest.mark.asyncio
+async def test_load_sim_device_bundled(capsys) -> None:
+    # _FLUA.loadSimDevice(name): load a simulated device bundled with flua
+    # (shipped in the wheel), drive it with fibaro.call in the same callback,
+    # and get a Lua error for unknown/bad names
+    loader_code = (
+        "setTimeout(function()\n"
+        "  local temp = _FLUA.loadSimDevice('temperatureSensor')\n"
+        "  print('LOADED', temp)\n"
+        "  fibaro.call(temp, 'setValue', 21.5, 'C')  -- delivered via the pump\n"
+        "  local motion = _FLUA.loadSimDevice('motionSensor')\n"
+        "  fibaro.call(motion, 'breach')\n"
+        "  setTimeout(function()\n"
+        "    local dev = api.get('/devices/'..temp)\n"
+        "    print('DEV', dev.type, dev.properties.value, dev.properties.unit)\n"
+        "    local mdev = api.get('/devices/'..motion)\n"
+        "    print('BREACH', mdev.properties.value)\n"
+        "    fibaro.call(motion, 'clearBreach')\n"
+        "    setTimeout(function()\n"
+        "      mdev = api.get('/devices/'..motion)\n"
+        "      print('CLEAR', mdev.properties.value)\n"
+        "      local ok, err = pcall(_FLUA.loadSimDevice, 'noSuchDevice')\n"
+        "      print('ERR', ok, err)\n"
+        "      local ok2, err2 = pcall(_FLUA.loadSimDevice, '../etc/passwd')\n"
+        "      print('ERR2', ok2, err2)\n"
+        "      _FLUA.exit(0)  -- the sim devices' keepalive never drains; end the run\n"
+        "    end, 50)\n"
+        "  end, 50)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(None, loader_code, {}, "loader")
+        await wait_until(lambda: not engine.is_running())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    # the loader is 5000; the sim devices get the next engine-assigned ids
+    assert "LOADED 5001" in out
+    assert "DEV com.fibaro.temperatureSensor 21.5 C" in out
+    # the sensor's value IS the breach state (no separate breached property)
+    assert "BREACH true" in out
+    assert "CLEAR false" in out
+    # unknown names throw (the message lists what is bundled)
+    assert "ERR false loadSimDevice: unknown sim device 'noSuchDevice'" in out
+    assert "temperatureSensor" in out
+    # path traversal is refused
+    assert "ERR2 false loadSimDevice: bad sim device name" in out
+
+
 def test_cli_directive_injection(tmp_path) -> None:
     # -D/--directive injects --%% lines as if appended to every QA's header —
     # testing foreign code without editing it

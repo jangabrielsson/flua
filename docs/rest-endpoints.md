@@ -25,7 +25,8 @@ Notes:
   `/flua/icons/{set}/{file}` — the icon cache channel, `/flua/iconMap` —
   the deviceIcon id→set lookup + per-set file lists for state switching).
 - **`PUT /weather` is a flua extension** — the HC3's weather is
-  provider-owned and read-only; the sim lets a test QA override it.
+  provider-owned and read-only; the sim lets a test QA override it
+  (merging per field; each changed field emits a `WeatherChangedEvent`).
 - The full HC3 surface is much larger than this table (359 endpoints in
   `docs/specs/hc3-api.json`); the sim implements the slice QAs, tools, and
   the viewer actually touch — the rest forwards to the HC3 online.

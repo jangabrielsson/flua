@@ -162,7 +162,7 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
             "value": el["value"],
         }
     if typ == "slider":
-        return {
+        element = {
             "name": name,
             "visible": el.get("visible", True),
             "step": el["step"],
@@ -173,6 +173,9 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
             "text": el["text"],
             "type": "slider",
         }
+        if el.get("unit"):
+            element["unit"] = el["unit"]
+        return element
     # label
     return {
         "name": name,
@@ -351,6 +354,8 @@ def _element(component: dict[str, Any], callbacks: dict[str, dict[str, str]]) ->
             "step": str(component.get("step", "1")),
             "value": str(component.get("value", "0")),
         }
+        if component.get("unit"):
+            element["unit"] = str(component["unit"])
         if events.get("onChanged"):
             element["onChanged"] = events["onChanged"]
     elif typ == "select":

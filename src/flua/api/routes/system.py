@@ -405,32 +405,51 @@ def flua_system_log_delete(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     return None, 204
 
 
-def weather_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    # no weather provider in the sim: stable fake data, HC3-shaped, units
-    # from the configured location; PUT /weather overrides any field (a
-    # flua extension — the HC3's weather is provider-owned)
+def _effective_weather(state: SimState) -> dict[str, Any]:
+    """The simulated weather record: stable fake HC3-shaped data (units
+    from the configured location) with any PUT /weather overrides merged
+    in."""
     weather = {
-        "ConditionCode": 1,
+        "ConditionCode": 30,  # partlyCloudy in the HC3 weather template's code table
         "Humidity": 62.0,
         "Temperature": 12.5,
         "TemperatureUnit": state.location.get("temperatureUnit", "C"),
+        # raw is the provider-style name, Converted the HC3's own condition
+        # vocabulary (the weather QA template's: clear, partlyCloudy, ...)
         "WeatherCondition": "Partly cloudy",
-        "WeatherConditionConverted": "Partly cloudy",
+        "WeatherConditionConverted": "partlyCloudy",
         "Wind": 4.2,
         "WindUnit": state.location.get("windUnit", "km/h"),
     }
     weather.update(state.weather_overrides)
-    return public(weather), 200
+    return weather
+
+
+def weather_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
+    # no weather provider in the sim: stable fake data, HC3-shaped, units
+    # from the configured location; PUT /weather overrides any field (a
+    # flua extension — the HC3's weather is provider-owned)
+    return public(_effective_weather(state)), 200
 
 
 def weather_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     # PUT /weather — flua-only (no HC3 counterpart): a test QA sets the
-    # weather its scene logic reacts to
+    # weather its scene logic reacts to. The PUT merges: only the fields in
+    # the body change, and each actually-changed field emits one
+    # WeatherChangedEvent (change/newValue/oldValue) on the refreshStates
+    # feed — re-PUTting the same value emits nothing.
     if not isinstance(req.body, dict):
         return None, 400
+    weather = _effective_weather(state)
     for key, value in req.body.items():
-        if not isinstance(value, (dict, list)):
-            state.weather_overrides[key] = value
+        if isinstance(value, (dict, list)):
+            continue
+        entry = state.record_weather_changed(key, value, weather.get(key), _now(req))
+        if entry is None:
+            continue
+        state.weather_overrides[key] = value
+        if req.emit is not None:
+            req.emit(messages.refresh_state_event(entry))
     return None, 200
 
 
