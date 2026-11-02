@@ -124,6 +124,9 @@ async def test_docs_channel_serves_packaged_tree(server) -> None:
     assert status == 200 and "flua" in linked.lower()
     status, _, post = await asyncio.to_thread(_http_page, f"{base}/docs/forum/01-hello-flua.html")
     assert status == 200 and "flua" in post.lower()
+    # un-styled posts get the injected theme block (VS Code webviews have no
+    # browser default colors — the variables theme the page to the editor)
+    assert "vscode-editor-background" in post
     status, gheaders, guide = await asyncio.to_thread(_http_page, f"{base}/docs/USAGE.md")
     assert status == 200 and "text/plain" in gheaders["Content-Type"] and "flua" in guide
     # a missing file 404s, and ../ escapes the tree

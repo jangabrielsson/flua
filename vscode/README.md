@@ -20,6 +20,14 @@ packages without unpacking them by hand.
   `QuickApp:onInit`/`selfTest`, or right-click → Flua: Run QA) — starts
   `flua --ui <file>` in the shared flua terminal; `Flua: Run QA with watch`
   adds `--watch` (edit, auto-restart, same terminal).
+- **Interactive CodeLens** (flua.codeLensInteract):
+  - `▶ Call <method>` on every other `QuickApp:<method>` — resolves the
+    running QA by its `--%%name` (starts it if it isn't running), prompts
+    for the method's arguments, and posts the action to the sim.
+  - `▶ button 'B1'` / `▶ slider 's1'` / … on `--%%u:` lines — injects the
+    declared element's UI event (onReleased/onChanged/onToggled, with a
+    value prompt where needed) into the running QA, exactly like the
+    viewer does. Multi-element lines offer a picker.
 - **Open viewer / timeline / docs** — served pages in a VS Code webview:
   starts (or reuses) `flua --ui` on the `flua.viewerPort` port and opens
   the page through VS Code's port mapping; falls back to the system
@@ -105,4 +113,6 @@ executable.
   true) or the flua output channel.
 - `flua.viewerPort` — the port for flua --ui sessions started by Run QA /
   Open viewer / timeline / docs (default 8090; a busy port falls back).
-- `flua.codeLens` — the Run QA / Run selfTest CodeLens links (default true).
+- `flua.codeLens` — the CodeLens links (default true).
+- `flua.codeLensInteract` — the interactive lenses: Call <method> on QA
+  methods and the UI-event lens on `--%%u` lines (default true).

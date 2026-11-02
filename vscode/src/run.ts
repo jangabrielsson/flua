@@ -117,7 +117,237 @@ export async function openFluaPage(kind: "viewer" | "timeline" | "docs"): Promis
   }
 }
 
-/** ▶ Run QA CodeLens on QuickApp:onInit / selfTest lines (flua.codeLens). */
+// -- the running QA (lenses poke it through the sim API) ----------------------
+
+interface RunningDevice {
+  id: number;
+  name: string;
+}
+
+/** The QA's --%%name (the first header token), if declared. */
+async function qaName(document: vscode.TextDocument): Promise<string | undefined> {
+  for (let i = 0; i < Math.min(document.lineCount, 60); i++) {
+    const match = document.lineAt(i).text.match(/^--%%name:\s*(\S+)/);
+    if (match) {
+      return match[1];
+    }
+  }
+  return undefined;
+}
+
+/** The running device with this name (the latest one when several). */
+async function runningDevice(name: string): Promise<RunningDevice | undefined> {
+  try {
+    const res = await fetch(`http://127.0.0.1:${viewerPort()}/flua/devices`);
+    if (!res.ok) {
+      return undefined;
+    }
+    const devices = (await res.json()) as Array<{ id: number; name?: string }>;
+    const matches = devices.filter((d) => d.name === name);
+    return matches.length
+      ? { id: matches[matches.length - 1].id, name }
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The running device for this document; offers to start the QA when the
+ * server has no device of that name. */
+async function ensureQaRunning(
+  document: vscode.TextDocument
+): Promise<RunningDevice | undefined> {
+  const name = await qaName(document);
+  if (!name) {
+    void vscode.window.showWarningMessage(
+      "flua: the QA has no --%%name — add one so it can be found when running"
+    );
+    return undefined;
+  }
+  const existing = await runningDevice(name);
+  if (existing) {
+    return existing;
+  }
+  const action = await vscode.window.showInformationMessage(
+    `flua: "${name}" is not running — start it?`,
+    "Run QA"
+  );
+  if (action !== "Run QA") {
+    return undefined;
+  }
+  runQa(document.uri);
+  for (let attempt = 0; attempt < 40; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const device = await runningDevice(name);
+    if (device) {
+      return device;
+    }
+  }
+  return undefined;
+}
+
+/** "true/false" -> boolean, numbers -> number, everything else a string. */
+function parseArg(text: string): unknown {
+  const trimmed = text.trim();
+  if (trimmed === "true") {
+    return true;
+  }
+  if (trimmed === "false") {
+    return false;
+  }
+  if (trimmed !== "" && !isNaN(Number(trimmed))) {
+    return Number(trimmed);
+  }
+  return trimmed;
+}
+
+/** Prompt for a method's arguments (comma-separated, Lua-literal-ish). */
+async function promptArgs(params: string[]): Promise<unknown[] | undefined> {
+  if (!params.length) {
+    return [];
+  }
+  const input = await vscode.window.showInputBox({
+    prompt: `arguments for ${params.join(", ")} — comma-separated (numbers, true/false, or strings)`,
+    placeHolder: params.join(", "),
+  });
+  if (input === undefined) {
+    return undefined;
+  }
+  return input.split(",").map(parseArg);
+}
+
+/** Call an action method on the running QA: POST /devices/{id}/action/{name}. */
+export async function callAction(
+  uri: vscode.Uri,
+  action: string,
+  params: string[]
+): Promise<void> {
+  const document = await vscode.workspace.openTextDocument(uri);
+  const device = await ensureQaRunning(document);
+  if (!device) {
+    return;
+  }
+  const args = await promptArgs(params);
+  if (args === undefined) {
+    return; // cancelled
+  }
+  try {
+    const res = await fetch(
+      `http://127.0.0.1:${viewerPort()}/devices/${device.id}/action/${encodeURIComponent(action)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ args }),
+      }
+    );
+    void vscode.window.showInformationMessage(
+      `flua: ${action}(${args.map(String).join(", ")}) on ${device.name} → HTTP ${res.status}`
+    );
+  } catch (error) {
+    void vscode.window.showWarningMessage(`flua: call failed: ${String(error)}`);
+  }
+}
+
+interface UiElement {
+  kind: string; // button | switch | slider | select | multi
+  name: string;
+}
+
+const UI_EVENT_TYPES = new Map<string, string>([
+  ["button", "onReleased"],
+  ["switch", "onReleased"],
+  ["slider", "onChanged"],
+  ["select", "onToggled"],
+  ["multi", "onToggled"],
+]);
+
+/** The UI elements declared on a --%%u: line (one or more). */
+function elementsOnLine(line: string): UiElement[] {
+  const elements: UiElement[] = [];
+  for (const match of line.matchAll(/\{(button|switch|slider|select|multi)='([^']+)'/g)) {
+    elements.push({ kind: match[1], name: match[2] });
+  }
+  return elements;
+}
+
+/** Inject a UI event for one element: the same GET the viewer uses. */
+export async function injectUiEvent(
+  uri: vscode.Uri,
+  element?: UiElement,
+  line?: number
+): Promise<void> {
+  const document = await vscode.workspace.openTextDocument(uri);
+  let target = element;
+  if (!target) {
+    const index = typeof line === "number" ? line : 0;
+    const candidates = elementsOnLine(document.lineAt(index).text);
+    if (candidates.length > 1) {
+      const picked = await vscode.window.showQuickPick(
+        candidates.map((e) => `${e.kind} '${e.name}'`),
+        { placeHolder: "which element?" }
+      );
+      target = picked
+        ? candidates.find((e) => `${e.kind} '${e.name}'` === picked)
+        : undefined;
+    } else {
+      target = candidates[0];
+    }
+  }
+  if (!target) {
+    return;
+  }
+  const device = await ensureQaRunning(document);
+  if (!device) {
+    return;
+  }
+  const eventType = UI_EVENT_TYPES.get(target.kind) ?? "onReleased";
+  let value: string | undefined;
+  if (target.kind === "switch") {
+    value = await vscode.window.showInputBox({
+      prompt: `value for ${target.name} (onReleased)`,
+      value: "true",
+    });
+  } else if (target.kind === "slider") {
+    value = await vscode.window.showInputBox({
+      prompt: `value for slider ${target.name} (onChanged)`,
+    });
+  } else if (target.kind === "select") {
+    value = await vscode.window.showInputBox({
+      prompt: `option value for ${target.name} (onToggled)`,
+    });
+  } else if (target.kind === "multi") {
+    value = await vscode.window.showInputBox({
+      prompt: `option values for ${target.name}, comma-separated (onToggled)`,
+    });
+  }
+  if (value === undefined) {
+    return; // cancelled
+  }
+  const query = new URLSearchParams({
+    deviceID: String(device.id),
+    elementName: target.name,
+    eventType,
+  });
+  if (value !== undefined && value !== "") {
+    query.set("value", value);
+  }
+  try {
+    const res = await fetch(
+      `http://127.0.0.1:${viewerPort()}/plugins/callUIEvent?${query.toString()}`
+    );
+    void vscode.window.showInformationMessage(
+      `flua: ${eventType} on ${target.name} (${device.name}) → HTTP ${res.status}`
+    );
+  } catch (error) {
+    void vscode.window.showWarningMessage(`flua: UI event failed: ${String(error)}`);
+  }
+}
+
+// -- CodeLens ----------------------------------------------------------------
+
+/** ▶ lenses: Run QA on onInit/selfTest; Call <action> on every other
+ * QuickApp method; one lens per --%%u: line that injects the declared
+ * element's UI event into the running QA. */
 class FluaCodeLensProvider implements vscode.CodeLensProvider {
   private _onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChangeCodeLenses = this._onDidChange.event;
@@ -130,27 +360,62 @@ class FluaCodeLensProvider implements vscode.CodeLensProvider {
     if (!vscode.workspace.getConfiguration("flua").get<boolean>("codeLens", true)) {
       return [];
     }
+    const interact = vscode.workspace
+      .getConfiguration("flua")
+      .get<boolean>("codeLensInteract", true);
     const lenses: vscode.CodeLens[] = [];
     for (let i = 0; i < document.lineCount; i++) {
-      const match = document.lineAt(i).text.match(/^\s*function\s+QuickApp:(onInit|selfTest)\b/);
-      if (!match) {
+      const line = document.lineAt(i).text;
+      const range = new vscode.Range(i, 0, i, line.length);
+      const method = line.match(/^\s*function\s+QuickApp:(\w+)\s*\(([^)]*)\)/);
+      if (method) {
+        const name = method[1];
+        const params = method[2]
+          .split(",")
+          .map((p) => p.trim().split(/\s/)[0])
+          .filter((p) => p && p !== "self");
+        if (name === "onInit" || name === "selfTest") {
+          lenses.push(
+            new vscode.CodeLens(range, {
+              title: name === "selfTest" ? "▶ Run selfTest" : "▶ Run QA",
+              command: "flua.run",
+              arguments: [document.uri],
+            })
+          );
+        } else if (interact) {
+          lenses.push(
+            new vscode.CodeLens(range, {
+              title: `▶ Call ${name}`,
+              command: "flua.callAction",
+              arguments: [document.uri, name, params],
+            })
+          );
+        }
         continue;
       }
-      const range = new vscode.Range(i, 0, i, document.lineAt(i).text.length);
-      lenses.push(
-        new vscode.CodeLens(range, {
-          title: match[1] === "selfTest" ? "▶ Run selfTest" : "▶ Run QA",
-          command: "flua.run",
-          arguments: [document.uri],
-        })
-      );
+      if (interact && /^\s*--%%u:/.test(line)) {
+        const elements = elementsOnLine(line);
+        if (!elements.length) {
+          continue;
+        }
+        const one = elements.length === 1 ? elements[0] : undefined;
+        lenses.push(
+          new vscode.CodeLens(range, {
+            title: one
+              ? `▶ ${one.kind} '${one.name}'`
+              : `▶ UI events (${elements.length})`,
+            command: "flua.uiEvent",
+            arguments: [document.uri, one, i],
+          })
+        );
+      }
     }
     return lenses;
   }
 }
 
-/** Register the run/watch commands, the served-page webviews, and the
- * CodeLens provider. */
+/** Register the run/watch commands, the served-page webviews, the action/
+ * UI-event lenses and their commands. */
 export function registerRun(context: vscode.ExtensionContext): void {
   const lenses = new FluaCodeLensProvider();
   context.subscriptions.push(
@@ -161,9 +426,20 @@ export function registerRun(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("flua.openViewer", () => void openFluaPage("viewer")),
     vscode.commands.registerCommand("flua.openTimeline", () => void openFluaPage("timeline")),
     vscode.commands.registerCommand("flua.openDocs", () => void openFluaPage("docs")),
+    vscode.commands.registerCommand(
+      "flua.callAction",
+      (uri: vscode.Uri, action: string, params: string[]) =>
+        void callAction(uri, action, params)
+    ),
+    vscode.commands.registerCommand(
+      "flua.uiEvent",
+      (uri: vscode.Uri, element?: UiElement, line?: number) =>
+        void injectUiEvent(uri, element, line)
+    ),
     vscode.languages.registerCodeLensProvider({ language: "lua" }, lenses),
     vscode.workspace.onDidChangeConfiguration((event) => {
-      if (event.affectsConfiguration("flua.codeLens")) {
+      if (event.affectsConfiguration("flua.codeLens") ||
+          event.affectsConfiguration("flua.codeLensInteract")) {
         lenses.refresh();
       }
     })

@@ -56,7 +56,12 @@
         "flua.codeLens": {
           "type": "boolean",
           "default": true,
-          "description": "Show Run QA / Run selfTest CodeLens links on QuickApp:onInit and selfTest."
+          "description": "Show CodeLens links on QuickApp functions and --%%u UI lines."
+        },
+        "flua.codeLensInteract": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the interactive CodeLens links: Call <action> on QuickApp methods and the UI-event lens on --%%u lines (they drive the running QA through the sim API)."
         }
       }
     },
@@ -147,6 +152,14 @@
       {
         "command": "flua.openDocs",
         "title": "Flua: Open docs"
+      },
+      {
+        "command": "flua.callAction",
+        "title": "Flua: Call QA action"
+      },
+      {
+        "command": "flua.uiEvent",
+        "title": "Flua: Inject UI event"
       }
     ],
     "submenus": [

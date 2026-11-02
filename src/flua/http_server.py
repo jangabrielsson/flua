@@ -74,6 +74,18 @@ _DOCS_MIME = {
     ".png": "image/png",
 }
 
+# The theme block prepended to served .html docs: VS Code webviews have no
+# browser default colors, so the docs read the theme's CSS variables — in a
+# plain browser the fallbacks are the ordinary defaults (white/black).
+_DOCS_THEME = (
+    b"<style>"
+    b"body{background:var(--vscode-editor-background,#fff);"
+    b"color:var(--vscode-editor-foreground,#1c1c1c);"
+    b"font-family:var(--vscode-font-family,-apple-system,'Segoe UI',system-ui,sans-serif)}"
+    b"a{color:var(--vscode-textLink-foreground,#06c)}"
+    b"</style>"
+)
+
 
 def _docs_file(subpath: str) -> tuple[bytes, str] | None:
     """Resolve a /docs/<path> request inside the packaged docs tree;
@@ -82,9 +94,17 @@ def _docs_file(subpath: str) -> tuple[bytes, str] | None:
     candidate = (root / subpath).resolve()
     if not candidate.is_relative_to(root) or not candidate.is_file():
         return None
-    return candidate.read_bytes(), _DOCS_MIME.get(
+    content_type = _DOCS_MIME.get(
         candidate.suffix.lower(), "application/octet-stream"
     )
+    body = candidate.read_bytes()
+    if content_type.startswith("text/html") and b"<style" not in body[:4096]:
+        # no page stylesheet: the injected theme block sets the base colors
+        body = _DOCS_THEME + body
+    return body, content_type
+
+
+
 
 
 class ApiServer:

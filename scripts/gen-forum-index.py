@@ -59,13 +59,18 @@ def main() -> int:
 <meta charset="utf-8">
 <title>flua docs</title>
 <style>
-  body {{ font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
-         max-width: 52rem; margin: 2rem auto; padding: 0 1rem; color: #1c2b3a; }}
-  h1 {{ color: #003a70; }}
-  h2 {{ border-bottom: 1px solid #dce6ee; padding-bottom: .3rem; margin-top: 2rem; }}
-  a {{ color: #0a6cff; text-decoration: none; }}
+  /* VS Code webviews have no browser defaults: read the theme's CSS
+     variables, with the ordinary browser palette as fallbacks */
+  body {{ font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a); }}
+  h1 {{ color: var(--vscode-textLink-foreground, #003a70); }}
+  h2 {{ border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+        padding-bottom: .3rem; margin-top: 2rem; }}
+  a {{ color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }}
   li {{ margin: .35rem 0; line-height: 1.4; }}
-  .covers {{ color: #5b6b7a; }}
+  .covers {{ color: var(--vscode-descriptionForeground, #5b6b7a); }}
   ul.refs {{ columns: 2; }}
 </style>
 </head>
