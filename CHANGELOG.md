@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.123] - 2026-11-02
+
+### Added
+- enhance color handling in UI components and add tests for RGB sliders
+
 ## [0.1.122] - 2026-11-02
 
 ### Added
