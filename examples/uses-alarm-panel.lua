@@ -35,7 +35,11 @@ function QuickApp:onInit()
   local polls = 0
   function poll()
     polls = polls + 1
-    if seenArmed or polls >= 100 then
+    -- 300 x 10 ms = 3 s of headroom: the armed transition fires at the
+    -- armDelay (1 s) + event delivery, and on a loaded CI runner the
+    -- 100th poll used to race the deadline exactly (VERDICT just before
+    -- the armed event arrived)
+    if seenArmed or polls >= 300 then
       print("PHASE", seenArming, seenArmed)
       print(seenArming and seenArmed and "VERDICT: all passed" or "VERDICT: failed")
       exit(seenArming and seenArmed and 0 or 1)
