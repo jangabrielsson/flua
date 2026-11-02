@@ -138,7 +138,7 @@ function Event.DevicePropertyUpdatedEvent(event)
 end
 
 function QuickApp:onInit()
-  self:debug("alarmEndpoint initialized")
+  self:debug("alarmEndpoint initialized - under construction")
   local qaAlarms = api.get("/devices?type=com.fibaro.alarmPartition") or {}
   for _, device in ipairs(qaAlarms) do qaPartition(device.id) end
   

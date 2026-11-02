@@ -583,6 +583,35 @@ async def test_load_sim_device_color_controller_no_recursion(capsys) -> None:
     assert "stack overflow" not in out
 
 
+@pytest.mark.asyncio
+async def test_load_sim_device_with_directives(capsys) -> None:
+    # the optional second argument overrides the device's --%% header, like
+    # loadQAfromFile's: rename it and preset properties before it boots
+    loader_code = (
+        "setTimeout(function()\n"
+        "  local t = _FLUA.loadSimDevice('temperatureSensor',\n"
+        "    {'name:Hall temp', 'property:value=21.5', 'property:unit=C'})\n"
+        "  setTimeout(function()\n"
+        "    local dev = api.get('/devices/'..t)\n"
+        "    print('DEV', dev.name, dev.properties.value, dev.properties.unit)\n"
+        "    local ok, err = pcall(_FLUA.loadSimDevice, 'temperatureSensor', 'not-a-table')\n"
+        "    print('BAD', ok, err)\n"
+        "    _FLUA.exit(0)\n"
+        "  end, 50)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(None, loader_code, {}, "loader")
+        await wait_until(lambda: not engine.is_running())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "DEV Hall temp 21.5 C" in out
+    assert "BAD false loadSimDevice: directives must be a table of strings" in out
+
+
 def test_cli_directive_injection(tmp_path) -> None:
     # -D/--directive injects --%% lines as if appended to every QA's header —
     # testing foreign code without editing it

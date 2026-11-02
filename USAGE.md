@@ -1159,6 +1159,11 @@ local temp = _FLUA.loadSimDevice("temperatureSensor")  -- throws on unknown name
 fibaro.call(temp, "setValue", 21.5, "C")
 local motion = _FLUA.loadSimDevice("motionSensor")
 fibaro.call(motion, "breach")
+-- like loadQAfromFile, an optional second argument overrides the device's
+-- --%% header: rename it, preset its properties — one bundled device
+-- becomes any number of distinct devices
+local hall = _FLUA.loadSimDevice("temperatureSensor",
+  { "name:Hall temp", "property:value=21.5", "property:unit=C" })
 ```
 
 The bundled set mirrors the `quickapp-types` device templates
@@ -1672,10 +1677,12 @@ live on `_FLUA` so your code stays portable:
 - `_FLUA.loadFQAfromFile(path, directives?)` — like `loadQAfromFile` for a
   `.fqa` package: unpacks it to a temp dir first (the CLI's pipeline),
   name/type/UI come from the package header
-- `_FLUA.loadSimDevice(name)` — load a simulated device bundled with flua
+- `_FLUA.loadSimDevice(name, directives?)` — load a simulated device bundled with flua
   (`src/flua/simdevices`, shipped in the wheel): the file name without
-  suffix (`.lua` then `.fqa`), e.g. `"temperatureSensor"`. Returns the
-  device id, or throws an error naming the bundled set
+  suffix (`.lua` then `.fqa`), e.g. `"temperatureSensor"`. The optional
+  `directives` table overrides the device's `--%%` header like
+  `loadQAfromFile`'s (rename, preset properties). Returns the device id,
+  or throws an error naming the bundled set
 - `_FLUA.async.run(fn)` / `_FLUA.async.await(worker)` / `_FLUA.async.wait(ms)` — coroutine awaits
 - `_FLUA.millitime()` — virtual time in whole milliseconds (sub-second timing; `os.time()` is whole seconds, `os.clock()` is real CPU time)
 - `_FLUA.postRefreshEvent(event)` — inject a fake refreshStates event

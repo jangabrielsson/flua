@@ -351,8 +351,9 @@ def install_bindings(engine: "LuaEngine") -> None:
         return qa_id, err
 
     # bundled simulated devices (src/flua/simdevices, shipped in the wheel)
-    def load_sim_device(name: str) -> tuple[object, object]:
-        return engine.load_sim_device(name)
+    def load_sim_device(name: str, directives: object = None) -> tuple[object, object]:
+        extra = None if directives is None else lua_to_python(directives)
+        return engine.load_sim_device(name, extra)
 
     # _FLUA.keepAlive(): this QA keeps the run alive until it exits
     def keep_alive(qa_id: object) -> None:

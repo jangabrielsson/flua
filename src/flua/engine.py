@@ -1138,11 +1138,17 @@ class LuaEngine:
         self.track_temp_dir(base)
         return self.load_qa_file(main_path, directives)
 
-    def load_sim_device(self, name: str | None) -> tuple[int | None, str | None]:
+    def load_sim_device(
+        self, name: str | None, directives: list[str] | None = None
+    ) -> tuple[int | None, str | None]:
         """Load a bundled simulated device by its file name (no suffix):
         ``_FLUA.loadSimDevice("temperatureSensor")``. Resolves .lua first,
         then .fqa, inside the simdevices/ directory that ships in the wheel.
-        Returns (qa_id, None) or (None, error) like load_qa_file."""
+        ``directives`` (a table of directive strings, like loadQAfromFile's
+        second argument) is applied as if appended to the device's --%%
+        header — e.g. rename it or preset its properties:
+        {"name:Hall temp", "property:value=21.5", "property:unit=C"}.
+        Returns (qa_id, None) or (None, error)."""
         if (
             not isinstance(name, str)
             or not name
@@ -1153,7 +1159,7 @@ class LuaEngine:
         for suffix in (".lua", ".fqa"):
             path = SIM_DEVICES_DIR / f"{name}{suffix}"
             if path.is_file():
-                return self.load_qa_file(str(path))
+                return self.load_qa_file(str(path), directives)
         available = sorted(
             p.stem for p in SIM_DEVICES_DIR.iterdir() if p.suffix in (".lua", ".fqa")
         )

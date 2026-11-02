@@ -1179,10 +1179,15 @@ end
 -- in the wheel, so pip-only installs have them too):
 --   local temp = _FLUA.loadSimDevice("temperatureSensor")
 --   fibaro.call(temp, "setValue", 21.5, "C")
--- Resolves <name>.lua, then <name>.fqa. Returns the device id, or THROWS
--- an error naming the bundled devices when the name is unknown.
-function _FLUA.loadSimDevice(name)
-  local id, err = _PY.load_sim_device(name)
+-- Resolves <name>.lua, then <name>.fqa. The optional second argument is a
+-- table of directive strings applied as if appended to the device's --%%
+-- header (like loadQAfromFile's): rename it, preset its properties, ...
+--   local t = _FLUA.loadSimDevice("temperatureSensor",
+--     {"name:Hall temp", "property:value=21.5", "property:unit=C"})
+-- Returns the device id, or THROWS an error naming the bundled devices
+-- when the name is unknown.
+function _FLUA.loadSimDevice(name, directives)
+  local id, err = _PY.load_sim_device(name, directives)
   if id then return id end
   error("loadSimDevice: " .. tostring(err), 2)
 end
