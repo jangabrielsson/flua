@@ -64,10 +64,7 @@ def _qa_check(args: dict[str, Any]) -> dict[str, Any]:
     lua = engine.lua_runtime()
     findings: list[dict[str, Any]] = []
     for path in _file_list(args):
-        for line in check_file(path, lua):
-            file, _, rest = line.partition(": ")
-            severity, _, message = rest.partition(": ")
-            findings.append({"file": file, "severity": severity, "message": message})
+        findings += check_file(path, lua)
     return {"ok": not any(f["severity"] == "error" for f in findings), "findings": findings}
 
 

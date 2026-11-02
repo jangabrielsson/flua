@@ -47,6 +47,16 @@
           "type": "boolean",
           "default": true,
           "description": "Offer to run Setup workspace when the workspace has Lua files but no HC3 completion config (.luarc.json/.luals). 'Don't ask again' turns this off."
+        },
+        "flua.viewerPort": {
+          "type": "number",
+          "default": 8090,
+          "description": "The port for flua --ui sessions started by Run QA / Open viewer / timeline / docs. A busy port falls back to the next free one."
+        },
+        "flua.codeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Run QA / Run selfTest CodeLens links on QuickApp:onInit and selfTest."
         }
       }
     },
@@ -117,6 +127,26 @@
       {
         "command": "flua.downloadQa",
         "title": "Flua: Download QA from HC3"
+      },
+      {
+        "command": "flua.run",
+        "title": "Flua: Run QA (--ui)"
+      },
+      {
+        "command": "flua.runWatch",
+        "title": "Flua: Run QA with watch (--ui --watch)"
+      },
+      {
+        "command": "flua.openViewer",
+        "title": "Flua: Open viewer"
+      },
+      {
+        "command": "flua.openTimeline",
+        "title": "Flua: Open timeline"
+      },
+      {
+        "command": "flua.openDocs",
+        "title": "Flua: Open docs"
       }
     ],
     "submenus": [
@@ -126,6 +156,18 @@
       }
     ],
     "menus": {
+      "editor/context": [
+        {
+          "command": "flua.run",
+          "when": "resourceExtname == .lua",
+          "group": "1_run@1"
+        },
+        {
+          "command": "flua.runWatch",
+          "when": "resourceExtname == .lua",
+          "group": "1_run@2"
+        }
+      ],
       "explorer/context": [
         {
           "submenu": "flua.explorer",
@@ -178,6 +220,28 @@
           "command": "flua.check",
           "when": "resourceExtname == .lua",
           "group": "4_check@1"
+        },
+        {
+          "command": "flua.run",
+          "when": "resourceExtname == .lua",
+          "group": "5_run@1"
+        },
+        {
+          "command": "flua.runWatch",
+          "when": "resourceExtname == .lua",
+          "group": "5_run@2"
+        },
+        {
+          "command": "flua.openViewer",
+          "group": "6_view@1"
+        },
+        {
+          "command": "flua.openTimeline",
+          "group": "6_view@2"
+        },
+        {
+          "command": "flua.openDocs",
+          "group": "6_view@3"
         }
       ]
     }

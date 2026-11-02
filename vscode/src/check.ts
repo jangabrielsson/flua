@@ -6,6 +6,8 @@ interface Finding {
   file: string;
   severity: "error" | "warning";
   message: string;
+  line?: number; // 1-based, from flua --check --json
+  column?: number; // 1-based, optional
 }
 
 interface CheckPayload {
@@ -58,11 +60,7 @@ export async function checkDocument(uri: vscode.Uri): Promise<void> {
   const findings = payload.findings ?? [];
   const byFile = new Map<string, vscode.Diagnostic[]>();
   for (const finding of findings) {
-    const line = extractLine(finding.message);
-    const range =
-      line !== undefined
-        ? new vscode.Range(line, 0, line, Number.MAX_SAFE_INTEGER)
-        : new vscode.Range(0, 0, 0, Number.MAX_SAFE_INTEGER);
+    const range = findingRange(finding);
     const diagnostic = new vscode.Diagnostic(
       range,
       finding.message,
@@ -91,6 +89,27 @@ export async function checkDocument(uri: vscode.Uri): Promise<void> {
       `flua: ${basename} has ${findings.length} finding(s) — see the Problems panel`
     );
   }
+}
+
+/** The finding's editor range: the structured line/column (1-based) from
+ * flua's JSON, anchored at the column when present; whole-line otherwise.
+ * Older flua versions embed the line in the message instead — fall back. */
+function findingRange(finding: Finding): vscode.Range {
+  let line: number | undefined;
+  let column: number | undefined;
+  if (typeof finding.line === "number" && finding.line > 0) {
+    line = finding.line - 1;
+    column = typeof finding.column === "number" && finding.column > 0
+      ? finding.column - 1
+      : 0;
+  } else {
+    line = extractLine(finding.message);
+    column = 0;
+  }
+  if (line === undefined) {
+    return new vscode.Range(0, 0, 0, Number.MAX_SAFE_INTEGER);
+  }
+  return new vscode.Range(line, column, line, Number.MAX_SAFE_INTEGER);
 }
 
 /** Lua/lupa error messages embed line numbers ("line 12", "[string ...]:3"). */

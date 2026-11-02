@@ -9,6 +9,11 @@ Three layers, all without running the QA:
 3. Deprecated REST endpoints — a hardcoded list, derived from the API
    reference in docs/specs/hc3-api.json (itself distilled from the official
    swagger; e.g. GET /quickApp/export is deprecated).
+
+Findings are structured dicts — ``{"file", "severity", "message", "line",
+"column"}`` with ``line``/``column`` optional (1-based; None when the
+location is not known, e.g. a directive inherited from an --%%include
+file). ``format_finding`` renders the human-readable form the CLI prints.
 """
 
 from __future__ import annotations
@@ -26,62 +31,144 @@ DEPRECATED_API = [
 ]
 
 
-def check_source(source: str, name: str, lua: Any, base_dir: str | Path = ".") -> list[str]:
-    """Findings for one QA source: "name: error: ..." or "name: warning: ..."."""
-    findings: list[str] = []
+def finding(
+    file: str,
+    severity: str,
+    message: str,
+    line: int | None = None,
+    column: int | None = None,
+) -> dict[str, Any]:
+    """One structured finding (line/column omitted from JSON when unknown)."""
+    entry: dict[str, Any] = {"file": file, "severity": severity, "message": message}
+    if line is not None:
+        entry["line"] = line
+    if column is not None:
+        entry["column"] = column
+    return entry
+
+
+def format_finding(entry: dict[str, Any]) -> str:
+    """The human-readable CLI line: ``file: severity: message``."""
+    return f"{entry['file']}: {entry['severity']}: {entry['message']}"
+
+
+def _line_col(source: str, offset: int) -> tuple[int, int]:
+    """1-based (line, column) for a character offset into source."""
+    line = source.count("\n", 0, offset) + 1
+    column = offset - source.rfind("\n", 0, offset)
+    return line, column
+
+
+def _directive_location(source: str, key: str) -> tuple[int, int] | None:
+    """The first occurrence of ``--%%key`` in source, or None (the key may
+    come from an --%%include file the source only references)."""
+    match = re.search(rf"^--%%{re.escape(key)}\b", source, re.MULTILINE)
+    return _line_col(source, match.start()) if match else None
+
+
+def _syntax_location(message: str) -> tuple[int | None, str]:
+    """Lua syntax errors read ``name:LINE: message`` — split that apart."""
+    match = re.search(r":(\d+):\s*", message)
+    if match:
+        return int(match.group(1)), message[match.end() :]
+    return None, message
+
+
+def check_source(
+    source: str, name: str, lua: Any, base_dir: str | Path = "."
+) -> list[dict[str, Any]]:
+    """Structured findings for one QA source (see the module docstring)."""
+    findings: list[dict[str, Any]] = []
     try:
         lua.compile(source, f"@{name}")  # compile-only: syntax validation
     except Exception as exc:
-        findings.append(f"{name}: error: syntax: {exc}")
+        line, detail = _syntax_location(str(exc))
+        findings.append(finding(name, "error", f"syntax: {detail}", line))
         return findings
     try:
         annotations = expand_includes(
             parse_annotations(source, warn_unknown=False), base_dir
         )
     except ValueError as exc:
-        findings.append(f"{name}: error: {exc}")
+        findings.append(finding(name, "error", str(exc)))
         return findings
     for key in annotations:
         if key not in ("varPkg", "svarPkg") and key not in KNOWN_DIRECTIVES:
-            findings.append(f"{name}: warning: unknown directive --%%{key}")
+            loc = _directive_location(source, key)
+            findings.append(
+                finding(
+                    name,
+                    "warning",
+                    f"unknown directive --%%{key}",
+                    *loc if loc else (None, None),
+                )
+            )
     both = set(annotations.get("var") or {}) & set(annotations.get("svar") or {})
     for var_name in sorted(both):
+        loc = re.search(
+            rf"^--%%var:\s*{re.escape(var_name)}\s*=", source, re.MULTILINE
+        )
         findings.append(
-            f"{name}: warning: both --%%var and --%%svar declare '{var_name}'"
-            " — the secret (--%%svar) wins"
+            finding(
+                name,
+                "warning",
+                f"both --%%var and --%%svar declare '{var_name}'"
+                " — the secret (--%%svar) wins",
+                *_line_col(source, loc.start()) if loc else (None, None),
+            )
         )
     # plua-era spelling: a space between the comment dashes and %%. flua's
     # parser only matches "--%%" with no space, so these lines are silently
     # ignored — say so, it is almost always a stale plua directive.
     for match in re.finditer(r"--\s+%%\s*(\S*)", source):
+        line, column = _line_col(source, match.start())
         findings.append(
-            f"{name}: warning: plua-style directive spelling (space before %%): "
-            f"line {source[:match.start()].count(chr(10)) + 1} — flua parses '--%%' "
-            "with no space; this line is ignored"
+            finding(
+                name,
+                "warning",
+                "plua-style directive spelling (space before %%): "
+                f"line {line} — flua parses '--%%' with no space; this line is ignored",
+                line,
+                column,
+            )
         )
     # even older spelling: "--%%name=value" (the pre-plua '=' syntax) is
     # ACCEPTED by the parser — say so, but nudge toward the colon form.
     for match in re.finditer(r"^--%%([A-Za-z_][A-Za-z0-9_-]*)=", source, re.MULTILINE):
         directive = match.group(1)
+        line, column = _line_col(source, match.start())
         findings.append(
-            f"{name}: warning: legacy directive spelling (--%%{directive}=...): "
-            f"line {source[:match.start()].count(chr(10)) + 1} — accepted for "
-            f"compatibility; respell as '--%%{directive}:...'"
+            finding(
+                name,
+                "warning",
+                f"legacy directive spelling (--%%{directive}=...): "
+                f"line {line} — accepted for compatibility; respell as "
+                f"'--%%{directive}:...'",
+                line,
+                column,
+            )
         )
     for method, prefix, advice in DEPRECATED_API:
         pattern = rf"api\.{method.lower()}\s*\(\s*['\"]({re.escape(prefix)}[^'\"]*)['\"]"
         for match in re.finditer(pattern, source):
+            line, column = _line_col(source, match.start())
             findings.append(
-                f"{name}: warning: deprecated API: {method} {match.group(1)} — {advice}"
+                finding(
+                    name,
+                    "warning",
+                    f"deprecated API: {method} {match.group(1)} — {advice}",
+                    line,
+                    column,
+                )
             )
     return findings
 
 
-def check_file(path: str, lua: Any) -> list[str]:
-    """Findings for one QA project: the main file plus every ``--%%file``
-    include, each with its own file context. A missing include is an error
-    (like the runtime's load); ``$name`` entries resolve to flua's bundled
-    libraries (src/flua/lua/lib)."""
+def check_file(path: str, lua: Any) -> list[dict[str, Any]]:
+    """Structured findings for one QA project: the main file plus every
+    ``--%%file`` include, each with its own file context. A missing include
+    is an error (like the runtime's load); ``$name`` entries resolve to
+    flua's bundled libraries (src/flua/lua/lib)."""
     source = Path(path).read_text(encoding="utf-8")
     base = Path(path).parent
     findings = check_source(source, path, lua, base)
@@ -106,7 +193,15 @@ def check_file(path: str, lua: Any) -> list[str]:
         if raw.startswith("$"):
             lib_name = raw[1:].lstrip("/")
             if Path(lib_name).name != lib_name or lib_name in ("", ".", ".."):
-                findings.append(f"{path}: error: --%%file:{raw},{name}: bad library name")
+                loc = re.search(rf"--%%file:\s*\$\s*{re.escape(lib_name)}", source)
+                findings.append(
+                    finding(
+                        path,
+                        "error",
+                        f"--%%file:{raw},{name}: bad library name",
+                        *_line_col(source, loc.start()) if loc else (None, None),
+                    )
+                )
                 continue
             target = bundled / lib_name
         else:
@@ -117,7 +212,15 @@ def check_file(path: str, lua: Any) -> list[str]:
                 # --%%file:path:name is the legacy plua spelling — flua reads
                 # path,name, so the whole value became the path
                 hint = " — legacy --%%file:path:name spelling? flua expects --%%file:path,name"
-            findings.append(f"{path}: error: --%%file:{raw},{name}: no such file: {target}{hint}")
+            loc = re.search(rf"--%%file:\s*{re.escape(raw)}", source)
+            findings.append(
+                finding(
+                    path,
+                    "error",
+                    f"--%%file:{raw},{name}: no such file: {target}{hint}",
+                    *_line_col(source, loc.start()) if loc else (None, None),
+                )
+            )
             continue
         resolved = target.resolve()
         if resolved in seen:

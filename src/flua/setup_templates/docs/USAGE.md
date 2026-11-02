@@ -1434,8 +1434,9 @@ Warnings don't fail the run; syntax errors exit 1. Good in CI. It checks the
 **whole project**: the main file plus every `--%%file` include (a missing
 include is an error, and `$name` entries resolve to flua's bundled
 libraries). `--check --json` prints the findings as one JSON document
-(`{"ok", "findings": [{file, severity, message}]}`) instead of prose — the
-agent/CI form.
+(`{"ok", "findings": [{file, severity, message, line?, column?}]}` — the
+1-based `line`/`column` anchor each finding in the source, for editor
+diagnostics) instead of prose — the agent/CI form.
 
 A wrong `--%%type` is an error with directions: it names close matches
 (typos) and points at `flua --tool catalog`, which lists every device type

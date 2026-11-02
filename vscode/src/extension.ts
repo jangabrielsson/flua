@@ -4,9 +4,11 @@ import { checkDocument, registerCheckDiagnostics } from "./check";
 import { execFlua, fluaExecutable, runFluaTool } from "./flua";
 import { FqaEditorProvider } from "./fqaEditor";
 import { registerMcp, unregisterMcp } from "./mcp";
+import { registerRun } from "./run";
 
 export function activate(context: vscode.ExtensionContext) {
   registerCheckDiagnostics(context);
+  registerRun(context);
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider(
       FqaEditorProvider.viewType,

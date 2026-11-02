@@ -16,6 +16,14 @@ packages without unpacking them by hand.
 
 ## Features
 
+- **Run QA** (`▶ Run QA` / `▶ Run selfTest` CodeLens on
+  `QuickApp:onInit`/`selfTest`, or right-click → Flua: Run QA) — starts
+  `flua --ui <file>` in the shared flua terminal; `Flua: Run QA with watch`
+  adds `--watch` (edit, auto-restart, same terminal).
+- **Open viewer / timeline / docs** — served pages in a VS Code webview:
+  starts (or reuses) `flua --ui` on the `flua.viewerPort` port and opens
+  the page through VS Code's port mapping; falls back to the system
+  browser where webviews cannot load it.
 - **Explorer context menu → flua** (right-click a file):
   - `Pack QA into .fqa` (`.lua`) — `flua --tool pack`
   - `Unpack .fqa into project` (`.fqa`) — `flua --tool unpack`
@@ -27,8 +35,9 @@ packages without unpacking them by hand.
   - `Setup workspace` — `flua --tool setup`
 - **Check on save**: saving a `.lua` file runs `flua --check --json`; syntax
   errors, unknown `--%%` directives, plua-style directive typos, and
-  deprecated REST endpoints appear in the Problems panel (findings for
-  `--%%file` includes land on those files).
+  deprecated REST endpoints appear in the Problems panel with their
+  editor ranges (the findings carry line/column; findings for `--%%file`
+  includes land on those files).
 - **Onboarding nudge**: a workspace with Lua files but no HC3 completion
   config (`.luarc.json`/`.luals`) gets a one-time offer to run Setup
   workspace (`flua.setupNudge` turns it off).
@@ -94,3 +103,6 @@ executable.
 - `flua.executable` — path to flua; empty = auto-detect.
 - `flua.runToolsInTerminal` — run tools in the integrated terminal (default
   true) or the flua output channel.
+- `flua.viewerPort` — the port for flua --ui sessions started by Run QA /
+  Open viewer / timeline / docs (default 8090; a busy port falls back).
+- `flua.codeLens` — the Run QA / Run selfTest CodeLens links (default true).

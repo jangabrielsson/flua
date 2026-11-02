@@ -55,7 +55,7 @@ def test_luals_library_files_parse() -> None:
     lua = engine.lua_runtime()
     for path in sorted((REPO / ".luals").glob("*.lua")):
         findings = check_source(path.read_text(encoding="utf-8"), path.name, lua)
-        errors = [f for f in findings if ": error:" in f]
+        errors = [f for f in findings if f["severity"] == "error"]
         assert not errors, f"{path.name}: {errors}"
 
 
@@ -64,7 +64,7 @@ def test_all_templates_pass_check() -> None:
     lua = engine.lua_runtime()
     for path in sorted(TEMPLATES.glob("*.lua")):
         findings = check_source(path.read_text(encoding="utf-8"), path.name, lua)
-        errors = [f for f in findings if ": error:" in f]
+        errors = [f for f in findings if f["severity"] == "error"]
         assert not errors, f"{path.name}: {errors}"
 
 

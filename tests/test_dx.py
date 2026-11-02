@@ -160,6 +160,30 @@ def test_check_json_output() -> None:
         assert payload["findings"][0]["severity"] == "error"
         assert "syntax" in payload["findings"][0]["message"]
         assert payload["findings"][0]["file"] == str(bad.resolve())
+        # the unclosed paren is reported at the EOF line (2: line 1 + newline)
+        assert payload["findings"][0]["line"] == 2  # the editor's squiggle anchor
+
+
+def test_check_json_findings_carry_locations() -> None:
+    # structured findings map into editor ranges: warnings pin the line and
+    # column of the offending directive/call
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        script = Path(d) / "warn.lua"
+        script.write_text(
+            "--%%name:x\n"
+            "--%%instnat:true\n"
+            "print('ok')\n"
+            "api.get('/quickApp/export/5000')\n"
+        )
+        result = _run("--check", "--json", str(script))
+        assert result.returncode == 0
+        payload = json.loads(result.stdout)
+        unknown = next(f for f in payload["findings"] if "unknown directive" in f["message"])
+        assert unknown["line"] == 2 and unknown["column"] == 1
+        deprecated = next(f for f in payload["findings"] if "deprecated API" in f["message"])
+        assert deprecated["line"] == 4 and deprecated["column"] == 1
 
 
 def test_check_follows_file_includes() -> None:

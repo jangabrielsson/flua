@@ -840,11 +840,11 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
 
 def _check_cli(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     """Static checks for every QA file / -e code; exit 1 only on errors."""
-    from .check import check_file, check_source
+    from .check import check_file, check_source, format_finding
 
     engine = LuaEngine()
     lua = engine.lua_runtime()
-    findings: list[str] = []
+    findings: list[dict[str, Any]] = []
     unpack_dirs: list[str] = []
     if args.code is not None:
         findings += check_source(args.code, "<command line>", lua)
@@ -862,20 +862,15 @@ def _check_cli(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         with contextlib.suppress(OSError):
             shutil.rmtree(directory, ignore_errors=True)
     if args.json:
-        parsed = []
-        for line in findings:
-            file, _, rest = line.partition(": ")
-            severity, _, message = rest.partition(": ")
-            parsed.append({"file": file, "severity": severity, "message": message})
-        payload = {"ok": not any(f["severity"] == "error" for f in parsed), "findings": parsed}
+        payload = {"ok": not any(f["severity"] == "error" for f in findings), "findings": findings}
         print(json.dumps(payload))
         return 0 if payload["ok"] else 1
     if not findings:
         print("ok")
         return 0
-    for line in findings:
-        print(line)
-    return 1 if any(": error:" in line for line in findings) else 0
+    for entry in findings:
+        print(format_finding(entry))
+    return 1 if any(f["severity"] == "error" for f in findings) else 0
 
 
 def _export_cli(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
