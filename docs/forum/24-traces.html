@@ -1,0 +1,46 @@
+<h2>Traces your agent can read</h2>
+
+<p>Post 16 gave agents the MCP server. But sometimes the agent isn't
+driving — it's <i>reading</i>: you hand it a trace of what the QA did and
+ask why the lamp never turned on. flua's structured traces are made for
+that, and since the last posts they're declarable as directives — in the
+QA header, in an include, or in <code>.flua-directives</code>.</p>
+
+<p><code>--%%trace</code> selects categories (api, ui, net, timer, or
+all); <code>--%%syslog</code> picks the file. One JSON line per event —
+lifecycle events plus every trace:</p>
+
+<pre>
+-- .flua-directives
+--%%trace:api
+--%%syslog:trace.json
+</pre>
+
+<pre>
+.venv/bin/flua qa.lua
+cat trace.json
+# {"event": "run_start", "qa": null, "code": 0, "detail": ""}
+# {"event": "trace", "qa": 5000, "tag": "traced5000",
+#  "detail": "method=GET, url=/devices?parentId=5000, status=200",
+#  "data": {"category": "api", "method": "GET", "url": "/devices?parentId=5000", "status": 200}}
+# ...
+</pre>
+
+<p>That <code>data</code> field is the machine-readable part: category,
+method, URL, status — no prose to parse. Trace bodies are truncated at
+1000 characters (they may carry secrets), and the same stream feeds
+<code>/flua/systemLog</code> and the MCP server's system events. An agent
+gets one self-describing timeline: what booted, what it called, what
+answered.</p>
+
+<p>Declaring the trace in the QA's directory means every run — F5, the
+test runner, a replay — produces the same artifact, with no flags to
+remember. The CLI flags (<code>--trace</code>, <code>--syslog</code>)
+still win when you want a one-off.</p>
+
+<p>This closes the series — from foreign QAs to traces, everything grew
+out of one idea: the QA file is the source of truth, and the laptop is
+where you test it.</p>
+
+<p><small>--%%trace/--%%syslog: USAGE.md · pip: fibaro-flua 0.1.83 ·
+flua: https://github.com/jangabrielsson/flua</small></p>

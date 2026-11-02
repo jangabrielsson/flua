@@ -1,0 +1,69 @@
+<h2>Developing QuickApps with AI agents — and a tool that makes it fast</h2>
+
+<p>Many of you who code your own QuickApps (or modify existing open-source
+ones) have probably realized by now that a coding agent can help a lot —
+GitHub Copilot, Claude, ChatGPT, DeepSeek, or whichever AI coding service
+you use.</p>
+
+<p>When I first tried it, about two years ago, it was hit and miss.
+Sometimes the code was fine, sometimes it was not. I saw particular issues
+with Lua — probably because Lua is not the biggest language on GitHub, and
+the agents were mostly trained on the more popular languages like
+JavaScript and Python.</p>
+
+<p>By now, in 2026, the Lua code agents produce is quite good. As an old
+university teacher of programming methodology, I do not have much to
+complain about. What is missing is two things: the <b>domain knowledge</b>
+to code QuickApps for the Fibaro system, and a <b>fast code → verify
+loop</b> to arrive at a correct solution.</p>
+
+<h3>Give the agent the domain knowledge</h3>
+
+<p>Some of it has crept into today's agents already: even without any
+guidance they know roughly how a QA should be coded, so they must have
+trained on the QA/Lua code that is out there. But with some added
+<code>SKILL.md</code> documents outlining specific techniques, issues and
+gotchas for QuickApps — together with <code>AGENTS.md</code> directives for
+QA development — the output from the agent can be very good:</p>
+
+<pre>
+"Please code a Philips Hue QA for me — the credentials are in my .env
+file, and here is a link to the new V3 Hue protocol. Outline a plan for
+how to do it, and create a minimal viable QA to test it."
+</pre>
+
+<p>A prompt like this gets you very far — if the agent has been given the
+right skills and tools.</p>
+
+<h3>…and speaking of tools</h3>
+
+<p>An excellent tool for the agent is my flua QA emulator. flua is a Lua
+engine — a bundled Lua interpreter with a command-line interface — with a
+<b>built-in emulation of an HC3</b>. Feed it a QA file and the QA runs
+offline:</p>
+
+<pre>
+flua --api local --instant hello_hue.lua
+</pre>
+
+<p>This runs flua against the simulated HC3, fires all timers faster than
+real time (while keeping a virtual clock), and emulates the QA
+<code>hello_hue.lua</code>. Exactly what the agent needs: the
+coding→testing cycle should not involve the real HC3 — your family will
+not appreciate the lights going wild while the agent iterates.</p>
+
+<p>And the agent does not just write the code — it <i>verifies</i> it, in
+a loop, against the emulator, without a controller anywhere in the loop.
+That is what makes the partnership fast.</p>
+
+<h3>To sum up</h3>
+
+<p>AI coding is here to stay, it is getting increasingly good at making
+QuickApps — and with tools like flua the process is becoming even more
+agent-friendly and streamlined. Give your agent the skills, an
+<code>AGENTS.md</code> (<code>flua --tool setup</code> does just that), and flua, and you have a coding partner that both
+writes and verifies the code.</p>
+
+<p><small>flua: https://github.com/jangabrielsson/flua — QuickApp emulator
+for offline development. I am also posting a tutorial series here on the
+forum, from your first QA to agent-driven development.</small></p>

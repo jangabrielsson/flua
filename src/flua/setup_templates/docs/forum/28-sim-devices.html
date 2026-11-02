@@ -1,0 +1,104 @@
+<h2>Your house, simulated: 30 device types, one call each</h2>
+
+<p>Here is the classic testing gap: your QuickApp reacts to <i>other</i>
+devices — a scene fires on motion, a climate QA follows a temperature
+sensor, an alarm panel arms on a door sensor. To test that logic you need
+the devices around your QA. Until now you stubbed them by hand. Not
+anymore: flua ships <b>simulated devices</b> — 30 device types, bundled in
+the package (a pip install is enough), loaded with one call.</p>
+
+<pre>
+local temp = _FLUA.loadSimDevice("temperatureSensor")  -- returns the device id
+fibaro.call(temp, "setValue", 21.5, "C")               -- the house warms up
+</pre>
+
+<p>The whole contract fits in one QA:</p>
+
+<pre>
+--%%name:HouseCheck
+--%%type:com.fibaro.genericDevice
+function QuickApp:onInit()
+  -- the house: two devices, loaded by name — bundled with flua
+  local temp = _FLUA.loadSimDevice("temperatureSensor")
+  local motion = _FLUA.loadSimDevice("motionSensor")
+  self:debug("sim devices:", temp, motion)
+
+  -- a reacting QA: it watches the house like a real scene would
+  local events = RefreshStateSubscriber()
+  events:subscribe(
+    function(event) return event.type == "DevicePropertyUpdatedEvent" end,
+    function(event)
+      self:debug("change:", json.encode(event.data))
+    end)
+  events:run()
+
+  -- drive the devices — exactly like the HC3 UI or a scene would
+  fibaro.call(temp, "setValue", 21.5, "C")
+  fibaro.call(motion, "breach")
+  fibaro.call(motion, "clearBreach")
+
+  setTimeout(function()
+    local dev = api.get("/devices/"..temp)
+    self:debug("temp is now", dev.properties.value, dev.properties.unit)
+    _FLUA.exit(0)   -- the sim devices stay up; end the run ourselves
+  end, 300)
+end
+</pre>
+
+<p>Run it and watch the subscriber follow every change — three
+<code>DevicePropertyUpdatedEvent</code>s, exactly as a real device would
+post them. Your scenes and reacting QAs get the genuine event flow,
+offline, on your laptop.</p>
+
+<h3>One vocabulary for every type</h3>
+
+<p>The bundled set mirrors the QuickApp device templates — and every sim
+device answers a uniform, <code>fibaro.call</code>-able API:</p>
+
+<ul>
+<li><b>Value sensors</b> (temperature, humidity, light, rain, wind, energy,
+power, …): <code>setValue(value, unit?)</code> and
+<code>setUnit(unit)</code>.</li>
+<li><b>Breach sensors</b> (motion, door, window, smoke, flood, fire, …):
+<code>setValue(bool)</code>, <code>breach()</code>,
+<code>clearBreach()</code>. The sensor's <code>value</code> <i>is</i> the
+breach state — the HC3 contract, no extra property.</li>
+<li><b>Switches and controllers</b>: <code>turnOn</code>/<code>turnOff</code>/
+<code>setValue</code>, plus their stock actions —
+<code>arm</code>/<code>disarm</code>/<code>setArmed</code> for the alarm
+partition, <code>setThermostatMode</code>/<code>setHeatingThermostatSetpoint</code>
+for the HVAC trio, <code>setColor</code> for the color controller,
+<code>play</code>/<code>pause</code>/<code>setVolume</code> for the player,
+<code>emitCentralSceneEvent</code> for the remote.</li>
+</ul>
+
+<p>Unknown name? <code>loadSimDevice</code> throws an error that lists
+every bundled device — discoverability built in. And because the devices
+live inside flua, there is nothing to download, unpack, or configure.</p>
+
+<h3>They look real in the viewer too</h3>
+
+<p>Start any run with <code>--ui</code> and the sim devices appear as
+normal panels: ARMED/DISARMED on the alarm partition, colored TRUE/FALSE
+on breach sensors, live readings with their units on value sensors, the
+transport state on the player, the condition on the weather device. The
+types that have controls (switches, player, climate, color) can be driven
+straight from the panel while your QA reacts.</p>
+
+<h3>The weather, programmable</h3>
+
+<p>Want the <i>house</i> weather instead of one device? The weather
+simulator QA (<code>weatherMgr</code>) drives the
+simulated <code>/weather</code> endpoint — condition, temperature,
+humidity, wind — and every change posts a
+<code>WeatherChangedEvent</code> on the refreshStates feed. Combine it
+with the climate QA you are testing and you have a whole season on
+demand.</p>
+
+<p>Sim devices keep the run alive for as long as they exist (no more
+<code>setInterval(function() end, 3600000)</code> hacks — that is
+<code>_FLUA.keepAlive()</code> now, and they call it themselves), so a
+test run ends with <code>_FLUA.exit(0)</code> when you say so.</p>
+
+<p>Next up: the house gets a custom REST surface — registered endpoints
+your QAs (and your tools) can call.</p>

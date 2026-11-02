@@ -1,0 +1,80 @@
+<h2>The flua VS Code extension</h2>
+
+<p>Everything flua does on the command line now has a home in the editor:
+install <b>flua</b> from the VS Code marketplace
+(<code>GsonSoft-development.flua</code>) and the explorer grows a flua
+menu — pack a QA into a <code>.fqa</code>, unpack one into a project,
+upload files or whole QAs to the HC3, scaffold from the 30 type templates,
+run Setup, and register the flua-mcp server with Copilot. Saving a
+<code>.lua</code> file runs <code>flua --check</code> into the Problems
+panel. And <code>.fqa</code> packages stop being raw JSON: they open in a
+viewer with the package's name, type, interfaces, variables, and a
+syntax-highlighted preview per file.</p>
+
+<p>Underneath, the extension only shells out to the <code>flua</code>
+executable — it auto-detects your workspace's <code>.venv/bin/flua</code>
+(or takes the <code>flua.executable</code> setting). So everything in this
+post also works from the terminal; that is where the naming story starts.</p>
+
+<h3>Packages named after the QA, not the file</h3>
+
+<p><code>--tool pack</code> and <code>flua export</code> now name the
+output after the QA's <code>--%%name</code> — <code>MyQA.fqa</code> when
+there is no name — instead of blindly copying the file name. A QA called
+"Hall lamp" packs like this:</p>
+
+<pre>
+-- hall.lua
+--%%name:Hall lamp
+--%%file:lib.lua,lib
+print(LIB)
+</pre>
+
+<pre>
+# lib.lua
+LIB = "ok"
+</pre>
+
+<pre>
+.venv/bin/flua --tool pack hall.lua
+# packed Hall lamp (2 files) to Hall_lamp.fqa
+</pre>
+
+<h3>Unpacking keeps the naming symmetric</h3>
+
+<p>Downloaded QAs were always named <code>&lt;QA&gt;_&lt;file&gt;_&lt;id&gt;.lua</code>
+so several QAs can share a directory and the HC3 id rides along. Plain
+unpacking now follows the same pattern, minus the id:</p>
+
+<pre>
+.venv/bin/flua --tool unpack Hall_lamp.fqa -d project
+# unpacked to project/ (main: project/Hall_lamp_main.lua)
+
+ls project/
+# Hall_lamp_lib.lua   Hall_lamp_main.lua
+</pre>
+
+<p>The unpacked project runs like any other — the generated header points
+<code>--%%file</code> at the renamed files, so nothing needs fixing:</p>
+
+<pre>
+.venv/bin/flua project/Hall_lamp_main.lua
+# [Hall lamp5000]: ok
+</pre>
+
+<p>In the editor, the same tools hang off the explorer's flua submenu:
+right-click <code>hall.lua</code> → Pack QA into .fqa; right-click the
+<code>.fqa</code> → Unpack into project or Upload as new QA. The
+<code>.fqa</code> viewer shows the metadata block — name, type,
+interfaces, the variables, one line each — and every file's Lua preview.
+The identity properties you declare (<code>--%%manufacturer</code>,
+<code>--%%model</code>, <code>--%%build</code>, <code>--%%uid</code>,
+<code>deviceRole</code>) now travel in packages, so a round-trip pack →
+upload → download keeps them.</p>
+
+<p>Next time: your QuickApp gets a test suite — <code>flua test</code>
+runs <code>*_test.lua</code> files with timeouts and a PASS/FAIL report.</p>
+
+<p><small>Extension: GsonSoft-development.flua on the marketplace ·
+vscode/README.md · pip: fibaro-flua 0.1.83 ·
+flua: https://github.com/jangabrielsson/flua</small></p>

@@ -1,0 +1,90 @@
+<h2>Give the simulated HC3 its own REST surface</h2>
+
+<p>The HC3's API has 359 endpoints. flua implements the slice your QAs
+actually touch; the rest forwards to a real controller in online mode.
+But sometimes you want a <i>missing</i> endpoint to exist in the offline
+sim — a panel the HC3 has no route for, a sprinkler service, the alarm
+partition logic. Now you can register it yourself, from Lua:</p>
+
+<pre>
+api.registerEndpoint("GET", "/panels/sprinklers/{id}", function(req)
+  return { id = tonumber(req.params.id), name = "Sprinklers " .. req.params.id }, 200
+end)
+</pre>
+
+<p>The handler returns <code>(data, status)</code> like any REST route, and
+from then on <b>every QA in the run</b> reaches it with plain
+<code>api.get</code> — no special client, no mocking framework. The whole
+pattern is two small files:</p>
+
+<pre>
+-- mock-panels.lua — the emulation module (require() it from any QA)
+local M = {}
+
+api.registerEndpoint("GET", "/panels/sprinklers/{id}", function(req)
+  -- {id} params are strings; the query arrives parsed, e.g. {zone={"2"}}
+  return { id = tonumber(req.params.id), name = "Sprinklers " .. req.params.id }, 200
+end)
+
+api.registerEndpoint("POST", "/panels/sprinklers/{id}/actions/run", function(req)
+  _FLUA.postRefreshEvent{
+    type = "DevicePropertyUpdatedEvent",
+    data = { id = 900001, property = "state", newValue = "running" },
+  }
+  return { started = true, minutes = req.body and req.body.minutes or 5 }, 200
+end)
+
+return M
+
+-- uses-mock-panels.lua — a consumer QA (run: flua --api local examples/uses-mock-panels.lua)
+function QuickApp:onInit()
+  require("mock-panels")
+  setTimeout(function()
+    local panel, s = api.get("/panels/sprinklers/7?zone=2")
+    print("GET", s, json.encode(panel))
+    local run, s2 = api.post("/panels/sprinklers/7/actions/run", { minutes = 10 })
+    print("POST", s2, json.encode(run))
+    local ok = s == 200 and panel.name == "Sprinklers 7" and s2 == 200 and run.started == true
+    print(ok and "VERDICT: all passed" or "VERDICT: failed")
+    exit(ok and 0 or 1)
+  end, 20)
+end
+</pre>
+
+<pre>
+GET 200 {"id":7,"name":"Sprinklers 7"}
+POST 200 {"minutes":10,"started":true}
+VERDICT: all passed
+</pre>
+
+<h3>The rules, in one breath</h3>
+
+<ul>
+<li>The handler runs as a QA callback on the pump — the full api surface
+works inside it (<code>setTimeout</code> for delayed state transitions,
+<code>_FLUA.postRefreshEvent</code> for events your subscribers see).</li>
+<li><code>req</code> is <code>{method, path, params, query, body}</code> —
+<code>{name}</code> segments become params, the query arrives parsed.</li>
+<li>Built-in routes win over registered ones; <code>override=true</code>
+inverts that, so you can prototype the <i>real</i> behavior of an existing
+endpoint in Lua — arming delays, state machines — before promoting it to
+a Python built-in once the contract is understood.</li>
+<li>A crashed handler answers 500; a handler calling its own endpoint gets
+404 (no recursion). Routes die with the QA — a restart's onInit
+re-registers them.</li>
+</ul>
+
+<p>The repo ships both flavors as examples:
+<code>examples/mock-panels.lua</code> (additive endpoints) and the alarm
+loop — <code>examples/alarm-logic.lua</code> overrides the built-in alarm
+partition endpoints with exit-delay arming and refreshState events, an
+<code>examples/alarm-panel.lua</code> QA carries the arm/disarm UI, and
+<code>examples/uses-alarm-panel.lua</code> consumes it.</p>
+
+<p>And the weather simulator from the last post is the same idea one level
+up: a QA whose endpoints <i>and</i> events make the whole
+<code>/weather</code> surface come alive, so your climate QAs get a
+forecast to react to.</p>
+
+<p>Next up: packaging those endpoints as QuickApps — emulation you can
+distribute like any other QA.</p>

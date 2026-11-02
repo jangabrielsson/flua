@@ -404,7 +404,7 @@ def _load_qas(
                 local_params["initialInterfaces"] = list(interfaces)
         global_config.update(global_params)  # last file wins
         specs.append((str(path.resolve()), None, local_params))
-    if not specs:
+    if not specs and not args.ui:
         parser.error("no script or -e code given")
     return global_config, specs
 

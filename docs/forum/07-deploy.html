@@ -1,0 +1,71 @@
+<h2>From laptop to HC3 with one command</h2>
+
+<p>The whole point of developing offline is that the transfer to the real
+controller is painless. flua ships the HC3 file tools as subcommands — no
+web UI dragging, no copy-paste between editor and browser.</p>
+
+<p>First, credentials (once). flua reads the HC3 connection from the
+environment — a local <code>.env</code> in your project, <code>~/.env</code>,
+or your shell:</p>
+
+<pre>
+HC3_URL=http://192.168.1.10/
+HC3_USER=admin
+HC3_PASSWORD=your-password
+HC3_PIN=1111
+</pre>
+
+<p>Then the tools (<code>flua --tool</code> lists them all):</p>
+
+<pre>
+flua --tool downloadQA 123    # pull an existing QA from the HC3,
+                              # unpacked into editable .lua files on disk
+
+flua --tool updateQA 123 main.lua   # push your changes back — all files,
+                                    # name, properties and UI in one go
+
+flua --tool uploadQA my-qa.lua      # package the project and install it
+                                    # as a NEW QuickApp on the HC3
+
+flua --tool pack my-qa.lua          # build the .fqa locally, no HC3 needed
+flua --tool uploadFQA my-qa.fqa     # deploy a ready-made package
+</pre>
+
+<p>The downloaded project is a normal flua project: you edit and test it
+offline, then <code>updateQA</code> ships it back. And because it is the
+same file format both ways, the workflow is symmetric — bring an HC3 QA
+home, work on it offline, put it back.</p>
+
+<p>For the fastest loop of all, you don't have to push the whole QA:
+<code>downloadQA</code> stamps every unpacked file with two directives —
+<code>--%%deviceId:123</code> and <code>--%%qaFile:lib</code> — and
+<code>--tool uploadFile</code> reads them to push just that one file to the
+right QA on the HC3. <code>--tool setup</code> even installs a VS Code task
+("Flua: Upload file to HC3") that runs it on the file you are editing —
+edit, Ctrl/Cmd+Shift+B-style task, done. (Updating the main file restarts
+the QA; the tool warns if the file looks like it was copied from another
+QA's project.)</p>
+
+<p>Want to run against the real HC3 directly, with flua as a smarter
+runtime? That is <b>online mode</b> — the QA runs in flua but talks to your
+real controller:</p>
+
+<pre>
+--%%mode:online        -- in the QA header (or use --api remote on the CLI)
+</pre>
+
+<p>Everything still works — the viewer, the debugger, the virtual clock —
+but <code>api.*</code> calls now reach the real HC3. Use it when the device
+you are integrating with must be real.</p>
+
+<p>There is also <b>proxy mode</b> (<code>--%%mode:proxy</code>) for the
+opposite direction: flua mirrors your QA onto the HC3 as a
+<code>&lt;name&gt;_Proxy</code> device and funnels its actions and UI events
+back to the emulator, so the QA runs offline but appears — and behaves — as
+a device on your real HC3. Full rundown in USAGE.md.</p>
+
+<p>Next and last in this series: the newest trick — mock servers in Lua, so
+integrations get tested too.</p>
+
+<p><small>Tools + modes: USAGE.md ("Deploying to the HC3", "Mode comparison")
+· flua: https://github.com/jangabrielsson/flua</small></p>

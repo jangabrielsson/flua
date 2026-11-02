@@ -1,0 +1,61 @@
+<h2>Develop QuickApps on your laptop — meet flua</h2>
+
+<p>We all know the HC3 edit-save-test cycle: open the web editor, tweak a line,
+save, wait for the QA to restart, watch the debug console, repeat. flua runs
+your QuickApp <b>on your laptop</b>, against a simulated HC3 — no controller
+involved, no risk to the house, instant feedback. The very same file runs on
+the real HC3 when you are done.</p>
+
+<p>flua is a small command-line tool (Python + a bundled Lua engine). Install
+it once:</p>
+
+<pre>
+pip install fibaro-flua
+</pre>
+
+<p>In a new project folder, create <code>quickapp.lua</code>:</p>
+
+<pre>
+--%%name:HelloLamp
+--%%type:com.fibaro.binarySwitch
+
+function QuickApp:onInit()
+  self:debug("Hello from", self.name, self.id)
+end
+</pre>
+
+<p>The <code>--%%</code> lines are HC3 QuickApp declarations — flua reads the
+same header the HC3 uses. Run it:</p>
+
+<pre>
+flua --ui 8090 quickapp.lua
+</pre>
+
+<p>Open <code>http://127.0.0.1:8090/</code> — that is the UI viewer: your QA,
+its device, and its controls rendered like the HC3 client. The log line
+appears in the terminal, immediately. No save button, no waiting.</p>
+
+<p>For VS Code users, one command sets everything up (launch configurations,
+tasks, even agent instructions):</p>
+
+<pre>
+flua --tool setup
+</pre>
+
+<p>Then just press <b>F5</b> — the "Run Current File (UI)" configuration runs
+the QA you are editing and opens the viewer. Debugging configurations come
+with it too (more on that in a later post).</p>
+
+<p>Notice the pattern that makes F5 work without flags: nearly everything
+flua can take on the command line can also be set as a <code>--%%</code>
+directive <i>in the QA file itself</i> — the name, the type, the UI, the
+clock, the mode. The file carries its own scenario; the command line just
+runs it.</p>
+
+<p>What you got for free just now: a <i>simulated HC3</i> with your device on
+it, a virtual clock, and a viewer — the same QuickApp API the real controller
+gives you. Next post: designing the UI for your QA, without leaving the
+laptop.</p>
+
+<p><small>flua is open source:
+https://github.com/jangabrielsson/flua · docs: USAGE.md and docs/tutorial/ in the repo.</small></p>

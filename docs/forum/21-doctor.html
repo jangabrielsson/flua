@@ -1,0 +1,42 @@
+<h2>flua doctor — one command says why it doesn't work</h2>
+
+<p>Support questions about flua setups all start the same way: which
+Python, is it a venv, where do the credentials come from, is the HC3
+reachable, why no autocomplete. <code>flua doctor</code> answers all of
+them in one block — paste the output into the question instead of
+describing your setup:</p>
+
+<pre>
+.venv/bin/flua doctor
+# flua doctor
+#   ✓ flua              0.1.83 (Lua 5.4, Python 3.14.3)
+#   ✓ virtualenv        virtualenv at ~/projects/flua/.venv
+#   ✓ HC3 credentials   HC3_URL set (from /Users/you/.env)
+#   ✓ HC3 connection    http://192.168.1.23/ reachable — my-hc3 (version 5.210.12)
+#   ✗ LuaLS setup       no .luarc.json/.luals — run `flua --tool setup` for HC3 autocomplete
+#   ✗ VS Code run/debug no .vscode/launch.json — run `flua --tool setup` for the run/debug configs
+#   ✓ VS Code extension installed (version 0.1.83)
+#   ✓ flua-mcp          flua-mcp on PATH
+#   ✓ project files     3 QA file(s); .flua-directives overrides active
+# flua doctor: 7 ok, 2 problem(s)
+</pre>
+
+<p>Nine checks, and each ✗ names its fix. The HC3 checks use the same
+<code>.env</code> chain as flua itself — a read-only
+<code>GET /settings/info</code> confirms reachability and reports the
+controller's firmware version, and a wrong password is diagnosed as
+<i>credentials rejected</i> rather than silence. Secrets never appear:
+credentials are reported as set/unset with their source file, never as
+values. Missing credentials are fine — that just means the offline sim
+(flua's default); half-configured ones (a URL without user/password) are
+flagged as the problem they are.</p>
+
+<p>Skip the network check with <code>--no-network</code>; get the same
+nine checks as one JSON document with <code>--json</code> — handy when
+your coding agent asks "what's wrong with this environment".</p>
+
+<p>Next time: the real house becomes a test fixture — record a session on
+your HC3 and replay it offline.</p>
+
+<p><small>flua doctor: USAGE.md · pip: fibaro-flua 0.1.83 ·
+flua: https://github.com/jangabrielsson/flua</small></p>

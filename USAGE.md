@@ -606,8 +606,14 @@ simulated HC3 API — no file to open:
 
 ```bash
 .venv/bin/flua --ui 8090 examples/ui.lua   # UI viewer on http://127.0.0.1:8090/
+.venv/bin/flua --ui 8090                   # no QA at all: viewer + docs, until Ctrl-C
 open http://127.0.0.1:8090/               # press Connect; the base URL matches
 ```
+
+With no script the session just serves — the viewer, the run timeline, and
+the **built-in docs** at `/docs/` (the manual ships in the wheel, so a
+pip-installed flua carries its own: USAGE, architecture notes, and the
+tutorial series).
 
 The page defaults its API address to its own origin, so a busy port falling
 back to the next free one needs no editing. The page ships inside the flua

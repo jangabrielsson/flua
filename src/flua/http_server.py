@@ -62,6 +62,31 @@ def _timeline_html() -> bytes:
     return b"<html><body>viewer/timeline.html missing from the flua package</body></html>"
 
 
+# The packaged docs tree (USAGE.md, ARCHITECTURE.md, docs/forum/...): the
+# /docs channel serves it, so a pip-installed flua carries its own manual.
+_DOCS_PATH = Path(__file__).parent / "setup_templates" / "docs"
+_DOCS_MIME = {
+    ".html": "text/html; charset=utf-8",
+    ".htm": "text/html; charset=utf-8",
+    ".md": "text/plain; charset=utf-8",
+    ".txt": "text/plain; charset=utf-8",
+    ".json": "application/json",
+    ".png": "image/png",
+}
+
+
+def _docs_file(subpath: str) -> tuple[bytes, str] | None:
+    """Resolve a /docs/<path> request inside the packaged docs tree;
+    None when missing or escaping the tree (path traversal)."""
+    root = _DOCS_PATH.resolve()
+    candidate = (root / subpath).resolve()
+    if not candidate.is_relative_to(root) or not candidate.is_file():
+        return None
+    return candidate.read_bytes(), _DOCS_MIME.get(
+        candidate.suffix.lower(), "application/octet-stream"
+    )
+
+
 class ApiServer:
     """Serve an :class:`~flua.api.Api` over HTTP (loopback by default)."""
 
@@ -123,6 +148,22 @@ class ApiServer:
             if method == "GET" and path in ("/timeline", "/timeline/"):
                 # the run timeline (virtual time x QA rows; polls /flua/systemLog)
                 _respond_html(writer, _timeline_html(), extra=_CORS)
+                return
+            if method == "GET" and (path == "/docs" or path.startswith("/docs/")):
+                # the built-in docs channel: the packaged docs tree ships in
+                # the wheel, so a pip-installed flua serves its own manual
+                if path in ("/docs", "/docs/"):
+                    subpath = "forum/index.html"
+                else:
+                    subpath = urllib.parse.unquote(path[len("/docs/") :])
+                    if subpath.endswith("/"):
+                        subpath += "index.html"
+                hit = _docs_file(subpath)
+                if hit is None:
+                    _respond(writer, 404, {"error": "not found"}, extra=_CORS)
+                    return
+                body, content_type = hit
+                _write(writer, 200, content_type, body, extra=_CORS)
                 return
             if method == "GET" and path.startswith("/flua/icons/"):
                 # the icon channel: raw image bytes from the shared cache

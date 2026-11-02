@@ -1,0 +1,74 @@
+<h2>Time travel for your timers and scenes</h2>
+
+<p>Every HC3 QA has timers — and testing them on the real controller means
+waiting. A QA that acts at 22:00, polls every hour, or re-arms after ten
+quiet minutes is painful to develop. flua runs your QA on a <b>virtual
+clock</b>: the QA believes it is any date and time you choose, and you can
+fast-forward through hours in seconds.</p>
+
+<p>A lamp that turns itself on at 22:00 — with the scenario configured
+<b>in the file</b>, so plain F5 in VS Code (or a bare <code>flua
+night_lamp.lua</code>) runs it as-is:</p>
+
+<pre>
+--%%name:NightLamp
+--%%type:com.fibaro.binarySwitch
+--%%time:start=2027/6/21 21:59:50,speed=60
+
+function QuickApp:onInit()
+  self:debug("booted at", os.date("%Y/%m/%d %H:%M:%S"))
+  local now = os.date("*t")
+  local target = os.time{year=now.year, month=now.month, day=now.day, hour=22, min=0}
+  if os.time() > target then target = target + 24 * 3600 end
+  setTimeout(function()
+    self:updateProperty("value", true)
+    self:debug("good night — lamp on at", os.date("%H:%M:%S"))
+    exit(0)
+  end, (target - os.time()) * 1000)
+end
+</pre>
+
+<p>The <code>--%%time:</code> directive sets the virtual start time and
+speed for this QA. Run it — no flags needed:</p>
+
+<pre>
+flua night_lamp.lua
+</pre>
+
+<p>The log tells the story — virtual time, not wall time:</p>
+
+<pre>
+[21.06.2027][21:59:51] NightLamp5000: booted at 2027/06/21 21:59:51
+[21.06.2027][22:00:00] NightLamp5000: good night — lamp on at 22:00:00
+</pre>
+
+<p>The QA booted at 21:59 <i>on June 21 2027</i> and fired exactly at
+22:00:00 — in a fraction of a real second. Change the directive to a date
+where 22:00 already passed and the QA arms itself for tomorrow instead;
+either branch is one line away, no waiting for the actual sun.</p>
+
+<p>For one-off experiments, the same parameters exist as command-line flags
+(they override the file):</p>
+
+<pre>
+flua --start "2027/6/21 21:59:50" --speed 60 night_lamp.lua
+flua --speed 3600 night_lamp.lua   # 1 hour of virtual time per real second
+flua --instant night_lamp.lua      # timers fire immediately, os.time() jumps
+flua --max-hours 24 night_lamp.lua # stop after a virtual day
+</pre>
+
+<p>...and as individual directives too: <code>--%%speed:3600</code>,
+<code>--%%instant:true</code>, <code>--%%maxhours:24</code>.</p>
+
+<p><code>--instant</code> is the one to remember: every
+<code>setTimeout</code>/<code>setInterval</code> fires at once and
+<code>os.time()</code> jumps by each delay, so a QA that loops through a whole
+day completes in a blink — ideal for catching infinite loops and off-by-one
+timer bugs <i>before</i> the controller finds them for you. The dates in the
+log are the QA's time, not your wall clock.</p>
+
+<p>And because the clock is virtual, it <i>pauses while you debug</i> — a
+breakpoint never races against a timer (next post).</p>
+
+<p><small>More timer patterns: <code>flua --examples</code> → timers.lua,
+timers2.lua, sleep.lua · flua: https://github.com/jangabrielsson/flua</small></p>

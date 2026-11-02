@@ -1,0 +1,62 @@
+<h2>Record &amp; replay the real house</h2>
+
+<p>The hardest thing to test is reality: the motion sensor that fires at
+3 a.m., the lamp someone toggles during dinner, the exact timing of it
+all. flua can now capture that and play it back offline — <b>record a
+session on your HC3, replay it against your QA in the sim</b>, at any
+speed.</p>
+
+<h3>Record</h3>
+
+<p><code>flua record</code> snapshots the device list and then polls the
+HC3's <code>/refreshStates</code> feed, appending every property change
+with a relative timestamp. It needs the usual HC3 credentials (the
+<code>.env</code> chain):</p>
+
+<pre>
+.venv/bin/flua record -o house.json --duration 60
+# recorded 14 events from 188 devices to house.json
+</pre>
+
+<p>Ctrl-C stops early and still saves. The file is one JSON document:
+the devices (so the replay seeds the same house) and the event timeline.</p>
+
+<h3>Replay</h3>
+
+<p>Point a QA at it with <code>--replay</code> (or the
+<code>--%%replay:house.json</code> directive, so it can live in
+<code>.flua-directives</code>). A QA reacting to the hall lamp:</p>
+
+<pre>
+-- qa.lua
+--%%name:house-react
+local sub = RefreshStateSubscriber()
+sub:subscribe(
+  function(event) return event.data and event.data.id == 10 or false end,
+  function(event) print("LAMP", tostring(event.data.newValue)) end)
+sub:run()
+setTimeout(function() exit(0) end, 3000)
+</pre>
+
+<pre>
+.venv/bin/flua --replay house.json qa.lua
+# [house-react5000]: LAMP true
+# [house-react5000]: LAMP false
+</pre>
+
+<p>The events fire on the <b>virtual timeline</b>, through the same path
+live refreshStates take — so <code>--speed 60</code> compresses a
+minute-long recording into a second, and <code>--instant</code> replays
+the whole session immediately. The recording also works as a plain seed
+(<code>--seed house.json</code> loads the devices without the events), and
+events for devices the replay run didn't seed are skipped silently.</p>
+
+<p>This is the regression test you always wanted: capture the house while
+it misbehaves, then iterate on the QA offline against <i>exactly what
+happened</i> — deterministic, repeatable, no controller involved.</p>
+
+<p>Next time: how much of the HC3 does flua actually cover — and what
+happens with device types it has never heard of.</p>
+
+<p><small>record/replay: USAGE.md · pip: fibaro-flua 0.1.83 ·
+flua: https://github.com/jangabrielsson/flua</small></p>

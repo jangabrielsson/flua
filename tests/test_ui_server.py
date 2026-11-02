@@ -98,12 +98,41 @@ async def test_viewer_page_served_at_root(server) -> None:
     assert 'id="viewtoggle"' in page
     assert "View: condensed" in page
     assert "smallqa" in page
+    # the docs link (the packaged manual ships with the wheel)
+    assert 'href="/docs/"' in page
     # the viewer polls its own emulated-only device list, and the API still
     # answers on the same server
     status, _, devices = await asyncio.to_thread(_http, f"{base}/flua/devices")
     assert status == 200 and isinstance(devices, list)
     status, _, devices = await asyncio.to_thread(_http, f"{base}/devices")
     assert status == 200 and isinstance(devices, list)
+
+
+@pytest.mark.asyncio
+async def test_docs_channel_serves_packaged_tree(server) -> None:
+    # /docs serves the packaged docs tree (the wheel ships it): the forum
+    # index, a post, a guide — and path traversal stays inside the tree
+    _, _, base = server
+    status, headers, page = await asyncio.to_thread(_http_page, f"{base}/docs/")
+    assert status == 200 and "text/html" in headers["Content-Type"]
+    assert "flua documentation" in page
+    # the index links resolve against the /docs channel root (the posts
+    # live in forum/ — a relative href would miss it and 404)
+    match = re.search(r'href="(/docs/[^"]+)"', page)
+    assert match, "the docs index carries no links"
+    status, _, linked = await asyncio.to_thread(_http_page, f"{base}{match.group(1)}")
+    assert status == 200 and "flua" in linked.lower()
+    status, _, post = await asyncio.to_thread(_http_page, f"{base}/docs/forum/01-hello-flua.html")
+    assert status == 200 and "flua" in post.lower()
+    status, gheaders, guide = await asyncio.to_thread(_http_page, f"{base}/docs/USAGE.md")
+    assert status == 200 and "text/plain" in gheaders["Content-Type"] and "flua" in guide
+    # a missing file 404s, and ../ escapes the tree
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        await asyncio.to_thread(_http_page, f"{base}/docs/nope.html")
+    assert exc.value.code == 404
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        await asyncio.to_thread(_http_page, f"{base}/docs/../pyproject.toml")
+    assert exc.value.code == 404
 
 
 @pytest.mark.asyncio
@@ -353,6 +382,52 @@ def test_ui_flag_keeps_api_alive_after_qa_drains(tmp_path) -> None:
         assert proc.poll() is None, "flua --ui exited after the QA drained"
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/devices", timeout=2) as res:
             assert json.loads(res.read())
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=10)
+
+
+def test_ui_flag_serves_docs_without_any_qa(tmp_path) -> None:
+    # `flua --ui` alone (no script, no -e) is an interactive session: it
+    # serves the viewer AND the /docs channel until interrupted — the
+    # built-in manual needs no QA to host it
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "flua", "--api", "local", "--ui", str(port)],
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    drained: list[str] = []
+
+    def drain() -> None:
+        for line in proc.stdout:
+            drained.append(line)
+
+    threading.Thread(target=drain, daemon=True).start()
+    try:
+        deadline = time.monotonic() + 15.0
+        saw_docs = False
+        while time.monotonic() < deadline and proc.poll() is None:
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/docs/", timeout=0.5) as res:
+                    page = res.read().decode("utf-8")
+                saw_docs = "flua documentation" in page
+                if saw_docs:
+                    break
+            except OSError:
+                time.sleep(0.1)
+        assert proc.poll() is None, "flua --ui exited before serving: " + "".join(drained)
+        assert saw_docs, "docs page never served: " + "".join(drained)
+        time.sleep(1.0)
+        assert proc.poll() is None, "flua --ui (no QA) exited while idle"
     finally:
         proc.terminate()
         try:

@@ -1,0 +1,128 @@
+<h2>Develop a QA together with your agent</h2>
+
+<p>The last few posts covered the flua toolbox. This one puts it to work in
+a different loop: you and an AI coding agent (Copilot, Claude Code, or
+whatever sits in your editor) developing a QA together — the agent writes
+and <i>verifies</i> the code itself, against the simulated HC3, without a
+controller anywhere in the loop. That is what makes the partnership fast:
+the agent does not just propose code, it proves it runs.</p>
+
+<h3>One-time setup: what the agent gets</h3>
+
+<p><code>flua --tool setup</code> (post 1) scaffolds more than VS Code
+configs — it installs the agent's knowledge base into your project:</p>
+
+<ul>
+  <li><b>Skills</b> — <code>quickapp-api</code> (the full HC3 API
+  reference), <code>quickapp-patterns</code> (timers, refreshStates,
+  children, persistence), <code>quickapp-test</code> (the verify loop
+  below), <code>quickapp-troubleshooting</code>, <code>flua-setup</code>,
+  plus type templates for all 30 device types.</li>
+  <li><b>Language-server types</b> — <code>.luarc.json</code> + the
+  <code>.luals/</code> library: autocomplete and parameter hints for
+  <code>QuickApp</code>, <code>fibaro</code>, <code>api</code> and
+  <code>json</code>, so the agent writes against the real API surface.</li>
+  <li><b>Project instructions</b> — an <code>AGENTS.md</code> and Copilot
+  instructions pointing at those skills.</li>
+</ul>
+
+<p>That matters: the agent now answers from the HC3 API reference instead of
+its training data, and it knows how flua expects code to be verified.</p>
+
+<h3>The loop the agent runs</h3>
+
+<p>Because offline is the default, verification is one command. Give the QA
+self-assertions (post 6):</p>
+
+<pre>
+--%%name:hello_agent
+--%%type:com.fibaro.binarySwitch
+
+local failures = 0
+local function expect(cond, msg)
+  if cond then print("PASS: " .. msg)
+  else failures = failures + 1; print("FAIL: " .. msg) end
+end
+
+function QuickApp:onInit()
+  expect(api.get("/devices/" .. self.id).id == self.id, "device registered")
+  self:updateProperty("value", true)
+  expect(self.properties.value == true, "value flips on")
+  -- the lamp turns off 10 minutes later — virtual minutes
+  setTimeout(function()
+    self:updateProperty("value", false)
+    expect(self.properties.value == false, "lamp off after 10 minutes")
+    print("failures:", failures)
+    exit(failures > 0 and 1 or 0)
+  end, 10 * 60 * 1000)
+end
+</pre>
+
+<p>Now the agent's loop is mechanical:</p>
+
+<pre>
+flua --api local --instant hello_agent.lua
+echo $?          # 0 = all PASS lines held; anything else = read the FAIL lines
+</pre>
+
+<pre>
+PASS: device registered
+PASS: value flips on
+[10 virtual minutes later]
+PASS: lamp off after 10 minutes
+failures: 0
+</pre>
+
+<p>The virtual clock is the agent's secret weapon: <code>--instant</code>
+fast-forwards time until no timers are pending, so the ten-minute wait
+above runs in a fraction of a second — timers, scenes, scheduled logic all
+verified without waiting for real time. For date-dependent logic (sunrise
+times differ by season) pin the start date instead:
+<code>--start "2027/06/21 05:00:00"</code> runs the QA on a midsummer
+morning, every run. (Both also exist as <code>--%%time:</code> directives
+in the header — post 3 has the full time-travel rundown.)</p>
+
+<p>Ask for it explicitly: <i>"Change the QA so the lamp also turns off at
+sunrise — assert the timer with <code>--start</code> pinned to a midsummer
+morning and run <code>flua --instant</code> until they pass."</i> The agent
+edits, runs, reads the FAIL lines, fixes, repeats — at instant speed, so
+the loop stays tight — and you review the final diff, not every
+iteration.</p>
+
+<h3>When the logic needs interactions</h3>
+
+<p>Timers, device actions and UI events are exactly the cases where an agent
+normally gets stuck. flua gives it hands:</p>
+
+<pre>
+flua --api local --ui 8090 qa.lua &amp;    # serve the simulated HC3
+
+curl "http://127.0.0.1:8090/plugins/callUIEvent?deviceID=5000&amp;elementName=onBtn&amp;eventType=onReleased"
+curl -X POST -H "Content-Type: application/json" -d '{"args":["42"]}' \
+  http://127.0.0.1:8090/devices/5000/action/setValue
+curl http://127.0.0.1:8090/devices/5000     # inspect state, view, properties
+</pre>
+
+<p>Integrations get mocked in Lua with <code>net.*Server</code> (post 8) —
+the agent writes the mock from the service's protocol and the QA's real
+client code runs against it. Test-only helpers live in files loaded with
+<code>require("testlib")</code>, which are never packaged into the .fqa, so
+the scaffolding never reaches the controller (post 10).</p>
+
+<h3>The division of labor, honestly</h3>
+
+<p>What the agent is good at here: mechanical iterations, the verify loop,
+mock servers, API-shape drudgery, and regressions — every change re-runs
+the same assertions. What stays yours: what the QA should <i>do</i>, the
+edge cases that matter for your house, and the final look at the diff —
+plus the moment the QA graduates to the real HC3 (post 7), where you, not
+the agent, decide it is ready.</p>
+
+<p>And the whole loop never touches the controller: the worst the agent can
+do is fail an assertion.</p>
+
+<p>Next time: your QA's secrets — API keys and passwords without
+hardcoding them, with config files and <code>--%%var</code>.</p>
+
+<p><small>flua: https://github.com/jangabrielsson/flua · skills:
+<code>flua --tool setup</code> → .github/skills/</small></p>

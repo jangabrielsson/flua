@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>flua docs</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem; color: #1c2b3a; }
+  h1 { color: #003a70; }
+  h2 { border-bottom: 1px solid #dce6ee; padding-bottom: .3rem; margin-top: 2rem; }
+  a { color: #0a6cff; text-decoration: none; }
+  li { margin: .35rem 0; line-height: 1.4; }
+  .covers { color: #5b6b7a; }
+  ul.refs { columns: 2; }
+</style>
+</head>
+<body>
+<h1>flua documentation</h1>
+<p>Shipped with flua — this page and everything below it come from the
+installed package, so the docs always match your version.</p>
+<h2>Guides</h2>
+<ul class="refs">
+  <li><a href="/docs/USAGE.md">USAGE.md</a>
+      <span class="covers">— the user guide (plain text)</span></li>
+  <li><a href="/docs/ARCHITECTURE.md">ARCHITECTURE.md</a>
+      <span class="covers">— internals</span></li>
+  <li><a href="/docs/concurrency.md">concurrency.md</a>
+      <span class="covers">— threading &amp; execution model</span></li>
+  <li><a href="/docs/walkthroughs.md">walkthroughs.md</a>
+      <span class="covers">— guided traces</span></li>
+  <li><a href="/docs/invariants.md">invariants.md</a>
+      <span class="covers">— behavioral contracts</span></li>
+</ul>
+<h2>The tutorial series</h2>
+<ol>
+<li><a href="/docs/forum/01-hello-flua.html">Develop QuickApps on your laptop — meet flua</a> <span class="covers">— install, first QA, `--ui` viewer, `--tool setup`, F5</span></li>
+<li><a href="/docs/forum/02-build-the-ui.html">Design your QuickApp UI without the controller</a> <span class="covers">— `--%%u` (label/button/slider/switch/select/multi), viewer interactions, updateView, `json.array()`</span></li>
+<li><a href="/docs/forum/03-time-travel.html">Time travel for your timers and scenes</a> <span class="covers">— virtual clock: `--%%time:`/`--%%speed`/`--%%instant`/`--%%maxhours` directives + `--start`/`--speed`/`--instant` flags, setTimeout scheduling</span></li>
+<li><a href="/docs/forum/04-debug-with-vscode.html">Debug HC3 Lua in VS Code — breakpoints included</a> <span class="covers">— mobdebug launch configs, clock pauses while debugging, `--debugger`, `--check`</span></li>
+<li><a href="/docs/forum/05-the-house-comes-alive.html">Run a whole house: many QAs, one flua</a> <span class="covers">— multi-QA runs, find-device-by-name, qa3/qa4, trigger.lua, `--seed`</span></li>
+<li><a href="/docs/forum/06-qa-as-test.html">Let your QA test itself</a> <span class="covers">— self-asserting QAs (selfTest.lua), exit codes, quickapp-test skill for agents, `require()` test libs</span></li>
+<li><a href="/docs/forum/07-deploy.html">From laptop to HC3 with one command</a> <span class="covers">— `.env`, downloadQA/updateQA/uploadQA/pack/uploadFQA, uploadFile single-file updates + VS Code task, online mode, proxy mode mention</span></li>
+<li><a href="/docs/forum/08-mock-integrations.html">Mock your integrations: HTTP, TCP, UDP and WebSocket servers in Lua</a> <span class="covers">— `net.*Server`, mockServer.lua, stateful handlers, require'd mocks</span></li>
+<li><a href="/docs/forum/09-device-catalog.html">The device catalog: 30 device types, one command</a> <span class="covers">— `--tool newQA`, type templates + canonical actions, quickAppVariables</span></li>
+<li><a href="/docs/forum/10-multi-file-qas.html">Multi-file QAs: grow your project, keep it organized</a> <span class="covers">— `--%%file` + EOH, load order, files API, `require` vs packaged files</span></li>
+<li><a href="/docs/forum/11-refreshstate.html">Listen to the house: the refreshState event flow</a> <span class="covers">— RefreshStateSubscriber, event shape, predicates, `/refreshStates`</span></li>
+<li><a href="/docs/forum/12-child-devices.html">Child devices, the HC3 way</a> <span class="covers">— QuickAppChild + createChildDevice (basic HC3 API — not QwikAppChild), parentId, removeChildDevice</span></li>
+<li><a href="/docs/forum/13-develop-with-your-agent.html">Develop a QA together with your agent</a> <span class="covers">— agent verify loop (exit codes, PASS/FAIL), --tool setup skills + LuaLS types, virtual clock in the loop (--instant, --start), driving the sim over HTTP, net.*Server mocks, require'd test libs</span></li>
+<li><a href="/docs/forum/14-secrets-and-config.html">Keep your secrets out of your QuickApp — configs, env and --%%var</a> <span class="covers">— `.flua.lua` config file, `.env` chain + `os.getenv`, `--%%var` expressions (tables, nil-unset, faulty-expr errors), package values (`--%%var`,...,"<placeholder>"/`--%%clobber`) vs uploadQA, quickAppVariables round-trip</span></li>
+<li><a href="/docs/forum/15-real-integrations.html">Real integrations: HTTP and MQTT from your QuickApp</a> <span class="covers">— `net.HTTPClient` (GET/POST, success/error callbacks, timeout), `mqtt.Client` (events, QoS, echo demo, MQTT_URL override, TLS + `useSNI`), mock→real loop</span></li>
+<li><a href="/docs/forum/16-mcp-for-agents.html">Meet flua-mcp: flua as a tool your agent can call</a> <span class="covers">— `flua-mcp` (stdio + Streamable HTTP transports, dual-era protocol), tools (`qa_check`/`qa_run` with summary+filter, `qa_ui`, sessions `qa_start`/`qa_probe`/`qa_action`/`qa_stop`), resources (`flua://docs/*`), prompts (`qa_debug`/`qa_skeleton`), host registration (Claude Desktop, Copilot, remote URL)</span></li>
+<li><a href="/docs/forum/17-modbus-mockserver.html">Mock a Modbus device — develop your Modbus client on the laptop</a> <span class="covers">— `examples/Modbus Server/` (SolarEdge SunSpec mock + generic modbus_server.lua, buttons, dual wire-base serving), minimal SunSpec client QA, launch config with two QAs, `-D var:host` override, downloadQA+unpack for existing QAs</span></li>
+<li><a href="/docs/forum/18-test-foreign-qas.html">Test foreign QAs without touching them</a> <span class="covers">— `.flua-directives` next to the main file (tester wins over the QA's header), `-D` on top, `os.getenv` expressions, the full precedence chain</span></li>
+<li><a href="/docs/forum/19-vscode-extension.html">The flua VS Code extension</a> <span class="covers">— marketplace install (`GsonSoft-development.flua`), explorer tool menus, the `.fqa` viewer (metadata + Lua previews), check-on-save; pack/unpack naming (`<QA name>.fqa`, `<name>_main.lua`), identity properties traveling in packages</span></li>
+<li><a href="/docs/forum/20-test-suite.html">A test suite for your QuickApps</a> <span class="covers">— `require("flua-test")` assertions, `flua test` discovery + per-file timeout, PASS/FAIL/TIME report, exit codes for CI</span></li>
+<li><a href="/docs/forum/21-doctor.html">flua doctor — one command says why it doesn't work</a> <span class="covers">— nine checks: runtime, venv, HC3 credentials/reachability (secrets never echoed), LuaLS/.vscode setup, extension, flua-mcp; `--no-network`, `--json`</span></li>
+<li><a href="/docs/forum/22-record-replay.html">Record &amp; replay the real house</a> <span class="covers">— `flua record` (device snapshot + refreshStates feed), `--replay`/`--%%replay` on the virtual timeline, RefreshStateSubscriber reactions, `--speed`/`--instant`, recording doubles as `--seed`</span></li>
+<li><a href="/docs/forum/23-audit.html">How much of the HC3 does flua cover?</a> <span class="covers">— `flua audit` (routes, device catalog, QA templates — pinned floors), the type hierarchy fallback for unknown device types (`devices/hierarchy.json`)</span></li>
+<li><a href="/docs/forum/24-traces.html">Traces your agent can read</a> <span class="covers">— `--%%trace`/`--%%syslog` as directives (header/include/.flua-directives), the one-JSON-line-per-event stream, categories, truncation, `/flua/systemLog` + MCP system events</span></li>
+<li><a href="/docs/forum/25-run-timeline.html">The run timeline: your QA's story, drawn</a> <span class="covers">— `/timeline` under `--ui`: one lane per QA (+ a separate timer lane), virtual time on the x-axis, colored marks with stacked-event tooltips, fixed time scale with horizontal scroll, clear-without-recompressing, `--speed`/`--instant` interplay</span></li>
+<li><a href="/docs/forum/26-feedback-loop.html">Your feedback loop — now with an issue for it</a> <span class="covers">— the feedback issue template + labels, the copy-paste prompt so your coding agent files the report, what happens after (verify → fix with pinning tests → rainy-day parking → response)</span></li>
+<li><a href="/docs/forum/27-ui-test-automation.html">Stop clicking — automate your UI tests</a> <span class="covers">— the self-asserting UI-interaction pattern (`examples/ui-interaction-test.lua`), the data-driven whole-UI suite (`examples/ui-interaction-suite.lua`), wait-for-async-callback polling, `--strict-tests` + `--result-json` for CI</span></li>
+<li><a href="/docs/forum/28-sim-devices.html">Your house, simulated: 30 device types, one call each</a> <span class="covers">— `_FLUA.loadSimDevice` (bundled sim devices, pip install included), the uniform fibaro.call drivers (setValue/setUnit/breach/clearBreach/turnOn/…), viewer status panels, `_FLUA.keepAlive()`, the weather simulator QA</span></li>
+<li><a href="/docs/forum/29-registered-endpoints.html">Give the simulated HC3 its own REST surface</a> <span class="covers">— `api.registerEndpoint` (additive + `override=true`), the mock-panels module/consumer pair, handler-on-the-pump semantics (setTimeout, postRefreshEvent), the alarm-logic override loop, the weather simulator as an endpoint QA</span></li>
+</ol>
+<h2>Standalone posts</h2>
+<ul>
+<li><a href="/docs/forum/install-macos.html">Installing flua on macOS — Python, pip, VS Code, and the usual bumps</a></li>
+<li><a href="/docs/forum/install-windows.html">Installing flua on Windows 11 — Python, pip, VS Code, and the usual bumps</a></li>
+<li><a href="/docs/forum/promotion.html">Developing QuickApps with AI agents — and a tool that makes it fast</a></li>
+</ul>
+</body>
+</html>

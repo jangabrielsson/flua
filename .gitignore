@@ -19,7 +19,6 @@ dev/
 testQAs/
 tmp/
 .directives
-forum\ posts/
 
 # agent tooling state (auto-generated; repo guidance lives in .github/)
 .codewhale/

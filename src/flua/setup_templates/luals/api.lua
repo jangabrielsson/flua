@@ -10,7 +10,7 @@
 ---@field put fun(url: string, body?: any): any, number
 ---@field delete fun(url: string, body?: any): any, number
 ---@field hc3 api_hc3 Direct calls to the real HC3 (bypasses the hybrid dispatch)
----@field registerEndpoint fun(method: string, pattern: string, handler: fun(req: EndpointRequest): any, number, override?: boolean): number Emulate (or, with override=true, REPLACE) a REST endpoint — offline sim only
+---@field registerEndpoint fun(method: string, pattern: string, handler: (fun(req: EndpointRequest): any, number), override?: boolean): number Emulate (or, with override=true, REPLACE) a REST endpoint — offline sim only
 api = {}
 
 ---The request a registered endpoint handler receives.

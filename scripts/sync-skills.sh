@@ -28,6 +28,9 @@ echo "synced $SRC_DIR -> $DEST"
 DOCS_SRC="${DOCS_SRC:-docs}"
 DOCS_DEST="${DOCS_DEST:-src/flua/setup_templates/docs}"
 
+# the web docs landing page regenerates from the forum set before the copy
+python3 scripts/gen-forum-index.py
+
 rm -rf "$DOCS_DEST"
 mkdir -p "$DOCS_DEST"
 # Root-only docs ship alongside the tree; root README.md is skipped on

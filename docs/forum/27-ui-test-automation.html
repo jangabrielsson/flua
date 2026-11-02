@@ -1,0 +1,83 @@
+<h2>Stop clicking — automate your UI tests</h2>
+
+<p>Every QuickApp has that moment: a handful of buttons and selects, each
+with a callback, and "did I break any of them with that change?" means
+clicking through the whole UI by hand. With 44 possible actions, that is
+an afternoon you never get back. flua can do it in one run, one exit code
+— the QA <i>is</i> the test.</p>
+
+<p>Two ready-made examples ship with flua; run them from the repo root:</p>
+
+<pre>
+flua --api local examples/ui-interaction-test.lua    # one action, end to end
+flua --api local examples/ui-interaction-suite.lua   # the whole UI, data-driven
+</pre>
+
+<h3>The one-action pattern</h3>
+
+<p><code>ui-interaction-test.lua</code> loads a JSON fixture, injects a
+button release and a select change the way the HC3 UI would deliver them,
+waits for each asynchronous callback, and asserts both the rendered view
+(<code>self:getView()</code>) and the simulator state
+(<code>api.get</code> / <code>self.properties</code>). The verdict is the
+exit code:</p>
+
+<pre>
+flua --api local examples/ui-interaction-test.lua
+echo $?          # 0 = every check passed
+</pre>
+
+<p>The one detail that trips people up: <code>_FLUA.uiEvent(...)</code>
+returns before the callback runs — it delivers the event like the HC3 UI
+does. So the test <b>polls for the callback's effect</b> and then asserts,
+instead of asserting immediately. The example's <code>waitUntil</code>
+helper is the whole trick, and it works in every clock mode
+(<code>--instant</code> included).</p>
+
+<h3>The whole-UI pattern (44 buttons? no problem)</h3>
+
+<p><code>ui-interaction-suite.lua</code> scales it: a table of cases, one
+loop:</p>
+
+<pre>
+local cases = {
+  {element="btnA", event="onReleased", expect="A"},
+  {element="btnB", event="onReleased", expect="B"},
+  {element="btnC", event="onReleased", expect="C"},
+}
+</pre>
+
+<p>Each row injects the event, waits for the callback's effect on the
+view, checks it, and moves to the next — printing PASS/FAIL per element
+and exiting with the failure count. For your real QA, the
+<code>expect</code> check becomes an assertion on the actual state: the
+view text, a property, a variable, an API read. One run covers the whole
+surface; the exit code feeds CI.</p>
+
+<pre>
+PASS btnA -> A
+PASS btnB -> B
+PASS btnC -> C
+VERDICT: all passed
+</pre>
+
+<h3>Making it CI-proof</h3>
+
+<p>Two flags turn the pattern into a trustworthy pipeline step:</p>
+
+<pre>
+flua --api local --strict-tests --result-json result.json qa.lua
+</pre>
+
+<ul>
+<li><code>--strict-tests</code> — an unhandled callback error fails the
+run (exit 1) even if a later callback exits 0. Sticky: your UI callback
+crashing can never look green.</li>
+<li><code>--result-json</code> — one machine-readable verdict
+(passed/failed/timeout, the failure records with the callback kind, clock
+mode, timings). Your agent or CI reads that instead of grepping logs.</li>
+</ul>
+
+<p>Add rows as the UI grows — the suite is a living regression test, and
+"did I break a button?" becomes a 10-second answer instead of an
+afternoon of clicking.</p>

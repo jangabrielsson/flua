@@ -1,0 +1,66 @@
+<h2>Design your QuickApp UI without the controller</h2>
+
+<p>The HC3 UI editor is fine for tweaks, but building a real interface there
+is slow. In flua, the UI is declared in the QA file itself — the
+<code>--%%u:</code> directives — and you see the result live in the viewer
+while you iterate.</p>
+
+<p>One <code>--%%u:</code> line is one row of the UI. Elements can share a
+row with <code>{{...},{...}}</code>:</p>
+
+<pre>
+--%%name:LightPanel
+--%%type:com.fibaro.binarySwitch
+
+--%%u:{label="status",text="Ready"}
+--%%u:{button="onBtn",text="Turn on",onReleased="handleOn"}
+--%%u:{slider="dim",text="Brightness",min="0",max="100",value="50",onChanged="dim"}
+--%%u:{switch="auto",text="Auto mode",value="false",onReleased="auto"}
+--%%u:{select="mode",text="Mode",value="eco",onToggled="mode",
+--     options={{type='option',text='Economy',value='eco'},{type='option',text='Comfort',value='comfort'}}}
+--%%u:{multi="tags",text="Tags",values={"home","night"},onToggled="tags",
+--     options={{type='option',text='Home',value='home'},{type='option',text='Night',value='night'}}}
+
+function QuickApp:onInit()
+  self:debug("panel ready")
+end
+
+function QuickApp:handleOn() self:updateProperty("value", true) end  -- the lamp goes on
+function QuickApp:dim(event) print("dim to", event.values[1]) end
+function QuickApp:auto(event) print("auto", event.values[1]) end
+function QuickApp:mode(event) print("mode", event.values[1]) end
+function QuickApp:tags(event) print("tags", json.encode(event.values[1])) end
+</pre>
+
+<p>Labels, buttons, sliders, switches, single and multi selects — the same
+elements the HC3 renders, laid out the same way. Run it with F5 ("Run
+Current File (UI)" from <code>flua --tool setup</code>) or from the
+terminal:</p>
+
+<pre>
+flua --ui 8090 quickapp.lua
+</pre>
+
+<p>Click things in the viewer: every interaction calls your handler, exactly
+like a tap on the real HC3 UI. Slider drags fire <code>onChanged</code>,
+buttons <code>onReleased</code>, selects <code>onToggled</code> — and the
+values follow the HC3 contract (slider values in <code>event.values[1]</code>,
+a multi select's chosen list in <code>event.values[1]</code> too).</p>
+
+<p>Update the UI from code, like on the HC3:</p>
+
+<pre>
+self:updateView("status", "text", "All good")
+self:updateView("tags", "selectedItems", json.array())  -- clear the multi select
+</pre>
+
+<p>The viewer follows along live. (One HC3 subtlety worth knowing: an empty
+list must be <code>json.array()</code> so it encodes as <code>[]</code> and
+not <code>{}</code> — the HC3 demos do the same.)</p>
+
+<p>Because the UI lives in the QA file, it is versioned with your code and
+uploaded with it — no separate UI editing step. Next post: the virtual clock,
+for testing timers and scenes in fast-forward.</p>
+
+<p><small>Full example: <code>flua --examples</code> → examples/ui.lua · flua:
+https://github.com/jangabrielsson/flua</small></p>

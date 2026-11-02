@@ -1,0 +1,89 @@
+<h2>Mock your integrations: HTTP, TCP, UDP and WebSocket servers in Lua</h2>
+
+<p>Many QAs talk to something outside the HC3: a weather API, a LAN device
+speaking a raw TCP protocol, a service pushing WebSocket messages. How do
+you test that <i>without</i> the external service — and without writing
+Python mock servers?</p>
+
+<p>flua's answer: your QA can <b>host</b> mock servers itself. Plain Lua, no
+HC3 counterpart needed, four transports — HTTP, TCP, UDP, WebSocket:</p>
+
+<pre>
+local http = net.HTTPServer()
+http:listen(0, function(req)                -- {method,url,headers,body}
+  if req.url == "/hello" then
+    return {status = 200, body = "Hello " .. req.body, headers = {["X-Mock"] = "1"}}
+  end
+  return {status = 404, body = "not found"}
+end)
+
+local tcp = net.TCPServer()
+tcp:listen(0, function(data) return data:upper() end)   -- package in, reply out
+
+local udp = net.UDPServer()
+udp:listen(0, function(data, ip, port) return "got:" .. data end)
+
+local ws = net.WebSocketServer()
+ws:listen(0, function(message, isBinary) return "echo:" .. message end)
+</pre>
+
+<p>Then point your QA's real client code at the mock — the same code that
+will talk to the real service later:</p>
+
+<pre>
+net.HTTPClient():request("http://127.0.0.1:" .. http.port .. "/hello", {
+  options = {method = "POST", data = "flua"},
+  success = function(resp) print(resp.status, resp.data) end,   -- 200  Hello flua
+})
+</pre>
+
+<p>Notes on the semantics (they are deliberately simple, one-shot
+request/response):</p>
+
+<ul>
+  <li>Handlers are ordinary closures — keep state across requests
+  (<code>local hits = 0</code>), branch on <code>req.url</code>, call
+  <code>api.get</code>. Write the mock from the service's protocol
+  documentation.</li>
+  <li><code>listen(0)</code> picks a free port — read <code>server.port</code>.
+  <code>server:close()</code> stops it; servers die with their QA.</li>
+  <li>A handler that raises answers HTTP 500 with the error text; no reply
+  within 10 s is a 504. The reply is the handler's synchronous return value,
+  so a mock can't simulate latency — for timeout tests, point the client at
+  an unreachable port.</li>
+  <li>Mock code can live in a sibling file loaded with
+  <code>require("mocklib")</code> — and only <code>--%%file</code> files are
+  packaged, so the mocks never ship to the HC3.</li>
+</ul>
+
+<p>The example that ships with flua does exactly what this series has been
+building toward: it hosts all four servers <i>and</i> verifies its own
+clients against them, ending with <code>exit(failures)</code> — F5 it, or
+run it from the terminal:</p>
+
+<pre>
+flua --api local mockServer.lua     # in the directory flua --examples prints
+</pre>
+
+<pre>
+PASS: http status (200)
+PASS: http body (Hello flua)
+PASS: tcp reply (HELLO)
+PASS: udp reply (sender's port echoed)
+PASS: ws reply (echo:hi)
+failures: 0
+</pre>
+
+<p>That closes the loop: UI, timers, device logic, deployment — and now the
+integrations too — all developed and verified on the laptop before anything
+touches the controller.</p>
+
+<p><b>Where to go from here:</b> the repo has a tutorial
+(<code>docs/tutorial/</code>, ten chapters), a full user guide
+(<code>USAGE.md</code>), and 40+ runnable examples
+(<code>flua --examples</code>). If something does not behave like the HC3
+or you are missing a feature, open an issue — flua is built to match the
+controller, and feedback from real QAs is what drives it.</p>
+
+<p><small>flua: https://github.com/jangabrielsson/flua · install: pip
+install fibaro-flua</small></p>

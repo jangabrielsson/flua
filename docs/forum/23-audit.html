@@ -1,0 +1,58 @@
+<h2>How much of the HC3 does flua cover?</h2>
+
+<p>flua simulates a slice of the HC3 — the parts QAs, tools, and the
+viewer actually touch — and forwards the rest to the real controller in
+online mode. Until now "a slice" was a feeling. <code>flua audit</code>
+turns it into numbers:</p>
+
+<pre>
+.venv/bin/flua audit
+# flua audit
+# REST routes (docs/specs/hc3-api.json)
+#   78 of 356 simulated (21%)
+#   278 not simulated (forwarded to the HC3 online)
+#   not simulated by area: energy 24, panels 30, scenes 11, settings 30, ...
+# Device catalog (src/flua/devices/devices.json)
+#   176 types: 26 light-modeled, 29 specific-device captures with light actions, 52 other, 69 inert
+# Type hierarchy (devices/hierarchy.json): 175 types (firmware 5.210.12), 174 in the catalog, 175 resolvable
+# QA templates (quickapp-types): 30 templates, 30 with resolvable types
+</pre>
+
+<p>Three numbers matter. <b>Routes</b>: 356 endpoints in the distilled
+swagger, 78 answered offline — the floor is pinned by a test, so coverage
+can only go up. <b>Templates</b>: all 30 QA scaffolds must actually boot,
+or CI fails. And <b>types</b>: 176 cataloged device types, 26 of them
+light-modeled. The specific captures (an FGR dimmer, a Davis weather
+station) are data for the house — for a QA you'd use the parent type
+instead, and the parents are the modeled ones.</p>
+
+<h3>Device types flua has never heard of</h3>
+
+<p>New HC3 firmware introduces new types. The catalog can lag — but flua
+now ships the HC3's own type hierarchy (distilled from the undocumented
+<code>/api/devices/hierarchy</code>), and an unknown type <b>falls back to
+its nearest cataloged ancestor</b>. Declare a type the catalog predates
+and it still runs, as its parent's skeleton, keeping its own name:</p>
+
+<pre>
+--%%type:com.fibaro.FGD223
+print("TYPE", api.get("/devices/".._FLUA.qaId).type)
+exit(0)
+</pre>
+
+<pre>
+.venv/bin/flua qa.lua
+# [qa5000]: TYPE com.fibaro.FGD223
+</pre>
+
+<p>Types the hierarchy never heard of still fail loudly with "unknown
+device type" — a typo stays a typo. The hierarchy file is regenerable from
+any HC3 (<code>scripts/extract_hierarchy.py</code>), so updating flua's
+knowledge is one command, and <code>flua audit --json</code> hands the
+same report to your agent or CI.</p>
+
+<p>Next time: the structured trace stream — what your AI agent should
+read while it debugs your QA.</p>
+
+<p><small>flua audit: USAGE.md · hierarchy: devices/hierarchy.json ·
+pip: fibaro-flua 0.1.83 · flua: https://github.com/jangabrielsson/flua</small></p>

@@ -1,0 +1,66 @@
+<h2>The device catalog: 30 device types, one command</h2>
+
+<p>Every QA starts with a device type — and each type comes with a contract:
+its canonical actions (<code>turnOn</code>/<code>turnOff</code> for a
+binarySwitch, <code>setValue</code> for a multilevelSwitch, …) and its
+property conventions. flua ships a template for all 30 types, so a new QA
+starts correct instead of from a blank file:</p>
+
+<pre>
+flua --tool newQA                    # lists all 30 types
+flua --tool newQA binarySwitch "Hall lamp"
+</pre>
+
+<pre>
+wrote binarySwitch.lua (com.fibaro.binarySwitch)
+</pre>
+
+<p>The template is a working QA — the type's canonical actions implemented,
+the standard property conventions in place:</p>
+
+<pre>
+--%%name:Hall lamp
+--%%type:com.fibaro.binarySwitch
+--%%description:"My description"
+
+-- Binary switch type should handle actions turnOn, turnOff
+-- To update binary switch state, update property "value" with boolean
+
+function QuickApp:onInit()
+    self:debug(self.name,self.id)
+    if not api.get("/devices/"..self.id).enabled then
+        self:debug(self.name,self.id,"Device is disabled")
+        return
+    end
+end
+
+function QuickApp:turnOn()
+    self:debug("binary switch turned on")
+    self:updateProperty("value", true)
+end
+</pre>
+
+<p>Run it right away — it works offline with no edits, and the UI viewer
+shows the type's default controls (On/Off buttons for a binarySwitch, a
+slider for a multilevelSwitch). That is also a checklist: if your QA is
+supposed to <i>be</i> a switch, these are the actions the rest of the house
+will call — implement them and you are a well-behaved citizen.</p>
+
+<p>For state that must survive restarts, the HC3 way is QuickApp variables —
+and they work offline exactly as on the controller:</p>
+
+<pre>
+function QuickApp:onInit()
+  self:setVariable("greeting", "hello")
+  print(self:getVariable("greeting"))   -- hello, also after a restart
+end
+</pre>
+
+<p>Variables live on the device (the <code>quickAppVariables</code>
+property), persist across QA restarts, and show up in the downloaded device
+data — same semantics as the HC3.</p>
+
+<p>Next post: your QA is growing — split it into files.</p>
+
+<p><small>flua: https://github.com/jangabrielsson/flua · templates:
+<code>--tool newQA</code> (they also ship as agent skill templates)</small></p>

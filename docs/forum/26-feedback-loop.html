@@ -1,0 +1,77 @@
+<h2>Your feedback loop — now with an issue for it</h2>
+
+<p>The last few weeks brought some of the best feedback flua has received —
+reports that came with the flua version, a minimal repro, and a clear
+"expected vs observed" per finding. Two things happened as a result:
+instant mode got its clock fixed, <code>--strict-tests</code> +
+<code>--result-json</code> were built for trustworthy CI runs, and a
+property-endpoint mismatch was verified against a live HC3 and corrected.
+That quality of report is worth making the default — so there is now a
+purpose-built issue template for it.</p>
+
+<h3>The feedback template</h3>
+
+<p>File it at
+<a href="https://github.com/jangabrielsson/flua/issues/new?template=feedback.md">
+github.com/jangabrielsson/flua/issues/new?template=feedback.md</a> — it
+asks for the things that make a report actionable:</p>
+
+<ul>
+<li>what you were doing (one paragraph)</li>
+<li><code>flua --version --machine</code> — version matters: reports
+against older releases often hit behavior that is already fixed</li>
+<li>results (what passed, what failed, the commands run)</li>
+<li>findings, one per heading — expected vs observed, a minimal repro,
+the suggested change</li>
+<li>what worked well, and your priorities</li>
+</ul>
+
+<p>Labels take it from there: <code>feedback</code>,
+<code>needs-repro</code>, <code>verified-fixed</code>,
+<code>rainy-day</code>.</p>
+
+<h3>You use a coding agent — let it file the report</h3>
+
+<p>Most of the forum is AI-assisted these days, and the agents are good at
+this. Hand yours this prompt at the end of a flua session:</p>
+
+<pre>
+File a flua feedback issue for this session. Use the "Feedback / experience
+report" template at
+https://github.com/jangabrielsson/flua/issues/new?template=feedback.md
+
+Include:
+- what we were testing and the goal
+- the output of `flua --version --machine` (and --capabilities-json if relevant)
+- every finding as its own section: expected vs observed, the smallest Lua
+  file/command that reproduces it, and the suggested change
+- what worked well, and which findings matter most to me
+- mark anything we could not verify as such
+
+Label it `feedback`. If gh is available, create it with
+`gh issue create --template feedback.md --label feedback`.
+</pre>
+
+<p>That takes about two minutes of agent time and replaces the
+paste-ping-pong: the issue keeps the version trail, the repro, and the
+resolution in one place, and the next person with the same problem finds
+it instead of re-reporting it.</p>
+
+<h3>What happens after you file</h3>
+
+<ul>
+<li>Every finding is verified against the current tree — confirmed defects
+are fixed with a pinning regression test, so they cannot silently return.</li>
+<li>Non-urgent improvements are parked in
+<code>docs/rainy_day_todos.md</code> with the rationale, and promoted when
+someone asks twice.</li>
+<li>Anything that needs a live-HC3 capture is captured read-only before a
+single route changes.</li>
+<li>You get a written response per round — what was already fixed, what
+changed, what was parked.</li>
+</ul>
+
+<p>The triage process itself is documented in
+<a href="https://github.com/jangabrielsson/flua/blob/main/docs/feedback/README.md">
+docs/feedback/README.md</a> — the same loop the maintainer's own agents
+follow.</p>

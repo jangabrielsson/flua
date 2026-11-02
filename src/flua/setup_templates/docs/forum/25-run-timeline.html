@@ -1,0 +1,54 @@
+<h2>The run timeline: your QA's story, drawn</h2>
+
+<p>Post 24 gave the traces to your agent. Now they get a face: the run
+timeline turns the same structured feed into a picture — one lane per QA,
+virtual time on the x-axis, every event a colored mark. Multi-QA
+interactions stop being JSON archaeology.</p>
+
+<p>Enable the trace categories and start the viewer; the timeline lives at
+<code>/timeline</code> (linked from the viewer header):</p>
+
+<pre>
+-- .flua-directives
+--%%trace:api,ui,net,timer
+--%%syslog:run.json
+</pre>
+
+<pre>
+.venv/bin/flua --ui 8091 qa.lua
+# flua: UI viewer on http://127.0.0.1:8091/ — open it in a browser
+open http://127.0.0.1:8091/timeline
+</pre>
+
+<p>What you see:</p>
+
+<ul>
+<li><b>One lane per QA</b> — plus a <code>system</code> lane for run
+lifecycle — with <b>timers in their own lane</b> (<code>&lt;tag&gt; ·
+timers</code>), because timer starts/expiries would drown everything
+else.</li>
+<li><b>Colors by kind</b> — blue <code>api</code> calls, green <code>ui</code>
+events, orange <code>net</code> operations, purple <code>timer</code>, gray
+lifecycle.</li>
+<li><b>Hover for everything</b> — time, QA, event name, detail, and the
+full data JSON. Events stacked at the same instant list together, so
+nothing hides behind its neighbor.</li>
+<li><b>Time stays honest</b> — a fixed minimum scale (40px per virtual
+second): long runs grow past the page width and the timeline scrolls,
+instead of compressing into unreadability. The <b>clear</b> button drops
+the drawn history but keeps the scale.</li>
+</ul>
+
+<p>Because the x-axis is <i>virtual</i> time, the timeline plays perfectly
+with time travel: run with <code>--speed 60</code> and watch a minute of
+behavior compress into a second, or <code>--instant</code> to have the
+whole run draw itself at once. Add <code>--%%syslog:run.json</code> (as
+above) and the same events persist for post-mortems — the live view reads
+the recent 2000 from the in-memory feed.</p>
+
+<p>Next time: proxy mode — flua mirrors a QA onto your real HC3, so it
+runs offline but behaves as a device on the controller. The deepest
+offline-online blend yet.</p>
+
+<p><small>timeline: /timeline under --ui · traces: USAGE.md ·
+pip: fibaro-flua 0.1.84 · flua: https://github.com/jangabrielsson/flua</small></p>

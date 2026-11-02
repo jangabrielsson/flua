@@ -1,0 +1,88 @@
+<h2>Test foreign QAs without touching them</h2>
+
+<p>You download someone's QA from the forum. It has their IP, their
+password, their names baked into the <code>--%%</code> header. You want to
+run it with <i>your</i> values — without editing the file (you want to send
+it back, or update it later). Until now that meant <code>-D</code> flags in
+a launch config, or worse, editing the QA and forgetting.</p>
+
+<p>flua's answer is a file: <code>.flua-directives</code>, sitting next to
+the QA's main file. It uses the exact same <code>--%%</code> syntax as a QA
+header, and it <b>wins over the QA's own directives</b>. Drop it in the
+directory, press F5 — no launch.json edits, no QA edits.</p>
+
+<h3>The foreign QA</h3>
+
+<p>Say the QA looks like this (their values, not yours):</p>
+
+<pre>
+-- foreign.lua — someone else's QA, do not edit
+--%%name:remote-lamp
+--%%var:host="192.168.1.10"
+--%%var:pwd="hunter2"
+print("RUN")
+setTimeout(function()
+  local dev = api.get("/devices/".._FLUA.qaId)
+  for _, qv in ipairs(dev.properties.quickAppVariables) do
+    print("VAR", qv.name, qv.value)
+  end
+  exit(0)
+end, 10)
+</pre>
+
+<p>Run it as-is:</p>
+
+<pre>
+.venv/bin/flua foreign.lua
+# [remote-lamp5000]: RUN
+# [remote-lamp5000]: VAR pwd hunter2
+# [remote-lamp5000]: VAR host 192.168.1.10
+</pre>
+
+<h3>Your override file</h3>
+
+<p>Next to it, create <code>.flua-directives</code> — same syntax as a QA
+header. Expressions work too: <code>os.getenv</code> reads your
+<code>.env</code> chain, so the file itself can stay secret-free:</p>
+
+<pre>
+-- .flua-directives — next to foreign.lua
+--%%var:host="10.0.0.99"
+--%%var:pwd=os.getenv("HC3_TEST_PWD")
+</pre>
+
+<pre>
+HC3_TEST_PWD=s3cret .venv/bin/flua foreign.lua
+# [remote-lamp5000]: VAR host 10.0.0.99
+# [remote-lamp5000]: VAR pwd s3cret
+</pre>
+
+<p>The QA's own header still wins nothing — the file overrides it, per
+key. An explicit <code>-D</code> flag still beats the file, so a one-off
+experiment doesn't require editing anything:</p>
+
+<pre>
+.venv/bin/flua -D 'var:host="11.0.0.1"' foreign.lua
+# [remote-lamp5000]: VAR pwd s3cret
+# [remote-lamp5000]: VAR host 11.0.0.1
+</pre>
+
+<h3>The full precedence chain</h3>
+
+<ul>
+<li>the QA's own header</li>
+<li>&lt; its <code>--%%include</code> defaults</li>
+<li>&lt; <code>.flua-directives</code> next to the main file</li>
+<li>&lt; <code>-D</code> flags</li>
+</ul>
+
+<p>Discovery keys on the directory of the file you pass on the command
+line — for a <code>.fqa</code>, the package's own directory, never inside
+it. A missing file is simply skipped. Several QAs in different directories
+each get their own overrides; a QA in the same directory shares yours.</p>
+
+<p>Next time: all of this grew a UI — the flua VS Code extension packs,
+unpacks, checks, and uploads from the explorer.</p>
+
+<p><small>.flua-directives: USAGE.md · pip: fibaro-flua 0.1.83 ·
+flua: https://github.com/jangabrielsson/flua</small></p>

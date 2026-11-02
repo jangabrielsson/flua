@@ -1,0 +1,123 @@
+<h2>Mock a Modbus device — develop your Modbus client on the laptop</h2>
+
+<p>A lot of QuickApps speak <b>Modbus TCP</b> — SolarEdge inverters, energy
+meters, battery systems. Developing one is painful: every change means
+uploading to the HC3, watching the log, poking the real device. flua flips
+that around: the same QA runs on the laptop, and a <i>second</i> QA can be
+the Modbus device. Change the mocked values with a button press and watch
+your client react — no controller, no inverter.</p>
+
+<p>The mock that ships with flua is a <b>SolarEdge inverter</b>
+(<code>examples/Modbus Server/</code>): the SunSpec register map straight
+from SolarEdge's technical note (a copy of the note sits next to the map),
+built on a small generic Modbus server library
+(<code>modbus_server.lua</code> — FC3 reads, FC6/FC16 writes, partial-frame
+buffering). It has buttons — <i>Sun +500W</i>, <i>Grid: Export</i>,
+<i>Battery SOC 100%</i> — that mutate the registers. One honest caveat: the
+mock QA itself only runs in flua — it opens local sockets, which the HC3
+does not allow. Your <i>client</i> still deploys to the HC3 unchanged.</p>
+
+<p>The client side is ordinary Modbus code. Here is a minimal SolarEdge
+SunSpec client — powerMeter device, reads AC power (SunSpec register
+40083) with its scale factor (40084) every ten seconds:</p>
+
+<pre>
+--%%name:SE Meter
+--%%type:com.fibaro.powerMeter
+--%%var:host="127.0.0.1"
+--%%var:port="1502"
+-- --------------- EOH ---------------
+-- Minimal SolarEdge SunSpec client: reads AC power (SunSpec register
+-- 40083, base-0) with its scale factor (40084) every 10 s.
+
+local socket = net.TCPSocket({timeout = 5000})
+
+local function word(x) return string.char(math.floor(x / 256) % 256, x % 256) end
+
+function QuickApp:readPower()
+  -- MBAP header + FC3 (read holding registers), 2 registers from 40083
+  local tx = string.char(0, 0, 0, 0, 0, 6, 1, 3) .. word(40083) .. word(2)
+  local function schedule() setTimeout(function() self:readPower() end, 10 * 1000) end
+  socket:connect(self:getVariable("host"), tonumber(self:getVariable("port")), {
+    success = function()
+      socket:write(tx, {
+        success = function()
+          socket:read({
+            success = function(response)
+              if response and #response >= 13 then
+                local power = response:byte(10) * 256 + response:byte(11)
+                local sf = response:byte(12) * 256 + response:byte(13)
+                if sf >= 0x8000 then sf = sf - 0x10000 end  -- int16
+                self:updateProperty("value", power * 10 ^ sf)
+                self:updateProperty("unit", "W")
+                self:updateProperty("log", os.date("%H:%M:%S"))
+              end
+              socket:close()
+              schedule()
+            end,
+            error = function() socket:close(); schedule() end,
+          })
+        end,
+        error = function() socket:close(); schedule() end,
+      })
+    end,
+    error = schedule,
+  })
+end
+
+function QuickApp:onInit() self:readPower() end
+</pre>
+
+<p>Save it and press F5 with the <i>Run &amp; Debug</i> configuration below
+(it is the standard UI+mobdebug launch with the mock file added as a second
+argument — both QAs boot in one flua, the mock binds 127.0.0.1:1502, the
+client connects to it):</p>
+
+<pre>
+{
+  "name": "Flua: Debug with Modbus (UI+mobdebug)",
+  "type": "luaMobDebug",
+  "request": "launch",
+  "workingDirectory": "${workspaceFolder}",
+  "sourceBasePath": "${workspaceFolder}",
+  "listenPort": 8172,
+  "stopOnEntry": false,
+  "sourceEncoding": "UTF-8",
+  "interpreter": ".venv/bin/flua",
+  "arguments": [
+    "--ui", "8090",
+    "-D", "var:host=\"127.0.0.1\"",
+    "${relativeFile}",
+    "examples/Modbus Server/solaredge_mock.lua"
+  ],
+  "listenPublicly": true
+}
+</pre>
+
+<p>The <code>-D var:host=…</code> is the launch-time override of the QA's
+own <code>--%%var:host</code> — no code edits to switch between the mock on
+the laptop and the inverter on the LAN. Open
+http://127.0.0.1:8090/ and you see both QAs: your client showing 2500 W,
+and the mock with its buttons. Press <i>Sun +500W</i> — the client's next
+poll reads 3000 W. The condensed view (the <b>View</b> toggle) shows both
+QAs as small status cards, and a breakpoint in the read callback stops the
+client mid-request (post 4).</p>
+
+<p>One address note, because it bites everyone once: SunSpec registers are
+<b>base-0 wire addresses</b> — AC power is register 40083, sent as address
+40083. Some QAs built from the legacy SolarEdge protocol docs number
+registers 1-based and subtract 40001 instead (40084 → wire 83). The real
+inverter answers <i>both</i> (verified on device), and so does the mock —
+its server library serves the map at two bases (<code>base</code> +
+<code>altBase</code>), so either client convention works.</p>
+
+<p>Already have a Modbus client QA running on your HC3? Bring it over:
+<code>flua --tool downloadQA &lt;id&gt;</code> (post 7's <code>.env</code>
+first), then <code>flua unpack name.fqa -d seqa/</code> — flua regenerates
+the <code>--%%</code> directives and you get a folder of .lua files to open
+in VS Code. Point <code>host</code> at 127.0.0.1, press F5, and you are
+developing against the mock instead of the controller. The QA you test
+here is the QA you deploy — only the <code>host</code> variable changes.</p>
+
+<p><small>flua: https://github.com/jangabrielsson/flua · install: pip
+install fibaro-flua</small></p>

@@ -1,0 +1,59 @@
+<h2>Child devices, the HC3 way</h2>
+
+<p>A QA can own <i>child devices</i> — separate devices on the controller
+that belong to the parent QA and let the rest of the house address its
+parts individually (a weather station with a temperature child and a wind
+child, a switch with per-outlet children). flua supports the HC3's basic
+child API — <code>QuickAppChild</code> subclasses and
+<code>createChildDevice</code> — offline, children appearing in the
+simulated device list like on a real controller.</p>
+
+<p>Define a child class with its own actions, create it in
+<code>onInit</code>:</p>
+
+<pre>
+Child = {}
+class 'Child'(QuickAppChild)
+function Child:__init(dev)
+  QuickAppChild.__init(self, dev)
+end
+function Child:wave()
+  print("CHILD", self.id, "waves back")
+end
+
+function QuickApp:onInit()
+  local child = self:createChildDevice(
+    { name = "Kid", type = "com.fibaro.binarySwitch" }, Child)
+  print("created", child.id, child.name)
+end
+</pre>
+
+<p>The child is now a real device in the sim:</p>
+
+<pre>
+local found = api.get("/devices?parentId=" .. self.id)  -- [{id = 900001, name = "Kid", ...}]
+fibaro.call(child.id, "wave")                           -- CHILD 900001 waves back
+</pre>
+
+<p>Everything the HC3 does with children works the same way offline:</p>
+
+<ul>
+  <li>Children are found by <code>parentId</code> — the same
+  <code>api.get</code> a QA uses on the controller.</li>
+  <li>Their actions and properties behave like any device's: call them with
+  <code>fibaro.call</code>, read their state with
+  <code>api.get("/devices/" .. child.id)</code>, subscribe to their events.</li>
+  <li><code>self.childDevices</code> holds the instances;
+  <code>initChildDevices</code> runs right after <code>onInit</code> and
+  re-attaches child instances that already exist on the device — so a QA
+  restart picks its children back up, like the HC3.</li>
+  <li>Clean up with the same endpoint as the HC3:
+  <code>api.delete("/plugins/removeChildDevice/" .. child.id)</code>.</li>
+</ul>
+
+<p>The workflow benefit is the same as everywhere in flua: the child logic
+is developed and debugged offline — breakpoints inside <code>Child:wave</code>
+included — and the parent QA uploads as one unit when it is ready.</p>
+
+<p><small>Example: <code>flua --examples</code> → children_local.lua (uses
+the basic HC3 child API) · flua: https://github.com/jangabrielsson/flua</small></p>

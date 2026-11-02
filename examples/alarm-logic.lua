@@ -13,11 +13,29 @@
 local M = {}
 
 M.exitDelayMs = 2000  -- the arming delay (tune per partition)
+M.armDelayMs = 1000  -- the arming delay (tune per partition)
 
 -- the module owns the partition state: id -> {armed, arming, breached}
-local partitions = {
-  [1] = { armed = false, arming = false, breached = false },
-}
+local partitions = {}
+local ID = 1
+
+local function shape(id)
+  if not id then id = ID; ID = ID + 1 end
+  local p = partitions[id] or {}
+  p = {
+    id = id,
+    name = p.name or "Alarm",
+    armed = p.armed or false,
+    arming = p.arming or false,
+    breached = p.breached or false,
+    breachDelay = p.breachDelay or M.exitDelayMs,
+    armDelay = p.armDelay or M.armDelayMs,
+    devices = p.devices or {},
+    lastActionAt = p.lastActionAt or 0,
+  }
+  partitions[id] = p
+  return p
+end
 
 local function emit(id, property, newValue)
   _FLUA.postRefreshEvent{
@@ -26,19 +44,17 @@ local function emit(id, property, newValue)
   }
 end
 
-local function shape(id)
-  local p = partitions[id] or { armed = false, arming = false, breached = false }
-  return {
-    id = id,
-    armed = p.armed,
-    arming = p.arming,
-    breached = p.breached,
-  }
-end
+api.registerEndpoint("POST", "/alarms/v1/partitions", function(req)
+  local data = req.body or {}
+  local p = shape()
+  p.name = data.name or "Alarm"
+  return p, 201
+end, true)
 
 api.registerEndpoint("GET", "/alarms/v1/partitions/{id}", function(req)
   local id = tonumber(req.params.id)
-  return partitions[id] and shape(id) or nil, partitions[id] and 200 or 404
+  local p,code = partitions[id] and shape(id) or nil, partitions[id] and 200 or 404
+  return p, code
 end, true)
 
 api.registerEndpoint("GET", "/alarms/v1/partitions", function()
@@ -61,7 +77,7 @@ api.registerEndpoint("POST", "/alarms/v1/partitions/{id}/actions/arm", function(
     p.arming = false
     p.armed = true
     emit(id, "armed", true)  -- armed after the exit delay
-  end, M.exitDelayMs)
+  end, p.armDelay)
   return nil, 202
 end, true)
 

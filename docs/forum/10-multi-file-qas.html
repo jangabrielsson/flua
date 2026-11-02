@@ -1,0 +1,52 @@
+<h2>Multi-file QAs: grow your project, keep it organized</h2>
+
+<p>A QA on the HC3 is a <i>set of named Lua files</i> — one is
+<code>main</code>, the rest are libraries it loads. flua keeps the same
+model: your files stay on disk, and the main file declares the extras in
+its header:</p>
+
+<pre>
+--%%name:weather-app
+--%%type:com.fibaro.binarySwitch
+--%%file:lib.lua,lib
+-- --------------- EOH ---------------
+
+function QuickApp:onInit()
+  print("helper says:", helper())   -- defined in lib.lua, loaded before main
+end
+</pre>
+
+<p>The rules:</p>
+
+<ul>
+  <li><code>--%%file:path,name</code> — the on-disk path and the QA file
+  name it gets on the HC3. Paths resolve relative to the main file.</li>
+  <li>Files load in declaration order, <b>main last</b> — so helpers are
+  available when <code>onInit</code> runs.</li>
+  <li>Everything below the <code>EOH</code> marker line is code; the
+  directives live above it.</li>
+</ul>
+
+<p>Run it like any QA — <code>flua --ui weather_app.lua</code> — and the
+files behave like they do on the controller. Even the file API works
+offline:</p>
+
+<pre>
+local files = api.get("/quickApp/" .. self.id .. "/files")
+for _, f in ipairs(files) do print("file:", f.name) end   -- main, lib
+</pre>
+
+<p>And when you deploy (<code>--tool uploadQA</code> / <code>updateQA</code>
+/ <code>pack</code>), exactly the declared files travel into the
+<code>.fqa</code> package — the HC3 gets the same file set you developed
+against. One deliberate difference from the controller is useful for
+testing: plain Lua <code>require("name")</code> also finds
+<code>name.lua</code> next to the main file — but require'd files are
+<i>not</i> packaged, so test helpers (mock servers, assertions) never ship
+to the HC3. <code>--%%file</code> = ships, <code>require</code> = stays
+local.</p>
+
+<p>Next post: listen to the house — the refreshState event flow.</p>
+
+<p><small>Example: <code>flua --examples</code> → multifile.lua ·
+flua: https://github.com/jangabrielsson/flua</small></p>

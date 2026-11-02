@@ -1,0 +1,65 @@
+<h2>Let your QA test itself</h2>
+
+<p>Here is a workflow shift worth adopting: the QA <i>is</i> the test. flua
+gives every QA an exit code — a runtime error exits 1, <code>exit(N)</code>
+exits N — so a QA can assert its own behavior and report success or failure
+to whatever runs it. No test framework, no extra files.</p>
+
+<pre>
+--%%name:my_qa_test
+local failures = 0
+
+local function assertEq(actual, expected, msg)
+  if tostring(actual) == tostring(expected) then
+    print("PASS: " .. msg .. " (" .. tostring(actual) .. ")")
+  else
+    failures = failures + 1
+    print("FAIL: " .. msg .. " — expected " .. tostring(expected) .. ", got " .. tostring(actual))
+  end
+end
+
+function QuickApp:onInit()
+  local device = api.get("/devices/" .. self.id)  -- the sim sees the QA
+  assertEq(device.id, self.id, "device visible in the sim")
+
+  self:updateProperty("value", 50)
+  assertEq(self.properties.value, 50, "updateProperty round trip")
+
+  print("failures:", failures)
+  exit(failures > 0 and 1 or 0)
+end
+</pre>
+
+<p>Run it (F5 works too — offline is the default, so no flags are needed):</p>
+
+<pre>
+flua --api local my_qa.lua
+echo $?          # 0 = everything passed, non-zero = look at the FAIL lines
+</pre>
+
+<p>This is the exact pattern of <code>selfTest.lua</code> in the examples
+directory (<code>flua --examples</code>). Every change you make can be
+verified in one command — your own mini test suite, living inside the QA.</p>
+
+<p>Two extensions that make this even more useful:</p>
+
+<ul>
+  <li><b>Coding agents.</b> If you work with an AI assistant (Copilot,
+  Claude Code, or similar), <code>flua --tool setup</code> has already
+  installed agent skills into your project — including
+  <code>quickapp-test</code>, which teaches the agent this exact
+  verify-loop: run offline, check the exit code, drive the sim over HTTP
+  when interactions are needed. Tell your agent "change the QA to do X and
+  verify it" and it can actually run and check the result.</li>
+  <li><b>Test code that never ships.</b> Helpers for testing can live in a
+  sibling file loaded with plain Lua <code>require("testlib")</code> — files
+  next to the QA load automatically, and only <code>--%%file</code> files
+  get packaged into the .fqa, so your test scaffolding never reaches the
+  controller.</li>
+</ul>
+
+<p>Next post: when the tests pass — the one-command path from laptop to
+HC3.</p>
+
+<p><small>flua: https://github.com/jangabrielsson/flua · agents: USAGE.md +
+the quickapp-test skill</small></p>

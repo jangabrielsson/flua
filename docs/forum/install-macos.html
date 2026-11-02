@@ -1,0 +1,137 @@
+<h2>Installing flua on macOS — Python, pip, VS Code, and the usual bumps</h2>
+
+<p>flua needs Python, and Python on a Mac is where most of the confusion
+lives — several Pythons can exist side by side. This post walks through the
+install, the upgrade, where things land, and what to do when something does
+not work. No programming background required.</p>
+
+<h3>1. Install Python (with Homebrew)</h3>
+
+<p>flua needs Python 3.11 or newer. The cleanest way on macOS is Homebrew.
+First check whether brew is there:</p>
+
+<pre>
+brew --version          # prints "Homebrew ..." — if not, install from https://brew.sh
+</pre>
+
+<p>Then install Python and check it:</p>
+
+<pre>
+brew install python3    # installs the current Python
+python3 --version       # should print Python 3.11 or newer
+python3 -m pip --version
+</pre>
+
+<p>The <code>python3 -m pip</code> form matters: it always uses the pip
+that belongs to <code>python3</code>, even when several Pythons are
+installed.</p>
+
+<h3>2. Install flua</h3>
+
+<pre>
+python3 -m pip install fibaro-flua
+</pre>
+
+<p>Test it — <code>flua</code> is now on your PATH:</p>
+
+<pre>
+flua --version
+</pre>
+
+<p>And a real smoke test. Save this as <code>hello.lua</code>:</p>
+
+<pre>
+function QuickApp:onInit()
+  print("QuickApp initialized")
+  exit(0)
+end
+</pre>
+
+<p>and run it:</p>
+
+<pre>
+flua hello.lua
+</pre>
+
+<p>You should see <code>QuickApp initialized</code> in the log. No HC3
+needed: without controller credentials flua runs against the emulated
+controller (force it anytime with <code>flua --api local hello.lua</code>).</p>
+
+<h3>3. Upgrade flua — and back down if needed</h3>
+
+<pre>
+python3 -m pip install --upgrade fibaro-flua
+flua --version          # confirm the new version
+</pre>
+
+<p>If a version turns out to have bugs, pin a known-good one instead of
+living with it:</p>
+
+<pre>
+python3 -m pip index versions fibaro-flua    # list every version on PyPI
+python3 -m pip install fibaro-flua==0.1.17   # pin a known-good version
+</pre>
+
+<p>Same rules as the upgrade: run the command with the Python that owns
+your <code>flua</code> (<code>head -1 $(which flua)</code> — see
+troubleshooting below).</p>
+
+<h3>4. Where is it installed?</h3>
+
+<pre>
+which flua               # e.g. /opt/homebrew/bin/flua (Apple Silicon)
+                         # or  /usr/local/bin/flua (Intel)
+which -a flua            # every flua on this machine (virtualenvs etc.)
+head -1 $(which flua)    # which Python owns this flua
+</pre>
+
+<p>That last line shows the Python your flua runs on — the shebang of the
+installed command. Handy when upgrades do not seem to stick.</p>
+
+<h3>5. VS Code: the launch.json story</h3>
+
+<p>Run <code>flua --tool setup</code> in your QA project folder. It writes
+<code>.vscode/launch.json</code> and <code>.vscode/tasks.json</code> — the
+F5 run/debug configurations.</p>
+
+<ul>
+<li>The <b>Run</b> configurations launch flua through VS Code's selected
+<b>Python interpreter</b> — so open the command palette (Cmd+Shift+P) and
+run <i>Python: Select Interpreter</i>, choosing the Python you installed
+flua with. (If the menu is missing, install the Python extension.)</li>
+<li>The <b>Debug</b> configurations (mobdebug breakpoints) need flua's
+absolute path — <code>--tool setup</code> resolves it at setup time
+(<code>which flua</code>) and writes it into launch.json, so VS Code finds
+flua even though it does not inherit the shell's PATH. Re-run
+<code>--tool setup</code> after reinstalling flua somewhere else.</li>
+</ul>
+
+<h3>6. Troubleshooting</h3>
+
+<ul>
+<li><b><code>flua: command not found</code></b> — flua landed in a Python
+whose bin directory is not on your PATH. Install with the exact Python you
+use: <code>which python3</code>, then <code>python3 -m pip install
+fibaro-flua</code>. Until then <code>python3 -m flua ...</code> works
+everywhere <code>flua</code> would.</li>
+<li><b>VS Code cannot find flua when debugging</b> — re-run <code>flua
+--tool setup</code> in the project (it re-resolves the absolute path). For
+the Run configurations, check the selected Python interpreter.</li>
+<li><b><code>externally-managed-environment</code> error</b> — newer
+Pythons refuse pip installs outside a virtual environment. Easiest fix:
+<code>brew install pipx</code>, then <code>pipx install fibaro-flua</code>
+(and <code>pipx upgrade fibaro-flua</code> for upgrades).</li>
+<li><b>pip tries to compile <code>lupa</code> and fails</b> — your pip is
+too old to find the prebuilt wheel. <code>python3 -m pip install --upgrade
+pip</code>, then install flua again.</li>
+<li><b>Several Pythons, one flua</b> — <code>which -a python3</code> lists
+them all; <code>head -1 $(which flua)</code> shows which one owns flua.
+Upgrade with that interpreter: <code>&lt;that python&gt; -m pip install
+--upgrade fibaro-flua</code>.</li>
+</ul>
+
+<p>Everything past step 2 — the emulator, the UI viewer, the VS Code
+debugger — is covered in the tutorial series here on the forum.</p>
+
+<p><small>flua: https://github.com/jangabrielsson/flua · docs:
+USAGE.md · pip: https://pypi.org/project/fibaro-flua/</small></p>

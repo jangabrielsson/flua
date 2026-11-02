@@ -1,0 +1,145 @@
+<h2>Meet flua-mcp: flua as a tool your agent can call</h2>
+
+<p>Post 13 put an agent in the loop: it writes the QA, runs flua, reads
+the PASS/FAIL lines, iterates. That loop needed a shell and the commands.
+flua 0.1.45 removes even that: <b>flua-mcp</b> ships in the same
+<code>fibaro-flua</code> wheel, so any MCP host — Claude Desktop,
+Copilot, Cursor — can call flua directly as a tool. No repo checkout, no
+shell commands, no parsing: the agent asks <i>check this</i> or <i>run
+this</i> and gets JSON back.</p>
+
+<h3>One line of setup</h3>
+
+<p>Upgrade flua, then register the server in your host's config. That is
+the whole install — the server is already on disk:</p>
+
+<pre>
+pip install -U fibaro-flua
+</pre>
+
+<p>Claude Desktop (<code>claude_desktop_config.json</code>):</p>
+
+<pre>
+{"mcpServers": {"flua": {"command": "flua-mcp"}}}
+</pre>
+
+<p>Copilot and other <code>.mcp.json</code> hosts (uses the interpreter
+flua runs on):</p>
+
+<pre>
+{"mcpServers": {"flua": {"command": "python", "args": ["-m", "flua.mcp.server"]}}}
+</pre>
+
+<h3>No shell at all? The HTTP transport</h3>
+
+<p>stdio is perfect for hosts on your laptop. Some hosts cannot spawn a
+local process — a cloud agent, a browser-based client, or one flua-mcp
+shared by several machines. For those, the same server speaks Streamable
+HTTP: one endpoint, the same tools, no session headers, no SSE. Opt-in,
+and safe by default:</p>
+
+<pre>
+flua-mcp --http                      # 127.0.0.1:8091, loopback only
+FLUA_MCP_TOKEN=secret \
+flua-mcp --http 0.0.0.0:8091        # LAN: every request needs the token
+</pre>
+
+<p>The server refuses non-loopback binds without a token — the guard is
+built in, not documented. Register it as a remote server:</p>
+
+<pre>
+{"mcpServers": {"flua": {"url": "http://127.0.0.1:8091/mcp"}}}
+</pre>
+
+<p>That is the piece that lets a cloud agent drive flua through a tunnel
+while the HC3 stays behind your router — and <code>mode: "remote"</code>
+is still explicit, so nothing reaches the controller uninvited.</p>
+
+<h3>The loop, as tool calls</h3>
+
+<p>Take the self-asserting QA from post 6, now with flua's built-in test
+library (the same file still runs on a real HC3 — there the assertions
+become no-ops):</p>
+
+<pre>
+--%%name:hello_mcp
+
+--%%file:$flua-test.lua,flua_test
+local Test = require("flua-test")
+local t = Test.new()
+
+function QuickApp:onInit()
+  t:expect(api.get("/devices/" .. self.id).id == self.id, "device registered")
+  self:updateProperty("value", true)
+  t:assert_eq(self.properties.value, true, "value flips on")
+  setTimeout(function()
+    self:updateProperty("value", false)
+    t:assert_eq(self.properties.value, false, "lamp off after 10 virtual minutes")
+    t:finish()
+  end, 10 * 60 * 1000)
+end
+</pre>
+
+<p>The agent calls <code>qa_check</code> for the static layer (syntax,
+unknown <code>--%%</code> directives, deprecated HC3 APIs) and then
+<code>qa_run</code> — offline, <code>instant</code> so the ten virtual
+minutes collapse to nothing. What it gets back is the answer, not log
+prose:</p>
+
+<pre>
+{"exitCode": 0,
+ "summary": {"levels": {"INFO": 1, "DEBUG": 4}, "pass": 3, "fail": 0, "failures": 0},
+ "logs": [...], "verdict": []}
+</pre>
+
+<p><code>exitCode</code> and <code>summary.failures</code> are the verdict;
+<code>summary.pass/fail</code> count the assertions; <code>logs</code> are
+structured <code>{time, level, tag, qaid, msg}</code> lines. When the agent
+only wants the failures it filters server-side —
+<code>{"filter": {"levels": ["ERROR"]}}</code> — instead of shelling out
+to jq. <code>qa_ui</code> returns a QA's controls as structured data the
+same way.</p>
+
+<h3>Live probing, without keeping a shell alive</h3>
+
+<p>Some bugs need a running QA, not a finished run. The session tier does
+that: <code>qa_start</code> boots an engine and returns a
+<code>sessionId</code>, <code>qa_probe</code> reads devices, QA status and
+<b>only the log lines since the last probe</b>, <code>qa_action</code>
+dispatches a device action into the running QA, and
+<code>qa_stop</code>/<code>qa_sessions</code> manage it. Sessions idle out
+on their own and die with the server — an agent cannot leak engines.</p>
+
+<h3>Knowledge rides along</h3>
+
+<p>The agent also gets flua's documentation without a repo checkout:
+<code>resources/read flua://docs/USAGE.md</code> serves the whole docs
+tree that ships in the wheel — the tutorial chapters, the architecture
+guide, the HC3 API reference. And two prompts seed the thinking:
+<code>qa_debug</code> turns a pasted error into the debugging workflow
+(static layer → offline reproduction → reading the error shape →
+shrinking → the pinned contracts), and <code>qa_skeleton</code> emits a
+runnable self-testing template with the deferred-onInit pattern — the demo
+above follows it. Both are pinned by the test suite, so the guidance never
+drifts from what flua actually does.</p>
+
+<h3>Guardrails are defaults</h3>
+
+<p>Every run is offline unless <code>mode: "remote"</code> is explicit —
+the worst the agent can do is fail an assertion. Controller credentials
+never travel in tool arguments; remote runs use the server's environment,
+the same <code>.env</code> chain flua itself uses. Runs are bounded by a
+timeout, and a bad request is a clean JSON-RPC error, never a dead server.
+The protocol is current (2026-07-28) with the legacy handshake still
+served, so old and new hosts both work.</p>
+
+<p>Post 13's loop, industrialized: the agent asks for the work as typed
+tool calls, proves it against the simulated house, and you review the
+diff — the controller still only hears from you.</p>
+
+<p>Next time: proxy mode — flua mirrors a QA onto your real HC3, so it
+runs offline but behaves as a device on the controller. The deepest
+offline-online blend yet.</p>
+
+<p><small>flua-mcp: docs/mcp.md · pip: fibaro-flua 0.1.45 ·
+flua: https://github.com/jangabrielsson/flua</small></p>

@@ -1,0 +1,56 @@
+<h2>Debug HC3 Lua in VS Code — breakpoints included</h2>
+
+<p>The HC3 web editor gives you <code>self:debug</code> prints and not much
+else. flua gives you a real debugger: breakpoints, step over/into, call
+stacks, and variable inspection — in VS Code, on the QA code you are editing,
+no changes to the file.</p>
+
+<p>If you ran <code>flua --tool setup</code> (post 1), the launch
+configurations are already in <code>.vscode/launch.json</code>:</p>
+
+<ul>
+  <li><b>Flua: Run Current File</b> — run, log in the terminal</li>
+  <li><b>Flua: Run Current File (UI)</b> — run + UI viewer in the browser</li>
+  <li><b>Flua: Debug Current File (mobdebug)</b> — breakpoints, stepping, variables</li>
+  <li><b>Flua: Debug Current File (UI+mobdebug)</b> — the debugger <i>and</i> the viewer together</li>
+</ul>
+
+<p>Press F5 with a <code>.lua</code> file open, or pick a configuration from
+the Run and Debug panel. Put a breakpoint on any line of <code>onInit</code>,
+start "Debug Current File (UI+mobdebug)", and VS Code stops there — before
+anything else runs. You can then step through your QA line by line, hover
+variables, and watch <code>self</code>, while the UI viewer sits in the
+browser showing the device you are debugging.</p>
+
+<p>Two flua-specific niceties you get for free:</p>
+
+<ul>
+  <li><b>The virtual clock pauses while you think.</b> Step slowly through a
+  QA with timers — nothing fires while the debugger is stopped, so the
+  state you are inspecting is exactly the state at the breakpoint, and the
+  run resumes from where you left it.</li>
+  <li><b>You debug against the simulated HC3.</b> <code>api.get</code>,
+  <code>fibaro.call</code>, UI events — everything the QA touches is fake, so
+  a misbehaving QA can never turn the house on and off while you are
+  stepping through it.</li>
+</ul>
+
+<p>Prefer the terminal? No setup needed:</p>
+
+<pre>
+flua --debugger 8172 quickapp.lua
+</pre>
+
+<p>...and attach a debugger client to port 8172 — the same protocol the
+mobdebug VS Code extension speaks, so the extension works out of the box.</p>
+
+<p>There is also a static check for the quick wins before you even run:</p>
+
+<pre>
+flua --check quickapp.lua   # syntax, --%% directive typos, deprecated APIs
+</pre>
+
+<p>Next post: stop testing one QA at a time — run a whole house full of
+devices in a single flua process.</p>
+
+<p><small>flua: https://github.com/jangabrielsson/flua · setup guide: USAGE.md</small></p>

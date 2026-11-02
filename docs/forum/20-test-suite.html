@@ -1,0 +1,62 @@
+<h2>A test suite for your QuickApps</h2>
+
+<p>Post 6 taught the pattern: a QA can assert its own behavior and exit
+with the failure count. Since then flua grew the missing half — a runner.
+<code>flua test</code> discovers <code>*_test.lua</code> files, runs each
+in its own flua process (with a wall-clock timeout, so a test that never
+exits can't block the rest), and reports one PASS/FAIL/TIME line per file.</p>
+
+<p>The assertions come from <code>require("flua-test")</code>, built into
+flua — no files to ship, nothing travels in the <code>.fqa</code>:</p>
+
+<pre>
+-- lamp_test.lua
+local Test = require("flua-test")
+local t = Test.new()
+
+t:expect(true, "the obvious one")
+t:assert_eq(2 + 2, 4, "math still works")
+
+local device = api.get("/devices/".._FLUA.qaId)
+t:expect(device.id == _FLUA.qaId, "the device is visible in the sim")
+
+t:finish()  -- "failures: N" + exit(failures > 0 and 1 or 0)
+</pre>
+
+<p>Make it fail, and the runner tells you why:</p>
+
+<pre>
+-- broken_test.lua
+local Test = require("flua-test")
+local t = Test.new()
+t:assert_eq(2 + 2, 5, "math still works")
+t:finish()
+</pre>
+
+<pre>
+.venv/bin/flua test
+#   FAIL  broken_test.lua  (failures: 1)
+#   PASS  lamp_test.lua
+# flua test: 1 passed, 1 failed, 0 timed out
+</pre>
+
+<p>Exit code 0 only when everything passes — CI-friendly. A test QA that
+forgets to exit hits the per-file timeout and is reported, not hung:</p>
+
+<pre>
+.venv/bin/flua test --timeout 5
+#   TIME  hanging_test.lua  (no exit within 5s — does the test end with t:finish()/exit(...)?)
+</pre>
+
+<p>Explicit file arguments run regardless of their name,
+<code>--list</code> shows what would run, <code>-v</code> dumps a failed
+test's output. Tests run with the working directory you invoke from, so
+<code>.flua-directives</code> overrides and the <code>.env</code> chain
+apply exactly as in a normal run — your suite can point a foreign QA's
+tests at your credentials without editing anything (post 18).</p>
+
+<p>Next time: when something doesn't work, one command tells you why —
+<code>flua doctor</code>.</p>
+
+<p><small>flua test: USAGE.md · flua-test: src/flua/lua/lib/flua-test.lua ·
+pip: fibaro-flua 0.1.83 · flua: https://github.com/jangabrielsson/flua</small></p>

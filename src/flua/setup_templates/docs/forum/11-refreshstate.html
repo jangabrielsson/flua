@@ -1,0 +1,59 @@
+<h2>Listen to the house: the refreshState event flow</h2>
+
+<p>Most interesting QAs react to <i>other devices</i>: the lamp watches the
+door sensor, the scene waits for the smoke detector. On the HC3 the
+mechanism is the <code>refreshStates</code> event feed; flua simulates it
+offline, so reactive logic is testable the same way timers are.</p>
+
+<p>The high-level way is the <code>RefreshStateSubscriber</code> class —
+subscribe with a predicate and a callback, then run:</p>
+
+<pre>
+local subscriber = RefreshStateSubscriber()
+subscriber:subscribe(
+  function(event) return true end,          -- which events to react to
+  function(event)
+    print("Event:", json.encode(event))
+  end)
+subscriber:run()
+
+function QuickApp:onInit()
+  setTimeout(function()
+    self:updateProperty("value", true)     -- the QA changes its own state
+  end, 100)
+end
+</pre>
+
+<pre>
+Event: {"type": "DevicePropertyUpdatedEvent",
+        "data": {"id": 5000, "property": "value", "oldValue": false, "newValue": true}, ...}
+</pre>
+
+<p>The event carries everything the HC3 delivers: the type, the device id,
+the changed property, and old/new values. Filter in the predicate — only
+door sensors, only breaches:</p>
+
+<pre>
+subscriber:subscribe(
+  function(event)
+    return event.type == "DevicePropertyUpdatedEvent"
+      and event.data.property == "value"
+  end,
+  function(event) print("door changed to", event.data.newValue) end)
+</pre>
+
+<p>Because events flow through the same pump as timers, the whole chain is
+deterministic: open the door QA, the lamp QA reacts, the scene reacts to
+the lamp — in one log, tagged per QA, reproducible every run
+(<code>flua door.lua lamp.lua</code> — several QAs, one process, as in
+post 5). Debugging a reaction chain becomes reading a chat log instead of
+staring at a live controller.</p>
+
+<p>The full event feed is also there at the API level — <code>api.get("/refreshStates?last=0")</code> returns the recorded events, and the
+HC3's polling contract holds — so QAs written against the raw feed port
+over unchanged.</p>
+
+<p>Next post: the devices <i>inside</i> your QA — child devices.</p>
+
+<p><small>Examples: <code>flua --examples</code> → refreshState.lua,
+trigger.lua · flua: https://github.com/jangabrielsson/flua</small></p>

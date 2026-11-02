@@ -1,0 +1,70 @@
+<h2>Run a whole house: many QAs, one flua</h2>
+
+<p>Real smart-home logic is rarely one QA: the door sensor talks to the lamp,
+the lamp asks the weather QA, the scene reacts to both. With flua you can run
+<b>several QAs in one process</b> — each isolated, each with its own device,
+all talking to each other over the same HC3 REST API the real controller
+uses.</p>
+
+<pre>
+flua --api local door.lua lamp.lua scene.lua
+</pre>
+
+<p>(F5 runs the <i>current</i> file — for a multi-QA house, the terminal
+command is the way; single-QA runs are always F5-able. And
+<code>--api local</code> is only there for clarity — offline is the default,
+so <code>flua door.lua lamp.lua scene.lua</code> does the same.)</p>
+
+<p>Device ids are assigned by the engine (starting at 5000), so QAs find each
+other the way they would on a real HC3 — by name, through the API:</p>
+
+<pre>
+local function findDevice(name)
+  local devices = api.get("/devices?name=" .. name) or {}
+  return devices[1] and devices[1].id
+end
+</pre>
+
+<p>A complete example ships with flua — two QAs that call each other's
+actions. <code>flua --examples</code> prints the examples directory; run the
+pair from there:</p>
+
+<pre>
+flua qa3.lua qa4.lua
+</pre>
+
+<p>qa4 finds qa-three, turns it on and off over the API, and qa-three calls
+qa4 back — exactly the <code>fibaro.call</code>/action pattern you use
+against the real controller:</p>
+
+<pre>
+[qa4]: turning qa-three on
+[qa3]: turned on
+[qa4]: got qa3 is on
+...
+</pre>
+
+<p>Reactions work the same way: <code>trigger.lua</code> in the examples
+directory starts a door sensor QA and a lamp QA in one run, subscribes the
+lamp to the door's state changes, and the lamp reacts when the door opens —
+the <i>refreshState</i> event flow, offline.</p>
+
+<p>Why this matters:</p>
+
+<ul>
+  <li><b>The simulator is your test house.</b> Seed it with your real device
+  names and ids (<code>--seed devices.json</code>) and the QAs talk to
+  "your" devices — offline.</li>
+  <li><b>Race conditions show up.</b> QAs run cooperatively in virtual time,
+  so cross-QA timing is deterministic — the intermittent bug that needs
+  three devices and a scene to reproduce is now a fixed, rerunnable
+  scenario.</li>
+  <li><b>One log, every device.</b> Each line is tagged with the QA's name
+  and id, so a conversation between five QAs reads like a chat log.</li>
+</ul>
+
+<p>Next post: turn that house into a test suite — let your QA assert its own
+behavior and report success or failure.</p>
+
+<p><small>Examples: <code>flua --examples</code> → qa3.lua/qa4.lua,
+trigger.lua · tutorial: docs/tutorial/04-the-house-comes-alive.md</small></p>
