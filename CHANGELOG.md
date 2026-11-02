@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.121] - 2026-11-02
+
+### Fixed
+- increase poll limit to 300 for better timing accuracy in alarm panel readiness check
+
 ## [0.1.120] - 2026-11-02
 
 ### Added
