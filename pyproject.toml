@@ -83,7 +83,14 @@ flua = [
     # globs don't match dotfiles — .luarc.json would be dropped from the wheel
     "setup_templates/.luarc.json",
 ]
-"flua.examples" = ["*.lua", "house.json", "multifile/*.lua", "Modbus Server/*"]
+"flua.examples" = [
+    "*.lua",
+    "*.json",
+    "multifile/*.lua",
+    "Modbus Server/*",
+    "Solar Edge Modbus Demo/*",
+    "event_tests/*",
+]
 
 [tool.ruff]
 line-length = 100

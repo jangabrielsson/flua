@@ -818,6 +818,30 @@ def test_wheel_ships_bundled_lua_libraries() -> None:
     assert lib_dir.is_dir() and list(lib_dir.glob("*.lua"))
 
 
+def test_wheel_ships_every_example_file() -> None:
+    # examples/ ships in the wheel as the flua.examples package — the
+    # package-data globs must cover every file under examples/, or pip
+    # users silently lose examples (fixtures, subdirectory demos, …)
+    import fnmatch
+    import tomllib
+
+    repo = Path(__file__).resolve().parent.parent
+    with open(repo / "pyproject.toml", "rb") as handle:
+        pyproject = tomllib.load(handle)
+    globs = pyproject["tool"]["setuptools"]["package-data"]["flua.examples"]
+    examples = repo / "examples"
+    uncovered: list[str] = []
+    for path in examples.rglob("*"):
+        if not path.is_file() or "__pycache__" in path.parts:
+            continue
+        if path.name == "__init__.py":
+            continue  # ships as the package itself, not package-data
+        relative = path.relative_to(examples).as_posix()
+        if not any(fnmatch.fnmatch(relative, pattern) for pattern in globs):
+            uncovered.append(relative)
+    assert not uncovered, f"examples not covered by package-data globs: {uncovered}"
+
+
 def test_packaged_skills_match_the_repo() -> None:
     # the wheel ships the skills; a sync guard keeps the copies honest
     repo = Path(__file__).resolve().parent.parent
