@@ -261,10 +261,11 @@ const UI_EVENT_TYPES = new Map<string, string>([
   ["multi", "onToggled"],
 ]);
 
-/** The UI elements declared on a --%%u: line (one or more). */
+/** The UI elements declared on a --%%u: line (one or more; both quote
+ * styles — the directive syntax takes Lua literals). */
 function elementsOnLine(line: string): UiElement[] {
   const elements: UiElement[] = [];
-  for (const match of line.matchAll(/\{(button|switch|slider|select|multi)='([^']+)'/g)) {
+  for (const match of line.matchAll(/\{(button|switch|slider|select|multi)=['"]([^'"]+)['"]/g)) {
     elements.push({ kind: match[1], name: match[2] });
   }
   return elements;
@@ -294,6 +295,7 @@ export async function injectUiEvent(
     }
   }
   if (!target) {
+    void vscode.window.showWarningMessage("flua: no UI element on that line");
     return;
   }
   const device = await ensureQaRunning(document);
@@ -301,6 +303,7 @@ export async function injectUiEvent(
     return;
   }
   const eventType = UI_EVENT_TYPES.get(target.kind) ?? "onReleased";
+  const needsValue = ["switch", "slider", "select", "multi"].includes(target.kind);
   let value: string | undefined;
   if (target.kind === "switch") {
     value = await vscode.window.showInputBox({
@@ -320,7 +323,7 @@ export async function injectUiEvent(
       prompt: `option values for ${target.name}, comma-separated (onToggled)`,
     });
   }
-  if (value === undefined) {
+  if (needsValue && value === undefined) {
     return; // cancelled
   }
   const query = new URLSearchParams({
