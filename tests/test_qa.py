@@ -549,6 +549,40 @@ async def test_load_sim_device_bundled(capsys) -> None:
     assert "ERR2 false loadSimDevice: bad sim device name" in out
 
 
+@pytest.mark.asyncio
+async def test_load_sim_device_color_controller_no_recursion(capsys) -> None:
+    # the colorController sim device's setColor <-> setColorComponents pair
+    # must terminate — the change guard mirrors the HC3 template (without
+    # it the two methods recurse into a stack overflow)
+    loader_code = (
+        "setTimeout(function()\n"
+        "  local rgb = _FLUA.loadSimDevice('colorController')\n"
+        "  fibaro.call(rgb, 'setColor', 255, 0, 0, 0)\n"
+        "  setTimeout(function()\n"
+        "    local dev = api.get('/devices/'..rgb)\n"
+        "    print('COLOR', dev.properties.color)\n"
+        "    fibaro.call(rgb, 'setColorComponents', {red = 0, green = 255, blue = 0, white = 0})\n"
+        "    setTimeout(function()\n"
+        "      dev = api.get('/devices/'..rgb)\n"
+        "      print('COLOR2', dev.properties.color)\n"
+        "      _FLUA.exit(0)\n"
+        "    end, 50)\n"
+        "  end, 50)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(None, loader_code, {}, "loader")
+        await wait_until(lambda: not engine.is_running())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "COLOR 255,0,0,0" in out
+    assert "COLOR2 0,255,0,0" in out
+    assert "stack overflow" not in out
+
+
 def test_cli_directive_injection(tmp_path) -> None:
     # -D/--directive injects --%% lines as if appended to every QA's header —
     # testing foreign code without editing it

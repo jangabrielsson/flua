@@ -33,9 +33,21 @@ function QuickApp:setColor(r, g, b, w)
 end
 
 function QuickApp:setColorComponents(colorComponents)
+  -- the HC3 template's change guard: only feed back into setColor when a
+  -- component actually changed — without it setColor <-> setColorComponents
+  -- recurses forever (the sim's own stack overflow)
   local cc = self.properties.colorComponents or {}
-  for k, v in pairs(colorComponents) do cc[k] = tonumber(v) or 0 end
-  self:updateProperty("colorComponents", cc)
-  self:setColor(cc["red"], cc["green"], cc["blue"], cc["white"])
+  local isColorChanged = false
+  for k, v in pairs(colorComponents) do
+    v = tonumber(v) or 0
+    if cc[k] ~= v then
+      cc[k] = v
+      isColorChanged = true
+    end
+  end
+  if isColorChanged then
+    self:updateProperty("colorComponents", cc)
+    self:setColor(cc["red"], cc["green"], cc["blue"], cc["white"])
+  end
 end
 
