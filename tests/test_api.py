@@ -1606,6 +1606,36 @@ def test_embedded_ui_color_controller(api: Api) -> None:
     assert view["values"]["__setValue"]["value"] == "60"
 
 
+def test_embedded_ui_color_sliders_follow_color(api: Api) -> None:
+    # setColor(r,g,b,w) must move the viewer's RGB sliders: the watches
+    # read colorComponents (dict) first, the "r,g,b,w" color string second
+    api.state.register_qa(
+        5000,
+        "rgb",
+        "com.fibaro.colorController",
+        {
+            "color": "255,0,0,0",
+            "colorComponents": {"red": 255, "green": 0, "blue": 0, "warmWhite": 0},
+        },
+    )
+    data, _ = api.dispatch("GET", "/flua/embeddedUI")
+    values = data["5000"]["values"]
+    assert values["__red"]["value"] == "255"
+    assert values["__green"]["value"] == "0"
+    assert values["__blue"]["value"] == "0"
+    assert values["__warmWhite"]["value"] == "0"
+    # string-only (a QA that updates just the color property)
+    api.state.register_qa(
+        5001, "rgb2", "com.fibaro.colorController", {"color": "0,128,0,200"}
+    )
+    data, _ = api.dispatch("GET", "/flua/embeddedUI")
+    values = data["5001"]["values"]
+    assert values["__red"]["value"] == "0"
+    assert values["__green"]["value"] == "128"
+    assert values["__blue"]["value"] == "0"
+    assert values["__warmWhite"]["value"] == "200"
+
+
 def test_embedded_ui_hvac_system_auto(api: Api) -> None:
     # the thermostat's default view, resolved per mode from the device
     # properties: setpoint steppers + target label, the setpoint slider, and

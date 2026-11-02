@@ -140,6 +140,41 @@ def _color_value(value: Any, properties: dict[str, Any] | None = None) -> str:
     )
 
 
+def _color_component(key: str) -> Callable[[Any, dict[str, Any] | None], str]:
+    """One RGB slider's value from the device's color state: the
+    ``colorComponents`` dict when present (red/green/blue/warmWhite), else
+    the "r,g,b,w" ``color`` string — so setColor(r,g,b,w) moves the viewer's
+    sliders even when only the string was written."""
+
+    def fmt(value: Any, properties: dict[str, Any] | None = None) -> str:
+        props = properties or {}
+        components = props.get("colorComponents")
+        if not isinstance(components, dict):
+            components = value if isinstance(value, dict) else None
+        raw: Any = None
+        if isinstance(components, dict):
+            raw = components.get(key)
+            if raw is None and key == "warmWhite":
+                # the HC3 template spells the 4th component "white"
+                raw = components.get("white")
+        if raw is None:
+            text = props.get("color")
+            parts = (
+                [part.strip() for part in str(text).split(",") if part.strip()]
+                if isinstance(text, str)
+                else []
+            )
+            index = {"red": 0, "green": 1, "blue": 2, "warmWhite": 3}.get(key)
+            if index is not None and len(parts) > index:
+                raw = parts[index]
+        try:
+            return str(int(float(raw) + 0.5))
+        except (TypeError, ValueError):
+            return "0"
+
+    return fmt
+
+
 def _num(value: Any, default: float = 0.0) -> float:
     """A numeric device property — tolerant of the ``{value, unit}`` object
     shape some QAs store for setpoints, and of missing/None values."""
@@ -542,6 +577,22 @@ EMBEDDED_WATCHES: dict[str, list[dict[str, Any]]] = {
         # brightness follows the value property (the removed state label's
         # watch died with it)
         {"property": "value", "id": "__setValue", "prop": "value", "fmt": _int_value},
+        # the RGB sliders follow the color state: the colorComponents dict
+        # when present, else the "r,g,b,w" color string (setColor updates
+        # both on the sim device, so the sliders move either way)
+        *[
+            {"property": prop, "id": comp, "prop": "value", "fmt": _color_component(key)}
+            for prop, comp, key in (
+                ("colorComponents", "__red", "red"),
+                ("color", "__red", "red"),
+                ("colorComponents", "__green", "green"),
+                ("color", "__green", "green"),
+                ("colorComponents", "__blue", "blue"),
+                ("color", "__blue", "blue"),
+                ("colorComponents", "__warmWhite", "warmWhite"),
+                ("color", "__warmWhite", "warmWhite"),
+            )
+        ],
     ],
     "com.fibaro.multilevelSensor": [
         {

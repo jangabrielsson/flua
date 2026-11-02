@@ -29,13 +29,19 @@ function QuickApp:setColor(r, g, b, w)
   local color = string.format("%d,%d,%d,%d", tonumber(r) or 0, tonumber(g) or 0,
     tonumber(b) or 0, tonumber(w) or 0)
   self:updateProperty("color", color)
-  self:setColorComponents({red = r, green = g, blue = b, white = w})
+  self:setColorComponents({red = r, green = g, blue = b, warmWhite = w})
 end
 
 function QuickApp:setColorComponents(colorComponents)
   -- the HC3 template's change guard: only feed back into setColor when a
   -- component actually changed — without it setColor <-> setColorComponents
-  -- recurses forever (the sim's own stack overflow)
+  -- recurses forever (the sim's own stack overflow). The 4th component is
+  -- warmWhite (the viewer's slider and the init default); "white" is
+  -- accepted too (the HC3 template's spelling).
+  if colorComponents.white ~= nil and colorComponents.warmWhite == nil then
+    colorComponents.warmWhite = colorComponents.white
+    colorComponents.white = nil
+  end
   local cc = self.properties.colorComponents or {}
   local isColorChanged = false
   for k, v in pairs(colorComponents) do
@@ -47,7 +53,7 @@ function QuickApp:setColorComponents(colorComponents)
   end
   if isColorChanged then
     self:updateProperty("colorComponents", cc)
-    self:setColor(cc["red"], cc["green"], cc["blue"], cc["white"])
+    self:setColor(cc["red"], cc["green"], cc["blue"], cc["warmWhite"])
   end
 end
 
