@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.125] - 2026-11-03
+
+### Fixed
+- update wheel installation script to use absolute paths for compatibility
+
 ## [0.1.124] - 2026-11-03
 
 ### Added
