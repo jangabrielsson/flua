@@ -59,11 +59,26 @@ export function execFlua(
   });
 }
 
+/** Quote an argument for the user's terminal shell (PowerShell/cmd on
+ * Windows, sh-family elsewhere) — detected from vscode.env.shell, so a
+ * workspace path with spaces survives every platform. Bare safe tokens
+ * pass through unquoted. */
 function shellQuote(arg: string): string {
-  if (/^[a-zA-Z0-9_./:=@%+\-]+$/.test(arg)) {
+  if (/^[a-zA-Z0-9_./:=\\@%+\-]+$/.test(arg)) {
     return arg;
   }
-  return `"${arg.replace(/"/g, '\\"')}"`;
+  const name = (vscode.env.shell || "")
+    .split(/[\\/]/)
+    .pop()
+    ?.toLowerCase() ?? "";
+  if (name.startsWith("pwsh") || name.startsWith("powershell")) {
+    // PowerShell strong quoting: 'literal', an inner ' doubled
+    return `'${arg.replace(/'/g, "''")}'`;
+  }
+  if (name === "cmd.exe") {
+    return `"${arg.replace(/"/g, '""')}"`;
+  }
+  return `"${arg.replace(/"/g, '\\"')}"`; // sh/bash/zsh
 }
 
 /** Run flua in a shared "flua" terminal — visible output, interactive

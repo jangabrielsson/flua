@@ -109,8 +109,19 @@ export async function openFluaPage(kind: "viewer" | "timeline" | "docs"): Promis
     );
     openPanels.set(viewType, panel);
     panel.onDidDispose(() => openPanels.delete(viewType));
-    panel.webview.html = `<!doctype html><html><body style="margin:0;padding:0;overflow:hidden">
-<iframe src="${mapped.toString()}" style="border:0;width:100vw;height:100vh"></iframe>
+    // the footer's "Open in browser" link posts this message — a blank
+    // panel (workspace trust blocking the embedded page) is never a dead end
+    panel.webview.onDidReceiveMessage((message) => {
+      if (message === "openBrowser") {
+        void vscode.env.openExternal(url);
+      }
+    });
+    panel.webview.html = `<!doctype html><html><body style="margin:0;padding:0;overflow:hidden;display:flex;flex-direction:column;height:100vh">
+<iframe src="${mapped.toString()}" style="border:0;flex:1;min-height:0"></iframe>
+<div style="padding:6px 10px;font-size:12px;color:var(--vscode-descriptionForeground);font-family:var(--vscode-font-family)">
+  <a href="#" onclick="acquireVsCodeApi().postMessage('openBrowser');return false;">Open in browser</a>
+  <span>— blank panel? workspace trust can block the embedded page; the browser always works.</span>
+</div>
 </body></html>`;
   } catch {
     void vscode.env.openExternal(url);
