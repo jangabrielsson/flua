@@ -612,6 +612,170 @@ async def test_load_sim_device_with_directives(capsys) -> None:
     assert "BAD false loadSimDevice: directives must be a table of strings" in out
 
 
+@pytest.mark.asyncio
+async def test_load_sim_device_alarm_endpoint(capsys) -> None:
+    # the alarmEndpoint sim device: /alarms/v1/* serves built-in partitions,
+    # deployed com.fibaro.alarmPartition QAs, and POST-created partitions —
+    # arming a QA partition dispatches to the QA's own action
+    loader_code = (
+        "setTimeout(function()\n"
+        "  _FLUA.loadSimDevice('alarmEndpoint')\n"
+        "  local garden = _FLUA.loadSimDevice('alarmPartition', {'name:Garden'})\n"
+        "  setTimeout(function()\n"
+        "    local parts, s = api.get('/alarms/v1/partitions')\n"
+        "    print('LIST', s, #parts, parts[1].name, parts[2].name)\n"
+        "    local _, s2 = api.post('/alarms/v1/partitions/' .. garden .. '/actions/arm')\n"
+        "    print('ARM-QA', s2)\n"
+        "    local p, s3 = api.post('/alarms/v1/partitions', {name = 'Garage'})\n"
+        "    print('CREATE', s3, p.id, p.name)\n"
+        "    local _, s4 = api.post('/alarms/v1/partitions/' .. p.id .. '/actions/arm')\n"
+        "    print('ARM-CREATED', s4)\n"
+        "    local _, s5 = api.post('/alarms/v1/partitions/1/actions/arm')\n"
+        "    print('ARM-BUILTIN', s5)\n"
+        "    setTimeout(function()\n"
+        "      local parts2, s6 = api.get('/alarms/v1/partitions')\n"
+        "      local armed = {}\n"
+        "      for _, p2 in ipairs(parts2) do armed[p2.name] = p2.armed end\n"
+        "      print('LIST2', s6, json.encode(armed))\n"
+        "      local gardenDev = api.get('/devices/' .. garden)\n"
+        "      print('GARDEN-ARMED', gardenDev.properties.armed)\n"
+        "      _FLUA.exit(0)\n"
+        "    end, 100)\n"
+        "  end, 100)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(None, loader_code, {}, "loader")
+        await wait_until(lambda: not engine.is_running())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    # the merged list: built-in Home + the deployed alarmPartition QA
+    assert "LIST 200 2 Home Garden" in out
+    # arming the QA partition dispatches to the QA's own arm action
+    assert "ARM-QA 202" in out
+    assert "GARDEN-ARMED true" in out
+    # POST creates a partition; arming it and the built-in both take effect
+    assert "CREATE 200" in out
+    assert "ARM-CREATED 202" in out
+    assert "ARM-BUILTIN 202" in out
+    assert "\"Home\":true" in out and "\"Garden\":true" in out and "\"Garage\":true" in out
+
+
+@pytest.mark.asyncio
+async def test_load_sim_device_alarm_endpoint_live_tracking(capsys) -> None:
+    # deployed alarmPartition QAs are tracked live: a QA started AFTER the
+    # endpoint is adopted via DeviceCreatedEvent, and direct arm/breach on
+    # the QA (bypassing the endpoint) emit the alarm + home-level events
+    loader_code = (
+        "setTimeout(function()\n"
+        "  _FLUA.loadSimDevice('alarmEndpoint')\n"
+        "  setTimeout(function()\n"
+        "    local garden = _FLUA.loadSimDevice('alarmPartition', {'name:Garden'})\n"
+        "    setTimeout(function()\n"
+        "      local parts, s = api.get('/alarms/v1/partitions')\n"
+        "      print('LIST', s, #parts, parts[2] and parts[2].name)\n"
+        "      fibaro.call(garden, 'arm')          -- direct: not via the endpoint\n"
+        "      fibaro.call(garden, 'breached', true)\n"
+        "      setTimeout(function()\n"
+        "        local parts2 = api.get('/alarms/v1/partitions')\n"
+        "        local state = {}\n"
+        "        for _, p in ipairs(parts2) do\n"
+        "          state[p.name] = tostring(p.armed) .. '/' .. tostring(p.breached)\n"
+        "        end\n"
+        "        print('LIST2', json.encode(state))\n"
+        "        local feed = api.get('/refreshStates')\n"
+        "        local types = {}\n"
+        "        for _, e in ipairs(feed.events or {}) do types[#types + 1] = e.type end\n"
+        "        print('FEED', json.encode(types))\n"
+        "        _FLUA.exit(0)\n"
+        "      end, 100)\n"
+        "    end, 100)\n"
+        "  end, 100)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(None, loader_code, {}, "loader")
+        await wait_until(lambda: not engine.is_running())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    # the late-started QA appears in the merged list
+    assert "LIST 200 2 Garden" in out
+    # direct QA arm/breach emit the partition-level and home-level events
+    feed_line = next(line for line in out.splitlines() if "FEED " in line)
+    for event_type in (
+        "AlarmPartitionArmedEvent",
+        "HomeArmStateChangedEvent",
+        "AlarmPartitionBreachedEvent",
+        "HomeBreachedEvent",
+    ):
+        assert event_type in feed_line
+    # the cache reflects the QA's own transitions
+    assert "\"Garden\":\"true/true\"" in out
+
+
+@pytest.mark.asyncio
+async def test_load_sim_device_alarm_panel(capsys) -> None:
+    # the alarmPanel sim device: a UI over /alarms/v1/* — the select lists
+    # the partitions, picking one updates the info label, Arm arms it
+    loader_code = (
+        "setTimeout(function()\n"
+        "  _FLUA.loadSimDevice('alarmEndpoint')\n"
+        "  _FLUA.loadSimDevice('alarmPanel')\n"
+        "  local garden = _FLUA.loadSimDevice('alarmPartition', {'name:Garden'})\n"
+        "  setTimeout(function()\n"
+        "    local view = api.get('/plugins/getView?id=5002')\n"
+        "    local texts = {}\n"
+        "    for _, row in ipairs(view['$jason']['body']['sections']['items']) do\n"
+        "      for _, c in ipairs(row['components']) do\n"
+        "        if c.name == 'partition' then\n"
+        "          for _, o in ipairs(c.options or {}) do texts[#texts + 1] = o.text end\n"
+        "        end\n"
+        "      end\n"
+        "    end\n"
+        "    print('OPTIONS', json.encode(texts))\n"
+        "    api.get('/plugins/callUIEvent?deviceID=5002&elementName=partition'\n"
+        "      .. '&eventType=onToggled&value=' .. garden)\n"
+        "    setTimeout(function()\n"
+        "      api.get('/plugins/callUIEvent?deviceID=5002&elementName=btnArm'\n"
+        "        .. '&eventType=onReleased')\n"
+        "      setTimeout(function()\n"
+        "        local view2 = api.get('/plugins/getView?id=5002')\n"
+        "        local info = ''\n"
+        "        for _, row in ipairs(view2['$jason']['body']['sections']['items']) do\n"
+        "          for _, c in ipairs(row['components']) do\n"
+        "            if c.name == 'lblInfo' then info = c.text or '' end\n"
+        "          end\n"
+        "        end\n"
+        "        print('INFO', info)\n"
+        "        local gardenDev = api.get('/devices/' .. garden)\n"
+        "        print('GARDEN-ARMED', gardenDev.properties.armed)\n"
+        "        _FLUA.exit(0)\n"
+        "      end, 100)\n"
+        "    end, 100)\n"
+        "  end, 100)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(None, loader_code, {}, "loader")
+        await wait_until(lambda: not engine.is_running())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    # the select lists the built-in Home + the deployed Garden QA
+    assert 'OPTIONS ["Home","Garden"]' in out
+    # picking Garden + pressing Arm drives the endpoint: label + device state
+    assert "Garden (id" in out and "armed" in out
+    assert "GARDEN-ARMED true" in out
+
+
 def test_cli_directive_injection(tmp_path) -> None:
     # -D/--directive injects --%% lines as if appended to every QA's header —
     # testing foreign code without editing it

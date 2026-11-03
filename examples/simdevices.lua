@@ -41,4 +41,8 @@ function QuickApp:onInit()
   for _,d in ipairs(devices) do 
     _FLUA.loadSimDevice(d)
   end
+  local pm = api.get("/devices?type=com.fibaro.powerMeter")
+  self:debug("power meters found:", pm[1].id)
+  --fibaro.call(pm[1].id, "setValue", 55, "Watt")
+  fibaro.call(pm[1].id, "updateProperty", "unit", "KH")
 end

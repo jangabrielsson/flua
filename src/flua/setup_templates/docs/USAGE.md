@@ -1180,6 +1180,11 @@ their stock actions (`arm`/`disarm`/`setArmed`, `setThermostatMode`,
 `setHeatingThermostatSetpoint`, `setColor`, `createChild`, …). Drive one and
 watch scenes and reacting QAs fire like on a real device.
 
+`alarmEndpoint` is the system-level one: it serves the `/alarms/v1/*`
+endpoints with the HC3's partition model — the built-in partitions,
+deployed `com.fibaro.alarmPartition` QAs (arming dispatches to the QA's
+own `arm` action), and partitions created via `POST /alarms/v1/partitions`.
+
 ## Network clients
 
 Real network, HC3-style APIs, all asynchronous through the pump (callbacks
