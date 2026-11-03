@@ -1,0 +1,11 @@
+# GitHub language statistics: exclude captured reference material and
+# generated artifacts, so the repo's language is the codebase (Python/Lua),
+# not the HTML manuals it documents. These files stay in git and in diffs —
+# linguist-detectable=false only removes them from the language bar.
+docs/specs/*.html       linguist-detectable=false
+graphify-out/*.html     linguist-detectable=false
+docs/forum/*.html       linguist-detectable=false
+
+# synced/generated copies (sync-skills.sh): excluded from the stats entirely
+# and collapsed in diffs by default
+src/flua/setup_templates/docs/**   linguist-vendored
