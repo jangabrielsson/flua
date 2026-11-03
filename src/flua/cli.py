@@ -257,6 +257,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="restart QAs when their files change (mtime polling, no dependencies)",
     )
     parser.add_argument(
+        "--helper-port",
+        type=int,
+        default=None,
+        metavar="PORT",
+        help="the FluaHelper bridge server port (online mode; default 8099) — "
+        "the helper QA deployed with flua --tool installHelper connects here",
+    )
+    parser.add_argument(
         "--ui",
         nargs="?",
         const=8090,
@@ -559,6 +567,8 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         return _check_cli(parser, args)
 
     global_config, qa_specs = _load_qas(parser, args)
+    if args.helper_port is not None:
+        global_config["helperPort"] = args.helper_port
     if args.watch:
         # watch mode survives QA boot errors: the flag rides the global
         # config into every QA's _FLUA.config, and the bootstrap's error

@@ -436,6 +436,12 @@ resumeQa = function(qaId, co, ...)
       sleeping[qaId] = true
       pendingApi[qaId] = co
       _PY.post(res)
+    elseif rt == "table" and res.type == "helperCall" then
+      -- api.helper: an RPC through the deployed FluaHelper QA — same
+      -- suspension as the remote api.* path above
+      sleeping[qaId] = true
+      pendingApi[qaId] = co
+      _PY.post(res)
     else
       -- yield protocol violation (e.g. async.await outside async.run)
       _PY.flua_log("error", qaId, "unexpected yield from QA callback (fibaro.sleep expects ms)")
@@ -736,6 +742,44 @@ local function installQaGlobals(env)
     post = apiCall("POST"),
     put = apiCall("PUT"),
     delete = apiCall("DELETE"),
+    -- helper(method, path, data): an RPC executed ON the controller through
+    -- the deployed FluaHelper QA (its local context — the HC3's local-only
+    -- API surface, e.g. single-key variables). Returns (data, status) like
+    -- api.get; (nil, 0) when the helper is not installed/connected.
+    helper = function(method, path, data)
+      local qaId = env._FLUA.qaId
+      if qaCoroutines[coroutine.running()] == qaId then
+        return coroutine.yield{
+          type = "helperCall",
+          method = method,
+          url = tostring(path),
+          body = data,
+          qa = qaId,
+        }
+      end
+      return _PY.helper_call(method, path, data, qaId)
+    end,
+    -- helperFibaro(name, args): execute fibaro.<name>(table.unpack(args))
+    -- inside the deployed FluaHelper QA ON the controller and return its
+    -- values — the real HC3's fibaro.* surface (parity probes, real device
+    -- actions). Runs in the HELPER's context: source-trigger data and the
+    -- QA's own id are the helper's, and fibaro.sleep would block the helper
+    -- (drop the connection) — don't. Returns nothing on failure (a warning
+    -- is logged).
+    helperFibaro = function(name, args)
+      local qaId = env._FLUA.qaId
+      if qaCoroutines[coroutine.running()] == qaId then
+        local values = coroutine.yield{
+          type = "helperCall",
+          kind = "fibaro",
+          name = tostring(name),
+          args = args,
+          qa = qaId,
+        }
+        return table.unpack(values or {})
+      end
+      return _PY.helper_fibaro(name, args, qaId)
+    end,
     -- registerEndpoint(method, pattern, handler[, override]): emulate a
     -- missing HC3 endpoint from Lua — or, with override=true, REPLACE a
     -- built-in's shallow behavior with real logic (prototype the panel in

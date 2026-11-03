@@ -61,6 +61,13 @@ from .config import (
 from .devices import catalog_types, skeleton_for
 from .environment import EnvChain
 from .hc3 import Hc3Remote
+from .helper import (
+    _HELPER_TIMEOUT,
+    _HELPER_WAKE_WAIT,
+    DEFAULT_HELPER_PORT,
+    Hc3Helper,
+    helper_identity,
+)
 from .http import abort_http_response, http_call, open_http, read_sse_block
 from .http_server import ApiServer
 from .loghtml import render_html as render_html_tags
@@ -199,6 +206,12 @@ class LuaEngine:
         self._lua = lupa.LuaRuntime(unpack_returned_tuples=True, encoding="UTF-8")
         self._inbound: deque[dict[str, Any]] = deque()
         self._outbound: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        # the HC3 helper bridge (FluaHelper QA): online mode only; the
+        # service binds 0.0.0.0 so the controller's QA can reach the laptop
+        helper_port = (config or {}).get("helperPort")
+        self.helper = Hc3Helper(
+            int(helper_port) if helper_port is not None else DEFAULT_HELPER_PORT
+        )
         # (qa_id, method, url) of shape-only stub calls already warned about
         # (one warning per QA per route — the default-on stub warning)
         self._stub_warned: set[tuple[int, str, str]] = set()
@@ -344,6 +357,7 @@ class LuaEngine:
             messages.MQTT_DISCONNECT: self._handle_mqtt_disconnect,
             messages.CLEAR_TIMEOUT: self._handle_clear_timeout,
             messages.API_CALL: self._handle_api_call,
+            messages.HELPER_CALL: self._handle_api_call,
             messages.USER_API_RESULT: self._handle_user_api_result,
             messages.POST_REFRESH_EVENT: self._handle_post_refresh_event,
             messages.QA_VARS: self._handle_qa_vars,
@@ -1783,6 +1797,8 @@ class LuaEngine:
         self._system_event("run_start", None, "")
         self._pump_task = asyncio.create_task(self._pump(), name="flua-pump")
         if self.hc3 is not None:
+            # the FluaHelper bridge only matters against a real controller
+            await self.helper.start()
             # online mode: mirror the real HC3's refreshStates feed
             self._hc3_last: int | None = None
             self._poller_task = asyncio.create_task(self._hc3_poll(), name="flua-hc3-poll")
@@ -1792,6 +1808,7 @@ class LuaEngine:
             self._system_event("run_stop", None, "")
         self._running = False
         self._timers.stop()
+        await self.helper.stop()
         self.sync_sockets.close_all()
         self.server_host.close_all()
         if self._logfile is not None:
@@ -2185,6 +2202,44 @@ class LuaEngine:
         else:
             task.add_done_callback(self._http_tasks.discard)
 
+    def _wake_helper(self) -> None:
+        """The helper's connection is down and flua needs to send: ask the
+        deployed FluaHelper to dial in — discover it by quickAppUuid, fire
+        its connect action with this machine's ws:// URL through the HC3's
+        public action API — and wait up to _HELPER_WAKE_WAIT for it. Runs
+        in the api worker thread; best-effort — a missing helper means the
+        caller gets the usual (nil, 0) + warning. The helper itself never
+        re-dials: it waits idle until asked."""
+        if self.hc3 is None:
+            return
+        try:
+            uuid, _version = helper_identity()
+            # the HC3's property filter takes the raw UNQUOTED form (quoted
+            # values match nothing — verified live on 5.221)
+            devices, status = self.api.dispatch_hc3(
+                "GET", f"/devices?property=[quickAppUuid,{uuid}]"
+            )
+            helpers = [
+                device
+                for device in (devices or [])
+                if isinstance(device, dict)
+                and (device.get("properties") or {}).get("quickAppUuid") == uuid
+            ]
+            if not helpers:
+                return
+            controller = urllib.parse.urlparse(self.hc3.base_url).hostname or "127.0.0.1"
+            url = f"ws://{Hc3Helper.lan_ip(controller)}:{self.helper.port}/"
+            for device in helpers:
+                self.api.dispatch_hc3(
+                    "POST", f"/devices/{device['id']}/action/connect", {"args": [url]}
+                )
+        except Exception:
+            logger.debug("helper wake-up failed", exc_info=True)
+            return
+        deadline = time.monotonic() + _HELPER_WAKE_WAIT
+        while not self.helper.connected and time.monotonic() < deadline:
+            time.sleep(0.1)
+
     def _handle_api_call(self, msg: dict[str, Any]) -> None:
         """A suspended QA's api.* call (remote mode): dispatch in a worker
         thread so the slow HC3 part never freezes the pump — the calling QA
@@ -2195,6 +2250,13 @@ class LuaEngine:
         url = str(msg.get("url") or "")
         body = msg.get("body")
         hc3_direct = bool(msg.get("hc3"))
+        is_helper = msg.get("type") == messages.HELPER_CALL
+        # kind == "fibaro": a controller-side fibaro.<name>(...) RPC through
+        # the helper (parity probes, real device actions) instead of an api.*
+        # call; name/args carry the function and its argument list
+        kind = msg.get("kind") or "api"
+        fname = str(msg.get("name") or "")
+        fargs = msg.get("args") if isinstance(msg.get("args"), list) else []
         # api.registerEndpoint: an offline-sim feature — the QA's own
         # registered endpoints answer its api.* calls (built-ins were
         # already excluded by the caller's pre-check; in remote mode the
@@ -2231,7 +2293,45 @@ class LuaEngine:
         def worker() -> None:
             try:
                 try:
-                    if hc3_direct:
+                    if is_helper:
+                        # the helper bridge: the RPC runs on the controller
+                        # through the deployed FluaHelper QA's local context.
+                        # The helper never re-dials on its own — when the
+                        # connection is down, flua asks it to connect (its
+                        # connect action through the HC3) and waits for it.
+                        if not self.helper.connected:
+                            self._wake_helper()
+                        if kind == "fibaro":
+                            values, ok = asyncio.run_coroutine_threadsafe(
+                                self.helper.call_fibaro(fname, fargs), self._loop
+                            ).result(_HELPER_TIMEOUT)
+                            if not ok:
+                                self.flua_log(
+                                    "warning",
+                                    qa,
+                                    f"api.helperFibaro {fname} -> "
+                                    + (
+                                        values
+                                        if isinstance(values, str)
+                                        else "helper not connected/failed "
+                                        "(run flua --tool installHelper)"
+                                    ),
+                                )
+                                data, status = None, 0
+                            else:
+                                data, status = values, 1
+                        else:
+                            data, status = asyncio.run_coroutine_threadsafe(
+                                self.helper.call(method, url, body), self._loop
+                            ).result(_HELPER_TIMEOUT)
+                            if status == 0 and data is None:
+                                self.flua_log(
+                                    "warning",
+                                    qa,
+                                    f"api.helper {method} {url} -> helper not connected "
+                                    "(run flua --tool installHelper)",
+                                )
+                    elif hc3_direct:
                         data, status = self.api.dispatch_hc3(method, url, body)
                     else:
                         data, status = self.api.dispatch(method, url, body, qa_id=qa)

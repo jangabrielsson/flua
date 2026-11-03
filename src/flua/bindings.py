@@ -403,8 +403,46 @@ def install_bindings(engine: "LuaEngine") -> None:
 
     py["to_json"] = to_json
     py["parse_json"] = parse_json
+    # api.helper from main-state code (no coroutine to suspend): the RPC
+    # runs inline on the event loop and returns (data, status)
+    def helper_call(method: str, url: str, body: object, qa_id: object) -> tuple[object, object]:
+        import asyncio
+
+        from .helper import _HELPER_TIMEOUT
+
+        if not engine.helper.connected:
+            return None, 0
+        return asyncio.run_coroutine_threadsafe(
+            engine.helper.call(method, url, lua_to_python(body, lua)), engine._loop
+        ).result(_HELPER_TIMEOUT)
+
     py["api"] = api_call
     py["api_hc3"] = api_hc3
+    py["helper_call"] = helper_call
+    # api.helperFibaro from main-state code (no coroutine to suspend): the
+    # RPC runs inline on the event loop and returns the function's values
+    def helper_fibaro(name: object, args: object, qa_id: object) -> tuple:
+        import asyncio
+
+        from .helper import _HELPER_TIMEOUT
+
+        if not engine.helper.connected:
+            engine.flua_log(
+                "warning", qa_id, f"api.helperFibaro {name} -> helper not connected"
+            )
+            return ()
+        values, ok = asyncio.run_coroutine_threadsafe(
+            engine.helper.call_fibaro(str(name), lua_to_python(args, lua) or []),
+            engine._loop,
+        ).result(_HELPER_TIMEOUT)
+        if not ok:
+            engine.flua_log(
+                "warning", qa_id, f"api.helperFibaro {name} -> {values or 'helper failed'}"
+            )
+            return ()
+        return tuple(values)
+
+    py["helper_fibaro"] = helper_fibaro
     py["device_for"] = device_for
     py["load_qa_file"] = load_qa_file
     py["load_fqa_file"] = load_fqa_file

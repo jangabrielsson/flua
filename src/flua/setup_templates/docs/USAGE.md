@@ -377,7 +377,10 @@ them. QA state is keyed by QA name (not the per-run id), so persisted state
 is stable across runs; `--%%var` and the other property directives win over
 persisted values. `internalStorage` (`self:internalStorageSet/Get`) is
 persisted with the QA's state too — plugin variables survive runs like on
-the HC3.
+the HC3. Variable names must match `[A-Za-z][A-Za-z0-9_]*` (letters, then
+letters/digits/underscores) — the HC3 rejects anything else with 400, and
+flua does the same so a QA breaks during development instead of on the
+controller.
 
 Names: `--%%name:value` for scalars,
 `--%%name:sub1=val1,sub2=val2` for subparameters. A typo'd directive is
@@ -996,6 +999,58 @@ stops flua immediately with a warning, because the HC3 locks itself after
 bypassing the hybrid dispatch (this is what `fibaro.callhc3` uses, and it's
 handy in test code that wants ground-truth data). Offline it stands in for
 the simulated HC3.
+
+### The FluaHelper bridge (the HC3's local-only API)
+
+The HC3 serves part of its API only to LOCAL callers: the single-key QA
+variable endpoints (`GET /plugins/{id}/variables/{key}`) and the variable
+writes (`PUT`/`POST`/`DELETE`) refuse external callers, while the list
+endpoint works fine. For those, flua deploys a small invisible helper QA
+on the controller that executes calls in the local context and reports
+back over a WebSocket:
+
+```bash
+flua --tool installHelper        # uploads FluaHelper + points it at this machine
+flua --api remote --helper-port 8099 my-qa.lua   # the helper server (default 8099)
+```
+
+The helper auto-detects this machine's LAN address (a UDP route probe;
+`--tool installHelper --host IP` overrides). It never re-dials on its own:
+after a disconnect it sits idle until flua needs it — then flua discovers
+it by `quickAppUuid`, fires its `connect` action through the HC3, and waits
+for the dial-in before sending the RPC. One helper serves many flua
+machines at once (a connection per ws:// URL); re-asking with the same URL
+replaces the stale connection. Re-running `installHelper` is safe and
+idempotent — it finds the helper by its `quickAppUuid` property (never by
+name, so a renamed QA stays recognized), keeps the newest, removes any
+older or duplicate copies, and re-points the survivor at this machine.
+From a QA, calls route through it:
+
+```lua
+local value, status = api.helper("GET", "/plugins/4357/variables/heat", nil)
+api.helper("PUT", "/plugins/4357/variables/heat", { name = "heat", value = "2" })
+```
+
+`api.helper` suspends the calling QA like any remote `api.*` call and
+returns `(data, status)` — `(nil, 0)` when the helper is not installed or
+not connected (the run log says so, pointing at `installHelper`). The
+helper server binds **0.0.0.0** (the controller must reach the laptop);
+your OS firewall may ask about Python once.
+
+The same bridge runs controller-side `fibaro.*` functions — the real HC3's
+Lua surface, for parity probes or real device actions:
+
+```lua
+local globals = api.helperFibaro("getGlobalVariable", { "HomeStatus" })
+api.helperFibaro("call", { 88, "turnOn" })     -- acts on the REAL device 88
+```
+
+`api.helperFibaro(name, args)` executes `fibaro[name](table.unpack(args))`
+inside the helper QA and returns its values (nothing on failure — a
+warning is logged). It runs in the **helper's** context: the QA's own id
+and source-trigger data are the helper's, and actions affect the real
+controller. Avoid `fibaro.sleep` — it would block the helper's thread and
+drop the connection.
 
 ### Proxy mode (`--%%mode:proxy`)
 

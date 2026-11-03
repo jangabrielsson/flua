@@ -28,6 +28,7 @@ def test_registry_discovers_all_tools() -> None:
         "downloadFQA",
         "downloadQA",
         "icons",
+        "installHelper",
         "migrate",
         "newQA",
         "pack",
@@ -662,6 +663,43 @@ def test_new_qa_tool_scaffolds_from_templates(tmp_path, capsys, monkeypatch) -> 
     assert "unknown" in capsys.readouterr().err
     assert module.run(parser, parser.parse_args(["sensor"])) == 1
     assert "ambiguous" in capsys.readouterr().err
+
+
+def test_install_helper_decides_by_version() -> None:
+    # installHelper is idempotent: same/newer helper = keep + reconnect,
+    # older = delete + re-upload, absent = install
+    from flua.tools.install_helper import _bundled_identity, _decide, _filter_helpers
+
+    uuid, version = _bundled_identity()
+    assert uuid and version  # the bundled source declares its identity
+
+    def helper(ver: str, name: str = "FluaHelper") -> dict:
+        return {"id": 1, "name": name, "properties": {"quickAppUuid": uuid, "model": ver}}
+
+    assert _decide([], version) == ("install", None)
+    same = helper(version)
+    assert _decide([same], version) == ("skip", same)
+    assert _decide([helper("1.0.0")], version)[0] == "replace"
+    assert _decide([helper("9.9.9")], version)[0] == "skip"  # never downgrade
+    # discovery is by quickAppUuid only: a RENAMED helper is still found,
+    # an unrelated device named FluaHelper is not
+    renamed = {
+        "id": 2, "name": "Garage door",
+        "properties": {"quickAppUuid": uuid, "model": "1.0.0"},
+    }
+    impostor = {"id": 3, "name": "FluaHelper", "properties": {}}
+    assert _filter_helpers([same, renamed, impostor], uuid) == [same, renamed]
+    # equal versions: the latest creation date wins the keep slot
+    older = {"id": 4, "properties": {"quickAppUuid": uuid, "model": version}, "created": 100}
+    newer = {"id": 5, "properties": {"quickAppUuid": uuid, "model": version}, "created": 200}
+    decision, best = _decide([older, newer], version)
+    assert decision == "skip" and best["id"] == 5
+    # a newer version beats an older one regardless of creation order
+    decision, best = _decide(
+        [{"id": 6, "properties": {"quickAppUuid": uuid, "model": "1.0.0"}, "created": 999}],
+        version,
+    )
+    assert decision == "replace"
 
 
 def test_setup_tool_scaffolds_a_qa_project(tmp_path, capsys) -> None:

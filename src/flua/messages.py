@@ -67,6 +67,13 @@ API_CALL = (
     # {"method": str, "url": str, "body": any, "qa": int, "hc3"?: bool}
     "apiCall"
 )
+HELPER_CALL = (
+    # QA -> engine: an RPC through the deployed FluaHelper QA (the HC3's
+    # local-only API surface) — {"method", "url", "body", "qa"}. With
+    # kind="fibaro" it instead runs fibaro.<name>(...) in the helper QA:
+    # {"kind": "fibaro", "name", "args", "qa"}
+    "helperCall"
+)
 API_RESULT = "apiResult"  # engine -> QA: the response — {"qa", "data", "status"}
 SCENE_EXECUTE = "sceneExecute"  # engine -> scene QA: manual run — {"qa": int}
 SCENE_TRIGGER = "sceneTrigger"  # QA -> engine -> Lua: a sourceTrigger event for the scene runner
