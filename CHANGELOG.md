@@ -4,6 +4,21 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.124] - 2026-11-03
+
+### Added
+- enhance CI workflow to support Windows and improve compatibility documentation
+- implement shape-only stub warnings and route classification for API endpoints
+- add alarm system control panel and enhance alarm endpoint functionality
+- enhance loadSimDevice functionality with optional directives for property overrides
+
+### Changed
+- Enhance documentation and compatibility information for flua
+- test: add coverage for all example files in package-data globs
+
+### Fixed
+- correct rootDir configuration in tsconfig.json
+
 ## [0.1.123] - 2026-11-02
 
 ### Added
