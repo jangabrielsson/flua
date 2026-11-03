@@ -710,6 +710,17 @@ def test_setup_tool_scaffolds_a_qa_project(tmp_path, capsys) -> None:
     extensions = (tmp_path / ".vscode/extensions.json").read_text()
     assert "bierner.markdown-mermaid" in extensions
     assert "GsonSoft-development.flua" in extensions
+    # the common QA snippets (qa-header/qa-http/qa-rs/…) ship too — scoped
+    # to Lua, and managed: refreshed while unmodified, kept once edited
+    snippets_path = tmp_path / ".vscode" / "flua.code-snippets"
+    assert snippets_path.exists()
+    snippets = json.loads(snippets_path.read_text())
+    assert snippets["QuickApp header"]["prefix"] == "qa-header"
+    assert snippets["RefreshStateSubscriber"]["scope"] == "lua"
+    snippets_path.write_text('{"mine": {"prefix": "x", "body": ["x"]}}\n')
+    assert module.run(parser, parser.parse_args([str(tmp_path)])) == 0
+    assert "kept .vscode/flua.code-snippets" in capsys.readouterr().out
+    assert "mine" in snippets_path.read_text()
     # idempotent: a second run keeps the existing files
     (tmp_path / "AGENTS.md").write_text("custom\n")
     assert module.run(parser, parser.parse_args([str(tmp_path)])) == 0
@@ -791,6 +802,15 @@ def test_packaged_luarc_matches_the_repo() -> None:
     packaged = repo / "src" / "flua" / "setup_templates" / ".luarc.json"
     origin = repo / ".luarc.json"
     assert packaged.read_bytes() == origin.read_bytes(), "sync .luarc.json into setup_templates"
+
+
+def test_repo_vscode_snippets_match_the_setup_template() -> None:
+    # the repo's own .vscode/flua.code-snippets is the same file --tool
+    # setup ships to QA projects — a sync guard keeps the two identical
+    repo = Path(__file__).resolve().parent.parent
+    repo_copy = repo / ".vscode" / "flua.code-snippets"
+    template = repo / "src" / "flua" / "setup_templates" / "vscode" / "flua.code-snippets"
+    assert repo_copy.read_bytes() == template.read_bytes(), "sync the snippets into .vscode/"
 
 
 def test_packaged_luals_library_matches_the_repo() -> None:

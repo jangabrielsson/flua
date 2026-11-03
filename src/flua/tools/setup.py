@@ -34,6 +34,9 @@ _TEMPLATES = {
     "vscode/launch.json": (".vscode/launch.json", "if-absent"),
     "vscode/tasks.json": (".vscode/tasks.json", "if-absent"),
     "vscode/extensions.json": (".vscode/extensions.json", "if-absent"),
+    # common QA snippets (qa-header, qa-http, qa-rs, …): delivered on
+    # upgrade until the user edits the file, then kept (the managed policy)
+    "vscode/flua.code-snippets": (".vscode/flua.code-snippets", "managed"),
     "luals": (".luals", "refresh"),
     ".luarc.json": (".luarc.json", "refresh"),
     "AGENTS.md": ("AGENTS.md", "managed"),

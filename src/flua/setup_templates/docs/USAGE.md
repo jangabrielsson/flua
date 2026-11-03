@@ -210,7 +210,12 @@ with the HC3 globals and loads the bundled **`.luals/` type library** — LuaLS
 definitions for `QuickApp`, `fibaro`, `api` and `json` — so QA code in the
 repo gets autocomplete and parameter hints. `flua --tool setup` ships the
 same configuration (and the type library) into scaffolded projects for pip
-users; the two copies are kept byte-identical by a test.
+users; the two copies are kept byte-identical by a test. Setup also writes
+`.vscode/flua.code-snippets` — shortcut snippets for the common QA patterns
+(`qa-header`, `qa-http`, `qa-rs`, `qa-btn`/`qa-slider`/`qa-switch`/
+`qa-select`, `qa-simdevice`, `qa-selfassert`): type the prefix in a `.lua`
+file and accept the completion. The file is managed — upgrades deliver new
+snippets until you edit it, then it's yours.
 
 ### The flua VS Code extension
 
