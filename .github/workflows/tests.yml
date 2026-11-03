@@ -74,7 +74,9 @@ jobs:
         shell: bash
         run: |
           python -m venv ./.wheelvenv
-          if [ -d ./.wheelvenv/Scripts ]; then BIN=./.wheelvenv/Scripts; else BIN=./.wheelvenv/bin; fi
+          # absolute: the smoke steps cd to /tmp/wheelsmoke later, and a
+          # relative $BIN would not survive that
+          if [ -d ./.wheelvenv/Scripts ]; then BIN="$PWD/.wheelvenv/Scripts"; else BIN="$PWD/.wheelvenv/bin"; fi
           "$BIN/pip" install dist/*.whl
           "$BIN/flua" --version
           mkdir -p /tmp/wheelsmoke && cd /tmp/wheelsmoke
