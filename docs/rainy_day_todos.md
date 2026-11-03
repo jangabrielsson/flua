@@ -134,3 +134,40 @@ and every plugin boundary risks it.
 - **Refused:** a full plugin lifecycle (sandboxing/loading/versioning —
   no security story exists in-process, and it is permanent API surface);
   hooks into the pump/scheduler/clock (where the invariants live).
+
+## Pump wake-up, event-driven (parked 2026-11-03)
+
+- **What**: replace the pump's idle polling entirely — an `asyncio.Event`
+  set by `enqueue_outbound` (with `call_soon_threadsafe` from the worker
+  threads) so the pump sleeps until there is actual work.
+- **What NOT to touch blindly**: the `get_nowait()` drain loop exists
+  because `wait_for(queue.get(), timeout)` lost messages on Python <= 3.12
+  (ADR 0006, CI failures) — an event wake-up must keep the drain semantics
+  and earn trust on the full 3.11-3.15 CI matrix.
+- **Rationale**: shipped the cheap 80% first (the adaptive idle poll:
+  `_PUMP_POLL_IDLE` when no timers are pending); the event-driven version
+  removes the remaining ~20 wakeups/sec but rewrites the most delicate
+  part of the engine.
+
+## QA id band — HC3 devices approaching 5000 (parked 2026-11-03)
+
+- **What**: the real HC3's QA ids never get reused, and one user's controller
+  is already at 4357 — once real device ids cross 5000 they collide with
+  flua's emulated QA ids (engine-assigned from 5000). The fix, in order of
+  leverage:
+  1. *Cheap insurance*: in online/hybrid mode the allocator consults the
+     real HC3's /devices id set when skipping (today it only skips ids in
+     the sim's own state) — collision becomes impossible without any
+     configurability.
+  2. *Shape-based QA detection*: `api/state.py:is_plugin_device()` uses
+     `id >= 5000`; replace with device-shape markers (quickAppVariables /
+     view / uiView), which also makes everything base-agnostic.
+  3. *Configurable base*: a `qaIdBase` knob (`.flua.lua` / CLI flag) for
+     users who want a clean id band — the seed point is a single line
+     (`engine.py:_next_qa_id`).
+- **What NOT to worry about**: the blast radius is small — one seed point,
+  one id-range heuristic, the online allocation gap; tests keep the default
+  base and stay green.
+- **Rationale**: parked at the owner's request ("we can wait a bit longer
+  until we go there"); items 1-2 are worthwhile insurance before any
+  configurability.

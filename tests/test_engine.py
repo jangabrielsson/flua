@@ -74,6 +74,23 @@ async def test_interval_then_clear_and_exit(capsys) -> None:
 
 
 @pytest.mark.asyncio
+async def test_pump_idle_poll_adapts_to_timers() -> None:
+    # the pump's idle sleep: long when no timers are pending (an idle run
+    # must not spin at 10 ms), tight when a timer exists (virtual-clock
+    # deadline precision — the timing-sensitive tests depend on it)
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        assert engine._idle_poll_delay() == 0.05
+        engine.execute("setTimeout(function() end, 100000)")
+        # the setTimeout message rides the inbound queue to the pump
+        await asyncio.sleep(0.1)
+        assert engine._idle_poll_delay() == 0.01
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
 async def test_exit_message_sets_exit_code() -> None:
     engine = LuaEngine()
     await engine.start()

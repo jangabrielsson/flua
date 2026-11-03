@@ -119,6 +119,11 @@ _EXPORT_PROPERTIES = frozenset(
 # Seconds the pump waits on the outbound queue before re-checking the inbound
 # queue and the running flag. Upper bound on timer delivery latency.
 _PUMP_POLL = 0.01
+# The pump's idle poll: no pending timers means no virtual-clock deadline
+# precision to keep — sleep long so an idle run (a keep-alive QA, a server
+# session) stops waking 100 times a second. New work still lands within
+# one poll (50 ms) — imperceptible for the viewer/tools.
+_PUMP_POLL_IDLE = 0.05
 
 # Structured run traces (--trace / LuaEngine(trace=...)): opt-in extra
 # events agents can read from the syslog file to follow what a QA does.
@@ -2012,7 +2017,7 @@ class LuaEngine:
                 batch = [self._outbound.get_nowait()]
             except asyncio.QueueEmpty:
                 self._flush_db()  # idle: persist any --%%db:+ changes
-                await asyncio.sleep(_PUMP_POLL)
+                await asyncio.sleep(self._idle_poll_delay())
                 continue
             while not self._outbound.empty():
                 batch.append(self._outbound.get_nowait())
@@ -2029,6 +2034,12 @@ class LuaEngine:
                 # forever: yield to the event loop so the CLI's wall-cap
                 # check runs (and Ctrl-C stays interruptible)
                 await asyncio.sleep(0)
+
+    def _idle_poll_delay(self) -> float:
+        """The pump's sleep when the outbound queue is empty: the tight
+        poll while timers are pending (virtual-clock deadline precision),
+        the long one otherwise (an idle run must not spin)."""
+        return _PUMP_POLL if self._timers.active_count() else _PUMP_POLL_IDLE
 
     async def _drain_inbound(self) -> None:
         while self._inbound:
