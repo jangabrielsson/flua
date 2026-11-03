@@ -54,7 +54,10 @@ jobs:
       - run: pytest tests/ -q --ignore=tests/test_hc3_live.py --ignore=tests/test_hc3_compat.py
 
   wheel:
-    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -64,12 +67,17 @@ jobs:
       - run: python -m build
       # install the built wheel into a clean venv and smoke-test the pip
       # user's commands — catches packaging gaps (e.g. a template the
-      # package-data globs dropped, which the source-tree tests can't see)
-      - run: |
-          python -m venv /tmp/wheelvenv
-          /tmp/wheelvenv/bin/pip install dist/*.whl
-          /tmp/wheelvenv/bin/flua --version
+      # package-data globs dropped, which the source-tree tests can't see).
+      # Windows runs the same smoke (git-bash): the author develops on
+      # macOS daily, Windows is where CI has to catch what that misses.
+      - name: smoke-test the built wheel (clean venv)
+        shell: bash
+        run: |
+          python -m venv ./.wheelvenv
+          if [ -d ./.wheelvenv/Scripts ]; then BIN=./.wheelvenv/Scripts; else BIN=./.wheelvenv/bin; fi
+          "$BIN/pip" install dist/*.whl
+          "$BIN/flua" --version
           mkdir -p /tmp/wheelsmoke && cd /tmp/wheelsmoke
-          /tmp/wheelvenv/bin/flua --tool setup project
-          /tmp/wheelvenv/bin/flua --tool newQA binarySwitch "Smoke QA"
-          /tmp/wheelvenv/bin/flua --check binarySwitch.lua
+          "$BIN/flua" --tool setup project
+          "$BIN/flua" --tool newQA binarySwitch "Smoke QA"
+          "$BIN/flua" --check binarySwitch.lua

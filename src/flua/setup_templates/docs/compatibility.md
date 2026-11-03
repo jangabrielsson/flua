@@ -12,8 +12,10 @@ authoritative facts (`version`, `lupa`, `lua`, `python`, `integerBytes`,
 - **Tested in CI** (Ubuntu, every push): 3.11, 3.12, 3.13, 3.14, 3.15 —
   the matrix in `.github/workflows/tests.yml` is the contract; the wheel
   smoke test runs on 3.12.
-- **Everyday development**: macOS (the author's daily driver) and Windows
-  (community-tested; the flua forum suites run on Windows + 3.12).
+- **The wheel smoke also runs on Windows** (`windows-latest`) — the pip
+  user's commands in a clean venv. macOS is the author's daily driver (and
+  therefore continuously exercised); the Windows smoke exists because CI
+  catches what daily development cannot.
 - **lupa**: pinned to `lupa>=2.6,<2.7`. 2.6 ships binary wheels for
   cp311–cp314 on the common platforms; cp315 — and exotic platforms — build
   lupa from source and need a C compiler. A source-build failure on install
