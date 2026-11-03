@@ -51,7 +51,7 @@ Check that it works:
 flua --version
 ```
 
-> ✅ **You should see** `flua 0.1.12` (or newer).
+> ✅ **You should see** `flua 0.1.x` (or newer).
 
 If the `flua` command is not found, it still works as a Python module —
 every `flua` command in this tutorial can also be written `python3 -m flua`.
@@ -65,7 +65,7 @@ flua --api local -e 'print("Hello HC3!")'
 ```
 
 ```text
-🚀 flua 0.1.12 (Lua 5.5, Python 3.14.3), mode offline
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
 [04.10.2026][20:11:43][DEBUG  ][QA50005000]: Hello HC3!
 ```
 
@@ -91,7 +91,7 @@ flua doctor
 
 ```text
 flua doctor
-  ✓ flua              0.1.84 (Lua 5.5, Python 3.14.3)
+  ✓ flua              0.1.x (Lua 5.4, Python 3.x)
   ✓ virtualenv        virtualenv at ~/sunset-lamp/.venv
   ✓ HC3 credentials   not configured — offline sim only
   ✓ HC3 connection    skipped — no HC3_URL

@@ -59,7 +59,7 @@ flua --api local examples/trigger_sensor.lua examples/trigger_lamp.lua
 ```
 
 ```text
-🚀 flua 0.1.14 (Lua 5.5, Python 3.14.3), mode offline
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
 [05.10.2026][10:34:26][DEBUG  ][motion-sensor5000]: sensor online
 [05.10.2026][10:34:26][DEBUG  ][trigger-lamp5001]: lamp online
 [05.10.2026][10:34:27][DEBUG  ][trigger-lamp5001]: lamp now ON

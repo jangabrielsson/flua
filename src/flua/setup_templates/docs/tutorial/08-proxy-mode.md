@@ -55,7 +55,7 @@ flua sunset_lamp_ui.lua
 ```text
 flua: proxy installed: 123 SunsetLamp_Proxy
 flua: proxy connected — SunsetLamp_Proxy (5000) sends actions and UI events to http://192.168.1.42:8080
-🚀 flua 0.1.14 (Lua 5.5, Python 3.14.3), mode proxy:5000
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode proxy:5000
 [05.10.2026][21:00:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready, 60 W
 ```
 

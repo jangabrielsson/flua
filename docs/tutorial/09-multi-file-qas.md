@@ -35,7 +35,7 @@ flua --api local examples/multifile.lua
 ```
 
 ```text
-🚀 flua 0.1.14 (Lua 5.5, Python 3.14.3), mode offline
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
 [05.10.2026][10:33:55][DEBUG  ][multifile-demo5000]: helper says: loaded in order
 ```
 

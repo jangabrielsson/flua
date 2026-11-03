@@ -35,7 +35,7 @@ flua --api remote --start '2026/10/4 18:30:00' sunset_lamp_ui.lua
 ```
 
 ```text
-🚀 flua 0.1.12 (Lua 5.5, Python 3.14.3), mode online
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode online
 [04.10.2026][18:30:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready, 60 W
 ```
 

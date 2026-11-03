@@ -50,7 +50,7 @@ chapter 01's setup installed it). VS Code runs the file and shows the log
 in its terminal panel:
 
 ```text
-🚀 flua 0.1.12 (Lua 5.5, Python 3.14.3), mode offline
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
 [04.10.2026][20:50:10][DEBUG  ][hello5000]: Hello from my first QuickApp
 [04.10.2026][20:50:10][DEBUG  ][hello5000]: tick 1
 [04.10.2026][20:50:11][DEBUG  ][hello5000]: tick 2

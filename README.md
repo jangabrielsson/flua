@@ -30,6 +30,8 @@ directives, multi-file QAs, the offline HC3, and deploying to the HC3.
 The rest of this file is how flua works under the hood. Deeper references:
 [ARCHITECTURE.md](ARCHITECTURE.md) (internals),
 [docs/concurrency.md](docs/concurrency.md) (threading model),
+[docs/compatibility.md](docs/compatibility.md) (the runtime compatibility
+matrix — Python/Lua/HC3 versions),
 [docs/invariants.md](docs/invariants.md) (behavioral contracts + pinning
 tests), [docs/rest-endpoints.md](docs/rest-endpoints.md) (REST route
 reference), [docs/decisions/](docs/decisions/) (the ADR log), and
@@ -44,7 +46,10 @@ python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
 ```
 
-Requires Python 3.11+. `lupa` is the only runtime dependency.
+Requires Python 3.11+. `lupa` is the only runtime dependency. The
+supported Python/Lua/HC3 matrix lives in
+[docs/compatibility.md](docs/compatibility.md); `flua --version --machine`
+prints the installed versions as one JSON line.
 
 For VS Code, `flua --tool setup` scaffolds a QA project with run/debug
 launch configurations, **Lua Language Server support** (a `.luarc.json`
@@ -111,7 +116,7 @@ network connections are pending — a script with no timers just runs and exits,
 like the standard interpreter (`--ui` is the exception: it keeps the run alive
 until Ctrl-C so the viewer never loses its API). On startup flua prints a
 one-line greeting with the versions and the resolved mode —
-`flua 0.1.45 (Lua 5.5, Python 3.14.3), mode online` (offline / `proxy:<id>`
+`flua 0.1.x (Lua 5.4, Python 3.x), mode online` (offline / `proxy:<id>`
 in the other modes; `--nogreet` to skip it).
 
 Each file is started as a tracked `setTimeout` callback with delay 0, so it

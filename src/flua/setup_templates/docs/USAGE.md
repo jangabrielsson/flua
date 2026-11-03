@@ -32,6 +32,10 @@ when it works.
 ## Install
 
 Python 3.11+. lupa (which bundles Lua) is the only runtime dependency.
+The full runtime matrix — tested Python versions, the Lua 5.4/lupa pin and
+why, and the HC3's own Lua 5.3 — is in
+[`docs/compatibility.md`](docs/compatibility.md);
+`flua --version --machine` prints the installed versions as one JSON line.
 
 ```bash
 pip install fibaro-flua        # from PyPI — installs the flua command

@@ -75,7 +75,7 @@ flua --api local --start '2026/10/4 18:30:00' sunset_lamp_auto.lua
 ```
 
 ```text
-🚀 flua 0.1.12 (Lua 5.5, Python 3.14.3), mode offline
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
 [04.10.2026][18:30:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready
 [04.10.2026][18:30:00][DEBUG  ][SunsetLamp5000]: Lamp on
 ```
@@ -102,7 +102,7 @@ flua --api local --start '2026/10/4 18:00:00' --instant --max-hours 1 sunset_lam
 ```
 
 ```text
-🚀 flua 0.1.12 (Lua 5.5, Python 3.14.3), mode offline
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
 [04.10.2026][18:00:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready
 [04.10.2026][18:13:00][DEBUG  ][SunsetLamp5000]: Lamp on
 flua: virtual time limit reached (1.0h)
@@ -144,7 +144,7 @@ same as the terminal command:
 ```
 
 ```text
-🚀 flua 0.1.13 (Lua 5.5, Python 3.14.3), mode offline
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
 [04.10.2026][18:30:01][DEBUG  ][dtime5000]: NOW 18:30
 ```
 
