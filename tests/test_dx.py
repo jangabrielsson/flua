@@ -804,6 +804,13 @@ def test_capabilities_json_table() -> None:
     assert by_name["simulated HC3 REST"]["status"] == "partial"  # shape-only stubs exist
     assert by_name["numeric32 emulation"]["status"] == "unsupported"
     assert by_name["--strict-tests / --result-json"]["status"] == "implemented"
+    # the machine-derived rest table classifies every implemented route
+    rest = payload["rest"]
+    by_path = {(entry["method"], entry["path"]): entry for entry in rest}
+    assert by_path[("GET", "/alarms/v1/devices")]["status"] == "stub"
+    assert by_path[("GET", "/devices/{id}")]["status"] == "state"
+    assert by_path[("PUT", "/weather")]["status"] == "extension"
+    assert all(entry["status"] in ("state", "stub", "extension") for entry in rest)
 
 
 def test_strict_tests_covers_mapped_ui_callbacks(tmp_path) -> None:

@@ -3,8 +3,13 @@
 Which simulated endpoints carry real data and which are HC3-shaped stubs.
 The classification rule (from `docs/notes/notes-rest-parity.md`): implement a
 stub for real only when (a) a QA calls it, (b) a tool/agent reads it, or
-(c) the compat suite flags shape drift. Hand-maintained — update when
-`routes/__init__.py` changes.
+(c) the compat suite flags shape drift.
+
+The stub column is **machine-readable**: `SHAPE_ONLY_ROUTES` in
+`src/flua/api/__init__.py` is the source of truth (update both together),
+`flua --capabilities-json` serves it as the `rest` table
+(`status: state | stub | extension`), and the runtime warns on first use
+of a stub (default on; `--%%warn:stubApi=false` silences).
 
 | Area | Real (state-backed) | Stub (shape-only: empty/zeroed) |
 |---|---|---|

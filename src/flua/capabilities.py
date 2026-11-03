@@ -235,6 +235,14 @@ CAPABILITIES: dict[str, list[dict[str, str]]] = {
 def report(engine: Any, runtime: dict[str, Any]) -> dict[str, Any]:
     """The full --capabilities-json payload; ``runtime`` is the same record
     ``--version --machine`` emits (version/lua/lupa/python/integerBytes/locale)."""
+    from .api import route_classification
+    from .api.routes import ROUTES
+
+    rest = [
+        {"method": method, "path": pattern, "status": route_classification(method, pattern)}
+        for method, pattern, _handler in ROUTES
+    ]
+    rest.sort(key=lambda entry: (entry["path"], entry["method"]))
     return {
         "schemaVersion": 1,
         "runtime": runtime,
@@ -244,4 +252,8 @@ def report(engine: Any, runtime: dict[str, Any]) -> dict[str, Any]:
             "claimed. This describes flua's emulated surface, not physical-HC3 parity."
         ),
         "capabilities": CAPABILITIES,
+        # machine-derived from the route table: state = real simulated data,
+        # stub = HC3-shaped but empty/zeroed (the docs/rest-endpoints.md stub
+        # column), extension = flua-only surface with no HC3 counterpart
+        "rest": rest,
     }

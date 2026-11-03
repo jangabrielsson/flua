@@ -669,6 +669,19 @@ def debug_flag(config: dict[str, Any], channel: str) -> bool:
     return bool(flag)
 
 
+def warn_enabled(config: dict[str, Any], channel: str, default: bool) -> bool:
+    """One ``--%%warn`` channel. The scalar form (``--%%warn:true`` /
+    ``false``) switches every channel; the dict form
+    (``--%%warn:stubApi=false``) sets channels individually. ``default`` is
+    the channel's state when the directive is absent."""
+    flag = config.get("warn")
+    if isinstance(flag, dict):
+        return bool(flag.get(channel, default))
+    if flag is None:
+        return default
+    return bool(flag)
+
+
 def merge_annotations(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
     """``extra`` behaves like more ``--%%`` lines appended to a QA's header:
     ``--%%var``/``--%%property`` merge per variable/property, ``--%%u``/

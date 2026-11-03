@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from . import __version__
-from .config import debug_flag
+from .config import debug_flag, warn_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -289,21 +289,51 @@ def install_bindings(engine: "LuaEngine") -> None:
     # like the real HC3 builtins; offline it dispatches to the simulated HC3
     # (running QAs + seeded state), online mode will route to the real HC3.
     def warn_api(method: str, url: str, status: int, qa_id: int | None) -> None:
-        """--%%warn:true: error status codes are easy to miss (most QA code
-        ignores them) — the HC3 stays silent, the emulator can shout."""
-        enabled = bool(engine.config.get("warn"))
+        """--%%warn status channel: error status codes are easy to miss
+        (most QA code ignores them) — the HC3 stays silent, the emulator
+        can shout."""
+        config: dict[str, object] = dict(engine.config)
         if qa_id is not None:
             info = engine.qa_info(int(qa_id))
             if info is not None:
-                enabled = enabled or bool(info.get("config", {}).get("warn"))
-        if enabled and (status >= 300 or status <= 0):
+                config.update(info.get("config", {}))
+        if warn_enabled(config, "status", False) and (status >= 300 or status <= 0):
             engine.flua_log("warning", qa_id, f"api {method.upper()} {url} -> {status}")
+
+    def warn_stub_api(method: str, url: str, qa_id: int) -> None:
+        """Default-on: a QA calling a shape-only stub route gets ONE warning
+        per route per run (the stubs answer 200 with empty/zeroed data that
+        looks plausible). --%%warn:stubApi=false (or --%%warn:false)
+        silences it."""
+        from .api import route_classification
+
+        if route_classification(method, url) != "stub":
+            return
+        config: dict[str, object] = dict(engine.config)
+        info = engine.qa_info(qa_id)
+        if info is not None:
+            config.update(info.get("config", {}))
+        if not warn_enabled(config, "stubApi", True):
+            return
+        key = (qa_id, method.upper(), url)
+        if key in engine._stub_warned:
+            return
+        engine._stub_warned.add(key)
+        engine.flua_log(
+            "warning",
+            qa_id,
+            f"api {method.upper()} {url} is a shape-only stub in the sim "
+            "(200 with empty/zeroed data) — mock it with api.registerEndpoint "
+            "or run online/proxy for real controller data",
+        )
 
     def api_call(
         method: str, url: str, body: object, qa_id: int | None = None
     ) -> tuple[object, int]:
         if debug_flag(engine.config, "api"):
             engine.debug_log(f"api {method.upper()} {url}")
+        if qa_id is not None:
+            warn_stub_api(method, url, int(qa_id))
         data, status = engine.api.dispatch(method, url, lua_to_python(body, lua), qa_id=qa_id)
         warn_api(method, url, status, qa_id)
         if data is None:

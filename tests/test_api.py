@@ -1474,6 +1474,23 @@ def test_embedded_ui_strips_insignificant_zeros(api: Api) -> None:
     assert data["5007"]["values"]["__multisensorValue"]["text"] == "348.4V"
 
 
+def test_route_classification() -> None:
+    # state vs stub vs extension: the machine-readable split behind
+    # --capabilities-json's rest table and the default-on stub warning
+    from flua.api import route_classification
+
+    assert route_classification("GET", "/alarms/v1/devices") == "stub"
+    assert route_classification("GET", "/users") == "stub"
+    assert route_classification("GET", "/panels/climate/3") == "stub"
+    assert route_classification("GET", "/iosDevices") == "stub"
+    assert route_classification("GET", "/devices/5") == "state"
+    assert route_classification("GET", "/weather") == "state"
+    assert route_classification("PUT", "/weather") == "extension"
+    assert route_classification("POST", "/devices") == "extension"
+    assert route_classification("GET", "/flua/devices") == "extension"
+    assert route_classification("GET", "/nonsense/route") is None
+
+
 def test_embedded_ui_only_plugin_devices(api: Api) -> None:
     # seed devices without a quickApp interface get no embedded view, even
     # when their type has one — the HC3 renders those itself

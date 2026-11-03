@@ -56,6 +56,7 @@ from .config import (
     merge_annotations,
     parse_annotations,
     split_annotations,
+    warn_enabled,
 )
 from .devices import catalog_types, skeleton_for
 from .environment import EnvChain
@@ -193,6 +194,9 @@ class LuaEngine:
         self._lua = lupa.LuaRuntime(unpack_returned_tuples=True, encoding="UTF-8")
         self._inbound: deque[dict[str, Any]] = deque()
         self._outbound: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        # (qa_id, method, url) of shape-only stub calls already warned about
+        # (one warning per QA per route — the default-on stub warning)
+        self._stub_warned: set[tuple[int, str, str]] = set()
         # --%%db: a JSON file seeding the sim (like --seed) and, with the +
         # variant, the file emulator state persists back to. The QA-state
         # section is engine-owned (keyed by QA name, not id); the rest seeds
@@ -2223,13 +2227,13 @@ class LuaEngine:
                 except Exception:
                     logger.exception("async api dispatch failed for %s %s", method, url)
                     data, status = None, 0
-                # --%%warn:true — error status codes are easy to miss (the HC3
-                # stays silent, the emulator can shout)
-                enabled = bool(self.config.get("warn"))
+                # --%%warn status channel — error status codes are easy to
+                # miss (the HC3 stays silent, the emulator can shout)
+                merged: dict[str, Any] = dict(self.config)
                 info = self._qas.get(qa)
                 if info is not None:
-                    enabled = enabled or bool(info.get("config", {}).get("warn"))
-                if enabled and (status >= 300 or status <= 0):
+                    merged.update(info.get("config", {}))
+                if warn_enabled(merged, "status", False) and (status >= 300 or status <= 0):
                     self.flua_log("warning", qa, f"api {method} {url} -> {status}")
                 info = self._qas.get(qa)
                 if info is not None and info.get("exited") is not None:

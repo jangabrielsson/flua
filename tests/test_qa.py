@@ -776,6 +776,61 @@ async def test_load_sim_device_alarm_panel(capsys) -> None:
     assert "GARDEN-ARMED true" in out
 
 
+@pytest.mark.asyncio
+async def test_stub_api_warning_default_on_and_deduped(capsys) -> None:
+    # a QA calling a shape-only stub route gets ONE warning per route (the
+    # stubs answer 200 with plausible empty data); real routes stay silent
+    loader_code = (
+        "setTimeout(function()\n"
+        "  local a, s1 = api.get('/alarms/v1/devices')\n"
+        "  print('STUB', s1, json.encode(a))\n"
+        "  local b, s2 = api.get('/alarms/v1/devices')  -- same route again\n"
+        "  print('STUB2', s2, json.encode(b))\n"
+        "  local c, s3 = api.get('/devices')\n"
+        "  print('REAL', s3, type(c) == 'table')\n"
+        "  _FLUA.exit(0)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(None, loader_code, {}, "loader")
+        await wait_until(lambda: not engine.is_running())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    # the stub still answers 200 with the HC3 shape
+    assert "STUB 200" in out and "STUB2 200" in out and "REAL 200" in out
+    # ...and warns exactly once for it, never for the real route
+    assert out.count("shape-only stub") == 1
+    assert "GET /alarms/v1/devices is a shape-only stub" in out
+    assert "GET /devices is a shape-only stub" not in out
+
+
+@pytest.mark.asyncio
+async def test_stub_api_warning_opt_out(capsys) -> None:
+    # --%%warn:stubApi=false silences the stub channel (the scalar
+    # --%%warn:false silences everything); here the QA's config is passed
+    # directly (the CLI parses code headers, the engine does not)
+    loader_code = (
+        "setTimeout(function()\n"
+        "  local a, s = api.get('/alarms/v1/devices')\n"
+        "  print('STUB', s, json.encode(a))\n"
+        "  _FLUA.exit(0)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(None, loader_code, {"warn": {"stubApi": False}}, "loader")
+        await wait_until(lambda: not engine.is_running())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "STUB 200" in out
+    assert "shape-only stub" not in out
+
+
 def test_cli_directive_injection(tmp_path) -> None:
     # -D/--directive injects --%% lines as if appended to every QA's header —
     # testing foreign code without editing it

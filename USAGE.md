@@ -327,7 +327,7 @@ Parsing stops at the end-of-header marker:
 | `--%%debug:ws=true` | debug logging: byte-level `net.WebSocketClient` traffic — handshake leftovers, per-frame rx/tx with masked previews, close codes (global) |
 | `--%%debug:true` | shorthand for all three debug channels (`:false` disables them) |
 | `--%%loglength:120` | debug line length cap (default 120) |
-| `--%%warn:true` | extra runtime warnings for things the HC3 stays silent about (global) |
+| `--%%warn:true` | extra runtime warnings for things the HC3 stays silent about: the `status` channel (api error codes, off by default); the `stubApi` channel (shape-only stub calls, **on by default**, `--%%warn:stubApi=false` to silence) (global) |
 | `--%%trace:api,ui` | the `--trace` categories (api, ui, net, timer, `all`) as a directive (global) |
 | `--%%syslog:run.json` | the `--syslog` file — one JSON line per system/trace event (global) |
 | `--%%strict-tests:true` | the `--strict-tests` CI mode as a directive (global): unhandled callback errors fail the run with exit 1, sticky |
@@ -536,11 +536,26 @@ flua --run-for 30 --debug ws SonosPlayer.lua     # sim HC3, real player,
 with `...`).
 
 `--%%warn:true` turns on extra runtime warnings for things the HC3 never
-complains about — starting with api error codes: when an `api.get`/`post`/
-`put`/`delete` (or `api.hc3.*`) returns a 4xx/5xx — or a transport failure —
-the emulator logs it, because most QA code silently ignores those status
-codes. Flua's own log lines are visually distinct from QA logs: a `[FLUA]`
-level column plus the QA tag the message belongs to:
+complains about, as channels:
+
+- `status` (default off, `--%%warn:true` enables it) — api error codes:
+  when an `api.get`/`post`/`put`/`delete` (or `api.hc3.*`) returns a
+  4xx/5xx — or a transport failure — the emulator logs it, because most
+  QA code silently ignores those status codes.
+- `stubApi` (**default on**) — when a QA calls one of the sim's
+  shape-only stub endpoints (`/alarms/v1/devices`, `/panels/climate`,
+  `/users`, … — see `docs/rest-endpoints.md`), it answers 200 in the HC3
+  shape but with empty/zeroed data. flua warns once per route so the
+  limit is visible at the point of use:
+
+```
+[02.11.2026][FLUA   ][my-qa5000]: api GET /alarms/v1/devices is a shape-only stub in the sim (200 with empty/zeroed data) — mock it with api.registerEndpoint or run online/proxy for real controller data
+```
+
+`--%%warn:false` silences every channel; the dict form sets channels
+individually (`--%%warn:stubApi=false`). Flua's own log lines are
+visually distinct from QA logs: a `[FLUA]` level column plus the QA tag
+the message belongs to:
 
 ```
 [02.10.2026][17:32:41][FLUA   ][my-qa5000]: api GET /devices/9999 -> 404

@@ -60,6 +60,40 @@ def _compile_routes() -> list[tuple[str, re.Pattern[str], dict[str, int], Handle
 
 _COMPILED = _compile_routes()
 
+# Shape-only stubs: HC3-shaped 200 responses with empty/zeroed data — the
+# docs/rest-endpoints.md "Stub" column, now machine-readable (that table
+# points here; update both together). They look plausible to a QA that
+# expects real controller state, so the runtime warns on first use
+# (--%%warn:stubApi=false silences).
+SHAPE_ONLY_ROUTES: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("GET", "/iosDevices"),
+        ("GET", "/alarms/v1/devices"),
+        ("GET", "/notificationCenter"),
+        ("GET", "/energy/devices"),
+        ("GET", "/users"),
+        ("GET", "/panels/climate"),
+        ("GET", "/panels/climate/{id}"),
+        ("GET", "/panels/notifications"),
+        ("GET", "/panels/family"),
+        ("GET", "/panels/sprinklers"),
+        ("GET", "/panels/humidity"),
+        ("GET", "/panels/favoriteColors"),
+        ("GET", "/panels/favoriteColors/v2"),
+    }
+)
+# flua-only routes with no HC3 counterpart (extensions beyond the /flua/
+# channel, which is classified by path).
+_EXTENSION_ROUTES: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("POST", "/devices"),  # flua extension: base device from the type skeleton
+        ("PUT", "/weather"),  # flua extension: the HC3's weather is provider-owned
+    }
+)
+_SHAPE_ONLY_COMPILED = [
+    (method, compile_pattern(pattern)[0]) for method, pattern in SHAPE_ONLY_ROUTES
+]
+
 # /quickApp/* is engine-backed (Api._dispatch routes it before the route
 # table) — the audit classifier and the user-route pre-check must still
 # count these paths as built-in/simulated. Mirrors Api._quickapp.
@@ -96,6 +130,27 @@ def route_match(method: str, path: str) -> bool:
         if route_method == method.upper() and pattern.match(path):
             return True
     return False
+
+
+def route_classification(method: str, path: str) -> str | None:
+    """What the sim serves for (method, path): ``"state"`` (real simulated
+    data), ``"stub"`` (HC3-shaped but empty/zeroed), ``"extension"``
+    (flua-only surface, no HC3 counterpart), or None (not implemented —
+    forwarded online). Drives --capabilities-json's rest table and the
+    default-on shape-only-stub warning (--%%warn:stubApi=false silences)."""
+    method = method.upper()
+    path = path.split("?", 1)[0]
+    normalized = re.sub(r"\{[^/{}]*\}", "x", path) if "{" in path else path
+    if path == "/proxy" or path.startswith("/flua/"):
+        return "extension"
+    for stub_method, regex in _SHAPE_ONLY_COMPILED:
+        if stub_method == method and regex.match(normalized):
+            return "stub"
+    if (method, path) in _EXTENSION_ROUTES:
+        return "extension"
+    if route_match(method, path):
+        return "state"
+    return None
 
 
 def _trace_body(body: Any) -> str:
