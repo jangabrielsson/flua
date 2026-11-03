@@ -211,6 +211,29 @@ def test_variables_status_contract(api: Api) -> None:
     assert api.dispatch("GET", "/plugins/5000/variables/k") == (None, 404)
 
 
+def test_variables_name_format(api: Api) -> None:
+    # the HC3 enforces [A-Za-z][A-Za-z0-9_]* on variable names (a POST with
+    # a bad name fails 400) — flua mirrors it so QAs break the same way
+    api.register_qa(5000, "qa", None, {})
+    err, status = api.dispatch(
+        "POST", "/plugins/5000/variables", {"name": "bad-name", "value": "1"}
+    )
+    assert status == 400 and err["reason"] == "WRONG_TYPE"
+    # digits and underscores are fine after the leading letter
+    var, status = api.dispatch("POST", "/plugins/5000/variables", {"name": "a1_b", "value": "1"})
+    assert status == 201 and var["name"] == "a1_b"
+    # PUT validates the path key and the body name
+    err, status = api.dispatch(
+        "PUT", "/plugins/5000/variables/bad-key", {"name": "bad-key", "value": "1"}
+    )
+    assert status == 400 and err["reason"] == "WRONG_TYPE"
+    err, status = api.dispatch(
+        "PUT", "/plugins/5000/variables/a1_b", {"name": "bad name", "value": "2"}
+    )
+    assert status == 400 and err["reason"] == "WRONG_TYPE"
+    assert api.dispatch("GET", "/plugins/5000/variables/a1_b")[1] == 200
+
+
 def test_variables_list_and_clear(api: Api) -> None:
     api.register_qa(5000, "qa", None, {})
     api.dispatch("POST", "/plugins/5000/variables", {"name": "b", "value": "2"})

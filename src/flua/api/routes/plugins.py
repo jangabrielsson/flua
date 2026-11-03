@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import re
 import time
 from typing import Any
 
@@ -90,6 +91,25 @@ def variable_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     return (public(var), 200) if var is not None else (None, 404)
 
 
+VARIABLE_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
+
+
+def _bad_name(name: Any) -> dict[str, str] | None:
+    """The HC3 rejects variable names not matching ``[A-Za-z][A-Za-z0-9_]*``
+    (a POST with such a name fails 400; mirror the error shape so flua QAs
+    break the same way as on the controller)."""
+    if not isinstance(name, str) or VARIABLE_NAME_RE.fullmatch(name) is None:
+        return {
+            "message": (
+                "name: expected Wrong variable name format. "
+                f"Accepted format: [A-Za-z][A-Za-z0-9_]* got: {name}"
+            ),
+            "reason": "WRONG_TYPE",
+            "type": "ERROR",
+        }
+    return None
+
+
 def _var_from_body(req: ApiRequest, default_name: str | None = None) -> dict[str, Any] | None:
     if not isinstance(req.body, dict):
         return None
@@ -107,13 +127,17 @@ def variable_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     dev = state.device(req.path_params["id"])
     if dev is None:
         return None, 404
-    variables = _variables(state, dev)
     key = req.path_params["key"]
+    if bad := _bad_name(key):
+        return bad, 400
+    variables = _variables(state, dev)
     if key not in variables:
         return None, 404  # drives quickapp.lua's PUT -> POST fallback
     spec = _var_from_body(req, default_name=key)
     if spec is None:
         return None, 400
+    if bad := _bad_name(spec["name"]):
+        return bad, 400
     if state.is_proxy(dev["id"]):
         # the HC3 owns the device; its own event comes back via the poll
         variables[key] = spec
@@ -135,6 +159,8 @@ def variable_post(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     spec = _var_from_body(req)
     if spec is None:
         return None, 400
+    if bad := _bad_name(spec["name"]):
+        return bad, 400
     variables = _variables(state, dev)
     if state.is_proxy(dev["id"]):
         variables[spec["name"]] = spec
