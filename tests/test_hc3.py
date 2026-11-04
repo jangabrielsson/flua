@@ -152,8 +152,13 @@ class _MockHc3(BaseHTTPRequestHandler):
             if not self._authed():
                 self._send_json({"error": "unauthorized"}, 401)
                 return
+            # the HC3's real /plugins shape (live-verified 5.221): the
+            # plugin-type catalog, not a device list
             self._send_json(
-                [{"id": 45, "name": "hc3-plugin", "type": "com.fibaro.binarySwitch"}]
+                {
+                    "installed": [{"name": "hc3-plugin", "predefined": True}],
+                    "all": {"types": []},
+                }
             )
             return
         if self.path.startswith("/api/devices/45"):
@@ -586,11 +591,11 @@ async def test_scenes_merge_online(
 
 
 @pytest.mark.asyncio
-async def test_plugins_merge_online(
+async def test_plugins_online_passthrough(
     tmp_path, capsys, mock_hc3, monkeypatch
 ) -> None:
-    # online: the emulated QA (a local resource) merges into the controller's
-    # plugin list
+    # online: /plugins is the controller's plugin-type catalog (live-verified
+    # 5.221) — passed through as-is; the emulated QAs live in /devices
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.setenv("HC3_URL", mock_hc3)
     monkeypatch.setenv("HC3_USER", "admin")
@@ -599,19 +604,17 @@ async def test_plugins_merge_online(
     script.write_text(
         "setTimeout(function()\n"
         "  local p = api.get('/plugins')\n"
-        "  local names = {}\n"
-        "  for i = 1, #p do names[#names + 1] = p[i].name end\n"
-        "  print('PLUGINS', #p, json.encode(names))\n"
+        "  print('PLUGINS', type(p), #(p.installed or {}), (p.installed or {})[1].name)\n"
         "end, 20)\n"
     )
     engine = LuaEngine(api_mode="remote")
     await engine.start()
     try:
         engine.start_qa(str(script), None, {}, str(script))
-        out = await _wait_for_output(capsys, 'PLUGINS 2')
+        out = await _wait_for_output(capsys, "PLUGINS")
     finally:
         await engine.stop()
-    assert 'PLUGINS 2 ["hc3-plugin","plugins"]' in out
+    assert "PLUGINS table 1 hc3-plugin" in out
 
 
 @pytest.mark.asyncio

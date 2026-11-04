@@ -23,10 +23,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import re
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import mkdtemp
@@ -165,8 +167,8 @@ def _normalize_line(text: str) -> str:
 
 def _probe_qa_transcript(client: Any, engine: Any, verbose: bool) -> list[str]:
     """Upload the Tier-3 probe QA, collect its PROBE lines from
-    /debugMessages (tag-prefix filtered, whitespace-normalized), and delete
-    the QA again — the transcript the replay diffs against the sim's."""
+    /debugMessages (the HC3 tags QA lines QUICKAPP<id>), and delete the QA
+    again — the transcript the replay diffs against the sim's."""
     source = _probe_qa_path()
     qa_id = engine._prepare_qa(str(source), None, {"name": "flua_p_probe"}, str(source))
     fqa = engine.qa_export(qa_id)
@@ -176,6 +178,7 @@ def _probe_qa_transcript(client: Any, engine: Any, verbose: bool) -> list[str]:
     if status not in (200, 201):
         raise SystemExit(f"error: cannot upload the probe QA (HTTP {status})")
     device_id = device["id"] if isinstance(device, dict) and "id" in device else int(device)
+    tag = f"QUICKAPP{device_id}"
     if verbose:
         print(f"probe QA uploaded (device {device_id}) — waiting for the transcript")
     try:
@@ -189,7 +192,7 @@ def _probe_qa_transcript(client: Any, engine: Any, verbose: bool) -> list[str]:
                     _normalize_line(str(entry.get("message", "")))
                     for entry in messages
                     if isinstance(entry, dict)
-                    and str(entry.get("tag", "")).startswith("flua_p_probe")
+                    and str(entry.get("tag", "")) == tag
                     and str(entry.get("message", "")).startswith("PROBE")
                 ]
                 if any("timer fired" in line for line in lines):
@@ -204,40 +207,75 @@ def _probe_qa_transcript(client: Any, engine: Any, verbose: bool) -> list[str]:
             print(f"warning: cannot delete the probe QA (HTTP {del_status})")
 
 
-async def _helper_fibaro(engine: Any) -> list[dict]:
-    """Run the fibaro probes inside the deployed FluaHelper QA: start the
-    helper server, wake the helper (on-demand dial-in), call each probe,
-    stop the server. Records ok + the values' shape — never the values."""
+async def _helper_session(engine: Any, use: Any) -> Any:
+    """Start the helper server, wake the deployed FluaHelper and run ``use``
+    while it is connected, then stop the server. The wake runs in a worker
+    thread — ``_wake_helper`` polls with time.sleep, and the event loop must
+    stay free to accept the helper's dial-in while it does."""
     engine._loop = asyncio.get_running_loop()
     await engine.helper.start()
     try:
-        engine._wake_helper()
-        deadline = time.monotonic() + 30
-        while not engine.helper.connected and time.monotonic() < deadline:
-            await asyncio.sleep(0.2)
-        results: list[dict] = []
-        for name, args, note in FIBARO_PROBES:
-            entry: dict = {
-                "name": name,
-                "args": args,
-                "ok": False,
-                "valuesShape": None,
-                "error": None,
-                "note": note,
-            }
-            if engine.helper.connected:
-                values, ok = await engine.helper.call_fibaro(name, args)
-                entry["ok"] = ok
-                if ok and isinstance(values, list):
-                    entry["valuesShape"] = shape(values)
-                else:
-                    entry["error"] = str(values) if values is not None else "helper failed"
-            else:
-                entry["error"] = "helper not connected (run flua --tool installHelper)"
-            results.append(entry)
-        return results
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            wake = pool.submit(engine._wake_helper)
+            deadline = time.monotonic() + 30
+            while not engine.helper.connected and time.monotonic() < deadline:
+                await asyncio.sleep(0.2)
+            with contextlib.suppress(Exception):
+                wake.result(timeout=5)  # let the wake thread finish polling
+        return await use(engine)
     finally:
         await engine.helper.stop()
+
+
+def _run_helper(engine: Any, use: Any) -> Any:
+    return asyncio.run(_helper_session(engine, use))
+
+
+# GET probes the HC3 serves only to local callers (external REST answers
+# 501) — captured through the FluaHelper instead.
+_PLUGIN_HELPER_PATTERNS = {
+    "/plugins/{id}",
+    "/plugins/{id}/variables",
+    "/plugins/{id}/variables/{key}",
+}
+
+
+def _make_helper_use(args: argparse.Namespace, client: Any, plugin_paths: dict) -> Any:
+    """Build the use() closure for one helper session: the fibaro probes
+    (--fibaro) and the plugin-family GETs, all inside the local context."""
+
+    async def use(engine: Any) -> dict:
+        results: dict = {}
+        if args.fibaro:
+            probes = []
+            for name, fargs, note in FIBARO_PROBES:
+                entry: dict = {
+                    "name": name,
+                    "args": fargs,
+                    "ok": False,
+                    "valuesShape": None,
+                    "error": None,
+                    "note": note,
+                }
+                if engine.helper.connected:
+                    values, ok = await engine.helper.call_fibaro(name, fargs)
+                    entry["ok"] = ok
+                    if ok and isinstance(values, list):
+                        entry["valuesShape"] = shape(values)
+                    else:
+                        entry["error"] = str(values) if values is not None else "helper failed"
+                else:
+                    entry["error"] = "helper not connected (run flua --tool installHelper)"
+                probes.append(entry)
+            results["fibaro"] = probes
+        for pattern, live_path in plugin_paths.items():
+            if live_path is None or not engine.helper.connected:
+                continue
+            data, status = await engine.helper.call("GET", live_path, None)
+            results[pattern] = (status, data)
+        return results
+
+    return use
 
 
 def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
@@ -259,7 +297,51 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
 
     entries: list[dict] = []
     skipped: list[dict] = []
+
+    # The HC3 serves the plugin-{id} family only to LOCAL callers (external
+    # REST gets 501/500) — capture them through the FluaHelper, which calls
+    # them in the QA-runtime context, and compare local-to-local.
+    plugin_paths: dict[str, str | None] = {
+        probe.pattern: probe.live(client)
+        for probe in PROBES
+        if probe.pattern in _PLUGIN_HELPER_PATTERNS
+    }
+    helper_results: dict = {}
+    if args.fibaro or any(plugin_paths.values()):
+        helper_results = _run_helper(engine, _make_helper_use(args, client, plugin_paths))
+
     for probe in PROBES:
+        if probe.pattern in _PLUGIN_HELPER_PATTERNS:
+            live_path = plugin_paths[probe.pattern]
+            if live_path is None:
+                skipped.append(
+                    {"pattern": probe.pattern, "reason": "no plugin device to point the probe at"}
+                )
+                continue
+            status, data = helper_results.get(probe.pattern, (0, None))
+            if status == 0:
+                skipped.append(
+                    {
+                        "pattern": probe.pattern,
+                        "reason": "helper not connected (the HC3 serves these locally only)",
+                    }
+                )
+                continue
+            entry: dict = {
+                "pattern": probe.pattern,
+                "path": live_path,
+                "status": status,
+                "shape": (
+                    shape(data)
+                    if 200 <= status < 300 and isinstance(data, (dict, list))
+                    else None
+                ),
+                "via": "helper",
+            }
+            entries.append(entry)
+            if args.verbose:
+                print(f"{status} {live_path}  # via helper")
+            continue
         live_path = probe.live(client)
         if live_path is None:
             skipped.append(
@@ -267,7 +349,7 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
             )
             continue
         data, status = client.request("GET", live_path)
-        entry: dict = {
+        entry = {
             "pattern": probe.pattern,
             "path": live_path,
             "status": status,
@@ -311,11 +393,14 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
             for record in records:
                 if args.verbose:
                     print(f"{sequence.id}/{record['step']}: {record['status']} {record['path']}")
-            if sequence.id == "qaLifecycle":
+            # register an artifact only when its create step actually created
+            # it (a 400/501 create leaves nothing to clean up)
+            created = bool(records) and 200 <= records[0]["status"] < 300
+            if sequence.id == "qaLifecycle" and created:
                 tracker.add("device", bindings["create.id"])
-            if sequence.id == "customEvents":
+            if sequence.id == "customEvents" and created:
                 tracker.add("customEvent", f"{prefix}_evt")
-            if sequence.id == "globalVariables":
+            if sequence.id == "globalVariables" and created:
                 tracker.add("globalVariable", f"{prefix}_gv")
             sequences.append({"id": sequence.id, "note": sequence.note, "results": records})
         deleted, failed = tracker.teardown(backend)
@@ -336,7 +421,7 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
 
     fibaro_fixture: dict | None = None
     if args.fibaro:
-        fibaro_results = asyncio.run(_helper_fibaro(engine))
+        fibaro_results = helper_results.get("fibaro") or []
         for result in fibaro_results:
             state = "ok" if result["ok"] else f"error: {result['error']}"
             print(f"fibaro.{result['name']}: {state}")

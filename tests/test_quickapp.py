@@ -475,7 +475,7 @@ async def test_quickapp_create_device(tmp_path, capsys) -> None:
                 "initialView": {},
             },
         )
-        assert status == 200
+        assert status == 201  # the HC3's create answer
         assert device["id"] == 5000
         assert device["name"] == "created-qa"
         assert device["roomID"] == 3

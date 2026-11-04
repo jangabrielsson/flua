@@ -90,7 +90,16 @@ def _binary_switch(client: Any) -> str | None:
 
 
 def _first_plugin(client: Any) -> str | None:
-    return _first_listed_id(client, "/plugins")
+    """A QA device on the controller. /plugins itself is the plugin-type
+    CATALOG on the HC3 (not the device list), so plugin ids come from the
+    device list's isPlugin flag."""
+    devices, status = client.request("GET", "/devices")
+    if status // 100 != 2 or not isinstance(devices, list):
+        return None
+    for device in devices:
+        if device.get("isPlugin"):
+            return f"/plugins/{device['id']}"
+    return None
 
 
 # Per-pattern config for placeholder routes (and house filters for a few
@@ -104,6 +113,13 @@ _CONFIG: dict[str, dict[str, Any]] = {
         ],
     },
     "/devices/{id}": {"sim": "/devices/10", "resolve": _binary_switch},
+    "/plugins": {
+        # the HC3's /plugins is the plugin-type catalog ({installed, all});
+        # the offline sim lists its QA devices instead — modeling the
+        # catalog is a separate work item (online mode passes the HC3's
+        # answer through)
+        "known_drift": "the sim lists its QA devices; the HC3 answers the plugin-type catalog",
+    },
     "/devices/{id}/properties/{name}": {
         "sim": "/devices/10/properties/value",
         "resolve": lambda client: (

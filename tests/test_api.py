@@ -168,7 +168,7 @@ def test_device_property_put(api: Api) -> None:
 
 
 def test_device_delete(api: Api) -> None:
-    assert api.dispatch("DELETE", "/devices/20") == (None, 204)
+    assert api.dispatch("DELETE", "/devices/20") == (None, 200)  # the HC3's answer
     assert api.dispatch("GET", "/devices/20") == (None, 404)
     assert api.dispatch("DELETE", "/devices/20") == (None, 404)
 
@@ -1358,7 +1358,7 @@ def test_device_created_and_removed_events(api: Api) -> None:
     )
     assert status == 200  # the HC3 returns 200 (spec: 200/400/500)
     child_id = child["id"]
-    assert api.dispatch("DELETE", f"/devices/{child_id}") == (None, 204)
+    assert api.dispatch("DELETE", f"/devices/{child_id}") == (None, 200)
     child2, _ = api.dispatch(
         "POST", "/plugins/createChildDevice", {"name": "fan", "parentId": 5000}
     )

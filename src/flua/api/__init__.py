@@ -421,9 +421,10 @@ class Api:
             return None, 404  # unit tests without an engine
         try:
             if len(segments) == 1 and method == "POST":
-                # POST /quickApp — create a QuickApp device (empty main)
+                # POST /quickApp — create a QuickApp device (empty main);
+                # 201 like the live HC3's upload
                 device = self._engine.create_qa(body)
-                return (device, 200) if device is not None else (None, 400)
+                return (device, 201) if device is not None else (None, 400)
             if segments[1] == "availableTypes" and method == "GET":
                 return self._engine.qa_available_types(), 200
             if segments[1] == "import" and method == "POST":

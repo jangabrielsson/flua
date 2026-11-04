@@ -5,6 +5,8 @@
 -- in the sim (replay): every PROBE line is deterministic — status codes,
 -- types and self-set values only, never names/ids of house objects — so
 -- the two /debugMessages transcripts are directly comparable.
+-- Every step runs under pcall: a failing step reports an ERR line instead
+-- of killing onInit, so the transcript always tells us what happened.
 -- Sentinels: PROBE_DONE ends onInit; the timer line comes last; then the
 -- QA has no pending work (it exits in the sim; the capture deletes it).
 --
@@ -19,45 +21,64 @@ function QuickApp:onInit()
     self:debug("PROBE " .. label .. " -> " .. tostring(value))
   end
 
+  local function probe(label, fn)
+    local ok, value = pcall(fn)
+    if ok then
+      report(label, value)
+    else
+      report(label, "ERR " .. tostring(value))
+    end
+  end
+
   local function getStatus(path)
     local _, status = api.get(path)
     return status
   end
 
   -- the read surface, status-only (house-independent)
-  report("api.get /devices", getStatus("/devices"))
-  report("api.get /plugins", getStatus("/plugins"))
-  report("api.get /globalVariables", getStatus("/globalVariables"))
-  report("api.get /settings/info", getStatus("/settings/info"))
-  report("api.get /refreshStates", getStatus("/refreshStates"))
-  report("api.get /rooms", getStatus("/rooms"))
-  report("api.get /scenes", getStatus("/scenes"))
-  report("api.get /customEvents", getStatus("/customEvents"))
-  report("api.get /debugMessages", getStatus("/debugMessages"))
-  report("api.get self device", getStatus("/devices/" .. self.id))
-  report("api.get self plugin", getStatus("/plugins/" .. self.id))
-  report("api.get absent route", getStatus("/no/such/route"))
+  probe("api.get /devices", function() return getStatus("/devices") end)
+  probe("api.get /plugins", function() return getStatus("/plugins") end)
+  probe("api.get /globalVariables", function() return getStatus("/globalVariables") end)
+  probe("api.get /settings/info", function() return getStatus("/settings/info") end)
+  probe("api.get /refreshStates", function() return getStatus("/refreshStates") end)
+  probe("api.get /rooms", function() return getStatus("/rooms") end)
+  probe("api.get /scenes", function() return getStatus("/scenes") end)
+  probe("api.get /customEvents", function() return getStatus("/customEvents") end)
+  probe("api.get /debugMessages", function() return getStatus("/debugMessages") end)
+  probe("api.get self device", function() return getStatus("/devices/" .. self.id) end)
+  probe("api.get self plugin", function() return getStatus("/plugins/" .. self.id) end)
+  probe("api.get absent route", function() return getStatus("/no/such/route") end)
 
   -- updateProperty round trip with a string value (the HC3's string-value
   -- quirk family) and a number
-  self:updateProperty("fluaParityProp", "hello")
-  report("updateProperty/getProperty", self:getProperty("fluaParityProp"))
-  self:updateProperty("fluaParityNum", 42)
-  report("updateProperty number", self:getProperty("fluaParityNum"))
+  probe("updateProperty/getProperty", function()
+    self:updateProperty("fluaParityProp", "hello")
+    return self:getProperty("fluaParityProp")
+  end)
+  probe("updateProperty number", function()
+    self:updateProperty("fluaParityNum", 42)
+    return self:getProperty("fluaParityNum")
+  end)
 
   -- updateView round trip: the view table reflects the label
-  self:updateView("fluaParityLabel", "text", "hello")
-  local view = self:getView()
-  local label = type(view) == "table" and view.fluaParityLabel
-  report("updateView/getView", type(view) .. ":" .. (label or "absent"))
+  probe("updateView/getView", function()
+    self:updateView("fluaParityLabel", "text", "hello")
+    local view = self:getView()
+    local label = type(view) == "table" and view.fluaParityLabel
+    return type(view) .. ":" .. (label or "absent")
+  end)
 
   -- an absent global variable is nil on both sides
-  local gv = fibaro.getGlobalVariable("fluaParityProbe")
-  report("fibaro.getGlobalVariable absent", gv == nil and "nil" or "value")
+  probe("fibaro.getGlobalVariable absent", function()
+    local gv = fibaro.getGlobalVariable("fluaParityProbe")
+    return gv == nil and "nil" or "value"
+  end)
 
   -- an unknown fibaro function errors on both sides
-  local okNope = pcall(function() return fibaro.nope() end)
-  report("fibaro.nope", okNope and "callable" or "error")
+  probe("fibaro.nope", function()
+    local okNope = pcall(function() return fibaro.nope() end)
+    return okNope and "callable" or "error"
+  end)
 
   self:debug("PROBE_DONE")
   setTimeout(function() self:debug("PROBE timer fired") end, 100)
