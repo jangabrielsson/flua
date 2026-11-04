@@ -1,23 +1,17 @@
 {
-  "captured": "2026-11-04T08:32:09.859936+00:00",
+  "captured": "2026-11-04T08:45:00.798486+00:00",
   "softVersion": "5.221.21",
   "serial": "HC3-00000422",
   "fluaVersion": "0.1.125",
   "probeCount": 49,
   "skipped": [],
   "mutations": {
-    "prefix": "flua_p_23e3061c",
+    "prefix": "flua_p_61ba7ab5",
     "sequences": [
       "customEvents",
       "globalVariables",
       "qaLifecycle"
     ],
     "cleanupFailed": []
-  },
-  "probe": {
-    "lines": 19
-  },
-  "fibaro": {
-    "probes": 4
   }
 }

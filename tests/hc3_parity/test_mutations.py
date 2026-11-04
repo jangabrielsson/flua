@@ -71,7 +71,7 @@ def test_qa_lifecycle_on_the_sim() -> None:
     qa_id = bindings["create.id"]
     assert qa_id  # the create response's id was extracted into the templates
     # the templated paths really used the extracted id
-    assert records[1]["path"] == f"/plugins/{qa_id}"
+    assert records[1]["path"] == f"/devices/{qa_id}"
     assert records[2]["path"] == "/plugins/updateProperty"
     assert records[3]["path"] == f"/devices/{qa_id}/properties/userDescription"
     assert records[4]["path"] == f"/devices/{qa_id}"

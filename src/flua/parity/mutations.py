@@ -108,8 +108,9 @@ SEQUENCES: list[Sequence] = [
     ),
     Sequence(
         "qaLifecycle",
-        "create QA, read, updateProperty, read the property, delete — the QA "
-        "needs no Lua on either side (updateProperty is a REST call)",
+        "create QA, read it, updateProperty, read the property, delete — "
+        "read goes through /devices/{id} (external-visible; /plugins/{id} is "
+        "the HC3's local-only family, covered by the helper-backed shape probes)",
         [
             Step(
                 "create",
@@ -119,7 +120,7 @@ SEQUENCES: list[Sequence] = [
                 live_fqa=True,
                 extract={"id": "id"},
             ),
-            Step("read", "GET", "/plugins/{create.id}"),
+            Step("read", "GET", "/devices/{create.id}"),
             Step(
                 "updateProperty",
                 "POST",

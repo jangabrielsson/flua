@@ -1,5 +1,5 @@
 {
-  "prefix": "flua_p_23e3061c",
+  "prefix": "flua_p_61ba7ab5",
   "sequences": [
     {
       "id": "customEvents",
@@ -16,7 +16,7 @@
         },
         {
           "step": "update",
-          "path": "/customEvents/flua_p_23e3061c_evt",
+          "path": "/customEvents/flua_p_61ba7ab5_evt",
           "status": 200,
           "shape": {
             "name": "str",
@@ -25,19 +25,19 @@
         },
         {
           "step": "fire",
-          "path": "/customEvents/flua_p_23e3061c_evt",
+          "path": "/customEvents/flua_p_61ba7ab5_evt",
           "status": 204,
           "shape": null
         },
         {
           "step": "publish",
-          "path": "/customEvents/flua_p_23e3061c_evt/publish",
+          "path": "/customEvents/flua_p_61ba7ab5_evt/publish",
           "status": 204,
           "shape": null
         },
         {
           "step": "delete",
-          "path": "/customEvents/flua_p_23e3061c_evt",
+          "path": "/customEvents/flua_p_61ba7ab5_evt",
           "status": 204,
           "shape": null
         }
@@ -63,7 +63,7 @@
         },
         {
           "step": "update",
-          "path": "/globalVariables/flua_p_23e3061c_gv",
+          "path": "/globalVariables/flua_p_61ba7ab5_gv",
           "status": 200,
           "shape": {
             "name": "str",
@@ -77,7 +77,7 @@
         },
         {
           "step": "read",
-          "path": "/globalVariables/flua_p_23e3061c_gv",
+          "path": "/globalVariables/flua_p_61ba7ab5_gv",
           "status": 200,
           "shape": {
             "name": "str",
@@ -91,13 +91,13 @@
         },
         {
           "step": "delete",
-          "path": "/globalVariables/flua_p_23e3061c_gv",
+          "path": "/globalVariables/flua_p_61ba7ab5_gv",
           "status": 200,
           "shape": null
         },
         {
           "step": "read_deleted",
-          "path": "/globalVariables/flua_p_23e3061c_gv",
+          "path": "/globalVariables/flua_p_61ba7ab5_gv",
           "status": 404,
           "shape": null
         }
@@ -105,7 +105,7 @@
     },
     {
       "id": "qaLifecycle",
-      "note": "create QA, read, updateProperty, read the property, delete \u2014 the QA needs no Lua on either side (updateProperty is a REST call)",
+      "note": "create QA, read it, updateProperty, read the property, delete \u2014 read goes through /devices/{id} (external-visible; /plugins/{id} is the HC3's local-only family, covered by the helper-backed shape probes)",
       "results": [
         {
           "step": "create",
@@ -208,9 +208,102 @@
         },
         {
           "step": "read",
-          "path": "/plugins/4382",
-          "status": 501,
-          "shape": null
+          "path": "/devices/4386",
+          "status": 200,
+          "shape": {
+            "id": "number",
+            "name": "str",
+            "roomID": "number",
+            "view": [
+              {
+                "assetsPath": "str",
+                "name": "str",
+                "translatesPath": "str",
+                "type": "str"
+              }
+            ],
+            "type": "str",
+            "baseType": "str",
+            "enabled": "bool",
+            "visible": "bool",
+            "isPlugin": "bool",
+            "parentId": "number",
+            "viewXml": "bool",
+            "hasUIView": "bool",
+            "configXml": "bool",
+            "interfaces": [
+              "str"
+            ],
+            "properties": {
+              "apiVersion": "str",
+              "autoOffDefaultTime": "number",
+              "autoOffTimestamp": "number",
+              "buildNumber": "number",
+              "categories": [
+                "str"
+              ],
+              "dead": "bool",
+              "deadReason": "str",
+              "deviceControlType": "number",
+              "deviceIcon": "number",
+              "deviceRole": "str",
+              "encrypted": "bool",
+              "icon": {
+                "path": "str",
+                "source": "str"
+              },
+              "initialInterfaces": [
+                "str"
+              ],
+              "isLight": "bool",
+              "log": "str",
+              "logTemp": "str",
+              "manufacturer": "str",
+              "model": "str",
+              "quickAppUuid": "str",
+              "quickAppVariables": [],
+              "saveLogs": "bool",
+              "state": "bool",
+              "supportedDeviceRoles": [
+                "str"
+              ],
+              "typeTemplateInitialized": "bool",
+              "uiCallbacks": [],
+              "uiView": [],
+              "useEmbededView": "bool",
+              "useUiView": "bool",
+              "userDescription": "str",
+              "value": "bool",
+              "viewLayout": {
+                "$jason": {
+                  "body": {
+                    "header": {
+                      "style": {
+                        "height": "str"
+                      },
+                      "title": "str"
+                    },
+                    "sections": {
+                      "items": []
+                    }
+                  },
+                  "head": {
+                    "title": "str"
+                  }
+                }
+              }
+            },
+            "actions": {
+              "setAutoOff": "number",
+              "toggle": "number",
+              "turnOff": "number",
+              "turnOn": "number"
+            },
+            "hiddenActions": {},
+            "created": "number",
+            "modified": "number",
+            "sortOrder": "number"
+          }
         },
         {
           "step": "updateProperty",
@@ -220,7 +313,7 @@
         },
         {
           "step": "read_property",
-          "path": "/devices/4382/properties/userDescription",
+          "path": "/devices/4386/properties/userDescription",
           "status": 200,
           "shape": {
             "value": "str",
@@ -229,7 +322,7 @@
         },
         {
           "step": "delete",
-          "path": "/devices/4382",
+          "path": "/devices/4386",
           "status": 200,
           "shape": null
         }
@@ -238,9 +331,9 @@
   ],
   "cleanup": {
     "deleted": [
-      "device 4382",
-      "globalVariable flua_p_23e3061c_gv",
-      "customEvent flua_p_23e3061c_evt"
+      "device 4386",
+      "globalVariable flua_p_61ba7ab5_gv",
+      "customEvent flua_p_61ba7ab5_evt"
     ],
     "failed": []
   }

@@ -16,7 +16,8 @@
       "ok": false,
       "valuesShape": null,
       "error": "helper failed",
-      "note": "absent variable: pins the nil-on-absent contract"
+      "note": "absent variable: pins the nil-on-absent contract",
+      "unreachable": true
     },
     {
       "name": "getSelfId",

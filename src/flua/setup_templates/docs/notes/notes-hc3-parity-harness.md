@@ -164,6 +164,44 @@ role as quick smoke checks; capture is the new deep entry point.
    `--fibaro` runs the house-independent helperFibaro probes
    (getName-no-args, getGlobalVariable-absent, getSelfId, nope)
    controller-side and pins ok + value shapes; replay calls the sim's
-   fibaro table with the same args. First finding already landed: the
-   sim lacked QuickApp:getProperty (fixed + pinned).
+   fibaro table with the same args. First finding: the HC3's getName
+   requires a deviceId too (the sim's check was right); getGlobalVariable
+   blocks in the helper's net-callback context (flagged unreachable —
+   the in-QA probe pins the contract).
 5. Quirk pinning as discoveries surface during capture runs.
+
+## First capture — drift ledger (5.221.21)
+
+The first full capture + replay round found and fixed (commits
+`fe6a0a3`–`def7ffc`):
+
+- names validated `[A-Za-z][A-Za-z0-9_]*` (customEvents/globalVariables
+  create 400, customEvents name routes 501 — the HC3's handler quirk);
+  the harness prefix is now `flua_p_<hex>`;
+- customEvents create 201; fire/publish/delete on absent names 204
+  (idempotent — the sim's 404 contradicted the HC3); update absent 404;
+- globalVariables create 201 + full dto; delete 200 (idempotent);
+- POST /quickApp 201; DELETE /devices/{id} 200;
+- QA-context api layer: unknown routes 501, GET /plugins/{id} 501 (even
+  own id), /plugins/updateProperty 400 for other callers (own QA or
+  parent only); user-registered endpoints keep their own contracts;
+- QuickApp has no getProperty/getView on the HC3: getProperty removed,
+  getView kept as a documented flua extension (the DX helpers use it);
+- /plugins is the plugin-type catalog on the HC3 (the sim lists its QA
+  devices offline — known divergence, catalog modeling deferred);
+  online mode passes the controller's answer through;
+- shape fixes: /refreshStates has no events key when idle (the harness
+  drains the replay feed), /weather drops WeatherConditionConverted,
+  scenes keep 'running' as a documented extension, /profiles/{id} drops
+  'active', /panels/notifications is a list;
+- capture-side: probe transcript keyed by the HC3's QUICKAPP<id> tag and
+  order-insensitive, helper wake runs in a worker thread, helper transport
+  failures flagged unreachable.
+
+House-state-dependent: /panels/family and /panels/humidity answer 501 on
+this house (no such panels) — known-drift entries. The full replay suite
+is green against the checked-in fixture: 65 offline tests pin the
+5.221.21 contract.
+
+Deferred: the settings PUT snapshot/restore probe, and modeling the
+/plugins plugin-type catalog in the sim.
