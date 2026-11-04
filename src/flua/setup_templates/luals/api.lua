@@ -28,7 +28,12 @@ api = {}
 ---@field delete fun(url: string, body?: any): any, number
 api_hc3 = {}
 
+---@class json.util
+---@field InitArray fun(value: any): any
+
 ---@class json
 ---@field encode fun(value: any): string
 ---@field decode fun(text: string): any
+---@field util json.util
+---@field array fun(): any
 json = {}
