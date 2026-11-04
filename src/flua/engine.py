@@ -53,6 +53,7 @@ from .config import (
     _is_eoh,
     debug_flag,
     expand_includes,
+    file_name_error,
     merge_annotations,
     parse_annotations,
     split_annotations,
@@ -1038,7 +1039,12 @@ class LuaEngine:
             for spec in raw:
                 path, _, name = str(spec).partition(",")
                 path = path.strip()
-                name = name.strip() or (Path(path).name if path else "")
+                declared = name.strip()
+                name = declared or (Path(path).name if path else "")
+                if declared and not config.get("fqafiles"):
+                    problem = file_name_error(declared)
+                    if problem is not None:
+                        raise ValueError(problem)
                 entries.append({"name": name, "path": path})
         config["files"] = entries
         return entries
@@ -1734,6 +1740,10 @@ class LuaEngine:
         if device_id is not None:
             header.append(f"--%%{DEVICE_ID_DIRECTIVE}:{device_id}")
             header.append(f"--%%{QA_FILE_DIRECTIVE}:main")
+        # mark the file lines as package-derived: the HC3-editor name rule
+        # (>=3 chars, identifier-like) applies to AUTHOR-declared names —
+        # packages may carry any name the HC3 accepted, and flua must open them
+        header.append("--%%fqafiles:true")
         header.append("-- --------------- EOH ---------------")
         content = str(main.get("content") or "")
         if strip_header:

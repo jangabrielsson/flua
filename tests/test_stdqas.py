@@ -19,7 +19,7 @@ import pytest
 
 pytest.importorskip("lupa")
 
-from flua.check import check_source  # noqa: E402
+from flua.check import check_file, check_source  # noqa: E402
 from flua.config import parse_annotations  # noqa: E402
 from flua.engine import LuaEngine  # noqa: E402
 
@@ -93,3 +93,18 @@ async def test_templates_boot_clean() -> None:
     finally:
         await engine.stop()
     assert booted == len(list(TEMPLATES.glob("*.lua")))
+
+
+def test_check_flags_short_file_names(tmp_path) -> None:
+    # a --%%file name the HC3 editor would refuse to open is a static error
+    main = tmp_path / "main.lua"
+    main.write_text(
+        "--%%file:extra.lua,a\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() end\n"
+    )
+    engine = LuaEngine()
+    lua = engine.lua_runtime()
+    findings = check_file(str(main), lua)
+    errors = [f for f in findings if f["severity"] == "error"]
+    assert any("too short" in f["message"] for f in errors), errors

@@ -167,6 +167,26 @@ def parse_scalar(text: str) -> Any:
 
 _LUA_NUMBER_RE = re.compile(r"-?\d+(\.\d+)?([eE][+-]?\d+)?")
 
+# The HC3's file EDITOR refuses names under 3 characters or with odd
+# characters (its upload API accepts anything — a QA uploaded with such a
+# name runs, but the file cannot be opened in the editor). flua enforces
+# the editor's rule for DECLARED --%%file names so multifile QAs stay
+# editable on the controller; the default name (derived from the path,
+# extension included) keeps today's behavior.
+FILE_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def file_name_error(name: str) -> str | None:
+    """None when the name is HC3-editor-friendly (at least 3 characters,
+    identifier-like); else the reason."""
+    if len(name) < 3:
+        return (
+            f"file name {name!r} is too short — the HC3 editor needs at least 3 characters"
+        )
+    if not FILE_NAME_RE.fullmatch(name):
+        return f"file name {name!r} is not identifier-like — the HC3 editor will not open it"
+    return None
+
 
 def parse_lua_literal(text: str) -> Any:
     """Parse the restricted Lua table-literal syntax used by ``--%%u``
@@ -622,6 +642,9 @@ KNOWN_DIRECTIVES = frozenset(
         "svar",  # --%%svar:name=expr — secret QuickApp variables (type='password')
         "clobber",  # --%%clobber:name=value — Plua-compatible package value
         "file",
+        "fqafiles",  # internal: .fqa unpack headers mark their file lines so
+        # the HC3-editor name rule (declared names) does not reject
+        # package-carried names flua must be able to open
         "mode",
         "offline",  # legacy alias for --%%mode:offline
         "proxy",  # legacy alias for --%%mode:proxy

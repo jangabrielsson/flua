@@ -42,8 +42,8 @@ async def test_extra_files_load_in_declaration_order(capsys) -> None:
     out = await _run_qas(
         {
             "main.lua": (
-                "--%%file:b.lua,b\n"
-                "--%%file:a.lua,a\n"
+                "--%%file:b.lua,bbb\n"
+                "--%%file:a.lua,aaa\n"
                 "-- --------------- EOH ---------------\n"
                 "function QuickApp:onInit()\n"
                 "  print('ORDER', ORDER)\n"
@@ -917,3 +917,37 @@ async def test_remove_child_device_guards_foreign_children(capsys) -> None:
         capsys=capsys,
     )
     assert "FOREIGN true true true" in out  # exists, no result, still there
+
+
+async def test_declared_file_names_must_pass_the_hc3_editor_rule(tmp_path) -> None:
+    # the HC3's upload accepts any file name, but its editor refuses to
+    # open names under 3 characters or with odd characters — a declared
+    # --%%file name must obey the editor's rule or the load fails loudly
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        main = tmp_path / "main.lua"
+        (tmp_path / "lib.lua").write_text("x = 1\n")
+        main.write_text(
+            "--%%file:lib.lua,ab\n"
+            "-- --------------- EOH ---------------\n"
+            "function QuickApp:onInit() end\n"
+        )
+        qa_id, err = engine.load_qa_file(str(main))
+        assert qa_id is None and err and "too short" in err
+        main.write_text(
+            "--%%file:lib.lua,my-file\n"
+            "-- --------------- EOH ---------------\n"
+            "function QuickApp:onInit() end\n"
+        )
+        qa_id, err = engine.load_qa_file(str(main))
+        assert qa_id is None and err and "not identifier-like" in err
+        main.write_text(
+            "--%%file:lib.lua,abc\n"
+            "-- --------------- EOH ---------------\n"
+            "function QuickApp:onInit() end\n"
+        )
+        qa_id, err = engine.load_qa_file(str(main))
+        assert qa_id is not None and err is None
+    finally:
+        await engine.stop()

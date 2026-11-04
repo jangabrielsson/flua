@@ -157,7 +157,7 @@ async def test_bundled_library_dollar_files(tmp_path, capsys) -> None:
     script.write_text(
         "--%%name:bundled_test\n"
         "--%%type:com.fibaro.binarySwitch\n"
-        "--%%file:$event_mgr.lua,em\n"
+        "--%%file:$event_mgr.lua,evm\n"
         "-- --------------- EOH ---------------\n"
         "function QuickApp:onInit()\n"
         "  print('HAS', fibaro.EventMgr ~= nil, fibaro.midnight ~= nil)\n"
@@ -172,9 +172,9 @@ async def test_bundled_library_dollar_files(tmp_path, capsys) -> None:
         await asyncio.sleep(0.3)
         # the bundled file is part of the QA's file set (it ships in .fqa)
         files = engine.qa_file_list(qa_id)
-        assert {f["name"] for f in files} == {"main", "em"}
+        assert {f["name"] for f in files} == {"main", "evm"}
         export = engine.qa_export(qa_id)
-        assert "EventMgr" in next(f["content"] for f in export["files"] if f["name"] == "em")
+        assert "EventMgr" in next(f["content"] for f in export["files"] if f["name"] == "evm")
     finally:
         await engine.stop()
     out = capsys.readouterr().out
@@ -186,14 +186,14 @@ def test_bundled_library_errors(tmp_path) -> None:
     engine = LuaEngine()
     bad = tmp_path / "bad.lua"
     bad.write_text(
-        "--%%name:bad\n--%%file:$nope.lua,x\n-- --------------- EOH ---------------\n"
+        "--%%name:bad\n--%%file:$nope.lua,xxx\n-- --------------- EOH ---------------\n"
         "function QuickApp:onInit() end\n"
     )
     _qa_id, err = engine.load_qa_file(str(bad))
     assert err and "bundled library not found" in err
     escape = tmp_path / "esc.lua"
     escape.write_text(
-        "--%%name:esc\n--%%file:$../evil.lua,x\n-- --------------- EOH ---------------\n"
+        "--%%name:esc\n--%%file:$../evil.lua,xxx\n-- --------------- EOH ---------------\n"
         "function QuickApp:onInit() end\n"
     )
     _qa_id2, err2 = engine.load_qa_file(str(escape))

@@ -455,3 +455,20 @@ def test_plua_headers_directive_maps_to_include() -> None:
     assert parse_annotations("--%%headers:defaults.lua\n") == {
         "include": "defaults.lua"
     }
+
+
+def test_file_name_validation() -> None:
+    # the HC3's file EDITOR refuses names under 3 characters or with odd
+    # characters — declared --%%file names must obey it (defaults derived
+    # from the path keep today's behavior)
+    from flua.config import file_name_error
+
+    assert file_name_error("abc") is None
+    assert file_name_error("aa1") is None
+    assert "too short" in file_name_error("a1")
+    assert file_name_error("_ab") is None
+    assert "too short" in file_name_error("a")
+    assert "too short" in file_name_error("ab")
+    assert "not identifier-like" in file_name_error("my-file")
+    assert "not identifier-like" in file_name_error("1ab")
+    assert "not identifier-like" in file_name_error("a.b")

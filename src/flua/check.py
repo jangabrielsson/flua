@@ -22,7 +22,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .config import KNOWN_DIRECTIVES, expand_includes, parse_annotations
+from .config import KNOWN_DIRECTIVES, expand_includes, file_name_error, parse_annotations
 
 # (http method, path prefix, advice) — derived from the distilled API
 # reference, docs/specs/hc3-api.json.
@@ -187,7 +187,21 @@ def check_file(path: str, lua: Any) -> list[dict[str, Any]]:
             continue
         raw, _, name = entry.partition(",")
         raw = raw.strip()
-        name = name.strip() or raw
+        declared = name.strip()
+        name = declared or raw
+        if declared and not annotations.get("fqafiles"):
+            problem = file_name_error(declared)
+            if problem is not None:
+                loc = re.search(rf"--%%file:\s*{re.escape(raw)}", source)
+                findings.append(
+                    finding(
+                        path,
+                        "error",
+                        problem,
+                        *_line_col(source, loc.start()) if loc else (None, None),
+                    )
+                )
+                continue
         if not raw:
             continue
         if raw.startswith("$"):
