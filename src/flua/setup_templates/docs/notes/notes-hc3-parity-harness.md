@@ -25,9 +25,13 @@ src/flua/parity/
   probes.py        # probe list: every implemented GET derived from the
                    # route registry (ROUTES), concrete sim paths + live
                    # resolvers + house filters
+  mutations.py     # Tier-2 sequences (customEvents, globalVariables,
+                   # QA lifecycle) + the artifact tracker (LIFO teardown)
 src/flua/tools/parity_capture.py  # flua --tool parityCapture (registry
-                   # convention: one module per tool)
-  cleanup.py       # flua --tool parityCleanup (Tier 2, not built yet)
+                   # convention: one module per tool; --mutations adds the
+                   # Tier-2 sequences)
+src/flua/tools/parity_cleanup.py  # flua --tool parityCleanup — removes
+                   # flua-p-* leftovers from crashed captures
 tests/hc3_parity/
   probe_qa/
     main.lua       # in-QA self-test, runs identically on HC3 and in sim
@@ -135,6 +139,16 @@ role as quick smoke checks; capture is the new deep entry point.
    comparison machinery is pinned by a synthetic-transcript test and the
    probe coverage by a route-registry test). First milestone complete:
    whole GET surface captured and replayed.
-3. Mutation probes + artifact tracker + `parityCleanup`.
+3. ~~Mutation probes + artifact tracker + `parityCleanup`~~ — done:
+   customEvents CRUD+fire+publish, globalVariables add/change/read/delete
+   (pins the post-delete 404), QA lifecycle (create/read/updateProperty/
+   read property/delete — no Lua needed on either side; the HC3 .fqa vs
+   sim {name} body asymmetry is modeled as an explicit per-side body).
+   `--mutations` gates the capture-side sequences; teardown is LIFO via
+   the tracker; `--tool parityCleanup` lists/deletes flua-p-* leftovers
+   (prefix-guarded). Replay runs the same sequences against an
+   engine-backed sim and compares status + shape per step.
+   Deferred: the settings PUT snapshot/restore probe — it changes real
+   controller state and deserves its own deliberate run, not a default.
 4. Probe QA (debugMessages transcript diff) + helperFibaro probes.
 5. Quirk pinning as discoveries surface during capture runs.

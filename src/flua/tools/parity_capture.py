@@ -1,10 +1,15 @@
 """``flua --tool parityCapture`` — capture REST shape fixtures from a real
 HC3 for offline parity replay.
 
-Read-only: every probe is a GET, nothing on the controller is created or
-changed. Output: ``tests/hc3_parity/fixtures/<softVersion>/`` with
-``meta.json`` (provenance) and ``shapes.json`` (status + normalized shape
-per probe), plus a compact diff against the previous fixture.
+Read-only by default: every probe is a GET, nothing on the controller is
+created or changed. ``--mutations`` adds the Tier-2 sequences — controlled
+create/update/delete cycles over ``flua-p-<uuid8>``-namespaced artifacts
+(QA, customEvent, globalVariable) with LIFO teardown afterwards.
+
+Output: ``tests/hc3_parity/fixtures/<softVersion>/`` with ``meta.json``
+(provenance), ``shapes.json`` (status + normalized shape per probe), and
+``mutations.json`` when requested, plus a compact diff against the
+previous fixture.
 
 Run it from a flua checkout whenever the controller's firmware changes;
 the offline replay suite (``tests/hc3_parity/test_hc3_replay.py``) then
@@ -15,10 +20,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+from tempfile import mkdtemp
+from typing import Any
 
 from flua import __version__
+from flua.parity.mutations import (
+    SEQUENCES,
+    ArtifactTracker,
+    LiveBackend,
+    run_sequence,
+)
 from flua.parity.normalize import drift, shape
 from flua.parity.probes import PROBES
 
@@ -38,6 +52,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--dry-run", action="store_true", help="resolve and print the probes, write nothing"
+    )
+    parser.add_argument(
+        "--mutations",
+        action="store_true",
+        help="also run the Tier-2 mutation sequences (flua-p-* artifacts, "
+        "cleaned up LIFO afterwards)",
     )
     parser.add_argument("--verbose", action="store_true", help="print each probe result")
 
@@ -88,6 +108,30 @@ def _diff_summary(previous: Path, entries: list[dict]) -> None:
         print(f"\ndiff vs {previous.name}: no changes")
 
 
+def _fqa_builder(engine: Any):
+    """Builds the minimal .fqa the HC3's POST /quickApp expects — the same
+    construction the live suite's QA round trip uses (a temp main.lua with
+    the directives, packaged by the engine)."""
+
+    def build(prefix: str) -> str:
+        directory = Path(mkdtemp(prefix="flua-parity-"))
+        main = directory / "main.lua"
+        main.write_text(
+            f"--%%name:{prefix}-qa\n"
+            "--%%type:com.fibaro.binarySwitch\n"
+            "-- --------------- EOH ---------------\n"
+            "function QuickApp:onInit() end\n",
+            encoding="utf-8",
+        )
+        qa_id = engine._prepare_qa(str(main), None, {"name": f"{prefix}-qa"}, str(main))
+        fqa = engine.qa_export(qa_id)
+        if fqa is None:
+            raise ValueError("cannot build the parity probe .fqa")
+        return json.dumps(fqa)
+
+    return build
+
+
 def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     engine = hc3_engine(parser)
     if engine.hc3 is None:
@@ -133,6 +177,37 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     print(f"{len(entries)} probes captured, {len(skipped)} skipped")
     for skip in skipped:
         print(f"  skipped {skip['pattern']}: {skip['reason']}")
+
+    mutation_fixture: dict | None = None
+    if args.mutations:
+        prefix = f"flua-p-{uuid.uuid4().hex[:8]}"
+        tracker = ArtifactTracker(prefix)
+        backend = LiveBackend(client)
+        sequences = []
+        for sequence in SEQUENCES:
+            records, bindings = run_sequence(
+                backend, sequence, prefix, _fqa_builder(engine)
+            )
+            for record in records:
+                if args.verbose:
+                    print(f"{sequence.id}/{record['step']}: {record['status']} {record['path']}")
+            if sequence.id == "qaLifecycle":
+                tracker.add("device", bindings["create.id"])
+            if sequence.id == "customEvents":
+                tracker.add("customEvent", f"{prefix}-evt")
+            if sequence.id == "globalVariables":
+                tracker.add("globalVariable", f"{prefix}-gv")
+            sequences.append({"id": sequence.id, "note": sequence.note, "results": records})
+        deleted, failed = tracker.teardown(backend)
+        print(f"cleanup: {len(deleted)} artifacts removed, {len(failed)} failures")
+        for failure in failed:
+            print(f"  cleanup failed: {failure}")
+        mutation_fixture = {
+            "prefix": prefix,
+            "sequences": sequences,
+            "cleanup": {"deleted": deleted, "failed": failed},
+        }
+
     if args.dry_run:
         return 0
 
@@ -147,10 +222,20 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         "probeCount": len(entries),
         "skipped": skipped,
     }
+    if mutation_fixture is not None:
+        meta["mutations"] = {
+            "prefix": mutation_fixture["prefix"],
+            "sequences": [seq["id"] for seq in mutation_fixture["sequences"]],
+            "cleanupFailed": mutation_fixture["cleanup"]["failed"],
+        }
     (out_dir / "meta.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
     (out_dir / "shapes.json").write_text(
         json.dumps({"probes": entries}, indent=2) + "\n", encoding="utf-8"
     )
+    if mutation_fixture is not None:
+        (out_dir / "mutations.json").write_text(
+            json.dumps(mutation_fixture, indent=2) + "\n", encoding="utf-8"
+        )
     print(f"wrote {out_dir}")
 
     previous = sorted(

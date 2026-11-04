@@ -20,6 +20,8 @@ import pytest
 pytest.importorskip("lupa")
 
 from flua.api import Api
+from flua.engine import LuaEngine
+from flua.parity.mutations import SEQUENCES_BY_ID, SimBackend, run_sequence
 from flua.parity.normalize import drift, shape
 from flua.parity.probes import PROBES, PROBES_BY_PATTERN, route_coverage
 
@@ -130,6 +132,58 @@ def test_replay_machinery_reports_drift() -> None:
     status_drifted = {"pattern": "/devices", "status": 404, "shape": None, "path": "/devices"}
     problems, _gaps = _compare_entry(api, status_drifted)
     assert any("status" in problem for problem in problems), problems
+
+
+@pytest.mark.skipif(
+    not _fixture_dirs(),
+    reason="no captured fixtures — run flua --tool parityCapture --mutations against a real HC3",
+)
+def test_replay_mutations(request: pytest.FixtureRequest) -> None:
+    """Replay the Tier-2 mutation sequences against the sim. Each fixture
+    with a mutations.json runs the same create/update/delete cycles
+    (namespaced flua-p-* artifacts, ephemeral sim) and compares status +
+    shape per step — ids are re-bound from the sim's own responses."""
+    dirs = _fixture_dirs()
+    fw = request.config.getoption("--parity-fw")
+    if fw:
+        dirs = [d for d in dirs if d.name == fw]
+    dirs = [d for d in dirs if (d / "mutations.json").exists()]
+    if not dirs:
+        pytest.skip("no captured mutations — capture with --mutations")
+    fixture_dir = dirs[-1]
+    fixture = json.loads((fixture_dir / "mutations.json").read_text())
+
+    engine = LuaEngine(seed=json.loads((REPO_ROOT / "examples/house.json").read_text()))
+    backend = SimBackend(engine.api)
+    problems: list[str] = []
+    gaps: list[str] = []
+    for sequence_fixture in fixture["sequences"]:
+        sequence = SEQUENCES_BY_ID.get(sequence_fixture["id"])
+        if sequence is None:
+            problems.append(f"{sequence_fixture['id']}: no such sequence in the current table")
+            continue
+        records, _bindings = run_sequence(backend, sequence, fixture["prefix"])
+        if len(records) != len(sequence_fixture["results"]):
+            problems.append(
+                f"{sequence_fixture['id']}: sequence changed since capture "
+                f"({len(records)} steps vs {len(sequence_fixture['results'])} recorded)"
+            )
+            continue
+        for record, expected in zip(records, sequence_fixture["results"], strict=True):
+            label = f"{sequence_fixture['id']}/{record['step']}"
+            if record["status"] != expected["status"]:
+                problems.append(
+                    f"{label}: status {record['status']} != captured {expected['status']}"
+                )
+            elif record["shape"] is not None and expected["shape"] is not None:
+                sub_problems, sub_gaps = drift(record["shape"], expected["shape"], label)
+                problems += sub_problems
+                gaps += sub_gaps
+    assert not problems, "mutation parity drift vs the captured HC3 fixture:\n" + "\n".join(
+        problems
+    )
+    if gaps:
+        print("info: mutation gaps (fields the sim does not model): " + ", ".join(gaps[:10]))
 
 
 def test_every_get_route_is_probed() -> None:

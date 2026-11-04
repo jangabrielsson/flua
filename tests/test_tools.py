@@ -33,6 +33,7 @@ def test_registry_discovers_all_tools() -> None:
         "newQA",
         "pack",
         "parityCapture",
+        "parityCleanup",
         "setup",
         "state",
         "ui",
