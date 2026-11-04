@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.129] - 2026-11-04
+
+### Fixed
+- proxy cleanup failures abort with a clear error instead of piling on
+
 ## [0.1.128] - 2026-11-04
 
 ### Fixed
