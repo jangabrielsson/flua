@@ -180,6 +180,12 @@ end
 -- @param elm - The UI element name
 -- @param prop - The property name to update
 -- @param value - The new value for the property
+function QuickAppBase:getProperty(name)
+  -- the HC3's QuickApp:getProperty (surfaced by the parity probe QA): the
+  -- property value or nil — the method-form companion to self.properties
+  return (self.properties or {})[name]
+end
+
 function QuickAppBase:updateView(elm,prop,value)
   api.post("/plugins/updateView", {
     deviceId = self.id,
