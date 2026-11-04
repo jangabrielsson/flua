@@ -1,0 +1,107 @@
+<h2>Proxy mode deep dive: the QA runs on your laptop, the device lives on the HC3</h2>
+
+<p>Way back in the deploy post, proxy mode got a teaser it never cashed
+in. Today's the day. Proxy mode runs your QA in the emulator while a
+mirror device — <code>&lt;name&gt;_Proxy</code>, same type, same UI —
+runs on the real HC3. The controller treats it as one device: actions
+and UI events aimed at the proxy land in the emulator, and every state
+change the QA makes is pushed to the controller. The phone app shows a
+real, live device. Your code never left the laptop.</p>
+
+<p>One directive switches it on. Here is the whole demo — a QA with a
+button, a counter in its internal storage, and a property update:</p>
+
+<pre>
+--%%name:proxy-demo
+--%%mode:proxy
+--%%u:{button="B1",text="Tap me",onReleased="tap"}
+-- --------------- EOH ---------------
+function QuickApp:onInit()
+  print("proxy id:", self.id)   -- the proxy's HC3 id, not an emulated one
+  local visits = tonumber(self:internalStorageGet("visits") or "0") + 1
+  self:internalStorageSet("visits", tostring(visits))
+  self:updateProperty("value", true)
+  print("visit:", visits)
+end
+function QuickApp:tap()
+  print("TAPPED")
+end
+</pre>
+
+<p>Run it online — flua deploys the proxy and the QA boots under the
+proxy's HC3 id:</p>
+
+<pre>
+flua: proxy installed: 4387 proxy-demo_Proxy
+🚀 flua 0.1.126 (Lua 5.4, Python 3.14.3), mode proxy:4387
+[proxy-demo4387]: proxy id: 4387
+[proxy-demo4387]: visit: 1
+flua: proxy connected — proxy-demo_Proxy (4387) sends actions and UI
+events to http://192.168.50.129:8081
+</pre>
+
+<p>Note <code>self.id</code>: it is <b>4387</b>, the controller's id —
+not an emulated 5000-something. The emulated QA and the HC3 device are
+the same id. And the QA never terminates: a proxy QA keeps flua alive,
+because the callbacks must have somewhere to land.</p>
+
+<h3>The state lives on the controller</h3>
+
+<p>Ask the HC3 what it knows about the device — the property update and
+the internal storage write went straight to the controller:</p>
+
+<pre>
+GET /devices/4387            -> 200, name: proxy-demo_Proxy, value: true
+GET /plugins/4387/variables  -> [{name:"con", value:{ip:"192.168.50.129", port:8081}},
+                                 {name:"visits", value:"1"}]
+</pre>
+
+<p>Now the money shot. Kill flua. Start it again. The proxy is reused,
+the QA boots, and the counter reads its previous value — from the HC3,
+not from any local state:</p>
+
+<pre>
+[proxy-demo4387]: proxy id: 4387
+[proxy-demo4387]: visit: 2
+</pre>
+
+<p>That's the proxy mode persistence story from the last post made
+concrete: a proxy QA's variables — and its children's — live on the
+controller. Reads answer from the HC3 (through the helper bridge), writes
+land there first and the emulator mirrors after. Kill and restart flua
+all you like; the state was never on the laptop. Libraries that stash
+their state in child variables survive too.</p>
+
+<h3>Tap the button</h3>
+
+<p>Open the phone app, find <code>proxy-demo_Proxy</code>, tap. The HC3
+delivers the UI event to the emulator's callback endpoint, and your QA
+runs the handler exactly like a tap in the simulated UI:</p>
+
+<pre>
+[proxy-demo4387]: TAPPED
+</pre>
+
+<p>Same for actions and sliders, and same for children: a
+<code>createChildDevice</code> creates the child on the HC3, an existing
+proxy's children are shadowed under their HC3 ids at startup, and their
+events route back like the parent's.</p>
+
+<h3>The fine print</h3>
+
+<ul>
+<li>Property updates produce <b>one</b> refreshState event — the
+controller's, mirrored back by the poll. flua never double-emits.</li>
+<li>The emulator listens for callbacks on port 8080 by default
+(<code>FLUA_PROXY_PORT</code> overrides; busy ports fall back). Your
+machine and the HC3 must share a network.</li>
+<li>One instance per QA: don't run the same QA in proxy mode from two
+flua processes — both would deploy a same-named proxy and fight over the
+callbacks.</li>
+<li>When you're done, delete <code>proxy-demo_Proxy</code> in the HC3 UI
+(or <code>DELETE /devices/&lt;id&gt;</code>) — the proxy is reused, not
+auto-removed.</li>
+</ul>
+
+<p>Next time: endpoint packages — wrap a simulated endpoint in a QA and
+distribute it as a .fqa, emulation like any other QA.</p>
