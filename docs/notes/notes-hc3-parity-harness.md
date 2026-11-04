@@ -27,6 +27,8 @@ src/flua/parity/
                    # resolvers + house filters
   mutations.py     # Tier-2 sequences (customEvents, globalVariables,
                    # QA lifecycle) + the artifact tracker (LIFO teardown)
+  fibaro_probes.py # helperFibaro probe list (house-independent ok/type
+                   # contracts, run controller-side via the FluaHelper)
 src/flua/tools/parity_capture.py  # flua --tool parityCapture (registry
                    # convention: one module per tool; --mutations adds the
                    # Tier-2 sequences)
@@ -34,6 +36,10 @@ src/flua/tools/parity_cleanup.py  # flua --tool parityCleanup — removes
                    # flua-p-* leftovers from crashed captures
 tests/hc3_parity/
   probe_qa/
+    main.lua       # in-QA self-test, runs identically on HC3 and in sim
+                   # (built on dev/apitest.lua; a test fixture, so it lives
+                   # here, not in src/) — deterministic PROBE lines to
+                   # /debugMessages, diffed as transcripts
     main.lua       # in-QA self-test, runs identically on HC3 and in sim
                    # (built on dev/apitest.lua; a test fixture, so it lives
                    # here, not in src/)
@@ -150,5 +156,14 @@ role as quick smoke checks; capture is the new deep entry point.
    engine-backed sim and compares status + shape per step.
    Deferred: the settings PUT snapshot/restore probe — it changes real
    controller state and deserves its own deliberate run, not a default.
-4. Probe QA (debugMessages transcript diff) + helperFibaro probes.
+4. ~~Probe QA (debugMessages transcript diff) + helperFibaro probes~~ —
+   done: `--probe` uploads tests/hc3_parity/probe_qa/main.lua to the HC3,
+   records its tag-filtered, whitespace-normalized /debugMessages
+   transcript, deletes the QA; replay runs the same QA in the sim and
+   diffs line by line (determinism pinned by a double-run test).
+   `--fibaro` runs the house-independent helperFibaro probes
+   (getName-no-args, getGlobalVariable-absent, getSelfId, nope)
+   controller-side and pins ok + value shapes; replay calls the sim's
+   fibaro table with the same args. First finding already landed: the
+   sim lacked QuickApp:getProperty (fixed + pinned).
 5. Quirk pinning as discoveries surface during capture runs.

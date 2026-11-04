@@ -5,11 +5,14 @@ Read-only by default: every probe is a GET, nothing on the controller is
 created or changed. ``--mutations`` adds the Tier-2 sequences — controlled
 create/update/delete cycles over ``flua-p-<uuid8>``-namespaced artifacts
 (QA, customEvent, globalVariable) with LIFO teardown afterwards.
+``--probe`` uploads the Tier-3 probe QA, collects its deterministic
+/debugMessages transcript and deletes it again; ``--fibaro`` runs the
+helperFibaro probes controller-side through the FluaHelper QA.
 
 Output: ``tests/hc3_parity/fixtures/<softVersion>/`` with ``meta.json``
 (provenance), ``shapes.json`` (status + normalized shape per probe), and
-``mutations.json`` when requested, plus a compact diff against the
-previous fixture.
+``mutations.json`` / ``probe_qa.json`` / ``fibaro.json`` when requested,
+plus a compact diff against the previous fixture.
 
 Run it from a flua checkout whenever the controller's firmware changes;
 the offline replay suite (``tests/hc3_parity/test_hc3_replay.py``) then
@@ -19,7 +22,10 @@ pins the sim against the captured shapes in CI without a controller.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
+import re
+import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -27,6 +33,7 @@ from tempfile import mkdtemp
 from typing import Any
 
 from flua import __version__
+from flua.parity.fibaro_probes import FIBARO_PROBES
 from flua.parity.mutations import (
     SEQUENCES,
     ArtifactTracker,
@@ -58,6 +65,17 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="also run the Tier-2 mutation sequences (flua-p-* artifacts, "
         "cleaned up LIFO afterwards)",
+    )
+    parser.add_argument(
+        "--probe",
+        action="store_true",
+        help="upload the Tier-3 probe QA, record its /debugMessages transcript, "
+        "delete it again",
+    )
+    parser.add_argument(
+        "--fibaro",
+        action="store_true",
+        help="run the helperFibaro probes controller-side through the FluaHelper",
     )
     parser.add_argument("--verbose", action="store_true", help="print each probe result")
 
@@ -130,6 +148,96 @@ def _fqa_builder(engine: Any):
         return json.dumps(fqa)
 
     return build
+
+
+def _probe_qa_path() -> Path:
+    root = _repo_root()
+    if root is None:
+        raise SystemExit(
+            "error: run parityCapture from a flua checkout (the probe QA lives in the repo)"
+        )
+    return root / "tests" / "hc3_parity" / "probe_qa" / "main.lua"
+
+
+def _normalize_line(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _probe_qa_transcript(client: Any, engine: Any, verbose: bool) -> list[str]:
+    """Upload the Tier-3 probe QA, collect its PROBE lines from
+    /debugMessages (tag-prefix filtered, whitespace-normalized), and delete
+    the QA again — the transcript the replay diffs against the sim's."""
+    source = _probe_qa_path()
+    qa_id = engine._prepare_qa(str(source), None, {"name": "flua-p-probe"}, str(source))
+    fqa = engine.qa_export(qa_id)
+    if fqa is None:
+        raise SystemExit("error: cannot package the probe QA")
+    device, status = client.request("POST", "/quickApp/", body=json.dumps(fqa))
+    if status not in (200, 201):
+        raise SystemExit(f"error: cannot upload the probe QA (HTTP {status})")
+    device_id = device["id"] if isinstance(device, dict) and "id" in device else int(device)
+    if verbose:
+        print(f"probe QA uploaded (device {device_id}) — waiting for the transcript")
+    try:
+        deadline = time.monotonic() + 90
+        lines: list[str] = []
+        while time.monotonic() < deadline:
+            data, dstatus = client.request("GET", "/debugMessages")
+            if dstatus == 200 and isinstance(data, dict):
+                messages = data.get("messages") or []
+                lines = [
+                    _normalize_line(str(entry.get("message", "")))
+                    for entry in messages
+                    if isinstance(entry, dict)
+                    and str(entry.get("tag", "")).startswith("flua-p-probe")
+                    and str(entry.get("message", "")).startswith("PROBE")
+                ]
+                if any("timer fired" in line for line in lines):
+                    break
+            time.sleep(2.0)
+        else:
+            print("warning: probe QA did not finish within 90s — recording what was seen")
+        return lines
+    finally:
+        _data, del_status = client.request("DELETE", f"/devices/{device_id}")
+        if del_status not in (200, 202, 204):
+            print(f"warning: cannot delete the probe QA (HTTP {del_status})")
+
+
+async def _helper_fibaro(engine: Any) -> list[dict]:
+    """Run the fibaro probes inside the deployed FluaHelper QA: start the
+    helper server, wake the helper (on-demand dial-in), call each probe,
+    stop the server. Records ok + the values' shape — never the values."""
+    engine._loop = asyncio.get_running_loop()
+    await engine.helper.start()
+    try:
+        engine._wake_helper()
+        deadline = time.monotonic() + 30
+        while not engine.helper.connected and time.monotonic() < deadline:
+            await asyncio.sleep(0.2)
+        results: list[dict] = []
+        for name, args, note in FIBARO_PROBES:
+            entry: dict = {
+                "name": name,
+                "args": args,
+                "ok": False,
+                "valuesShape": None,
+                "error": None,
+                "note": note,
+            }
+            if engine.helper.connected:
+                values, ok = await engine.helper.call_fibaro(name, args)
+                entry["ok"] = ok
+                if ok and isinstance(values, list):
+                    entry["valuesShape"] = shape(values)
+                else:
+                    entry["error"] = str(values) if values is not None else "helper failed"
+            else:
+                entry["error"] = "helper not connected (run flua --tool installHelper)"
+            results.append(entry)
+        return results
+    finally:
+        await engine.helper.stop()
 
 
 def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
@@ -208,6 +316,20 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
             "cleanup": {"deleted": deleted, "failed": failed},
         }
 
+    probe_fixture: dict | None = None
+    if args.probe:
+        transcript = _probe_qa_transcript(client, engine, args.verbose)
+        print(f"probe QA transcript: {len(transcript)} lines")
+        probe_fixture = {"transcript": transcript}
+
+    fibaro_fixture: dict | None = None
+    if args.fibaro:
+        fibaro_results = asyncio.run(_helper_fibaro(engine))
+        for result in fibaro_results:
+            state = "ok" if result["ok"] else f"error: {result['error']}"
+            print(f"fibaro.{result['name']}: {state}")
+        fibaro_fixture = {"probes": fibaro_results}
+
     if args.dry_run:
         return 0
 
@@ -228,6 +350,10 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
             "sequences": [seq["id"] for seq in mutation_fixture["sequences"]],
             "cleanupFailed": mutation_fixture["cleanup"]["failed"],
         }
+    if probe_fixture is not None:
+        meta["probe"] = {"lines": len(probe_fixture["transcript"])}
+    if fibaro_fixture is not None:
+        meta["fibaro"] = {"probes": len(fibaro_fixture["probes"])}
     (out_dir / "meta.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
     (out_dir / "shapes.json").write_text(
         json.dumps({"probes": entries}, indent=2) + "\n", encoding="utf-8"
@@ -235,6 +361,14 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     if mutation_fixture is not None:
         (out_dir / "mutations.json").write_text(
             json.dumps(mutation_fixture, indent=2) + "\n", encoding="utf-8"
+        )
+    if probe_fixture is not None:
+        (out_dir / "probe_qa.json").write_text(
+            json.dumps(probe_fixture, indent=2) + "\n", encoding="utf-8"
+        )
+    if fibaro_fixture is not None:
+        (out_dir / "fibaro.json").write_text(
+            json.dumps(fibaro_fixture, indent=2) + "\n", encoding="utf-8"
         )
     print(f"wrote {out_dir}")
 
