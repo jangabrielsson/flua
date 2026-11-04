@@ -161,16 +161,18 @@ def test_routes_die_with_the_qa() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "BEFORE 200" in result.stdout
-    # a fresh QA with no registration: the same path is a plain 404
+    # a fresh QA with no registration: the same path is gone — 501, the
+    # HC3's QA-context answer for unknown routes (the route died with the
+    # QA either way; the status is the controller's)
     result = _run_qa(
         "setTimeout(function()\n"
         "  local d, s = api.get('/vendor/gone')\n"
         "  print('AFTER', s)\n"
-        "  exit(s == 404 and 0 or 1)\n"
+        "  exit(s == 501 and 0 or 1)\n"
         "end, 20)\n"
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "AFTER 404" in result.stdout
+    assert "AFTER 501" in result.stdout
 
 
 def test_module_registers_endpoints_for_its_qa() -> None:

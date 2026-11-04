@@ -200,7 +200,9 @@ def _probe_qa_transcript(client: Any, engine: Any, verbose: bool) -> list[str]:
             time.sleep(2.0)
         else:
             print("warning: probe QA did not finish within 90s — recording what was seen")
-        return lines
+        # the HC3's buffer is newest-first, the sim's oldest-first — the
+        # transcript is order-insensitive by design, so sort it
+        return sorted(lines)
     finally:
         _data, del_status = client.request("DELETE", f"/devices/{device_id}")
         if del_status not in (200, 202, 204):
@@ -264,8 +266,13 @@ def _make_helper_use(args: argparse.Namespace, client: Any, plugin_paths: dict) 
                         entry["valuesShape"] = shape(values)
                     else:
                         entry["error"] = str(values) if values is not None else "helper failed"
+                        if entry["error"] in ("helper failed",) or entry["error"].startswith(
+                            "helper not connected"
+                        ):
+                            entry["unreachable"] = True  # transport, not a fibaro contract
                 else:
                     entry["error"] = "helper not connected (run flua --tool installHelper)"
+                    entry["unreachable"] = True
                 probes.append(entry)
             results["fibaro"] = probes
         for pattern, live_path in plugin_paths.items():

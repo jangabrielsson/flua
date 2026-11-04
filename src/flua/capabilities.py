@@ -43,7 +43,12 @@ CAPABILITIES: dict[str, list[dict[str, str]]] = {
             "status": "implemented",
             "note": "pinned by tests/test_quickapp.py",
         },
-        {"name": "getView", "status": "implemented", "note": ""},
+        {
+            "name": "getView",
+            "status": "removed",
+            "note": "the HC3's QuickApp has no getView (live-verified 5.221) — a sim-only "
+            "method would break on the controller",
+        },
         {
             "name": "setVariable/getVariable",
             "status": "implemented",

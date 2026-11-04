@@ -1,5 +1,5 @@
 {
-  "prefix": "flua-p-5735d9df",
+  "prefix": "flua_p_23e3061c",
   "sequences": [
     {
       "id": "customEvents",
@@ -8,31 +8,37 @@
         {
           "step": "create",
           "path": "/customEvents",
-          "status": 400,
-          "shape": null
+          "status": 201,
+          "shape": {
+            "name": "str",
+            "userDescription": "str"
+          }
         },
         {
           "step": "update",
-          "path": "/customEvents/flua-p-5735d9df-evt",
-          "status": 501,
-          "shape": null
+          "path": "/customEvents/flua_p_23e3061c_evt",
+          "status": 200,
+          "shape": {
+            "name": "str",
+            "userDescription": "str"
+          }
         },
         {
           "step": "fire",
-          "path": "/customEvents/flua-p-5735d9df-evt",
-          "status": 501,
+          "path": "/customEvents/flua_p_23e3061c_evt",
+          "status": 204,
           "shape": null
         },
         {
           "step": "publish",
-          "path": "/customEvents/flua-p-5735d9df-evt/publish",
-          "status": 501,
+          "path": "/customEvents/flua_p_23e3061c_evt/publish",
+          "status": 204,
           "shape": null
         },
         {
           "step": "delete",
-          "path": "/customEvents/flua-p-5735d9df-evt",
-          "status": 501,
+          "path": "/customEvents/flua_p_23e3061c_evt",
+          "status": 204,
           "shape": null
         }
       ]
@@ -44,30 +50,54 @@
         {
           "step": "create",
           "path": "/globalVariables",
-          "status": 400,
-          "shape": null
+          "status": 201,
+          "shape": {
+            "name": "str",
+            "value": "str",
+            "readOnly": "bool",
+            "isEnum": "bool",
+            "enumValues": [],
+            "created": "number",
+            "modified": "number"
+          }
         },
         {
           "step": "update",
-          "path": "/globalVariables/flua-p-5735d9df-gv",
-          "status": 404,
-          "shape": null
+          "path": "/globalVariables/flua_p_23e3061c_gv",
+          "status": 200,
+          "shape": {
+            "name": "str",
+            "value": "str",
+            "readOnly": "bool",
+            "isEnum": "bool",
+            "enumValues": [],
+            "created": "number",
+            "modified": "number"
+          }
         },
         {
           "step": "read",
-          "path": "/globalVariables/flua-p-5735d9df-gv",
-          "status": 404,
-          "shape": null
+          "path": "/globalVariables/flua_p_23e3061c_gv",
+          "status": 200,
+          "shape": {
+            "name": "str",
+            "value": "str",
+            "readOnly": "bool",
+            "isEnum": "bool",
+            "enumValues": [],
+            "created": "number",
+            "modified": "number"
+          }
         },
         {
           "step": "delete",
-          "path": "/globalVariables/flua-p-5735d9df-gv",
-          "status": 404,
+          "path": "/globalVariables/flua_p_23e3061c_gv",
+          "status": 200,
           "shape": null
         },
         {
           "step": "read_deleted",
-          "path": "/globalVariables/flua-p-5735d9df-gv",
+          "path": "/globalVariables/flua_p_23e3061c_gv",
           "status": 404,
           "shape": null
         }
@@ -178,7 +208,7 @@
         },
         {
           "step": "read",
-          "path": "/plugins/4380",
+          "path": "/plugins/4382",
           "status": 501,
           "shape": null
         },
@@ -190,7 +220,7 @@
         },
         {
           "step": "read_property",
-          "path": "/devices/4380/properties/userDescription",
+          "path": "/devices/4382/properties/userDescription",
           "status": 200,
           "shape": {
             "value": "str",
@@ -199,7 +229,7 @@
         },
         {
           "step": "delete",
-          "path": "/devices/4380",
+          "path": "/devices/4382",
           "status": 200,
           "shape": null
         }
@@ -208,11 +238,10 @@
   ],
   "cleanup": {
     "deleted": [
-      "device 4380",
-      "globalVariable flua-p-5735d9df-gv"
+      "device 4382",
+      "globalVariable flua_p_23e3061c_gv",
+      "customEvent flua_p_23e3061c_evt"
     ],
-    "failed": [
-      "customEvent flua-p-5735d9df-evt (HTTP 501)"
-    ]
+    "failed": []
   }
 }

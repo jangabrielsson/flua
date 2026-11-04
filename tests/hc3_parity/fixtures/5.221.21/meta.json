@@ -1,36 +1,21 @@
 {
-  "captured": "2026-11-04T08:11:57.970421+00:00",
+  "captured": "2026-11-04T08:32:09.859936+00:00",
   "softVersion": "5.221.21",
   "serial": "HC3-00000422",
   "fluaVersion": "0.1.125",
-  "probeCount": 46,
-  "skipped": [
-    {
-      "pattern": "/plugins/{id}",
-      "reason": "nothing on the HC3 to point the probe at"
-    },
-    {
-      "pattern": "/plugins/{id}/variables",
-      "reason": "nothing on the HC3 to point the probe at"
-    },
-    {
-      "pattern": "/plugins/{id}/variables/{key}",
-      "reason": "nothing on the HC3 to point the probe at"
-    }
-  ],
+  "probeCount": 49,
+  "skipped": [],
   "mutations": {
-    "prefix": "flua-p-5735d9df",
+    "prefix": "flua_p_23e3061c",
     "sequences": [
       "customEvents",
       "globalVariables",
       "qaLifecycle"
     ],
-    "cleanupFailed": [
-      "customEvent flua-p-5735d9df-evt (HTTP 501)"
-    ]
+    "cleanupFailed": []
   },
   "probe": {
-    "lines": 0
+    "lines": 19
   },
   "fibaro": {
     "probes": 4

@@ -130,6 +130,19 @@ _QUICKAPP_COMPILED = [
 ]
 
 
+def qa_context_status(method: str, path: str, status: int) -> int:
+    """The HC3's QA-runtime api.* layer: where it differs from the external
+    REST, QAs observe the local layer. Live-verified 5.221 by the parity
+    probe QA — unknown routes answer 501 (not 404), and GET /plugins/{id}
+    answers 501 even for the QA's own id (the variables routes stay
+    readable, which is why QAs hold their state there)."""
+    if status == 404 and not route_match(method, path):
+        return 501
+    if method.upper() == "GET" and re.fullmatch(r"/plugins/\d+", path.split("?", 1)[0]):
+        return 501
+    return status
+
+
 def route_match(method: str, path: str) -> bool:
     """Whether the sim implements (method, path) — the coverage audit's
     classifier (``flua audit``) and the registered-endpoint pre-check.

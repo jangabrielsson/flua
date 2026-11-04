@@ -419,6 +419,28 @@ def install_bindings(engine: "LuaEngine") -> None:
     py["api"] = api_call
     py["api_hc3"] = api_hc3
     py["helper_call"] = helper_call
+    # the QA-context status translation (unknown routes and GET /plugins/{id}
+    # answer 501 in the HC3's QA-runtime layer — live-verified)
+    def qa_context_status(method: object, url: object, status: object) -> int:
+        from .api import qa_context_status as _translate
+
+        return _translate(str(method), str(url), int(status))
+
+    py["qa_context_status"] = qa_context_status
+    # user-route existence WITHOUT the recursion guard (the api.* pre-check
+    # deliberately matches nothing mid-handler): the QA-context 501
+    # translation must not rewrite the user-route layer's own answers
+    def user_route_exists(qa: object, method: object, url: object) -> bool:
+        from .api import parse_url
+
+        segments, _query = parse_url(str(url))
+        path = "/" + "/".join(segments)
+        return (
+            engine._match_user_route(int(qa), str(method), path, override_only=False)
+            is not None
+        )
+
+    py["user_route_exists"] = user_route_exists
     # api.helperFibaro from main-state code (no coroutine to suspend): the
     # RPC runs inline on the event loop and returns the function's values
     def helper_fibaro(name: object, args: object, qa_id: object) -> tuple:

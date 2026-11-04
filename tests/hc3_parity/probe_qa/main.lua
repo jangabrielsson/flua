@@ -50,22 +50,22 @@ function QuickApp:onInit()
   probe("api.get absent route", function() return getStatus("/no/such/route") end)
 
   -- updateProperty round trip with a string value (the HC3's string-value
-  -- quirk family) and a number
+  -- quirk family) and a number — read back via self.properties, the HC3's
+  -- way (it has no getProperty)
   probe("updateProperty/getProperty", function()
     self:updateProperty("fluaParityProp", "hello")
-    return self:getProperty("fluaParityProp")
+    return self.properties.fluaParityProp
   end)
   probe("updateProperty number", function()
     self:updateProperty("fluaParityNum", 42)
-    return self:getProperty("fluaParityNum")
+    return self.properties.fluaParityNum
   end)
 
-  -- updateView round trip: the view table reflects the label
-  probe("updateView/getView", function()
+  -- updateView exists on both sides; the HC3 has no getView, so only the
+  -- write itself is probed
+  probe("updateView", function()
     self:updateView("fluaParityLabel", "text", "hello")
-    local view = self:getView()
-    local label = type(view) == "table" and view.fluaParityLabel
-    return type(view) .. ":" .. (label or "absent")
+    return "ok"
   end)
 
   -- an absent global variable is nil on both sides

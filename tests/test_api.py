@@ -398,9 +398,15 @@ def test_update_property(api: Api) -> None:
         "POST",
         "/plugins/updateProperty",
         {"deviceId": 5000, "propertyName": "value", "value": True},
+        qa_id=5000,
     ) == (None, 204)
     data, _ = api.dispatch("GET", "/devices/5000")
     assert data["properties"]["value"] is True
+    # other callers are rejected (the HC3 answers 400 externally — live-
+    # verified 5.221): only the device's own QA updates its properties
+    assert api.dispatch(
+        "POST", "/plugins/updateProperty", {"deviceId": 5000, "propertyName": "v", "value": 1}
+    ) == (None, 400)
     assert api.dispatch(
         "POST", "/plugins/updateProperty", {"deviceId": 9999, "propertyName": "v", "value": 1}
     ) == (None, 404)
@@ -718,7 +724,9 @@ async def test_print_of_api_error_shows_status(tmp_path, capsys) -> None:
     finally:
         await engine.stop()
     out = capsys.readouterr().out
-    assert "nil 404" in out  # the error status is visible, not blanked
+    # unknown routes answer 501 in the QA context (the HC3's local layer —
+    # live-verified 5.221); the status must print, not be blanked
+    assert "nil 501" in out
     assert " 201" in out  # the create call's status prints beside the table
     assert "MOD true" in out  # modified == os.time() (the virtual clock)
 
@@ -1302,6 +1310,7 @@ def test_refresh_states(api: Api) -> None:
         "POST",
         "/plugins/updateProperty",
         {"deviceId": 5000, "propertyName": "value", "value": True},
+        qa_id=5000,
     ) == (None, 204)
     data, status = api.dispatch("GET", "/refreshStates")
     assert status == 200
@@ -1331,6 +1340,7 @@ def test_refresh_states(api: Api) -> None:
         "POST",
         "/plugins/updateProperty",
         {"deviceId": 5000, "propertyName": "value", "value": True},
+        qa_id=5000,
     )
     data, _ = api.dispatch("GET", "/refreshStates?last=2")
     assert "events" not in data
@@ -1535,6 +1545,7 @@ def test_embedded_ui_binary_switch(api: Api) -> None:
         "POST",
         "/plugins/updateProperty",
         {"deviceId": 5000, "propertyName": "value", "value": False},
+        qa_id=5000,
     )
     data, _ = api.dispatch("GET", "/flua/embeddedUI")
     assert "FALSE" in data["5000"]["values"]["__binarysensorValue"]["text"]
@@ -1859,6 +1870,7 @@ def test_embedded_ui_hvac_system_auto(api: Api) -> None:
             "POST",
             "/plugins/updateProperty",
             {"deviceId": 5010, "propertyName": "thermostatMode", "value": mode},
+            qa_id=5010,
         )
 
     # Heat mode: both controls drive the heating side over the full range
@@ -1969,6 +1981,7 @@ def test_embedded_ui_hvac_cool_heat(api: Api) -> None:
         "POST",
         "/plugins/updateProperty",
         {"deviceId": 5012, "propertyName": "thermostatMode", "value": "Off"},
+        qa_id=5012,
     )
     data, _ = api.dispatch("GET", "/flua/embeddedUI")
     minus, label, plus = data["5012"]["uiView"][0]["components"]

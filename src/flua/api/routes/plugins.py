@@ -301,6 +301,15 @@ def plugin_update_property(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     dev = state.device(req.body.get("deviceId"))
     if dev is None:
         return None, 404
+    # the HC3 rejects property updates from other callers (live-verified
+    # 5.221: external REST answers 400) — the device's own QA updates it,
+    # and a parent QA updates its child devices
+    caller = req.qa_id
+    if caller is None or (
+        int(caller) != int(dev["id"])
+        and int(caller) != int(dev.get("parentId") or 0)
+    ):
+        return None, 400
     name = req.body.get("propertyName")
     if not isinstance(name, str):
         return None, 400

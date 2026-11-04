@@ -65,7 +65,9 @@ def test_qa_lifecycle_on_the_sim() -> None:
     records, bindings = run_sequence(
         SimBackend(engine.api), SEQUENCES_BY_ID["qaLifecycle"], PREFIX
     )
-    assert [r["status"] for r in records] == [201, 200, 204, 200, 200]
+    assert [r["status"] for r in records] == [201, 200, 400, 200, 200]
+    # updateProperty from an external caller is 400 (the HC3's answer,
+    # live-verified) — the sim mirrors it since the first capture
     qa_id = bindings["create.id"]
     assert qa_id  # the create response's id was extracted into the templates
     # the templated paths really used the extracted id

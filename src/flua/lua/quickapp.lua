@@ -180,12 +180,6 @@ end
 -- @param elm - The UI element name
 -- @param prop - The property name to update
 -- @param value - The new value for the property
-function QuickAppBase:getProperty(name)
-  -- the HC3's QuickApp:getProperty (surfaced by the parity probe QA): the
-  -- property value or nil — the method-form companion to self.properties
-  return (self.properties or {})[name]
-end
-
 function QuickAppBase:updateView(elm,prop,value)
   api.post("/plugins/updateView", {
     deviceId = self.id,
@@ -195,9 +189,14 @@ function QuickAppBase:updateView(elm,prop,value)
   })
 end
 
+-- NOTE: the HC3's QuickApp has NO getProperty (live-verified 5.221 by the
+-- parity probe QA) — QAs read self.properties directly. flua does not add
+-- it: a QA using it here would silently break on the controller.
+-- getView below IS a flua extension (see its comment).
+
 -- Returns the QA's current rendered view (the $jason viewLayout, including
--- updateView changes). Same API as the HC3; handy for asserting UI state
--- from inside a verify QA.
+-- updateView changes). A flua extension for verify QAs: the HC3's QuickApp
+-- has NO getView (live-verified 5.221) — a QA using it runs in flua only.
 function QuickAppBase:getView()
   local data, status = api.get("/plugins/getView?id=" .. self.id)
   if status == 200 then

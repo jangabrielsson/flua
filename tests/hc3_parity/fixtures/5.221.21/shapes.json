@@ -416,6 +416,27 @@
       "shape": null
     },
     {
+      "pattern": "/plugins/{id}",
+      "path": "/plugins/3",
+      "status": 501,
+      "shape": null,
+      "via": "helper"
+    },
+    {
+      "pattern": "/plugins/{id}/variables",
+      "path": "/plugins/3/variables",
+      "status": 200,
+      "shape": [],
+      "via": "helper"
+    },
+    {
+      "pattern": "/plugins/{id}/variables/{key}",
+      "path": "/plugins/3/variables/fluaParityProbe",
+      "status": 404,
+      "shape": null,
+      "via": "helper"
+    },
+    {
       "pattern": "/scenes",
       "path": "/scenes",
       "status": 200,

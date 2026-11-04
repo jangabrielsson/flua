@@ -5,7 +5,7 @@
       "args": [],
       "ok": false,
       "valuesShape": null,
-      "error": "helper not connected (run flua --tool installHelper)",
+      "error": "Wrong parameter type, number required. Provided param 'nil' is type of nil",
       "note": "no-arg call: the HC3 returns the controller name"
     },
     {
@@ -15,7 +15,7 @@
       ],
       "ok": false,
       "valuesShape": null,
-      "error": "helper not connected (run flua --tool installHelper)",
+      "error": "helper failed",
       "note": "absent variable: pins the nil-on-absent contract"
     },
     {
@@ -23,7 +23,7 @@
       "args": [],
       "ok": false,
       "valuesShape": null,
-      "error": "helper not connected (run flua --tool installHelper)",
+      "error": "fibaro.getSelfId is not a function",
       "note": "the HC3 has no such function \u2014 pins the error contract"
     },
     {
@@ -31,7 +31,7 @@
       "args": [],
       "ok": false,
       "valuesShape": null,
-      "error": "helper not connected (run flua --tool installHelper)",
+      "error": "fibaro.nope is not a function",
       "note": "a name neither side has \u2014 pins the error contract"
     }
   ]

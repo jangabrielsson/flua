@@ -406,6 +406,7 @@ async def test_device_property_put_restarts_qa(tmp_path, capsys) -> None:
             "POST",
             "/plugins/updateProperty",
             {"deviceId": 5000, "propertyName": "value", "value": False},
+            qa_id=5000,
         )
         await wait_until(lambda: not engine.has_pending_work())
         out = capsys.readouterr().out

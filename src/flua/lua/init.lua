@@ -722,19 +722,29 @@ local function installQaGlobals(env)
     return function(url, body)
       local qaId = env._FLUA.qaId
       local urm = _PY.user_route_match(qaId, method, tostring(url))
+      local function statusOf(data, status)
+        -- user-registered endpoints are a flua extension with their own
+        -- contracts (a self-call answers 404) — no HC3-layer translation
+        if urm or _PY.user_route_exists(qaId, method, tostring(url)) then
+          return data, status
+        end
+        return data, _PY.qa_context_status(method, url, status)
+      end
       if
         (_PY.api_remote_mode() or urm)
         and qaCoroutines[coroutine.running()] == qaId
       then
-        return coroutine.yield{
+        local data, status = coroutine.yield{
           type = "apiCall",
           method = method,
           url = tostring(url),
           body = body,
           qa = qaId,
         }
+        return statusOf(data, status)
       end
-      return _PY.api(method, url, body, qaId)
+      local data, status = _PY.api(method, url, body, qaId)
+      return statusOf(data, status)
     end
   end
   env.api = {

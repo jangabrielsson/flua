@@ -37,7 +37,7 @@ function QuickApp:onInit()
   assertTrue(self.id >= 5000, "emulated QA ids start at 5000")
 
   self:updateProperty("value", 50)
-  assertEq(self:getProperty("value"), 50, "updateProperty round trip")
+  assertEq(self.properties.value, 50, "updateProperty round trip")
 
   print("failures:", failures)
   exit(failures > 0 and 1 or 0)
