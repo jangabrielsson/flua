@@ -4,6 +4,14 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.128] - 2026-11-04
+
+### Fixed
+- accept a bare-id POST /quickApp response when deploying the proxy
+- report devices a failed proxy deploy created anyway (the HC3 quirk)
+- proxy discovery fallback and deploy diagnostics (forum bug report)
+- declare json.util.InitArray and json.array in the LuaLS types
+
 ## [0.1.127] - 2026-11-04
 
 ### Added
