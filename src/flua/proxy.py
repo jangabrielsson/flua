@@ -172,6 +172,9 @@ def build_proxy_fqa(
         "uiView": ui_view,
         "uiCallbacks": ui_callbacks,
         "useUiView": bool(device_properties.get("useUiView", False)),
+        # the flua identity marker: future discovery can find proxies by
+        # property instead of the unofficial name filter
+        "fluaProxy": True,
         "typeTemplateInitialized": True,
     }
     return {
@@ -207,7 +210,10 @@ def deploy_proxy(
     encoded = base64.b64encode(raw).decode("ascii")
     device, status = engine.api.dispatch_hc3("POST", "/quickApp", {"file": encoded})
     if status not in (200, 201) or not isinstance(device, dict):
-        return None
+        detail = json.dumps(device)[:200] if device is not None else "no response body"
+        raise ValueError(
+            f"cannot create proxy {name}_Proxy on the HC3 (HTTP {status}: {detail})"
+        )
     device["id"] = int(device["id"])
     return device
 
@@ -229,7 +235,14 @@ def existing_proxy(engine: LuaEngine, proxy_name: str, device_type: str) -> dict
     quoted = urllib.parse.quote(proxy_name)
     proxies, status = engine.api.dispatch_hc3("GET", f"/devices?name={quoted}")
     if status != 200 or not isinstance(proxies, list):
-        return None
+        # the name filter is unofficial (missing from the OpenAPI reference)
+        # and some firmware answers an error for it — fall back to a
+        # client-side scan of the full device list (one more request, always
+        # supported)
+        all_devices, status = engine.api.dispatch_hc3("GET", "/devices")
+        if status != 200 or not isinstance(all_devices, list):
+            return None
+        proxies = all_devices
     proxies = [dev for dev in proxies if dev.get("name") == proxy_name]
     if not proxies:
         return None
@@ -340,9 +353,7 @@ def resolve_proxy(
         # noUI: a FRESH proxy carries the empty UI shapes too — the
         # developer builds the UI in the HC3's editor from scratch
         deploy_properties = {} if no_ui else device_properties
-        device = deploy_proxy(engine, name, resolved_type, deploy_properties)
-        if device is None:
-            raise ValueError(f"cannot create proxy {proxy_name} on the HC3")
+        device = deploy_proxy(engine, name, resolved_type, deploy_properties)  # raises on failure
         engine.post_log("info", f"flua: proxy installed: {device.get('id')} {proxy_name}")
     else:
         if no_ui:

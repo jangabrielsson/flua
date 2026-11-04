@@ -39,6 +39,8 @@ class _MockHc3(BaseHTTPRequestHandler):
     requests: list[tuple[str, str, object]] = []  # (method, path, body)
     refresh_events: list[dict] = []  # served on the next refreshStates poll
     uploaded: list[dict] = []  # decoded .fqa packages (POST /quickApp)
+    reject_name_filter: bool = False  # a firmware that 400s the unofficial ?name=
+    fail_upload: bool = False  # a controller that rejects the proxy upload
 
     def _send_json(self, data, status: int = 200) -> None:
         payload = json.dumps(data).encode()
@@ -69,6 +71,8 @@ class _MockHc3(BaseHTTPRequestHandler):
         cls.raw_queries = []  # the raw query strings, as they arrived on the wire
         cls.refresh_events = []
         cls.uploaded = []
+        cls.reject_name_filter = False
+        cls.fail_upload = False
 
     @classmethod
     def seen(cls, method: str, path: str) -> list:
@@ -104,6 +108,11 @@ class _MockHc3(BaseHTTPRequestHandler):
             # omits it), plus parentId/interface — decoded values only, so
             # a form-style '+' would NOT match a name with a space
             name = query.get("name")
+            if name is not None and type(self).reject_name_filter:
+                # some firmware answers an error for the unofficial name
+                # filter — flua must fall back to the client-side scan
+                self._send_json({"error": "bad request"}, 400)
+                return
             parent = query.get("parentId")
             interface = query.get("interface")
             found = [
@@ -135,6 +144,9 @@ class _MockHc3(BaseHTTPRequestHandler):
             fqa = body if isinstance(body, dict) and isinstance(body.get("files"), list) else None
             if fqa is None:
                 self._send_json({"error": "bad fqa"}, 400)
+                return
+            if type(self).fail_upload:
+                self._send_json({"error": "upload service wedged"}, 503)
                 return
             type(self).uploaded.append(fqa)
             device_id = type(self).next_id
@@ -936,3 +948,43 @@ async def test_proxy_offline_is_disabled_with_warning(
     assert "proxy disabled" in caplog.text
     assert not engine.api.state.is_proxy(qa_id)
     assert capsys.readouterr().out  # the QA still ran normally
+
+
+async def test_proxy_reuse_falls_back_to_client_scan_when_name_filter_fails(
+    tmp_path, mock_hc3, monkeypatch
+) -> None:
+    # some firmware answers an error for the unofficial ?name= filter — the
+    # discovery must fall back to the client-side scan instead of deploying
+    # a duplicate proxy on every run (the accumulation bug report)
+    set_hc3_env(monkeypatch, tmp_path, mock_hc3)
+    _MockHc3.reject_name_filter = True
+    add_existing_proxy(57, "sw_Proxy", "com.fibaro.binarySwitch")
+    script = write_script(tmp_path)
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        qa_id, err = engine.load_qa_file(str(script))
+        assert err is None, err
+        await wait_until(lambda: _MockHc3.seen("POST", "/api/devices/57/action/CONNECT"))
+    finally:
+        await engine.stop()
+    assert qa_id == 57  # reused, not freshly deployed
+    assert _MockHc3.uploaded == []
+
+
+async def test_proxy_deploy_failure_names_the_http_status(
+    tmp_path, mock_hc3, monkeypatch
+) -> None:
+    # when the controller rejects the proxy upload, the error must carry
+    # the status and response — "cannot create proxy" alone hides the cause
+    set_hc3_env(monkeypatch, tmp_path, mock_hc3)
+    _MockHc3.fail_upload = True
+    script = write_script(tmp_path)
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        qa_id, err = engine.load_qa_file(str(script))
+        assert qa_id is None
+        assert err and "HTTP 503" in err and "upload service wedged" in err
+    finally:
+        await engine.stop()
