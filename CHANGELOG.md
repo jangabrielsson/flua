@@ -4,6 +4,17 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.127] - 2026-11-04
+
+### Added
+- enforce the HC3 file editor's name rule for --%%file names
+- fetch an HC3 device's UI back to --%%u rows (--tool ui --device)
+
+### Changed
+- forum post 31 — the promised proxy-mode deep dive
+- the mode x call routing matrix in USAGE.md
+- forum posts 30 (FluaHelper) and the compatibility notes
+
 ## [0.1.126] - 2026-11-04
 
 ### Added
