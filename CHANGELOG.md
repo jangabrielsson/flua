@@ -4,6 +4,37 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.126] - 2026-11-04
+
+### Added
+- parity probe QA transcript and helperFibaro probes (step 4)
+- parity mutation sequences, artifact tracker, and parityCleanup (step 3)
+- parity capture tool and offline replay suite (Tier 1, step 2)
+- helper server binds a free OS port by default
+- route variable endpoints by device namespace like the other REST APIs
+- FluaHelper bridge — api.helper and api.helperFibaro through a helper QA on the HC3
+- add tests for pump idle polling behavior and update documentation in rainy-day todos
+- add .gitattributes to manage GitHub language statistics and exclude generated files
+- add VS Code snippets for common QA patterns and update documentation
+- enhance shell argument quoting for cross-platform compatibility and improve webview panel messaging
+
+### Changed
+- stop recording the real HC3 serial in parity fixtures
+- extract the parity shape oracle into flua.parity.normalize
+- design the HC3 parity harness (capture once per FW, replay offline)
+- warn against running the same QA in proxy mode from parallel flua instances
+- drop unused examples/error.lua probe
+
+### Fixed
+- parity round complete — 65 offline tests pin the 5.221.21 contract
+- QA-context parity from the probe transcript (HC3-verified 5.221)
+- capture-side parity tooling + quickApp/device-delete statuses
+- shape parity — weather, profiles, panels/notifications + harness normalization
+- customEvents/globalVariables parity with the live HC3 (5.221 verified)
+- parityCapture --dry-run must not execute the write-side probes
+- add QuickApp:getProperty — the HC3 method the sim lacked
+- validate variable names like the HC3 in the variables routes
+
 ## [0.1.125] - 2026-11-03
 
 ### Fixed
