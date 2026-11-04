@@ -42,6 +42,7 @@ class _MockHc3(BaseHTTPRequestHandler):
     reject_name_filter: bool = False  # a firmware that 400s the unofficial ?name=
     fail_upload: bool = False  # a controller that rejects the proxy upload
     bare_id_upload: bool = False  # a firmware answering POST /quickApp with a bare int id
+    fail_delete: bool = False  # a controller whose DELETE /devices/{id} fails
 
     def _send_json(self, data, status: int = 200) -> None:
         payload = json.dumps(data).encode()
@@ -75,6 +76,7 @@ class _MockHc3(BaseHTTPRequestHandler):
         cls.reject_name_filter = False
         cls.fail_upload = False
         cls.bare_id_upload = False
+        cls.fail_delete = False
 
     @classmethod
     def seen(cls, method: str, path: str) -> list:
@@ -258,6 +260,9 @@ class _MockHc3(BaseHTTPRequestHandler):
     def do_DELETE(self):
         path = self.path.split("?")[0]
         type(self).requests.append((self.command, path, None))
+        if type(self).fail_delete:
+            self._send_json({"error": "delete rejected"}, 500)
+            return
         if path.startswith("/api/devices/"):
             device_id = int(path.rsplit("/", 1)[1])
             type(self).devices.pop(device_id, None)
@@ -1029,3 +1034,24 @@ async def test_proxy_deploy_accepts_a_bare_id_response(
     finally:
         await engine.stop()
     assert qa_id is not None  # the proxy runs under the HC3-assigned id
+
+
+async def test_proxy_cleanup_failure_aborts_instead_of_piling_on(
+    tmp_path, mock_hc3, monkeypatch
+) -> None:
+    # when a duplicate proxy cannot be deleted, flua must say so and NOT
+    # deploy yet another same-named device on top (the accumulation report)
+    set_hc3_env(monkeypatch, tmp_path, mock_hc3)
+    _MockHc3.fail_delete = True
+    add_existing_proxy(57, "sw_Proxy", "com.fibaro.binarySwitch")
+    add_existing_proxy(58, "sw_Proxy", "com.fibaro.binarySwitch")
+    script = write_script(tmp_path)
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        qa_id, err = engine.load_qa_file(str(script))
+        assert qa_id is None
+        assert err and "cannot remove duplicate proxy" in err and "HTTP 500" in err
+    finally:
+        await engine.stop()
+    assert _MockHc3.uploaded == []  # nothing new was deployed on top

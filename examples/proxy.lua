@@ -1,4 +1,4 @@
---%%name:P test
+--%%name:"P test"
 --%%type:com.fibaro.binarySwitch
 
 --%%u:{label="l1",text="Label text2"}
@@ -11,6 +11,7 @@
 
 function QuickApp:onInit()
   print("Proxy test initialized")
+  self:setVariable("testVar", "initialValue")
 end
 
 function QuickApp:fopp()

@@ -276,18 +276,31 @@ def existing_proxy(engine: LuaEngine, proxy_name: str, device_type: str) -> dict
         return None
     proxies = sorted(proxies, key=lambda dev: int(dev.get("id") or 0), reverse=True)
     for old in proxies[1:]:  # duplicates: keep only the newest
+        _data, del_status = engine.api.dispatch_hc3("DELETE", f"/devices/{int(old['id'])}")
+        if del_status not in (200, 202, 204):
+            # a failed cleanup must not be silent: proceeding to deploy on
+            # top piles up same-named devices (the accumulation bug report)
+            raise ValueError(
+                f"cannot remove duplicate proxy {old.get('id')} "
+                f"(HTTP {del_status}) — fix the controller and retry"
+            )
         engine.post(
             messages.log("info", f"flua: old proxy deleted: {old.get('id')} {old.get('name')}")
         )
-        engine.api.dispatch_hc3("DELETE", f"/devices/{int(old['id'])}")
     device = proxies[0]
     if device.get("type") != device_type:
+        _data, del_status = engine.api.dispatch_hc3("DELETE", f"/devices/{int(device['id'])}")
+        if del_status not in (200, 202, 204):
+            raise ValueError(
+                f"cannot remove the wrong-type proxy {device.get('id')} "
+                f"({device.get('type')!r} vs {device_type!r}, HTTP {del_status}) — "
+                "fix the controller and retry"
+            )
         engine.post_log(
             "info",
             f"flua: existing proxy of wrong type, deleted: "
             f"{device.get('id')} {device.get('name')}",
         )
-        engine.api.dispatch_hc3("DELETE", f"/devices/{int(device['id'])}")
         return None
     device["id"] = int(device["id"])
     engine.post(
