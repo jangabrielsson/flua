@@ -64,6 +64,7 @@ packages = [
     "flua.devices",
     "flua.examples",
     "flua.mcp",
+    "flua.parity",
     "flua.setup_templates.github.skills.skill-creator.scripts",
     "flua.tools",
 ]

@@ -20,6 +20,7 @@ pytest.importorskip("lupa")
 from flua.api import Api
 from flua.environment import EnvChain
 from flua.hc3 import Hc3Remote
+from flua.parity.normalize import drift
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -49,55 +50,6 @@ def _offline_api() -> Api:
     return api
 
 
-def _shape(value) -> object:
-    """JSON structure, ignoring concrete values: field names + types."""
-    if isinstance(value, dict):
-        return {key: _shape(val) for key, val in value.items()}
-    if isinstance(value, list):
-        return [_shape(value[0])] if value else []
-    if isinstance(value, bool):
-        return "bool"
-    if isinstance(value, (int, float)):
-        return "number"
-    if value is None:
-        return "null"
-    return "str"
-
-
-def _drift(offline: object, live: object, path: str = "") -> tuple[list[str], list[str]]:
-    """(problems, gaps) between two JSON structures. Problems are offline-only
-    fields and type mismatches on common fields — real compat bugs. Gaps are
-    fields the live HC3 has and the sim lacks — the sim is an incomplete
-    subset (catalog-capture limits), reported but not failed."""
-    problems: list[str] = []
-    gaps: list[str] = []
-    if isinstance(live, dict):
-        if not isinstance(offline, dict):
-            problems.append(f"{path or '/'}: offline={type(offline).__name__}, live=object")
-            return problems, gaps
-        for key in sorted(set(live) - set(offline)):
-            gaps.append(f"{path}.{key}: missing offline (live has {_shape(live[key])!r})")
-        for key in sorted(set(offline) - set(live)):
-            problems.append(f"{path}.{key}: only offline (live lacks it)")
-        for key in sorted(set(live) & set(offline)):
-            sub_problems, sub_gaps = _drift(offline[key], live[key], f"{path}.{key}")
-            problems += sub_problems
-            gaps += sub_gaps
-    elif isinstance(live, list):
-        if not isinstance(offline, list):
-            problems.append(f"{path or '/'}: offline={type(offline).__name__}, live=list")
-        elif live and offline:
-            sub_problems, sub_gaps = _drift(offline[0], live[0], f"{path}[]")
-            problems += sub_problems
-            gaps += sub_gaps
-    else:
-        expected = _shape(live)
-        actual = _shape(offline)
-        if actual != expected:
-            problems.append(f"{path or '/'}: offline={actual!r}, live={expected!r}")
-    return problems, gaps
-
-
 def _compare(method: str, path: str, live_filter=None) -> None:
     live = _live_client()
     live_data, live_status = live.request(method, path)
@@ -109,7 +61,7 @@ def _compare(method: str, path: str, live_filter=None) -> None:
     offline_data, offline_status = offline.dispatch(method, path)
     assert offline_status == 200, f"offline {method} {path} failed: {offline_status}"
 
-    problems, gaps = _drift(offline_data, live_data)
+    problems, gaps = drift(offline_data, live_data)
     assert not problems, f"{method} {path} shape drift vs the real HC3:\n" + "\n".join(problems)
     if gaps:
         print(
@@ -148,7 +100,7 @@ def test_single_device_shape_matches() -> None:
     offline_device, offline_status = offline.dispatch("GET", "/devices/5000")
     assert offline_status == 200
 
-    problems, gaps = _drift(offline_device, live_device)
+    problems, gaps = drift(offline_device, live_device)
     assert not problems, "device shape drift vs the real HC3:\n" + "\n".join(problems)
     if gaps:
         print(
