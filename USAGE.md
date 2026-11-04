@@ -1078,6 +1078,27 @@ and source-trigger data are the helper's, and actions affect the real
 controller. Avoid `fibaro.sleep` — it would block the helper's thread and
 drop the connection.
 
+### Mode × call routing (the behaviour matrix)
+
+Where a QA's call executes — and whose state answers — depends on the
+mode and the id namespace. Emulated ids (5000 and up) always stay in the
+sim; HC3-namespace ids (below 5000) belong to the controller. The
+matrix:
+
+| Call from QA code | offline | online | proxy |
+|---|---|---|---|
+| `api.get/post/...` (general REST) | the sim | hybrid: the sim answers what it owns, everything else forwards to the real HC3 (per-QA suspension — other QAs keep running) | the HC3 owns the state; the sim shadow's handlers proxy-forward and mirror back |
+| `fibaro.call(id, action, args)` | sim: emulated QAs run real code, seeded devices emulate the canonical actions | emulated id → sim (202); HC3 id → the real device on the controller | proxy devices → the HC3 runs the action (202 answered locally) |
+| `self:updateProperty` | sim (own QA or its children — other callers 400) | same for emulated QAs; HC3-namespace → the HC3 (400 unless the device's own QA) | pushed to the HC3, no local refreshState event — the controller's DevicePropertyUpdatedEvent comes back via the poll |
+| `/plugins/<id>/variables` (reads and writes, incl. internalStorage) | sim, emulated ids only | HC3 ids: single-key reads and writes via the FluaHelper (the HC3 refuses external callers); the list endpoint uses plain REST | the proxy QA's own + children's variables live on the HC3 via the helper — reads answer there, writes land there first with the sim mirroring after; state survives flua reruns |
+| `api.hc3.*` (forced controller call) | the sim stands in (no remote backend) | the real HC3, bypassing the hybrid dispatch | the real HC3 |
+| `api.helper` / `api.helperFibaro` | `(nil, 0)` + a warning (no helper server) | through the FluaHelper QA in the controller's local context | through the FluaHelper QA |
+
+The QA-facing statuses match the HC3's own layers: unknown `api.*` routes
+answer 501 in QA code (not the external REST's 404), and
+`GET /plugins/<id>` answers 501 even for the QA's own id — the variables
+endpoints are the supported read path.
+
 ### Proxy mode (`--%%mode:proxy`)
 
 To test a QA against its real UI in the phone app — or against scenes and
