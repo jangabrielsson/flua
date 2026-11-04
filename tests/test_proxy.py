@@ -41,6 +41,7 @@ class _MockHc3(BaseHTTPRequestHandler):
     uploaded: list[dict] = []  # decoded .fqa packages (POST /quickApp)
     reject_name_filter: bool = False  # a firmware that 400s the unofficial ?name=
     fail_upload: bool = False  # a controller that rejects the proxy upload
+    bare_id_upload: bool = False  # a firmware answering POST /quickApp with a bare int id
 
     def _send_json(self, data, status: int = 200) -> None:
         payload = json.dumps(data).encode()
@@ -73,6 +74,7 @@ class _MockHc3(BaseHTTPRequestHandler):
         cls.uploaded = []
         cls.reject_name_filter = False
         cls.fail_upload = False
+        cls.bare_id_upload = False
 
     @classmethod
     def seen(cls, method: str, path: str) -> list:
@@ -172,6 +174,10 @@ class _MockHc3(BaseHTTPRequestHandler):
                 "parentId": 0,
             }
             type(self).devices[device_id] = device
+            if type(self).bare_id_upload:
+                # some firmware answers POST /quickApp with the bare id
+                self._send_json(device_id)
+                return
             self._send_json(device)
             return
         if path.startswith("/api/devices/") and "/action/" in path:
@@ -1003,3 +1009,23 @@ async def test_proxy_deploy_failure_names_the_http_status(
         assert "created 1 same-named device(s) anyway" in err
     finally:
         await engine.stop()
+
+
+async def test_proxy_deploy_accepts_a_bare_id_response(
+    tmp_path, mock_hc3, monkeypatch
+) -> None:
+    # some firmware answers POST /quickApp with the bare integer id — the
+    # deploy must treat it as success (the forum report: 'cannot create
+    # proxy' while the controller had created the device just fine)
+    set_hc3_env(monkeypatch, tmp_path, mock_hc3)
+    _MockHc3.bare_id_upload = True
+    script = write_script(tmp_path)
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        qa_id, err = engine.load_qa_file(str(script))
+        assert err is None, err
+        await wait_until(lambda: _MockHc3.seen("POST", "/api/devices/100/action/CONNECT"))
+    finally:
+        await engine.stop()
+    assert qa_id is not None  # the proxy runs under the HC3-assigned id

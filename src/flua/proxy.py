@@ -209,7 +209,7 @@ def deploy_proxy(
     raw = json.dumps(fqa).encode("utf-8")
     encoded = base64.b64encode(raw).decode("ascii")
     device, status = engine.api.dispatch_hc3("POST", "/quickApp", {"file": encoded})
-    if status not in (200, 201) or not isinstance(device, dict):
+    if status not in (200, 201):
         detail = json.dumps(device)[:200] if device is not None else "no response body"
         # the HC3 quirk (live-verified): a rejected upload can still CREATE
         # the device — the shell lands first, file processing crashes after
@@ -226,8 +226,17 @@ def deploy_proxy(
                 f"anyway (ids {', '.join(leftovers)}) — the next run reuses the newest"
             )
         raise ValueError(f"cannot create proxy {name}_Proxy on the HC3 (HTTP {status}: {detail})")
-    device["id"] = int(device["id"])
-    return device
+    # the HC3 answers either the DeviceDto or a bare integer id (the live
+    # suite handles both) — normalize to the device id
+    if isinstance(device, dict) and device.get("id") is not None:
+        device["id"] = int(device["id"])
+        return device
+    if isinstance(device, int):
+        return {"id": device}
+    detail = json.dumps(device)[:200] if device is not None else "no response body"
+    raise ValueError(
+        f"cannot create proxy {name}_Proxy on the HC3 (unexpected 2xx response: {detail})"
+    )
 
 
 def _devices_by_name(engine: LuaEngine, name: str) -> list[dict[str, Any]]:
