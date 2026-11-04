@@ -3,7 +3,10 @@
 The browser viewer needs a browser; agents and quick eyeball checks need
 text. This renders the QA's compiled UI (the active format: the legacy
 viewLayout by default, uiView with --%%useUiView:true) as one line per
-element.
+element. ``--device ID`` instead fetches an HC3 device's UI (the proxy a
+mode:proxy run deployed, edited in the HC3's editor) and renders it back
+to ``--%%u`` rows plus the raw UI JSON — the lossless form to paste into
+a QA.
 """
 
 from __future__ import annotations
@@ -12,23 +15,51 @@ import argparse
 import json
 from typing import Any
 
-from .common import build_fqa
+from ..ui import ui_to_u_rows
+from .common import build_fqa, hc3_engine
 
 NAME = "ui"
 HELP = (
     "print a QA's DECLARED UI as text (elements, callbacks, options) — static, "
-    "not live state; for post-init values and callback behavior see "
-    "examples/ui-interaction-test.lua"
+    "not live state; --device ID fetches an HC3 device's UI and renders it "
+    "back to --%%u rows + the raw JSON; for post-init values and callback "
+    "behavior see examples/ui-interaction-test.lua"
 )
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("script", help="the QA main file")
+    parser.add_argument("script", nargs="?", help="the QA main file (omit with --device)")
+    parser.add_argument(
+        "--device",
+        type=int,
+        help="render the UI of an HC3 device by id (e.g. the proxy of a "
+        "--%%mode:proxy run, edited in the HC3's UI editor) instead of a script",
+    )
     parser.add_argument(
         "--json",
         action="store_true",
         help="structured dump instead of text: {name, type, useUiView, elements, callbacks}",
     )
+
+
+def device_ui(device: dict[str, Any]) -> tuple[str, list[str], Any]:
+    """(title, --%%u rows, raw UI JSON) for an HC3 device dict — the
+    inverse-export view of its UI properties (ui_to_u_rows, the same
+    converter downloadQA uses). The shorthand is lossy: unknown component
+    kinds degrade to labels, so the raw JSON travels alongside."""
+    properties = device.get("properties") or {}
+    rows = ui_to_u_rows(
+        ui_view=properties.get("uiView"),
+        view_layout=properties.get("viewLayout"),
+        ui_callbacks=properties.get("uiCallbacks"),
+    )
+    raw = (
+        properties.get("uiView")
+        if properties.get("useUiView")
+        else properties.get("viewLayout")
+    )
+    title = f'HC3 device "{device.get("name")}" ({device.get("type", "?")})'
+    return title, rows, raw
 
 
 def _callback_map(initial: dict[str, Any]) -> dict[str, dict[str, str]]:
@@ -183,6 +214,30 @@ def ui_dump(script: str) -> dict[str, Any]:
 
 
 def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
+    if args.device is not None:
+        if args.script:
+            parser.error("pass either a script or --device, not both")
+        engine = hc3_engine(parser)
+        if engine.hc3 is None:
+            parser.error("online mode required (HC3 credentials from the environment chain)")
+        device, status = engine.hc3.request("GET", f"/devices/{args.device}")
+        if status != 200 or not isinstance(device, dict):
+            parser.error(f"HC3 device {args.device}: HTTP {status}")
+        title, rows, raw = device_ui(device)
+        print(title)
+        if not rows:
+            print("  (no UI)")
+        else:
+            for row in rows:
+                print("  --%%u:" + row)
+            print(
+                "  # the shorthand is lossy (unknown kinds degrade to labels) — "
+                "the raw UI JSON below is the full picture"
+            )
+        print(json.dumps(raw, indent=1))
+        return 0
+    if not args.script:
+        parser.error("pass a script or --device")
     try:
         fqa, _ = build_fqa(args.script)
     except (FileNotFoundError, ValueError) as exc:

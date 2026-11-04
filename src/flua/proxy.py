@@ -337,7 +337,10 @@ def resolve_proxy(
     proxy_name = f"{name}_Proxy"
     device = existing_proxy(engine, proxy_name, resolved_type)
     if device is None:
-        device = deploy_proxy(engine, name, resolved_type, device_properties)
+        # noUI: a FRESH proxy carries the empty UI shapes too — the
+        # developer builds the UI in the HC3's editor from scratch
+        deploy_properties = {} if no_ui else device_properties
+        device = deploy_proxy(engine, name, resolved_type, deploy_properties)
         if device is None:
             raise ValueError(f"cannot create proxy {proxy_name} on the HC3")
         engine.post_log("info", f"flua: proxy installed: {device.get('id')} {proxy_name}")

@@ -1148,7 +1148,11 @@ An existing `<name>_Proxy` is reused (duplicates are deleted, the newest
 wins; a proxy of the wrong device type is deleted and recreated). On reuse
 flua refreshes the proxy's `viewLayout`/`uiView`/`uiCallbacks` from the QA's
 current `--%%u` directives, so UI edits between runs show up on the
-controller. `useUiView` is only pushed when the QA declares
+controller. With `--%%mode:proxy,noUI` flua never pushes the UI instead: a
+reused proxy keeps whatever the HC3 editor holds, and a fresh proxy
+deploys with empty UI shapes for you to build in the editor — fetch the
+result back with `flua --tool ui --device <id>` (renders `--%%u` rows plus
+the raw UI JSON) and adopt what you want into the QA. `useUiView` is only pushed when the QA declares
 `--%%useUiView` — otherwise the proxy keeps whatever you configured on the
 HC3 (the legacy `viewLayout` still has features the new `uiView` lacks), and
 a fresh proxy defaults to `true`. On startup flua tells the proxy where to
@@ -1730,6 +1734,12 @@ rendering of the UI without a browser: `flua --tool ui script.lua`; the
 structured form `flua --tool ui --json script.lua` returns
 `{name, type, useUiView, elements, callbacks}` — the agent form, no prose
 to parse.
+
+`flua --tool ui --device ID` runs the same rendering on an HC3 device —
+the use case is the proxy: with `--%%mode:proxy,noUI` you edit the
+proxy's UI in the HC3's own editor, then fetch it back as `--%%u` rows
+(plus the raw UI JSON — the shorthand is lossy, unknown component kinds
+degrade to labels) and adopt what you want into the QA.
 
 When the logic under test needs external interactions, serve the sim API
 with `--ui PORT` and drive it over HTTP (`/plugins/callUIEvent`,

@@ -552,6 +552,36 @@ async def test_proxy_mode_no_ui_leaves_proxy_ui_untouched(
     assert not _MockHc3.seen("PUT", "/api/devices/57")  # the UI sync is skipped
 
 
+async def test_proxy_mode_no_ui_fresh_proxy_carries_empty_ui(
+    tmp_path, mock_hc3, monkeypatch
+) -> None:
+    # --%%mode:proxy,noUI with NO existing proxy: the fresh proxy deploys
+    # with the EMPTY UI shapes — the developer builds the UI in the HC3's
+    # editor from scratch (the QA's --%%u stays on the laptop)
+    set_hc3_env(monkeypatch, tmp_path, mock_hc3)
+    script = write_script(
+        tmp_path,
+        content="--%%name:sw\n"
+        "--%%mode:proxy,noUI\n"
+        '--%%u:{button="btn",text="Go",onReleased="turnOn"}\n'
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() print('INIT', self.id) end\n",
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        qa_id, err = engine.load_qa_file(str(script))
+        assert err is None, err
+        await wait_until(lambda: bool(_MockHc3.uploaded))
+    finally:
+        await engine.stop()
+    assert qa_id is not None
+    fqa = _MockHc3.uploaded[0]
+    initial = fqa.get("initialProperties") or {}
+    assert initial.get("uiCallbacks") == []  # the QA's --%%u was NOT pushed
+    assert (initial.get("uiView") or []) == []
+
+
 @pytest.mark.asyncio
 async def test_devices_list_has_no_proxy_doublets(
     tmp_path, capsys, mock_hc3, monkeypatch

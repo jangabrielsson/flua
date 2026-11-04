@@ -474,3 +474,36 @@ def test_select_ui_view_carries_values_array() -> None:
     assert component["selectionType"] == "single"
     assert component["values"] == ["2"]
     assert "value" not in component  # the scalar spelling is gone from the uiView
+
+
+def test_device_ui_renders_from_an_hc3_device() -> None:
+    # the --tool ui --device path: an HC3 device's UI properties render
+    # back to --%%u rows (ui_to_u_rows, the downloadQA converter) with the
+    # raw JSON alongside — the lossless form for editor-made UIs
+    from flua.tools.ui import device_ui
+
+    device = {
+        "id": 57,
+        "name": "sw_Proxy",
+        "type": "com.fibaro.binarySwitch",
+        "properties": {
+            "useUiView": True,
+            "uiView": [
+                {
+                    "type": "row",
+                    "components": [
+                        {"type": "button", "name": "B1", "text": "Tap me"},
+                        {"type": "label", "name": "l1", "text": "Hi"},
+                    ],
+                }
+            ],
+            "uiCallbacks": [
+                {"name": "B1", "eventType": "onReleased", "callback": "tap"}
+            ],
+        },
+    }
+    title, rows, raw = device_ui(device)
+    assert 'HC3 device "sw_Proxy"' in title
+    assert len(rows) == 1
+    assert "button='B1'" in rows[0] and "onReleased='tap'" in rows[0]
+    assert raw == device["properties"]["uiView"]
