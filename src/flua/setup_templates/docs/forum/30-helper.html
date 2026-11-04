@@ -1,0 +1,89 @@
+<h2>The FluaHelper: the HC3's local-only API from your QA</h2>
+
+<p>Not everything on the HC3 is reachable over the REST API. The
+controller serves part of its surface only to <b>local callers</b> — QA
+code running on the box. The most useful casualty: the single-key QA
+variable endpoints. The list works fine, but
+<code>GET /plugins/&lt;id&gt;/variables/&lt;key&gt;</code> and the variable
+writes answer 500/501 to anything outside, which means no tool and no
+other QA can read or change a QA's <code>internalStorage</code> from the
+outside.</p>
+
+<p>flua's fix: a small invisible helper QA deployed to the controller.
+It runs your call in the local context and reports back over a WebSocket
+to your laptop. Install it once:</p>
+
+<pre>
+flua --tool installHelper
+# FluaHelper already installed (v1.3.0) — HC3 device id 4378
+</pre>
+
+<p>Re-running it is safe and idempotent — it finds the helper by its
+<code>quickAppUuid</code> (a renamed QA stays recognized), keeps the
+newest copy, and removes any older ones. The helper never dials anywhere
+on its own: it waits idle until flua needs it, then connects back on
+demand. One helper serves many flua machines; every online-mode run gets
+a free OS-assigned port, so parallel instances just work.</p>
+
+<h3>api.helper — any REST call, locally</h3>
+
+<p>From a QA, calls route through the helper with the same
+<code>(data, status)</code> contract as <code>api.get</code>:</p>
+
+<pre>
+--%%name:helper-demo
+--%%mode:online
+-- --------------- EOH ---------------
+function QuickApp:onInit()
+  -- single-key variable read: the HC3 refuses this to external callers,
+  -- so it goes through the helper. Point 4366/x at one of your QAs.
+  local v, status = api.helper("GET", "/plugins/4366/variables/x", nil)
+  print("helper read:", v and v.value, status)
+
+  -- fibaro.* executed on the real controller
+  print("fibaro.getName:", api.helperFibaro("getName", {1}))
+end
+</pre>
+
+<p>Run it online (credentials from the environment chain):</p>
+
+<pre>
+[helper-demo5000]: helper read: Hello world 200
+[helper-demo5000]: fibaro.getName: zwave
+</pre>
+
+<p>The single-key read answers the variable's dto
+(<code>{name, value, isHidden}</code>) — read the
+<code>value</code> field. <code>api.helperFibaro(name, args)</code> runs
+<code>fibaro.&lt;name&gt;(...)</code> inside the helper and returns its
+values — a window into the real controller's fibaro table from your
+laptop. Keep the calls quick: a <code>fibaro.sleep</code> would block the
+helper and drop the connection.</p>
+
+<p>If the helper is missing or unreachable, the call answers
+<code>(nil, 0)</code> and the run log says what to do — the QA never
+crashes:</p>
+
+<pre>
+[helper-demo5000]: api.helper GET /plugins/4366/variables/x -> helper not connected (run flua --tool installHelper)
+[helper-demo5000]: helper read: nil 0
+</pre>
+
+<h3>Transparent routing — and proxy state that survives</h3>
+
+<p>You rarely need <code>api.helper</code> explicitly for variables: in
+online and proxy mode, <code>api.*</code> calls to variable endpoints on
+an HC3-namespace id (below 5000 — the controller's own QAs) route through
+the helper automatically, exactly like the other REST endpoints forward
+to the HC3. Emulated ids (5000 and up) stay in the sim.</p>
+
+<p>In <b>proxy mode</b> that becomes a persistence story: a proxy QA's
+variables — and its children's — live on the real controller. Reads
+answer from the HC3, writes land there first with the sim shadow
+mirroring after. Kill flua, start it again: the state is still there,
+no db needed. Libraries that keep their state in child variables
+(QwikChild and friends) just work across restarts.</p>
+
+<p>Next time: the promised proxy-mode deep dive — flua mirrors a QA onto
+your real HC3, and the two stay in sync while you develop on the
+laptop.</p>

@@ -67,9 +67,11 @@ installed package, so the docs always match your version.</p>
 <li><a href="/docs/forum/27-ui-test-automation.html">Stop clicking — automate your UI tests</a> <span class="covers">— the self-asserting UI-interaction pattern (`examples/ui-interaction-test.lua`), the data-driven whole-UI suite (`examples/ui-interaction-suite.lua`), wait-for-async-callback polling, `--strict-tests` + `--result-json` for CI</span></li>
 <li><a href="/docs/forum/28-sim-devices.html">Your house, simulated: 30 device types, one call each</a> <span class="covers">— `_FLUA.loadSimDevice` (bundled sim devices, pip install included), the uniform fibaro.call drivers (setValue/setUnit/breach/clearBreach/turnOn/…), viewer status panels, `_FLUA.keepAlive()`, the weather simulator QA</span></li>
 <li><a href="/docs/forum/29-registered-endpoints.html">Give the simulated HC3 its own REST surface</a> <span class="covers">— `api.registerEndpoint` (additive + `override=true`), the mock-panels module/consumer pair, handler-on-the-pump semantics (setTimeout, postRefreshEvent), the alarm-logic override loop, the weather simulator as an endpoint QA</span></li>
+<li><a href="/docs/forum/30-helper.html">The FluaHelper: the HC3's local-only API from your QA</a> <span class="covers">— `--tool installHelper`, `api.helper` (REST in the controller's local context), `api.helperFibaro` (fibaro.* on the real HC3), transparent variable routing, proxy state that survives restarts</span></li>
 </ol>
 <h2>Standalone posts</h2>
 <ul>
+<li><a href="/docs/forum/compat-notes.html">flua compatibility notes — what changed to match the real HC3</a></li>
 <li><a href="/docs/forum/install-macos.html">Installing flua on macOS — Python, pip, VS Code, and the usual bumps</a></li>
 <li><a href="/docs/forum/install-windows.html">Installing flua on Windows 11 — Python, pip, VS Code, and the usual bumps</a></li>
 <li><a href="/docs/forum/promotion.html">Developing QuickApps with AI agents — and a tool that makes it fast</a></li>

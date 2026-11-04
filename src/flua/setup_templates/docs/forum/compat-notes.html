@@ -1,0 +1,76 @@
+<h2>flua compatibility notes — what changed to match the real HC3</h2>
+
+<p>flua's promise is that the same QA file behaves the same on your
+laptop and on the controller. To keep that promise honest, flua's
+behavior is now regularly pinned against a real HC3 — every REST
+response shape and status, the QA runtime's own view of the api, and the
+<code>fibaro</code> table. That work surfaced a batch of differences, and
+flua now matches the controller. If your QA asserts statuses or leans on
+sim-only conveniences, here is what changed.</p>
+
+<h3>The QA's own api layer</h3>
+
+<ul>
+<li><b>Unknown routes answer 501</b> inside QA code — the HC3's local
+layer answers 501, not the external REST's 404. <code>api.get</code> on
+a path no route serves now returns <code>(nil, 501)</code>.</li>
+<li><b><code>GET /plugins/&lt;id&gt;</code> answers 501</b> from QA code —
+even for the QA's own id. QAs on the HC3 don't read that route; the
+variable endpoints (<code>/plugins/&lt;id&gt;/variables...</code>) stay
+readable and are the supported way.</li>
+<li><b><code>POST /plugins/updateProperty</code> is own-device only</b> —
+external callers get 400, like the HC3. A QA updates its own properties
+(and its children's); <code>self:updateProperty</code> keeps working as
+always.</li>
+</ul>
+
+<h3>QuickApp methods</h3>
+
+<ul>
+<li><b><code>self:getProperty</code> is gone.</b> The HC3's QuickApp has
+no such method — read <code>self.properties.name</code> instead. A
+sim-only method was a trap: the QA would work on the laptop and break on
+the controller.</li>
+<li><b><code>self:getView</code> stays, but as a documented flua
+extension</b> — handy for verify QAs that assert UI state on the laptop;
+it does not exist on the HC3, so keep it out of code that ships.</li>
+</ul>
+
+<h3>Status codes</h3>
+
+<ul>
+<li><code>POST /quickApp</code> (create QA) → <b>201</b> (was 200).</li>
+<li><code>DELETE /devices/&lt;id&gt;</code> → <b>200</b> (was 204).</li>
+<li><code>POST /customEvents</code> → <b>201</b> (was 200); deleting an
+absent event answers <b>204</b> (was 404).</li>
+<li><code>POST /globalVariables</code> → <b>201</b> + the full variable
+dto; <code>DELETE /globalVariables/&lt;name&gt;</code> → <b>200</b>
+(idempotent, was 204/404).</li>
+</ul>
+
+<h3>Name rules</h3>
+
+<p>customEvent and globalVariable names are validated like QA variable
+names: <code>[A-Za-z][A-Za-z0-9_]*</code>. A name like
+<code>my-event</code> is rejected at creation (400) — the HC3's rule,
+hyphens and all. On the customEvents name routes an invalid name answers
+the HC3's own quirk, 501.</p>
+
+<h3>fire and publish are forgiving</h3>
+
+<p>Firing a customEvent that was never created (<code>POST
+/customEvents/&lt;name&gt;</code> or the publish GET) answers <b>204</b> —
+the HC3 does not error on unknown names, it just does nothing. flua used
+to 404; QAs that treated the 404 as "not created yet" should check the
+event list instead.</p>
+
+<h3>/plugins is a catalog</h3>
+
+<p><code>GET /plugins</code> answers the HC3's plugin-type catalog
+(<code>{installed, all}</code>), not a device list. In online mode flua
+passes the controller's answer through. QA devices live in
+<code>/devices</code>, like on the HC3.</p>
+
+<p>Everything above is pinned by the offline test suite — the same
+capture-based parity checks that will re-run against each new firmware,
+so the differences stay honest rather than drifting back.</p>

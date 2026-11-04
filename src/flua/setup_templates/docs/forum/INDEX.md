@@ -43,6 +43,7 @@ workflow: scenario parameters (clock, mode, seed) live in the QA file as
 | 27 | 27-ui-test-automation.html | Stop clicking — automate your UI tests | the self-asserting UI-interaction pattern (`examples/ui-interaction-test.lua`), the data-driven whole-UI suite (`examples/ui-interaction-suite.lua`), wait-for-async-callback polling, `--strict-tests` + `--result-json` for CI | ready |
 | 28 | 28-sim-devices.html | Your house, simulated: 30 device types, one call each | `_FLUA.loadSimDevice` (bundled sim devices, pip install included), the uniform fibaro.call drivers (setValue/setUnit/breach/clearBreach/turnOn/…), viewer status panels, `_FLUA.keepAlive()`, the weather simulator QA | ready |
 | 29 | 29-registered-endpoints.html | Give the simulated HC3 its own REST surface | `api.registerEndpoint` (additive + `override=true`), the mock-panels module/consumer pair, handler-on-the-pump semantics (setTimeout, postRefreshEvent), the alarm-logic override loop, the weather simulator as an endpoint QA | ready |
+| 30 | 30-helper.html | The FluaHelper: the HC3's local-only API from your QA | `--tool installHelper`, `api.helper` (REST in the controller's local context), `api.helperFibaro` (fibaro.* on the real HC3), transparent variable routing, proxy state that survives restarts | ready |
 
 Status: draft = written, not verified · ready = snippets run against flua ·
 posted = published (fill in the forum link and date).
@@ -80,7 +81,7 @@ posted = published (fill in the forum link and date).
 
 ## Ideas for the next series (unclaimed)
 
-- Proxy mode deep-dive (developing against the real HC3, mirrored) — teased in post 15
+- Proxy mode deep-dive (developing against the real HC3, mirrored) — teased in post 30
 - Endpoint packages as .fqa (distributing emulation like any QA) — teased in post 29
 - ~~Registered sim endpoints (`api.registerEndpoint`, the weather simulator QA, endpoint packages)~~ → claimed by post 29
 - ~~Building an offline house snapshot with `--tool createDB`~~ → claimed by post 22 (record & replay does it better)
@@ -90,5 +91,6 @@ posted = published (fill in the forum link and date).
 | File | Title | Covers | Status |
 |------|-------|--------|--------|
 | promotion.html | Developing QuickApps with AI agents — and a tool that makes it fast | the agent pitch: domain knowledge via skills/AGENTS.md + the code→verify loop with flua | ready |
+| compat-notes.html | flua compatibility notes — what changed to match the real HC3 | the QA api layer's 501s, updateProperty ownership, getProperty removal, status-code and name-rule corrections | ready |
 | install-macos.html | Installing flua on macOS — Python, pip, VS Code, and the usual bumps | brew/python install, pip install + upgrade/downgrade (version pinning), `which flua`/shebang, launch.json interpreter story, troubleshooting (PATH, PEP 668, lupa wheel, multi-Python) | ready |
 
