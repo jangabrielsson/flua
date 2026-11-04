@@ -211,11 +211,30 @@ def deploy_proxy(
     device, status = engine.api.dispatch_hc3("POST", "/quickApp", {"file": encoded})
     if status not in (200, 201) or not isinstance(device, dict):
         detail = json.dumps(device)[:200] if device is not None else "no response body"
-        raise ValueError(
-            f"cannot create proxy {name}_Proxy on the HC3 (HTTP {status}: {detail})"
-        )
+        # the HC3 quirk (live-verified): a rejected upload can still CREATE
+        # the device — the shell lands first, file processing crashes after
+        # (400 'map::at'), and the broken device stays behind. Say so, so
+        # the repeated 'cannot create proxy' + accumulating duplicates make
+        # sense at a glance.
+        leftovers = [
+            str(dev.get("id"))
+            for dev in _devices_by_name(engine, f"{name}_Proxy")
+        ]
+        if leftovers:
+            detail += (
+                f"; note: the HC3 created {len(leftovers)} same-named device(s) "
+                f"anyway (ids {', '.join(leftovers)}) — the next run reuses the newest"
+            )
+        raise ValueError(f"cannot create proxy {name}_Proxy on the HC3 (HTTP {status}: {detail})")
     device["id"] = int(device["id"])
     return device
+
+
+def _devices_by_name(engine: LuaEngine, name: str) -> list[dict[str, Any]]:
+    devices, status = engine.api.dispatch_hc3("GET", "/devices")
+    if status != 200 or not isinstance(devices, list):
+        return []
+    return [dev for dev in devices if dev.get("name") == name]
 
 
 def existing_proxy(engine: LuaEngine, proxy_name: str, device_type: str) -> dict[str, Any] | None:

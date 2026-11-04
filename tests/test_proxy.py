@@ -146,6 +146,18 @@ class _MockHc3(BaseHTTPRequestHandler):
                 self._send_json({"error": "bad fqa"}, 400)
                 return
             if type(self).fail_upload:
+                # the HC3 quirk: the device shell is created BEFORE file
+                # processing — a rejected upload can still leave it behind
+                device_id = type(self).next_id
+                type(self).next_id += 1
+                type(self).devices[device_id] = {
+                    "id": device_id,
+                    "name": fqa["name"],
+                    "type": fqa["type"],
+                    "interfaces": [],
+                    "properties": {},
+                    "parentId": 0,
+                }
                 self._send_json({"error": "upload service wedged"}, 503)
                 return
             type(self).uploaded.append(fqa)
@@ -986,5 +998,8 @@ async def test_proxy_deploy_failure_names_the_http_status(
         qa_id, err = engine.load_qa_file(str(script))
         assert qa_id is None
         assert err and "HTTP 503" in err and "upload service wedged" in err
+        # the HC3 quirk: the failed upload still created the device — the
+        # error must say so (the accumulating-duplicates bug report)
+        assert "created 1 same-named device(s) anyway" in err
     finally:
         await engine.stop()
