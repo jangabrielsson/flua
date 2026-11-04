@@ -1,4 +1,4 @@
---%%name:flua-p-probe
+--%%name:flua_p_probe
 --%%type:com.fibaro.binarySwitch
 -- --------------- EOH ---------------
 -- Tier-3 parity probe QA. The SAME self-test runs on the HC3 (capture) and

@@ -1,0 +1,38 @@
+{
+  "probes": [
+    {
+      "name": "getName",
+      "args": [],
+      "ok": false,
+      "valuesShape": null,
+      "error": "helper not connected (run flua --tool installHelper)",
+      "note": "no-arg call: the HC3 returns the controller name"
+    },
+    {
+      "name": "getGlobalVariable",
+      "args": [
+        "fluaParityProbe"
+      ],
+      "ok": false,
+      "valuesShape": null,
+      "error": "helper not connected (run flua --tool installHelper)",
+      "note": "absent variable: pins the nil-on-absent contract"
+    },
+    {
+      "name": "getSelfId",
+      "args": [],
+      "ok": false,
+      "valuesShape": null,
+      "error": "helper not connected (run flua --tool installHelper)",
+      "note": "the HC3 has no such function \u2014 pins the error contract"
+    },
+    {
+      "name": "nope",
+      "args": [],
+      "ok": false,
+      "valuesShape": null,
+      "error": "helper not connected (run flua --tool installHelper)",
+      "note": "a name neither side has \u2014 pins the error contract"
+    }
+  ]
+}

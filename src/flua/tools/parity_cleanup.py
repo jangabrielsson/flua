@@ -1,10 +1,10 @@
-"""``flua --tool parityCleanup`` — remove flua-p-* parity artifacts left on
+"""``flua --tool parityCleanup`` — remove flua_p_* parity artifacts left on
 an HC3 by a crashed parityCapture.
 
 The capture tears its own artifacts down LIFO; this is the safety net for
 interrupted runs. ``--list`` (default) scans /devices, /globalVariables and
 /customEvents for names starting with the prefix and prints them grouped;
-``--yes`` deletes them. The prefix guard accepts only ``flua-p-*`` so a
+``--yes`` deletes them. The prefix guard accepts only ``flua_p_*`` so a
 typo cannot target real devices.
 """
 
@@ -16,12 +16,12 @@ from typing import Any
 from .common import hc3_engine
 
 NAME = "parityCleanup"
-HELP = "list and remove flua-p-* parity artifacts left on an HC3"
+HELP = "list and remove flua_p_* parity artifacts left on an HC3"
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
-        "--prefix", default="flua-p-", help="artifact name prefix (default: flua-p-)"
+        "--prefix", default="flua_p_", help="artifact name prefix (default: flua_p_)"
     )
     parser.add_argument(
         "--yes", action="store_true", help="delete the listed artifacts"
@@ -31,9 +31,9 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 def check_prefix(prefix: str) -> str:
     """Validate and return the prefix — ValueError when it could target
     real devices (anything outside the parity namespace)."""
-    if not prefix.startswith("flua-p-"):
+    if not prefix.startswith("flua_p_"):
         raise ValueError(
-            f"refusing: --prefix must start with 'flua-p-' (got {prefix!r})"
+            f"refusing: --prefix must start with 'flua_p_' (got {prefix!r})"
         )
     return prefix
 

@@ -3,7 +3,7 @@ HC3 for offline parity replay.
 
 Read-only by default: every probe is a GET, nothing on the controller is
 created or changed. ``--mutations`` adds the Tier-2 sequences — controlled
-create/update/delete cycles over ``flua-p-<uuid8>``-namespaced artifacts
+create/update/delete cycles over ``flua_p_<uuid8>``-namespaced artifacts
 (QA, customEvent, globalVariable) with LIFO teardown afterwards.
 ``--probe`` uploads the Tier-3 probe QA, collects its deterministic
 /debugMessages transcript and deletes it again; ``--fibaro`` runs the
@@ -63,7 +63,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--mutations",
         action="store_true",
-        help="also run the Tier-2 mutation sequences (flua-p-* artifacts, "
+        help="also run the Tier-2 mutation sequences (flua_p_* artifacts, "
         "cleaned up LIFO afterwards)",
     )
     parser.add_argument(
@@ -135,13 +135,13 @@ def _fqa_builder(engine: Any):
         directory = Path(mkdtemp(prefix="flua-parity-"))
         main = directory / "main.lua"
         main.write_text(
-            f"--%%name:{prefix}-qa\n"
+            f"--%%name:{prefix}_qa\n"
             "--%%type:com.fibaro.binarySwitch\n"
             "-- --------------- EOH ---------------\n"
             "function QuickApp:onInit() end\n",
             encoding="utf-8",
         )
-        qa_id = engine._prepare_qa(str(main), None, {"name": f"{prefix}-qa"}, str(main))
+        qa_id = engine._prepare_qa(str(main), None, {"name": f"{prefix}_qa"}, str(main))
         fqa = engine.qa_export(qa_id)
         if fqa is None:
             raise ValueError("cannot build the parity probe .fqa")
@@ -168,7 +168,7 @@ def _probe_qa_transcript(client: Any, engine: Any, verbose: bool) -> list[str]:
     /debugMessages (tag-prefix filtered, whitespace-normalized), and delete
     the QA again — the transcript the replay diffs against the sim's."""
     source = _probe_qa_path()
-    qa_id = engine._prepare_qa(str(source), None, {"name": "flua-p-probe"}, str(source))
+    qa_id = engine._prepare_qa(str(source), None, {"name": "flua_p_probe"}, str(source))
     fqa = engine.qa_export(qa_id)
     if fqa is None:
         raise SystemExit("error: cannot package the probe QA")
@@ -189,7 +189,7 @@ def _probe_qa_transcript(client: Any, engine: Any, verbose: bool) -> list[str]:
                     _normalize_line(str(entry.get("message", "")))
                     for entry in messages
                     if isinstance(entry, dict)
-                    and str(entry.get("tag", "")).startswith("flua-p-probe")
+                    and str(entry.get("tag", "")).startswith("flua_p_probe")
                     and str(entry.get("message", "")).startswith("PROBE")
                 ]
                 if any("timer fired" in line for line in lines):
@@ -300,7 +300,7 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         return 0
 
     if args.mutations:
-        prefix = f"flua-p-{uuid.uuid4().hex[:8]}"
+        prefix = f"flua_p_{uuid.uuid4().hex[:8]}"
         tracker = ArtifactTracker(prefix)
         backend = LiveBackend(client)
         sequences = []
@@ -314,9 +314,9 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
             if sequence.id == "qaLifecycle":
                 tracker.add("device", bindings["create.id"])
             if sequence.id == "customEvents":
-                tracker.add("customEvent", f"{prefix}-evt")
+                tracker.add("customEvent", f"{prefix}_evt")
             if sequence.id == "globalVariables":
-                tracker.add("globalVariable", f"{prefix}-gv")
+                tracker.add("globalVariable", f"{prefix}_gv")
             sequences.append({"id": sequence.id, "note": sequence.note, "results": records})
         deleted, failed = tracker.teardown(backend)
         print(f"cleanup: {len(deleted)} artifacts removed, {len(failed)} failures")

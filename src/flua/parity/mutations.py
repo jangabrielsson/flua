@@ -1,5 +1,5 @@
 """Tier-2 mutation sequences: controlled create/update/delete cycles whose
-artifacts are namespaced ``flua-p-<uuid8>`` and cleaned up LIFO after the
+artifacts are namespaced ``flua_p_<uuid8>`` and cleaned up LIFO after the
 capture.
 
 A sequence is a list of steps. Step paths and bodies template ``{prefix}``
@@ -81,17 +81,17 @@ SEQUENCES: list[Sequence] = [
                 "create",
                 "POST",
                 "/customEvents",
-                {"name": "{prefix}-evt", "userDescription": "flua parity probe"},
+                {"name": "{prefix}_evt", "userDescription": "flua parity probe"},
             ),
             Step(
                 "update",
                 "PUT",
-                "/customEvents/{prefix}-evt",
+                "/customEvents/{prefix}_evt",
                 {"userDescription": "flua parity probe, updated"},
             ),
-            Step("fire", "POST", "/customEvents/{prefix}-evt"),
-            Step("publish", "GET", "/customEvents/{prefix}-evt/publish"),
-            Step("delete", "DELETE", "/customEvents/{prefix}-evt"),
+            Step("fire", "POST", "/customEvents/{prefix}_evt"),
+            Step("publish", "GET", "/customEvents/{prefix}_evt/publish"),
+            Step("delete", "DELETE", "/customEvents/{prefix}_evt"),
         ],
     ),
     Sequence(
@@ -99,11 +99,11 @@ SEQUENCES: list[Sequence] = [
         "add, change, read, delete — one namespaced variable (the final read "
         "pins the post-delete 404 contract)",
         [
-            Step("create", "POST", "/globalVariables", {"name": "{prefix}-gv", "value": "1"}),
-            Step("update", "PUT", "/globalVariables/{prefix}-gv", {"value": "2"}),
-            Step("read", "GET", "/globalVariables/{prefix}-gv"),
-            Step("delete", "DELETE", "/globalVariables/{prefix}-gv"),
-            Step("read_deleted", "GET", "/globalVariables/{prefix}-gv"),
+            Step("create", "POST", "/globalVariables", {"name": "{prefix}_gv", "value": "1"}),
+            Step("update", "PUT", "/globalVariables/{prefix}_gv", {"value": "2"}),
+            Step("read", "GET", "/globalVariables/{prefix}_gv"),
+            Step("delete", "DELETE", "/globalVariables/{prefix}_gv"),
+            Step("read_deleted", "GET", "/globalVariables/{prefix}_gv"),
         ],
     ),
     Sequence(
@@ -115,7 +115,7 @@ SEQUENCES: list[Sequence] = [
                 "create",
                 "POST",
                 "/quickApp/",
-                sim_body={"name": "{prefix}-qa", "type": "com.fibaro.binarySwitch"},
+                sim_body={"name": "{prefix}_qa", "type": "com.fibaro.binarySwitch"},
                 live_fqa=True,
                 extract={"id": "id"},
             ),

@@ -1,0 +1,218 @@
+{
+  "prefix": "flua-p-5735d9df",
+  "sequences": [
+    {
+      "id": "customEvents",
+      "note": "create, update, fire, publish, delete \u2014 one namespaced event",
+      "results": [
+        {
+          "step": "create",
+          "path": "/customEvents",
+          "status": 400,
+          "shape": null
+        },
+        {
+          "step": "update",
+          "path": "/customEvents/flua-p-5735d9df-evt",
+          "status": 501,
+          "shape": null
+        },
+        {
+          "step": "fire",
+          "path": "/customEvents/flua-p-5735d9df-evt",
+          "status": 501,
+          "shape": null
+        },
+        {
+          "step": "publish",
+          "path": "/customEvents/flua-p-5735d9df-evt/publish",
+          "status": 501,
+          "shape": null
+        },
+        {
+          "step": "delete",
+          "path": "/customEvents/flua-p-5735d9df-evt",
+          "status": 501,
+          "shape": null
+        }
+      ]
+    },
+    {
+      "id": "globalVariables",
+      "note": "add, change, read, delete \u2014 one namespaced variable (the final read pins the post-delete 404 contract)",
+      "results": [
+        {
+          "step": "create",
+          "path": "/globalVariables",
+          "status": 400,
+          "shape": null
+        },
+        {
+          "step": "update",
+          "path": "/globalVariables/flua-p-5735d9df-gv",
+          "status": 404,
+          "shape": null
+        },
+        {
+          "step": "read",
+          "path": "/globalVariables/flua-p-5735d9df-gv",
+          "status": 404,
+          "shape": null
+        },
+        {
+          "step": "delete",
+          "path": "/globalVariables/flua-p-5735d9df-gv",
+          "status": 404,
+          "shape": null
+        },
+        {
+          "step": "read_deleted",
+          "path": "/globalVariables/flua-p-5735d9df-gv",
+          "status": 404,
+          "shape": null
+        }
+      ]
+    },
+    {
+      "id": "qaLifecycle",
+      "note": "create QA, read, updateProperty, read the property, delete \u2014 the QA needs no Lua on either side (updateProperty is a REST call)",
+      "results": [
+        {
+          "step": "create",
+          "path": "/quickApp/",
+          "status": 201,
+          "shape": {
+            "id": "number",
+            "name": "str",
+            "roomID": "number",
+            "view": [
+              {
+                "assetsPath": "str",
+                "name": "str",
+                "translatesPath": "str",
+                "type": "str"
+              }
+            ],
+            "type": "str",
+            "baseType": "str",
+            "enabled": "bool",
+            "visible": "bool",
+            "isPlugin": "bool",
+            "parentId": "number",
+            "viewXml": "bool",
+            "hasUIView": "bool",
+            "configXml": "bool",
+            "interfaces": [
+              "str"
+            ],
+            "properties": {
+              "apiVersion": "str",
+              "autoOffDefaultTime": "number",
+              "autoOffTimestamp": "number",
+              "buildNumber": "number",
+              "categories": [
+                "str"
+              ],
+              "dead": "bool",
+              "deadReason": "str",
+              "deviceControlType": "number",
+              "deviceIcon": "number",
+              "deviceRole": "str",
+              "encrypted": "bool",
+              "icon": {
+                "path": "str",
+                "source": "str"
+              },
+              "initialInterfaces": [
+                "str"
+              ],
+              "isLight": "bool",
+              "log": "str",
+              "logTemp": "str",
+              "manufacturer": "str",
+              "model": "str",
+              "quickAppUuid": "str",
+              "quickAppVariables": [],
+              "saveLogs": "bool",
+              "state": "bool",
+              "supportedDeviceRoles": [
+                "str"
+              ],
+              "typeTemplateInitialized": "bool",
+              "uiCallbacks": [],
+              "uiView": [],
+              "useEmbededView": "bool",
+              "useUiView": "bool",
+              "userDescription": "str",
+              "value": "bool",
+              "viewLayout": {
+                "$jason": {
+                  "body": {
+                    "header": {
+                      "style": {
+                        "height": "str"
+                      },
+                      "title": "str"
+                    },
+                    "sections": {
+                      "items": []
+                    }
+                  },
+                  "head": {
+                    "title": "str"
+                  }
+                }
+              }
+            },
+            "actions": {
+              "setAutoOff": "number",
+              "toggle": "number",
+              "turnOff": "number",
+              "turnOn": "number"
+            },
+            "hiddenActions": {},
+            "created": "number",
+            "modified": "number",
+            "sortOrder": "number"
+          }
+        },
+        {
+          "step": "read",
+          "path": "/plugins/4380",
+          "status": 501,
+          "shape": null
+        },
+        {
+          "step": "updateProperty",
+          "path": "/plugins/updateProperty",
+          "status": 400,
+          "shape": null
+        },
+        {
+          "step": "read_property",
+          "path": "/devices/4380/properties/userDescription",
+          "status": 200,
+          "shape": {
+            "value": "str",
+            "modified": "number"
+          }
+        },
+        {
+          "step": "delete",
+          "path": "/devices/4380",
+          "status": 200,
+          "shape": null
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "deleted": [
+      "device 4380",
+      "globalVariable flua-p-5735d9df-gv"
+    ],
+    "failed": [
+      "customEvent flua-p-5735d9df-evt (HTTP 501)"
+    ]
+  }
+}

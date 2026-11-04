@@ -27,7 +27,7 @@ from flua.parity.mutations import (
 from flua.tools.parity_cleanup import check_prefix, delete_artifacts, scan_artifacts
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PREFIX = "flua-p-test00"
+PREFIX = "flua_p_test00"
 
 
 def _state_api() -> Api:
@@ -45,11 +45,19 @@ def test_events_and_globals_round_trip() -> None:
 
 def test_global_variable_statuses_are_pinned() -> None:
     """The sim's response statuses for the add/change/read/delete cycle —
-    the offline baseline the fixture replay diffs against."""
+    the HC3-verified baseline (live 5.221): create 201, delete 200
+    (idempotent), post-delete read 404."""
     records, _ = run_sequence(SimBackend(_state_api()), SEQUENCES_BY_ID["globalVariables"], PREFIX)
-    assert [r["status"] for r in records] == [200, 200, 200, 204, 404]
+    assert [r["status"] for r in records] == [201, 200, 200, 200, 404]
     assert [r["shape"] for r in records][0] is not None  # the create response has a shape
     assert records[-1]["shape"] is None  # the post-delete read has no 2xx body
+
+
+def test_custom_event_statuses_are_pinned() -> None:
+    """The sim's customEvents cycle — HC3-verified (live 5.221): create
+    201, fire/publish/delete 204 (also on absent names)."""
+    records, _ = run_sequence(SimBackend(_state_api()), SEQUENCES_BY_ID["customEvents"], PREFIX)
+    assert [r["status"] for r in records] == [201, 200, 204, 204, 204]
 
 
 def test_qa_lifecycle_on_the_sim() -> None:
@@ -86,12 +94,12 @@ def test_artifact_tracker_teardown_is_lifo() -> None:
     backend = _RecordingBackend()
     tracker = ArtifactTracker(PREFIX)
     tracker.add("device", 5001)
-    tracker.add("customEvent", f"{PREFIX}-evt")
-    tracker.add("globalVariable", f"{PREFIX}-gv")
+    tracker.add("customEvent", f"{PREFIX}_evt")
+    tracker.add("globalVariable", f"{PREFIX}_gv")
     deleted, failed = tracker.teardown(backend)
     assert [path for _method, path in backend.calls] == [
-        f"/globalVariables/{PREFIX}-gv",
-        f"/customEvents/{PREFIX}-evt",
+        f"/globalVariables/{PREFIX}_gv",
+        f"/customEvents/{PREFIX}_evt",
         "/devices/5001",
     ]
     assert len(deleted) == 3 and failed == []
@@ -131,29 +139,29 @@ def test_cleanup_scan_groups_by_prefix() -> None:
     client = _StubClient(
         devices=[
             {"id": 1, "name": "Ceiling Lamp"},
-            {"id": 5001, "name": f"{PREFIX}-qa"},
-            {"id": 5002, "name": "flua-p-other-qv"},
+            {"id": 5001, "name": f"{PREFIX}_qa"},
+            {"id": 5002, "name": "flua_p_other_qv"},
         ],
-        globals_=[{"name": "nightMode"}, {"name": f"{PREFIX}-gv"}],
-        events=[{"name": f"{PREFIX}-evt"}, {"name": "userEvent"}],
+        globals_=[{"name": "nightMode"}, {"name": f"{PREFIX}_gv"}],
+        events=[{"name": f"{PREFIX}_evt"}, {"name": "userEvent"}],
     )
     found = scan_artifacts(client, PREFIX)
     assert [d["id"] for d in found["devices"]] == [5001]  # the other prefix is excluded
-    assert [g["name"] for g in found["globalVariables"]] == [f"{PREFIX}-gv"]
-    assert [e["name"] for e in found["customEvents"]] == [f"{PREFIX}-evt"]
+    assert [g["name"] for g in found["globalVariables"]] == [f"{PREFIX}_gv"]
+    assert [e["name"] for e in found["customEvents"]] == [f"{PREFIX}_evt"]
 
     delete_artifacts(client, found)
     assert client.deletes == [
         "/devices/5001",
-        f"/globalVariables/{PREFIX}-gv",
-        f"/customEvents/{PREFIX}-evt",
+        f"/globalVariables/{PREFIX}_gv",
+        f"/customEvents/{PREFIX}_evt",
     ]
 
 
 def test_cleanup_prefix_guard() -> None:
-    assert check_prefix("flua-p-") == "flua-p-"
-    assert check_prefix("flua-p-abcd") == "flua-p-abcd"
-    with pytest.raises(ValueError, match="must start with 'flua-p-'"):
+    assert check_prefix("flua_p_") == "flua_p_"
+    assert check_prefix("flua_p_abcd") == "flua_p_abcd"
+    with pytest.raises(ValueError, match="must start with 'flua_p_'"):
         check_prefix("devices")
-    with pytest.raises(ValueError, match="must start with 'flua-p-'"):
+    with pytest.raises(ValueError, match="must start with 'flua_p_'"):
         check_prefix("")

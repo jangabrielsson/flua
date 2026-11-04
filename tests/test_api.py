@@ -539,12 +539,16 @@ def test_global_variable_create(api: Api) -> None:
     # POST /globalVariables — the real HC3's create call (the body carries
     # the name; a nameless body is a bad request)
     var, status = api.dispatch("POST", "/globalVariables", {"name": "FLUA", "value": "1"})
-    assert status == 200
+    assert status == 201
     assert var["name"] == "FLUA" and var["value"] == "1"
+    assert var["readOnly"] is False and var["isEnum"] is False and var["enumValues"] == []
     assert abs(var["modified"] - int(time.time())) <= 2  # stamped with now
     got, status = api.dispatch("GET", "/globalVariables/FLUA")
     assert status == 200 and got["value"] == "1"
     assert api.dispatch("POST", "/globalVariables", {"value": "1"})[1] == 400
+    # the name-format rule (the HC3's WRONG_TYPE answer) — same pattern as
+    # QA variable names
+    assert api.dispatch("POST", "/globalVariables", {"name": "bad-name", "value": "1"})[1] == 400
     # creating over an existing variable is a conflict — and the value stays
     assert api.dispatch("POST", "/globalVariables", {"name": "FLUA", "value": "2"})[1] == 409
     got, _ = api.dispatch("GET", "/globalVariables/FLUA")
@@ -560,7 +564,8 @@ def test_global_variable_events(api: Api) -> None:
     api.dispatch("POST", "/globalVariables", {"name": "GV", "value": "1"})
     api.dispatch("PUT", "/globalVariables/GV", {"value": "2"})
     api.dispatch("PUT", "/globalVariables/GV", {"value": "2"})  # no change
-    assert api.dispatch("DELETE", "/globalVariables/missing")[1] == 404
+    # deleting an absent variable is fine on the HC3 (idempotent, 200)
+    assert api.dispatch("DELETE", "/globalVariables/missing")[1] == 200
     api.dispatch("DELETE", "/globalVariables/GV")
     events = [entry for _, entry in api.state.events]
     assert [e["type"] for e in events] == [
@@ -714,7 +719,7 @@ async def test_print_of_api_error_shows_status(tmp_path, capsys) -> None:
         await engine.stop()
     out = capsys.readouterr().out
     assert "nil 404" in out  # the error status is visible, not blanked
-    assert " 200" in out  # the create call's status prints beside the table
+    assert " 201" in out  # the create call's status prints beside the table
     assert "MOD true" in out  # modified == os.time() (the virtual clock)
 
 
@@ -881,10 +886,11 @@ def test_group_action(api: Api) -> None:
 
 
 def test_custom_event(api: Api) -> None:
-    # firing an uncreated event 404s — creation is explicit
-    assert api.dispatch("POST", "/customEvents/wakeup") == (None, 404)
+    # firing an uncreated event still 204s — creation is explicit, but the
+    # live HC3 does not error either (verified 5.221)
+    assert api.dispatch("POST", "/customEvents/wakeup") == (None, 204)
     created, status = api.dispatch("POST", "/customEvents", {"name": "wakeup"})
-    assert status == 200 and created["name"] == "wakeup"
+    assert status == 201 and created["name"] == "wakeup"
     # creation does not fire; the explicit POST does
     assert api.emitted == []
     assert api.dispatch("POST", "/customEvents/wakeup") == (None, 204)
@@ -904,13 +910,21 @@ def test_custom_event_crud(api: Api) -> None:
     assert status == 200 and updated["userDescription"] == "y"
     api.dispatch("POST", "/customEvents", {"name": "b"})
     assert api.dispatch("PUT", "/customEvents/a", {"name": "b"})[1] == 409
-    assert api.dispatch("DELETE", "/customEvents/nope")[1] == 404
+    assert api.dispatch("DELETE", "/customEvents/nope")[1] == 204  # idempotent
     assert api.dispatch("DELETE", "/customEvents/b") == (None, 204)
     assert [e["name"] for e in api.state.custom_events] == ["a"]
-    # GET /customEvents/{name}/publish fires (the HC3's second endpoint)
-    assert api.dispatch("GET", "/customEvents/nope/publish")[1] == 404
+    # GET /customEvents/{name}/publish fires (the HC3's second endpoint);
+    # unknown-but-valid names still answer 204
+    assert api.dispatch("GET", "/customEvents/nope/publish")[1] == 204
     assert api.dispatch("GET", "/customEvents/a/publish") == (None, 204)
     assert api.emitted == [{"type": "customEvent", "name": "a"}]
+    # invalid names: 400 on create, 501 on the name-parameter routes (the
+    # HC3's handler quirk — verified live)
+    assert api.dispatch("POST", "/customEvents", {"name": "bad-name"})[1] == 400
+    assert api.dispatch("POST", "/customEvents/bad-name")[1] == 501
+    assert api.dispatch("PUT", "/customEvents/bad-name", {"userDescription": "x"})[1] == 501
+    assert api.dispatch("GET", "/customEvents/bad-name")[1] == 501
+    assert api.dispatch("DELETE", "/customEvents/bad-name")[1] == 501
 
 
 def test_misc_system_endpoints(api: Api) -> None:

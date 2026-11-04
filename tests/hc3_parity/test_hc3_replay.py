@@ -146,7 +146,7 @@ def test_replay_machinery_reports_drift() -> None:
 def test_replay_mutations(request: pytest.FixtureRequest) -> None:
     """Replay the Tier-2 mutation sequences against the sim. Each fixture
     with a mutations.json runs the same create/update/delete cycles
-    (namespaced flua-p-* artifacts, ephemeral sim) and compares status +
+    (namespaced flua_p_* artifacts, ephemeral sim) and compares status +
     shape per step — ids are re-bound from the sim's own responses."""
     dirs = _fixture_dirs()
     fw = request.config.getoption("--parity-fw")
@@ -213,7 +213,7 @@ def _sim_probe_transcript(engine: LuaEngine) -> list[str]:
         _normalize_line(str(entry.get("message", "")))
         for entry in (data.get("messages") or [])
         if isinstance(entry, dict)
-        and str(entry.get("tag", "")).startswith("flua-p-probe")
+        and str(entry.get("tag", "")).startswith("flua_p_probe")
         and str(entry.get("message", "")).startswith("PROBE")
     ]
 
@@ -278,7 +278,7 @@ async def test_probe_qa_runs_in_the_sim(capsys: pytest.CaptureFixture) -> None:
     engine = LuaEngine()
     await engine.start()
     try:
-        engine.start_qa(str(PROBE_QA), None, {"name": "flua-p-probe"}, str(PROBE_QA))
+        engine.start_qa(str(PROBE_QA), None, {"name": "flua_p_probe"}, str(PROBE_QA))
         await _wait_until(lambda: not engine.has_pending_work())
         transcript = _sim_probe_transcript(engine)
         assert transcript, "the probe QA logged nothing"
@@ -288,7 +288,7 @@ async def test_probe_qa_runs_in_the_sim(capsys: pytest.CaptureFixture) -> None:
         second = LuaEngine()
         await second.start()
         try:
-            second.start_qa(str(PROBE_QA), None, {"name": "flua-p-probe"}, str(PROBE_QA))
+            second.start_qa(str(PROBE_QA), None, {"name": "flua_p_probe"}, str(PROBE_QA))
             await _wait_until(lambda: not second.has_pending_work())
             assert _sim_probe_transcript(second) == transcript
         finally:
@@ -313,7 +313,7 @@ async def test_replay_probe_qa() -> None:
     engine = LuaEngine()
     await engine.start()
     try:
-        engine.start_qa(str(PROBE_QA), None, {"name": "flua-p-probe"}, str(PROBE_QA))
+        engine.start_qa(str(PROBE_QA), None, {"name": "flua_p_probe"}, str(PROBE_QA))
         await _wait_until(lambda: not engine.has_pending_work())
         sim = _sim_probe_transcript(engine)
     finally:

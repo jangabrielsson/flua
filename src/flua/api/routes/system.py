@@ -11,6 +11,7 @@ from ... import messages
 from ...devices import icon_catalog, icon_default_file, icon_manifest, skeleton_for
 from ..request import ApiRequest, remote_get
 from ..state import SimState, public
+from .plugins import VARIABLE_NAME_RE
 
 
 def _now(req: ApiRequest) -> float:
@@ -99,10 +100,14 @@ def global_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def globals_create(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    # POST /globalVariables — the real HC3's create-a-global-variable call
+    # POST /globalVariables — the real HC3's create call. Live HC3 (5.221):
+    # 201 + the full GlobalVariableDto; the name must match the name-format
+    # rule (400 WRONG_TYPE otherwise, like QA variable names).
     if not isinstance(req.body, dict) or not req.body.get("name"):
         return None, 400
     name = str(req.body["name"])
+    if VARIABLE_NAME_RE.fullmatch(name) is None:
+        return None, 400
     if name in state.global_variables:
         # creating over an existing variable is a conflict — the value stays
         return None, 409
@@ -110,25 +115,30 @@ def globals_create(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     var = {
         "name": name,
         "value": "" if value is None else str(value),
+        "readOnly": False,
+        "isEnum": False,
+        "enumValues": [],
+        "created": int(_now(req)),
         "modified": int(_now(req)),
     }
     state.global_variables[name] = var
     entry = state.record_global_added(name, var["value"], _now(req))
     if req.emit is not None:
         req.emit(messages.refresh_state_event(entry))
-    return public(var), 200
+    return public(var), 201
 
 
 def global_delete(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    # DELETE /globalVariables/{name} — fibaro.deleteGlobalVariable
+    # DELETE /globalVariables/{name} — fibaro.deleteGlobalVariable.
+    # Live HC3 (5.221): 200 on delete, 204-style silence is not it; an
+    # absent variable is still 200 (idempotent).
     name = req.path_params["name"]
     var = state.global_variables.pop(name, None)
-    if var is None:
-        return None, 404
-    entry = state.record_global_removed(name, _now(req))
-    if req.emit is not None:
-        req.emit(messages.refresh_state_event(entry))
-    return None, 204
+    if var is not None:
+        entry = state.record_global_removed(name, _now(req))
+        if req.emit is not None:
+            req.emit(messages.refresh_state_event(entry))
+    return None, 200
 
 
 def rooms_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
@@ -267,6 +277,8 @@ def custom_event_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     if remote is not None:
         return remote
     name = req.path_params["name"]
+    if VARIABLE_NAME_RE.fullmatch(name) is None:
+        return None, 501  # the HC3's handler quirk for malformed names
     for event in state.custom_events:
         if event.get("name") == name:
             return public(event), 200

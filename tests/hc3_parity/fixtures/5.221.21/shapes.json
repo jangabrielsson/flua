@@ -1,0 +1,1413 @@
+{
+  "probes": [
+    {
+      "pattern": "/devices",
+      "path": "/devices",
+      "status": 200,
+      "shape": [
+        {
+          "id": "number",
+          "name": "str",
+          "roomID": "number",
+          "view": [
+            {
+              "assetsPath": "str",
+              "name": "str",
+              "translatesPath": "str",
+              "type": "str"
+            }
+          ],
+          "type": "str",
+          "baseType": "str",
+          "enabled": "bool",
+          "visible": "bool",
+          "isPlugin": "bool",
+          "parentId": "number",
+          "viewXml": "bool",
+          "hasUIView": "bool",
+          "configXml": "bool",
+          "interfaces": [
+            "str"
+          ],
+          "properties": {
+            "apiVersion": "str",
+            "autoOffDefaultTime": "number",
+            "autoOffTimestamp": "number",
+            "buildNumber": "number",
+            "categories": [
+              "str"
+            ],
+            "dead": "bool",
+            "deadReason": "str",
+            "deviceControlType": "number",
+            "deviceIcon": "number",
+            "deviceRole": "str",
+            "encrypted": "bool",
+            "icon": {
+              "path": "str",
+              "source": "str"
+            },
+            "initialInterfaces": [],
+            "isLight": "bool",
+            "log": "str",
+            "logTemp": "str",
+            "mainFunction": "str",
+            "manufacturer": "str",
+            "model": "str",
+            "quickAppUuid": "str",
+            "quickAppVariables": [],
+            "saveLogs": "bool",
+            "state": "bool",
+            "supportedDeviceRoles": [
+              "str"
+            ],
+            "typeTemplateInitialized": "bool",
+            "uiCallbacks": [
+              {
+                "callback": "str",
+                "eventType": "str",
+                "name": "str"
+              }
+            ],
+            "uiView": [
+              {
+                "components": [
+                  {
+                    "eventBinding": {
+                      "onLongPressDown": [
+                        {
+                          "params": {
+                            "actionName": "str",
+                            "args": [
+                              "str"
+                            ]
+                          },
+                          "type": "str"
+                        }
+                      ],
+                      "onLongPressReleased": [
+                        {
+                          "params": {
+                            "actionName": "str",
+                            "args": [
+                              "str"
+                            ]
+                          },
+                          "type": "str"
+                        }
+                      ],
+                      "onReleased": [
+                        {
+                          "params": {
+                            "actionName": "str",
+                            "args": [
+                              "str"
+                            ]
+                          },
+                          "type": "str"
+                        }
+                      ]
+                    },
+                    "name": "str",
+                    "style": {
+                      "weight": "str"
+                    },
+                    "text": "str",
+                    "type": "str"
+                  }
+                ],
+                "style": {
+                  "weight": "str"
+                },
+                "type": "str"
+              }
+            ],
+            "useEmbededView": "bool",
+            "useUiView": "bool",
+            "userDescription": "str",
+            "value": "bool",
+            "viewLayout": {
+              "$jason": {
+                "body": {
+                  "header": {
+                    "style": {
+                      "height": "str"
+                    },
+                    "title": "str"
+                  },
+                  "sections": {
+                    "items": [
+                      {
+                        "components": [
+                          {
+                            "name": "str",
+                            "style": {
+                              "weight": "str"
+                            },
+                            "text": "str",
+                            "type": "str"
+                          }
+                        ],
+                        "style": {
+                          "weight": "str"
+                        },
+                        "type": "str"
+                      }
+                    ]
+                  }
+                },
+                "head": {
+                  "title": "str"
+                }
+              }
+            }
+          },
+          "actions": {
+            "setAutoOff": "number",
+            "toggle": "number",
+            "turnOff": "number",
+            "turnOn": "number"
+          },
+          "hiddenActions": {},
+          "created": "number",
+          "modified": "number",
+          "sortOrder": "number"
+        }
+      ]
+    },
+    {
+      "pattern": "/devices/{id}",
+      "path": "/devices/277",
+      "status": 200,
+      "shape": {
+        "id": "number",
+        "name": "str",
+        "roomID": "number",
+        "view": [
+          {
+            "assetsPath": "str",
+            "name": "str",
+            "translatesPath": "str",
+            "type": "str"
+          }
+        ],
+        "type": "str",
+        "baseType": "str",
+        "enabled": "bool",
+        "visible": "bool",
+        "isPlugin": "bool",
+        "parentId": "number",
+        "viewXml": "bool",
+        "hasUIView": "bool",
+        "configXml": "bool",
+        "interfaces": [
+          "str"
+        ],
+        "properties": {
+          "apiVersion": "str",
+          "autoOffDefaultTime": "number",
+          "autoOffTimestamp": "number",
+          "buildNumber": "number",
+          "categories": [
+            "str"
+          ],
+          "dead": "bool",
+          "deadReason": "str",
+          "deviceControlType": "number",
+          "deviceIcon": "number",
+          "deviceRole": "str",
+          "encrypted": "bool",
+          "icon": {
+            "path": "str",
+            "source": "str"
+          },
+          "initialInterfaces": [],
+          "isLight": "bool",
+          "log": "str",
+          "logTemp": "str",
+          "mainFunction": "str",
+          "manufacturer": "str",
+          "model": "str",
+          "quickAppUuid": "str",
+          "quickAppVariables": [],
+          "saveLogs": "bool",
+          "state": "bool",
+          "supportedDeviceRoles": [
+            "str"
+          ],
+          "typeTemplateInitialized": "bool",
+          "uiCallbacks": [
+            {
+              "callback": "str",
+              "eventType": "str",
+              "name": "str"
+            }
+          ],
+          "uiView": [
+            {
+              "components": [
+                {
+                  "eventBinding": {
+                    "onLongPressDown": [
+                      {
+                        "params": {
+                          "actionName": "str",
+                          "args": [
+                            "str"
+                          ]
+                        },
+                        "type": "str"
+                      }
+                    ],
+                    "onLongPressReleased": [
+                      {
+                        "params": {
+                          "actionName": "str",
+                          "args": [
+                            "str"
+                          ]
+                        },
+                        "type": "str"
+                      }
+                    ],
+                    "onReleased": [
+                      {
+                        "params": {
+                          "actionName": "str",
+                          "args": [
+                            "str"
+                          ]
+                        },
+                        "type": "str"
+                      }
+                    ]
+                  },
+                  "name": "str",
+                  "style": {
+                    "weight": "str"
+                  },
+                  "text": "str",
+                  "type": "str"
+                }
+              ],
+              "style": {
+                "weight": "str"
+              },
+              "type": "str"
+            }
+          ],
+          "useEmbededView": "bool",
+          "useUiView": "bool",
+          "userDescription": "str",
+          "value": "bool",
+          "viewLayout": {
+            "$jason": {
+              "body": {
+                "header": {
+                  "style": {
+                    "height": "str"
+                  },
+                  "title": "str"
+                },
+                "sections": {
+                  "items": [
+                    {
+                      "components": [
+                        {
+                          "name": "str",
+                          "style": {
+                            "weight": "str"
+                          },
+                          "text": "str",
+                          "type": "str"
+                        }
+                      ],
+                      "style": {
+                        "weight": "str"
+                      },
+                      "type": "str"
+                    }
+                  ]
+                }
+              },
+              "head": {
+                "title": "str"
+              }
+            }
+          }
+        },
+        "actions": {
+          "setAutoOff": "number",
+          "toggle": "number",
+          "turnOff": "number",
+          "turnOn": "number"
+        },
+        "hiddenActions": {},
+        "created": "number",
+        "modified": "number",
+        "sortOrder": "number"
+      }
+    },
+    {
+      "pattern": "/devices/{id}/properties/{name}",
+      "path": "/devices/277/properties/value",
+      "status": 200,
+      "shape": {
+        "value": "bool",
+        "modified": "number"
+      }
+    },
+    {
+      "pattern": "/plugins",
+      "path": "/plugins",
+      "status": 200,
+      "shape": {
+        "installed": [
+          {
+            "name": "str",
+            "predefined": "bool"
+          }
+        ],
+        "all": {
+          "types": [
+            {
+              "category": "number",
+              "plugins": [
+                {
+                  "type": "str",
+                  "name": "str",
+                  "defaultMainDeviceName": "str",
+                  "description": "str",
+                  "user": "str",
+                  "compatibility": [
+                    "str"
+                  ],
+                  "predefined": "bool",
+                  "version": "str",
+                  "url": "str",
+                  "installed": "bool"
+                }
+              ],
+              "installed": "number"
+            }
+          ]
+        },
+        "promo": [
+          {
+            "image": {
+              "big": "str",
+              "small": "str"
+            },
+            "url": "str"
+          }
+        ]
+      }
+    },
+    {
+      "pattern": "/plugins/callUIEvent",
+      "path": "/plugins/callUIEvent",
+      "status": 400,
+      "shape": null
+    },
+    {
+      "pattern": "/plugins/getView",
+      "path": "/plugins/getView",
+      "status": 400,
+      "shape": null
+    },
+    {
+      "pattern": "/scenes",
+      "path": "/scenes",
+      "status": 200,
+      "shape": [
+        {
+          "id": "number",
+          "name": "str",
+          "description": "str",
+          "type": "str",
+          "roomId": "number",
+          "mode": "str",
+          "maxRunningInstances": "number",
+          "icon": "str",
+          "iconExtension": "str",
+          "hidden": "bool",
+          "protectedByPin": "bool",
+          "stopOnAlarm": "bool",
+          "restart": "bool",
+          "enabled": "bool",
+          "content": "str",
+          "created": "number",
+          "updated": "number",
+          "isRunning": "bool",
+          "started": "number",
+          "categories": [
+            "number"
+          ],
+          "sortOrder": "number"
+        }
+      ]
+    },
+    {
+      "pattern": "/scenes/{id}",
+      "path": "/scenes/27",
+      "status": 200,
+      "shape": {
+        "id": "number",
+        "name": "str",
+        "description": "str",
+        "type": "str",
+        "roomId": "number",
+        "mode": "str",
+        "maxRunningInstances": "number",
+        "icon": "str",
+        "iconExtension": "str",
+        "hidden": "bool",
+        "protectedByPin": "bool",
+        "stopOnAlarm": "bool",
+        "restart": "bool",
+        "enabled": "bool",
+        "content": "str",
+        "created": "number",
+        "updated": "number",
+        "isRunning": "bool",
+        "started": "number",
+        "categories": [
+          "number"
+        ],
+        "sortOrder": "number"
+      }
+    },
+    {
+      "pattern": "/customEvents/{name}/publish",
+      "path": "/customEvents/fluaParityProbe/publish",
+      "status": 204,
+      "shape": null
+    },
+    {
+      "pattern": "/alarms/v1/partitions",
+      "path": "/alarms/v1/partitions",
+      "status": 200,
+      "shape": [
+        {
+          "id": "number",
+          "name": "str",
+          "breached": "bool",
+          "armed": "bool",
+          "breachDelay": "number",
+          "armDelay": "number",
+          "devices": [],
+          "lastActionAt": "number"
+        }
+      ]
+    },
+    {
+      "pattern": "/alarms/v1/partitions/breached",
+      "path": "/alarms/v1/partitions/breached",
+      "status": 200,
+      "shape": []
+    },
+    {
+      "pattern": "/alarms/v1/partitions/{id}",
+      "path": "/alarms/v1/partitions/1",
+      "status": 200,
+      "shape": {
+        "id": "number",
+        "name": "str",
+        "breached": "bool",
+        "armed": "bool",
+        "breachDelay": "number",
+        "armDelay": "number",
+        "devices": [],
+        "lastActionAt": "number"
+      }
+    },
+    {
+      "pattern": "/globalVariables",
+      "path": "/globalVariables",
+      "status": 200,
+      "shape": [
+        {
+          "name": "str",
+          "value": "str",
+          "readOnly": "bool",
+          "isEnum": "bool",
+          "enumValues": [],
+          "created": "number",
+          "modified": "number"
+        }
+      ]
+    },
+    {
+      "pattern": "/globalVariables/{name}",
+      "path": "/globalVariables/A",
+      "status": 200,
+      "shape": {
+        "name": "str",
+        "value": "str",
+        "readOnly": "bool",
+        "isEnum": "bool",
+        "enumValues": [],
+        "created": "number",
+        "modified": "number"
+      }
+    },
+    {
+      "pattern": "/settings/location",
+      "path": "/settings/location",
+      "status": 200,
+      "shape": {
+        "houseNumber": "number",
+        "timezone": "str",
+        "timezoneOffset": "number",
+        "ntp": "bool",
+        "ntpServer": "str",
+        "date": {
+          "day": "number",
+          "month": "number",
+          "year": "number"
+        },
+        "time": {
+          "hour": "number",
+          "minute": "number"
+        },
+        "latitude": "number",
+        "longitude": "number",
+        "city": "str",
+        "temperatureUnit": "str",
+        "windUnit": "str",
+        "timeFormat": "number",
+        "dateFormat": "str",
+        "decimalMark": "str"
+      }
+    },
+    {
+      "pattern": "/settings/info",
+      "path": "/settings/info",
+      "status": 200,
+      "shape": {
+        "serialNumber": "str",
+        "platform": "str",
+        "zwaveEngineVersion": "str",
+        "zigbeeStatus": "bool",
+        "hcName": "str",
+        "mac": "str",
+        "zwaveVersion": "str",
+        "zwaveRegion": "str",
+        "serverStatus": "number",
+        "defaultLanguage": "str",
+        "defaultRoomId": "number",
+        "sunsetHour": "str",
+        "sunriseHour": "str",
+        "hotelMode": "bool",
+        "temperatureUnit": "str",
+        "batteryLowNotification": "bool",
+        "date": "str",
+        "dateFormat": "str",
+        "timeFormat": "number",
+        "decimalMark": "str",
+        "timezoneOffset": "number",
+        "currency": "str",
+        "softVersion": "str",
+        "beta": "bool",
+        "currentVersion": {
+          "version": "str",
+          "type": "str"
+        },
+        "installVersion": {
+          "version": "str",
+          "type": "str",
+          "status": "str",
+          "progress": "number"
+        },
+        "timestamp": "number",
+        "online": "bool",
+        "tosAccepted": "bool",
+        "skin": "str",
+        "skinSetting": "str",
+        "updateStableAvailable": "bool",
+        "updateBetaAvailable": "bool",
+        "newestStableVersion": "str",
+        "newestBetaVersion": "str",
+        "isFTIConfigured": "bool",
+        "isSlave": "bool",
+        "hasFIDConnected": "bool",
+        "oemId": "str"
+      }
+    },
+    {
+      "pattern": "/refreshStates",
+      "path": "/refreshStates",
+      "status": 200,
+      "shape": {
+        "status": "str",
+        "last": "number",
+        "date": "str",
+        "timestamp": "number",
+        "timestampMillis": "number"
+      }
+    },
+    {
+      "pattern": "/profiles",
+      "path": "/profiles",
+      "status": 200,
+      "shape": {
+        "activeProfile": "number",
+        "profiles": [
+          {
+            "id": "number",
+            "name": "str",
+            "iconId": "number",
+            "devices": [
+              {
+                "id": "number",
+                "action": "null"
+              }
+            ],
+            "scenes": [],
+            "climateZones": [],
+            "partitions": []
+          }
+        ]
+      }
+    },
+    {
+      "pattern": "/rooms",
+      "path": "/rooms",
+      "status": 200,
+      "shape": [
+        {
+          "id": "number",
+          "name": "str",
+          "sectionID": "number",
+          "isDefault": "bool",
+          "visible": "bool",
+          "icon": "str",
+          "iconExtension": "str",
+          "iconColor": "str",
+          "defaultSensors": {
+            "temperature": "number",
+            "humidity": "number",
+            "light": "number"
+          },
+          "meters": {
+            "energy": "number"
+          },
+          "defaultThermostat": "number",
+          "sortOrder": "number",
+          "category": "str"
+        }
+      ]
+    },
+    {
+      "pattern": "/rooms/{id}",
+      "path": "/rooms/219",
+      "status": 200,
+      "shape": {
+        "id": "number",
+        "name": "str",
+        "sectionID": "number",
+        "isDefault": "bool",
+        "visible": "bool",
+        "icon": "str",
+        "iconExtension": "str",
+        "iconColor": "str",
+        "defaultSensors": {
+          "temperature": "number",
+          "humidity": "number",
+          "light": "number"
+        },
+        "meters": {
+          "energy": "number"
+        },
+        "defaultThermostat": "number",
+        "created": "number",
+        "modified": "number",
+        "sortOrder": "number",
+        "category": "str"
+      }
+    },
+    {
+      "pattern": "/sections",
+      "path": "/sections",
+      "status": 200,
+      "shape": [
+        {
+          "id": "number",
+          "name": "str",
+          "sortOrder": "number"
+        }
+      ]
+    },
+    {
+      "pattern": "/sections/{id}",
+      "path": "/sections/219",
+      "status": 200,
+      "shape": {
+        "id": "number",
+        "name": "str",
+        "created": "number",
+        "modified": "number",
+        "sortOrder": "number"
+      }
+    },
+    {
+      "pattern": "/customEvents",
+      "path": "/customEvents",
+      "status": 200,
+      "shape": [
+        {
+          "name": "str",
+          "userDescription": "str"
+        }
+      ]
+    },
+    {
+      "pattern": "/customEvents/{name}",
+      "path": "/customEvents/fluaParityProbe",
+      "status": 404,
+      "shape": null
+    },
+    {
+      "pattern": "/iosDevices",
+      "path": "/iosDevices",
+      "status": 200,
+      "shape": [
+        {
+          "id": "number",
+          "name": "str",
+          "udid": "str",
+          "push": "bool"
+        }
+      ]
+    },
+    {
+      "pattern": "/home",
+      "path": "/home",
+      "status": 200,
+      "shape": {
+        "timestamp": "number",
+        "defaultSensors": {
+          "temperature": "number",
+          "humidity": "number",
+          "light": "number"
+        },
+        "notificationClient": {
+          "marketingNotificationAllowed": "bool"
+        },
+        "hcName": "str",
+        "weatherProvider": "number",
+        "currency": "str",
+        "fireAlarmTemperature": "number",
+        "freezeAlarmTemperature": "number",
+        "timeFormat": "number",
+        "dateFormat": "str",
+        "firstRunAfterUpdate": "bool"
+      }
+    },
+    {
+      "pattern": "/debugMessages",
+      "path": "/debugMessages",
+      "status": 200,
+      "shape": {
+        "messages": [
+          {
+            "id": "number",
+            "timestamp": "number",
+            "type": "str",
+            "tag": "str",
+            "message": "str"
+          }
+        ],
+        "nextLast": "number"
+      }
+    },
+    {
+      "pattern": "/debugMessages/tags",
+      "path": "/debugMessages/tags",
+      "status": 200,
+      "shape": [
+        "str"
+      ]
+    },
+    {
+      "pattern": "/weather",
+      "path": "/weather",
+      "status": 200,
+      "shape": {
+        "Temperature": "number",
+        "TemperatureUnit": "str",
+        "Humidity": "number",
+        "Wind": "number",
+        "WindUnit": "str",
+        "WeatherCondition": "str",
+        "ConditionCode": "number"
+      }
+    },
+    {
+      "pattern": "/alarms/v1/devices",
+      "path": "/alarms/v1/devices",
+      "status": 200,
+      "shape": [
+        {
+          "id": "number",
+          "name": "str"
+        }
+      ]
+    },
+    {
+      "pattern": "/notificationCenter",
+      "path": "/notificationCenter",
+      "status": 200,
+      "shape": [
+        {
+          "id": "number",
+          "type": "str",
+          "created": "number",
+          "canBeDeleted": "bool",
+          "priority": "str",
+          "wasRead": "bool",
+          "recipient": "number",
+          "data": {
+            "deviceId": "number",
+            "title": "str",
+            "text": "str"
+          }
+        }
+      ]
+    },
+    {
+      "pattern": "/profiles/{id}",
+      "path": "/profiles/1",
+      "status": 200,
+      "shape": {
+        "id": "number",
+        "name": "str",
+        "iconId": "number",
+        "devices": [
+          {
+            "id": "number",
+            "action": "null"
+          }
+        ],
+        "scenes": [],
+        "climateZones": [],
+        "partitions": []
+      }
+    },
+    {
+      "pattern": "/icons",
+      "path": "/icons",
+      "status": 200,
+      "shape": {
+        "device": [
+          {
+            "id": "number",
+            "deviceType": "str",
+            "iconSetName": "str",
+            "fileExtension": "str"
+          }
+        ],
+        "room": [
+          {
+            "id": "number",
+            "iconName": "str",
+            "fileExtension": "str"
+          }
+        ],
+        "scene": [
+          {
+            "id": "number",
+            "iconName": "str",
+            "fileExtension": "str"
+          }
+        ]
+      }
+    },
+    {
+      "pattern": "/users",
+      "path": "/users",
+      "status": 200,
+      "shape": [
+        {
+          "id": "number",
+          "name": "str",
+          "type": "str",
+          "email": "str",
+          "rights": {
+            "devices": {
+              "all": "bool",
+              "sections": [],
+              "rooms": [],
+              "devices": []
+            },
+            "scenes": {
+              "all": "bool",
+              "sections": [],
+              "rooms": [],
+              "scenes": []
+            },
+            "alarmPartitions": {
+              "all": "bool",
+              "partitions": []
+            },
+            "profiles": {
+              "all": "bool",
+              "profiles": []
+            },
+            "climateZones": {
+              "all": "bool",
+              "zones": []
+            },
+            "advanced": {
+              "devices": "bool",
+              "rooms": "bool",
+              "blockScenes": "bool",
+              "scenarios": "bool",
+              "profiles": "bool",
+              "variablesAndEvents": "bool",
+              "access": "bool",
+              "update": "bool",
+              "backup": "bool",
+              "network": "bool",
+              "diagnostics": "bool",
+              "zWave": "bool",
+              "niceAndElero": "bool",
+              "climate": "bool",
+              "alarm": "bool",
+              "garden": "bool",
+              "knx": "bool"
+            }
+          },
+          "hotelRoom": "number",
+          "sendNotifications": "bool",
+          "tracking": "number",
+          "atHome": "bool",
+          "useOptionalArmPin": "bool",
+          "useIntegrationPin": "bool",
+          "skin": "str",
+          "skinSetting": "str",
+          "fidUuid": "str",
+          "fidLastSynchronizationTimestamp": "number",
+          "fidRole": "str",
+          "raStatus": "str",
+          "isAddTileVisible": "bool",
+          "isAdminTransferPossible": "bool",
+          "buiSettings": {},
+          "incorrectPin": {
+            "failedAttempts": "number",
+            "blockedUntil": "number",
+            "alarmTime": "number",
+            "failedAttemptsLimit": "number"
+          },
+          "incorrectIntegrationPin": {
+            "failedAttempts": "number",
+            "blockedUntil": "number",
+            "alarmTime": "number",
+            "failedAttemptsLimit": "number"
+          },
+          "tosAccepted": "bool",
+          "privacyPolicyAccepted": "bool",
+          "language": "str"
+        }
+      ]
+    },
+    {
+      "pattern": "/energy/devices",
+      "path": "/energy/devices",
+      "status": 200,
+      "shape": [
+        {
+          "id": "number",
+          "deleted": "bool",
+          "roomId": "number",
+          "mainEnergyMeter": "bool"
+        }
+      ]
+    },
+    {
+      "pattern": "/panels/location",
+      "path": "/panels/location",
+      "status": 200,
+      "shape": [
+        {
+          "id": "number",
+          "name": "str",
+          "latitude": "number",
+          "longitude": "number",
+          "radius": "number",
+          "address": "str",
+          "created": "number",
+          "modified": "number",
+          "home": "bool"
+        }
+      ]
+    },
+    {
+      "pattern": "/panels/climate",
+      "path": "/panels/climate",
+      "status": 200,
+      "shape": [
+        {
+          "id": "number",
+          "name": "str",
+          "active": "bool",
+          "mode": "str",
+          "properties": {
+            "mode": "str",
+            "handSetPointHeating": "number",
+            "handSetPointCooling": "number",
+            "handTimestamp": "number",
+            "handMode": "str",
+            "vacationSetPointHeating": "number",
+            "vacationSetPointCooling": "number",
+            "vacationMode": "str",
+            "vacationStartTime": "number",
+            "vacationEndTime": "number",
+            "currentTemperatureHeating": "number",
+            "currentTemperatureCooling": "number",
+            "currentSetpointTimeStartHour": "number",
+            "currentSetpointTimeStartMinute": "number",
+            "currentSetpointTimeEndHour": "number",
+            "currentSetpointTimeEndMinute": "number",
+            "autoSetPointHysteresis": "number"
+          }
+        }
+      ]
+    },
+    {
+      "pattern": "/panels/climate/{id}",
+      "path": "/panels/climate/1",
+      "status": 200,
+      "shape": {
+        "id": "number",
+        "name": "str",
+        "active": "bool",
+        "mode": "str",
+        "properties": {
+          "mode": "str",
+          "monday": {
+            "morning": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "day": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "evening": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "night": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            }
+          },
+          "tuesday": {
+            "morning": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "day": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "evening": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "night": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            }
+          },
+          "wednesday": {
+            "morning": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "day": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "evening": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "night": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            }
+          },
+          "thursday": {
+            "morning": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "day": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "evening": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "night": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            }
+          },
+          "friday": {
+            "morning": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "day": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "evening": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "night": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            }
+          },
+          "saturday": {
+            "morning": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "day": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "evening": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "night": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            }
+          },
+          "sunday": {
+            "morning": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "day": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "evening": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            },
+            "night": {
+              "hour": "number",
+              "minute": "number",
+              "temperatureHeating": "number",
+              "temperatureCooling": "number"
+            }
+          },
+          "handSetPointHeating": "number",
+          "handSetPointCooling": "number",
+          "handTimestamp": "number",
+          "handMode": "str",
+          "vacationSetPointHeating": "number",
+          "vacationSetPointCooling": "number",
+          "vacationMode": "str",
+          "vacationStartTime": "number",
+          "vacationEndTime": "number",
+          "currentTemperatureHeating": "number",
+          "currentTemperatureCooling": "number",
+          "currentSetpointTimeStartHour": "number",
+          "currentSetpointTimeStartMinute": "number",
+          "currentSetpointTimeEndHour": "number",
+          "currentSetpointTimeEndMinute": "number",
+          "autoSetPointHysteresis": "number",
+          "devices": [
+            "number"
+          ],
+          "incompatibleDevices": [
+            "number"
+          ],
+          "temperatureSensors": [],
+          "currentTemperature": "number",
+          "calculationStrategy": "str"
+        },
+        "created": "number",
+        "modified": "number"
+      }
+    },
+    {
+      "pattern": "/panels/notifications",
+      "path": "/panels/notifications",
+      "status": 200,
+      "shape": []
+    },
+    {
+      "pattern": "/panels/family",
+      "path": "/panels/family",
+      "status": 501,
+      "shape": null
+    },
+    {
+      "pattern": "/panels/sprinklers",
+      "path": "/panels/sprinklers",
+      "status": 200,
+      "shape": [
+        {
+          "id": "number",
+          "name": "str",
+          "isActive": "bool",
+          "days": [
+            "str"
+          ],
+          "sequences": [
+            {
+              "id": "number",
+              "startTime": "number",
+              "sprinklers": [
+                {
+                  "deviceId": "number",
+                  "duration": "number"
+                }
+              ],
+              "isRunning": "bool"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "pattern": "/panels/humidity",
+      "path": "/panels/humidity",
+      "status": 501,
+      "shape": null
+    },
+    {
+      "pattern": "/panels/favoriteColors",
+      "path": "/panels/favoriteColors",
+      "status": 200,
+      "shape": [
+        {
+          "id": "number",
+          "r": "number",
+          "g": "number",
+          "b": "number",
+          "w": "number",
+          "brightness": "number"
+        }
+      ]
+    },
+    {
+      "pattern": "/panels/favoriteColors/v2",
+      "path": "/panels/favoriteColors/v2",
+      "status": 200,
+      "shape": [
+        {
+          "id": "number",
+          "red": "number",
+          "green": "number",
+          "blue": "number",
+          "warmWhite": "number",
+          "brightness": "number"
+        }
+      ]
+    },
+    {
+      "pattern": "/diagnostics",
+      "path": "/diagnostics",
+      "status": 200,
+      "shape": {
+        "memory": {
+          "free": "number",
+          "cache": "number",
+          "buffers": "number",
+          "used": "number"
+        },
+        "storage": {
+          "internal": [
+            {
+              "name": "str",
+              "used": "number"
+            }
+          ]
+        },
+        "cpuLoad": [
+          {
+            "name": "str",
+            "user": "str",
+            "nice": "str",
+            "system": "str",
+            "idle": "str"
+          }
+        ]
+      }
+    },
+    {
+      "pattern": "/proxy",
+      "path": "/proxy",
+      "status": 400,
+      "shape": null
+    }
+  ]
+}
