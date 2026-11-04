@@ -287,6 +287,18 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         print(f"  skipped {skip['pattern']}: {skip['reason']}")
 
     mutation_fixture: dict | None = None
+    probe_fixture: dict | None = None
+    fibaro_fixture: dict | None = None
+    if args.dry_run:
+        for flag, label in (
+            (args.mutations, "mutations"),
+            (args.probe, "probe"),
+            (args.fibaro, "fibaro"),
+        ):
+            if flag:
+                print(f"dry-run: skipping the {label} probes (the write side of the capture)")
+        return 0
+
     if args.mutations:
         prefix = f"flua-p-{uuid.uuid4().hex[:8]}"
         tracker = ArtifactTracker(prefix)
@@ -329,9 +341,6 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
             state = "ok" if result["ok"] else f"error: {result['error']}"
             print(f"fibaro.{result['name']}: {state}")
         fibaro_fixture = {"probes": fibaro_results}
-
-    if args.dry_run:
-        return 0
 
     fixtures = _fixtures_dir(args)
     out_dir = fixtures / fw
