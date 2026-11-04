@@ -261,8 +261,10 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         metavar="PORT",
-        help="the FluaHelper bridge server port (online mode; default 8099) — "
-        "the helper QA deployed with flua --tool installHelper connects here",
+        help="the FluaHelper bridge server port (online mode; default: a free "
+        "OS-assigned port — the helper QA deployed with flua --tool installHelper "
+        "dials back to the advertised URL). Pin a fixed port only when you need "
+        "one (e.g. a firewall rule)",
     )
     parser.add_argument(
         "--ui",

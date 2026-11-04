@@ -33,7 +33,9 @@ from .server import _WS_GUID, _read_http_request, _read_ws_frame, _ws_frame
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_HELPER_PORT = 8099
+DEFAULT_HELPER_PORT = 0  # 0 = the OS picks a free port: the on-demand wake
+# advertises the actually-bound one, so the port never needs to be stable —
+# pass a fixed port only when you need one (e.g. a firewall rule)
 _HELPER_TIMEOUT = 15.0  # seconds an RPC may take before the caller gets (nil, 0)
 _HELPER_WAKE_WAIT = 8.0  # seconds to wait for the helper's dial-back after the connect action
 
@@ -57,6 +59,7 @@ class Hc3Helper:
 
     def __init__(self, port: int = DEFAULT_HELPER_PORT) -> None:
         self.port = port
+        self._bound_port: int | None = None  # the port the OS actually bound (port 0 -> picked)
         self._server: asyncio.Server | None = None
         self._writer: asyncio.StreamWriter | None = None
         self._pending: dict[int, asyncio.Future[tuple[Any, int]]] = {}
@@ -77,7 +80,16 @@ class Hc3Helper:
                 exc,
             )
             return
-        logger.info("flua helper server listening on 0.0.0.0:%d", self.port)
+        # record the actually-bound port (the OS assigns one when configured 0)
+        self._bound_port = self._server.sockets[0].getsockname()[1]  # type: ignore[union-attr]
+        logger.info("flua helper server listening on 0.0.0.0:%d", self._bound_port)
+
+    @property
+    def effective_port(self) -> int:
+        """The port to advertise to the helper QA (it dials back to the
+        advertised ws:// URL): the actually-bound port when the server is
+        up, else the configured one."""
+        return self._bound_port if self._bound_port is not None else self.port
 
     async def stop(self) -> None:
         if self._reader_task is not None:

@@ -3,7 +3,8 @@
 The HC3 serves some of its API only to LOCAL callers (single-key QA
 variables, variable writes, ...). The FluaHelper QA runs on the controller
 and executes such calls in the local context, reporting back over a
-WebSocket to flua's helper server (``--helper-port``, default 8099).
+WebSocket to flua's helper server (``--helper-port``; default: a free
+OS-assigned port — the on-demand wake advertises the actually-bound one).
 
 This tool uploads the bundled helper (src/flua/lua/FluaHelper_main.lua) as
 a new QA and tells it which ws:// URL to dial back to — the address of
@@ -84,7 +85,8 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         type=int,
         default=DEFAULT_HELPER_PORT,
         metavar="PORT",
-        help=f"the helper server port flua will listen on (default {DEFAULT_HELPER_PORT})",
+        help=f"the helper server port flua will listen on (default {DEFAULT_HELPER_PORT} "
+        "= a free OS-assigned port; pin a fixed one only when you need it)",
     )
     parser.add_argument(
         "--host",
@@ -148,7 +150,17 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         print(f"uploaded FluaHelper v{bundled_version} — HC3 device id {helper_id}")
 
     # point the helper (old or new) at THIS machine — the laptop's address
-    # may have changed since the last install
+    # may have changed since the last install. With the default port 0 the
+    # real port only exists once flua runs, so there is nothing to point at
+    # yet: the helper waits idle and flua's on-demand wake carries the
+    # actual ws:// URL when it needs the connection.
+    if args.port == 0:
+        print(
+            "helper deployed — it waits idle until flua asks it to connect\n"
+            "(online-mode runs advertise their actual port on demand; use\n"
+            "--helper-port N on flua to pin a fixed one)"
+        )
+        return 0
     if args.host:
         host = args.host
     else:

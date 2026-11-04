@@ -2247,7 +2247,7 @@ class LuaEngine:
             if not helpers:
                 return
             controller = urllib.parse.urlparse(self.hc3.base_url).hostname or "127.0.0.1"
-            url = f"ws://{Hc3Helper.lan_ip(controller)}:{self.helper.port}/"
+            url = f"ws://{Hc3Helper.lan_ip(controller)}:{self.helper.effective_port}/"
             for device in helpers:
                 self.api.dispatch_hc3(
                     "POST", f"/devices/{device['id']}/action/connect", {"args": [url]}

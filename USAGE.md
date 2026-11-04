@@ -1010,9 +1010,16 @@ on the controller that executes calls in the local context and reports
 back over a WebSocket:
 
 ```bash
-flua --tool installHelper        # uploads FluaHelper + points it at this machine
-flua --api remote --helper-port 8099 my-qa.lua   # the helper server (default 8099)
+flua --tool installHelper        # uploads FluaHelper; it waits idle for flua's wake
+flua --api remote my-qa.lua      # the helper server (a free OS-assigned port by default)
 ```
+
+The port is advertised to the helper on every wake (its `connect` action
+carries the `ws://` URL it dials back to), so it only has to match between
+the server bind and the wake — it never needs to be stable across runs.
+By default the OS picks a free port, which also means several flua
+instances in parallel on one machine just work; pass `--helper-port N`
+only when you need a fixed port (e.g. a firewall rule).
 
 The helper auto-detects this machine's LAN address (a UDP route probe;
 `--tool installHelper --host IP` overrides). It never re-dials on its own:

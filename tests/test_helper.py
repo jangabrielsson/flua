@@ -200,6 +200,77 @@ async def test_api_helper_fibaro_error_warns(capsys) -> None:
 
 
 @pytest.mark.asyncio
+async def test_helper_port_zero_binds_and_reports_the_os_port() -> None:
+    # port 0 -> the OS picks a free port; effective_port advertises it (the
+    # helper QA dials back to the advertised ws:// URL)
+    helper = Hc3Helper(0)
+    await helper.start()
+    try:
+        bound = helper._server.sockets[0].getsockname()[1]  # type: ignore[union-attr]
+        assert bound > 0
+        assert helper.effective_port == bound
+    finally:
+        await helper.stop()
+
+
+@pytest.mark.asyncio
+async def test_helper_wake_advertises_the_bound_port() -> None:
+    # helperPort 0: the wake's connect action must carry the actually-bound
+    # port (not 0) — the helper dials back to the advertised URL
+    from flua.helper import helper_identity
+
+    uuid, _version = helper_identity()
+    engine = LuaEngine(config={"helperPort": 0})
+    await engine.start()
+    try:
+        await engine.helper.start()
+        bound = engine.helper.effective_port
+        assert bound > 0
+        connect_bodies: list[dict] = []
+
+        class FakeRemote:
+            base_url = "http://192.168.50.57/"
+
+            def request(self, method: str, path: str, query=None, body=None):
+                if path == "/devices":
+                    return [
+                        {"id": 9, "properties": {"quickAppUuid": uuid, "model": "1.1.0"}}
+                    ], 200
+                connect_bodies.append(body or {})
+                return None, 202
+
+        fake = FakeRemote()
+        engine.hc3 = fake  # type: ignore[assignment]
+        engine.api._remote = fake  # type: ignore[attr-defined]
+
+        async def delayed_helper() -> None:
+            await asyncio.sleep(0.3)
+            await _fake_helper(bound, {"ok": True, "data": {"w": 1}, "status": 200})
+
+        client = asyncio.create_task(delayed_helper())
+        engine.start_qa(
+            None,
+            "setTimeout(function()\n"
+            "  local d, s = api.helper('GET', '/plugins/9/variables/x', nil)\n"
+            "  print('HELPER', s, json.encode(d))\n"
+            "  _FLUA.exit(0)\n"
+            "end, 20)\n",
+            {},
+            "waker",
+        )
+        await wait_until(lambda: not engine.is_running())
+        await client
+        assert connect_bodies and any(
+            f":{bound}/" in str(body.get("args")) for body in connect_bodies
+        )
+        assert all(":0/" not in str(body.get("args")) for body in connect_bodies)
+    finally:
+        engine.hc3 = None  # type: ignore[assignment]
+        engine.api._remote = None  # type: ignore[attr-defined]
+        await engine.stop()
+
+
+@pytest.mark.asyncio
 async def test_helper_call_unconnected_returns_zero() -> None:
     helper = Hc3Helper(0)
     await helper.start()
