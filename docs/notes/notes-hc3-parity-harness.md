@@ -22,10 +22,12 @@ commit fixtures + any sim fixes.
 src/flua/parity/
   normalize.py     # shape+id normalization, drift diff (extracted from
                    # test_hc3_compat.py's _shape/_drift — compat reuses it)
-  probes.py        # probe list: auto-derived GET routes + hand-curated
-                   # mutation sequences + fibaro probes
-  capture.py       # flua --tool parityCapture
-  cleanup.py       # flua --tool parityCleanup
+  probes.py        # probe list: every implemented GET derived from the
+                   # route registry (ROUTES), concrete sim paths + live
+                   # resolvers + house filters
+src/flua/tools/parity_capture.py  # flua --tool parityCapture (registry
+                   # convention: one module per tool)
+  cleanup.py       # flua --tool parityCleanup (Tier 2, not built yet)
 tests/hc3_parity/
   probe_qa/
     main.lua       # in-QA self-test, runs identically on HC3 and in sim
@@ -124,12 +126,15 @@ role as quick smoke checks; capture is the new deep entry point.
 
 ## Implementation order
 
-1. Extract the shape oracle from `test_hc3_compat.py` into
-   `src/flua/parity/normalize.py` (compat suite reuses it — no behavior
-   change, pins still green).
-2. Capture tool for shape probes (read-only, zero risk) + fixtures +
-   replay suite. First milestone: whole GET surface captured and
-   replayed.
+1. ~~Extract the shape oracle~~ — done: `flua.parity.normalize`
+   (`shape`/`drift`), compat suite reuses it.
+2. ~~Capture tool + fixtures + replay suite~~ — done: `--tool parityCapture`
+   (read-only, `--dry-run`, `--fw`, `--fixtures`), fixtures keyed by
+   softVersion, `tests/hc3_parity/test_hc3_replay.py` replays offline
+   (`--parity-fw` pins one fixture; without fixtures it skips; the
+   comparison machinery is pinned by a synthetic-transcript test and the
+   probe coverage by a route-registry test). First milestone complete:
+   whole GET surface captured and replayed.
 3. Mutation probes + artifact tracker + `parityCleanup`.
 4. Probe QA (debugMessages transcript diff) + helperFibaro probes.
 5. Quirk pinning as discoveries surface during capture runs.

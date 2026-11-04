@@ -32,6 +32,7 @@ def test_registry_discovers_all_tools() -> None:
         "migrate",
         "newQA",
         "pack",
+        "parityCapture",
         "setup",
         "state",
         "ui",
