@@ -1114,7 +1114,12 @@ HC3, and the two are treated as one device:
   then the sim shadow mirrors on success, exactly like property updates.
   Variable writes carry no refreshState event, so there is no event dedup
   to do. The proxy (and each child) keeps the state on the controller, so
-  it survives flua reruns without a db. `api.delete(
+  it survives flua reruns without a db.
+- **Don't run the same QA in proxy mode from two flua instances in
+  parallel** — both deploy a proxy with the same name on the HC3 and fight
+  over which flua the proxy sends actions and UI events back to. Testing
+  the same QA in parallel works in plain offline/online mode; proxy mode is
+  one instance per QA. `api.delete(
   '/plugins/removeChildDevice/' .. id)` deletes a child on the HC3 and drops
   its emulated shadow (offline it just removes the local child).
 
