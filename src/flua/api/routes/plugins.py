@@ -75,10 +75,26 @@ def _variables(state: SimState, dev: dict[str, Any]) -> dict[str, dict[str, Any]
     return state.plugin_variables.setdefault(dev["id"], {})
 
 
+def _proxy_variables(
+    dev: dict[str, Any], state: SimState, req: ApiRequest
+) -> tuple[Any, int] | None:
+    """Proxy devices own their variable state on the controller — it
+    survives flua reruns without an explicit db (children included: their
+    HC3 shadow keeps the state; plua behaved the same). READS run there
+    with the helper bridge — the sim shadow never decides the answer. None
+    (bridge missing — unit tests, offline edge) lets the sim-shadow path
+    answer."""
+    if state.is_proxy(dev["id"]) and req.helper is not None:
+        return req.helper(req.method, req.path, req.body)
+    return None
+
+
 def variables_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     dev = state.device(req.path_params["id"])
     if dev is None:
         return None, 404
+    if (r := _proxy_variables(dev, state, req)) is not None:
+        return r
     variables = sorted(_variables(state, dev).values(), key=lambda v: v["name"])
     return public(variables), 200
 
@@ -87,6 +103,8 @@ def variable_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     dev = state.device(req.path_params["id"])
     if dev is None:
         return None, 404
+    if (r := _proxy_variables(dev, state, req)) is not None:
+        return r
     var = _variables(state, dev).get(req.path_params["key"])
     return (public(var), 200) if var is not None else (None, 404)
 
@@ -130,16 +148,25 @@ def variable_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     key = req.path_params["key"]
     if bad := _bad_name(key):
         return bad, 400
-    variables = _variables(state, dev)
-    if key not in variables:
-        return None, 404  # drives quickapp.lua's PUT -> POST fallback
     spec = _var_from_body(req, default_name=key)
     if spec is None:
         return None, 400
     if bad := _bad_name(spec["name"]):
         return bad, 400
+    if state.is_proxy(dev["id"]) and req.helper is not None:
+        # the proxy (HC3 device) owns the state: the write runs there and
+        # the shadow mirrors it on success, like property updates do — but
+        # without a sim-side refreshState event (variable writes carry no
+        # event; anything the HC3 emits arrives through the poller)
+        r = req.helper(req.method, req.path, req.body)
+        if r[1] is not None and 200 <= r[1] < 300:
+            _variables(state, dev)[key] = spec
+        return r
+    variables = _variables(state, dev)
+    if key not in variables:
+        return None, 404  # drives quickapp.lua's PUT -> POST fallback
     if state.is_proxy(dev["id"]):
-        # the HC3 owns the device; its own event comes back via the poll
+        # helper missing (unit tests, offline edge): shadow + REST forward
         variables[key] = spec
         forward_to_proxy(req, True)
         return None, 204
@@ -161,6 +188,11 @@ def variable_post(state: SimState, req: ApiRequest) -> tuple[Any, int]:
         return None, 400
     if bad := _bad_name(spec["name"]):
         return bad, 400
+    if state.is_proxy(dev["id"]) and req.helper is not None:
+        r = req.helper(req.method, req.path, req.body)
+        if r[1] is not None and 200 <= r[1] < 300:
+            _variables(state, dev)[spec["name"]] = spec
+        return r
     variables = _variables(state, dev)
     if state.is_proxy(dev["id"]):
         variables[spec["name"]] = spec
@@ -183,8 +215,13 @@ def variable_delete(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     dev = state.device(req.path_params["id"])
     if dev is None:
         return None, 404
-    variables = _variables(state, dev)
     key = req.path_params["key"]
+    if state.is_proxy(dev["id"]) and req.helper is not None:
+        r = req.helper(req.method, req.path, req.body)
+        if r[1] is not None and 200 <= r[1] < 300:
+            _variables(state, dev).pop(key, None)
+        return r
+    variables = _variables(state, dev)
     if key not in variables:
         return None, 404
     del variables[key]
@@ -196,6 +233,11 @@ def variables_clear(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     dev = state.device(req.path_params["id"])
     if dev is None:
         return None, 404
+    if state.is_proxy(dev["id"]) and req.helper is not None:
+        r = req.helper(req.method, req.path, req.body)
+        if r[1] is not None and 200 <= r[1] < 300:
+            _variables(state, dev).clear()
+        return r
     _variables(state, dev).clear()
     forward_to_proxy(req, state.is_proxy(dev["id"]))
     return None, 204

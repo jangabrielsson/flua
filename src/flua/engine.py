@@ -2202,6 +2202,25 @@ class LuaEngine:
         else:
             task.add_done_callback(self._http_tasks.discard)
 
+    def _helper_bridge(self, method: str, path: str, body: Any) -> tuple[Any, int]:
+        """api.* fallback for HC3-namespace variables endpoints: the
+        controller refuses external REST callers for them, so route through
+        the deployed FluaHelper QA (its local context). Wake-on-demand like
+        the explicit api.helper path; (None, 0) + a warning when the helper
+        is missing or unreachable. Runs on the api worker thread."""
+        if not self.helper.connected:
+            self._wake_helper()
+        data, status = asyncio.run_coroutine_threadsafe(
+            self.helper.call(method, path, body), self._loop
+        ).result(_HELPER_TIMEOUT)
+        if status == 0 and data is None:
+            logger.warning(
+                "variables %s %s -> helper not connected (run flua --tool installHelper)",
+                method,
+                path,
+            )
+        return data, status
+
     def _wake_helper(self) -> None:
         """The helper's connection is down and flua needs to send: ask the
         deployed FluaHelper to dial in — discover it by quickAppUuid, fire

@@ -234,6 +234,115 @@ def test_variables_name_format(api: Api) -> None:
     assert api.dispatch("GET", "/plugins/5000/variables/a1_b")[1] == 200
 
 
+def test_variables_hc3_ids_route_through_helper_bridge(api: Api) -> None:
+    # HC3-namespace ids (< 5000) in online mode: the variables endpoints
+    # the controller refuses to external REST callers go through the
+    # FluaHelper bridge; the list still rides the REST transport
+    bridge_calls: list[tuple[str, str]] = []
+    rest_calls: list[tuple[str, str]] = []
+
+    class FakeRemote:
+        base_url = "http://hc3/"
+
+        def request(self, method: str, path: str, query=None, body=None):
+            rest_calls.append((method, path))
+            return None, 500  # the real HC3 refuses these externally
+
+    def fake_bridge(method: str, path: str, body):
+        bridge_calls.append((method, path))
+        return {"name": "x", "value": "1", "isHidden": False}, 200
+
+    api._remote = FakeRemote()  # type: ignore[attr-defined]
+    api._helper_bridge = fake_bridge  # type: ignore[attr-defined]
+    var, status = api.dispatch("GET", "/plugins/4357/variables/x", None)
+    assert status == 200 and var["value"] == "1"
+    api.dispatch("PUT", "/plugins/4357/variables/x", {"name": "x", "value": "2"})
+    api.dispatch("POST", "/plugins/4357/variables", {"name": "y", "value": "2"})
+    api.dispatch("DELETE", "/plugins/4357/variables/x", None)
+    assert bridge_calls == [
+        ("GET", "/plugins/4357/variables/x"),
+        ("PUT", "/plugins/4357/variables/x"),
+        ("POST", "/plugins/4357/variables"),
+        ("DELETE", "/plugins/4357/variables/x"),
+    ]
+    # the list endpoint works over REST (and keeps the REST array shape)
+    assert api.dispatch("GET", "/plugins/4357/variables") == (None, 500)
+    assert rest_calls == [("GET", "/plugins/4357/variables")]
+    # emulated ids (>= 5000) never leave the sim
+    assert api.dispatch("GET", "/plugins/5000/variables/x") == (None, 404)
+    assert rest_calls == [("GET", "/plugins/4357/variables")]
+
+
+def test_variables_proxy_devices_route_to_the_helper_bridge(api: Api) -> None:
+    # proxy QAs own their variable state on the controller (it survives
+    # flua reruns — plua behavior): the whole variables surface routes
+    # through the helper bridge, and the sim shadow must not decide
+    # existence (a fresh shadow is empty even when the HC3 has the key)
+    bridge_calls: list[tuple[str, str]] = []
+    rest_calls: list[tuple[str, str]] = []
+
+    class FakeRemote:
+        base_url = "http://hc3/"
+
+        def request(self, method: str, path: str, query=None, body=None):
+            rest_calls.append((method, path))
+            return None, 500
+
+    def fake_bridge(method: str, path: str, body):
+        bridge_calls.append((method, path))
+        return {"name": "x", "value": "hc3", "isHidden": False}, 200
+
+    api._remote = FakeRemote()  # type: ignore[attr-defined]
+    api._helper_bridge = fake_bridge  # type: ignore[attr-defined]
+    api.register_qa(777, "proxy", None, {}, proxy=True)
+    api.state.mark_proxy(777)  # the engine marks proxy QAs when they start
+    api.state.register_proxy_child({"id": 778, "name": "kid"})
+
+    var, status = api.dispatch("GET", "/plugins/777/variables/x", None)
+    assert status == 200 and var["value"] == "hc3"
+    api.dispatch("PUT", "/plugins/777/variables/x", {"name": "x", "value": "2"})
+    api.dispatch("POST", "/plugins/777/variables", {"name": "y", "value": "2"})
+    api.dispatch("GET", "/plugins/777/variables")
+    # the shadow mirrors successful writes (like property updates do) —
+    # silently, without a sim-side refreshState event
+    shadow = api.state.plugin_variables[777]
+    assert {k: v["value"] for k, v in shadow.items()} == {"x": "2", "y": "2"}
+    assert api.emitted == []
+    api.dispatch("DELETE", "/plugins/777/variables/x", None)
+    api.dispatch("DELETE", "/plugins/777/variables", None)
+    assert api.state.plugin_variables[777] == {}
+    # a proxy CHILD's variables go to the controller too (QwikChild keeps
+    # its state in child variables and recreates the child from it)
+    api.dispatch("GET", "/plugins/778/variables/class", None)
+    assert bridge_calls == [
+        ("GET", "/plugins/777/variables/x"),
+        ("PUT", "/plugins/777/variables/x"),
+        ("POST", "/plugins/777/variables"),
+        ("GET", "/plugins/777/variables"),
+        ("DELETE", "/plugins/777/variables/x"),
+        ("DELETE", "/plugins/777/variables"),
+        ("GET", "/plugins/778/variables/class"),
+    ]
+    assert rest_calls == []  # the REST transport is never hit
+    # non-proxy emulated ids stay in the sim
+    api.register_qa(5000, "qa", None, {})
+    api.dispatch("POST", "/plugins/5000/variables", {"name": "z", "value": "1"})
+    assert bridge_calls[-1] == ("GET", "/plugins/778/variables/class")
+    assert api.dispatch("GET", "/plugins/5000/variables/z")[1] == 200
+
+
+def test_variables_offline_only_emulated(api: Api) -> None:
+    api.register_qa(5000, "qa", None, {})
+    api.dispatch("POST", "/plugins/5000/variables", {"name": "x", "value": "1"})
+    assert api.dispatch("GET", "/plugins/5000/variables/x")[1] == 200
+    # no remote backend: the HC3 namespace is out of reach
+    assert api.dispatch("GET", "/plugins/4357/variables/x") == (None, 404)
+    assert api.dispatch("PUT", "/plugins/4357/variables/x", {"name": "x", "value": "1"}) == (
+        None,
+        404,
+    )
+
+
 def test_variables_list_and_clear(api: Api) -> None:
     api.register_qa(5000, "qa", None, {})
     api.dispatch("POST", "/plugins/5000/variables", {"name": "b", "value": "2"})

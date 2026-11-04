@@ -1037,6 +1037,25 @@ not connected (the run log says so, pointing at `installHelper`). The
 helper server binds **0.0.0.0** (the controller must reach the laptop);
 your OS firewall may ask about Python once.
 
+In online/proxy mode the routing is transparent too: `api.*` calls to the
+variables endpoints on an HC3-namespace id (below 5000 — the controller's
+own QAs) automatically go through the helper, exactly like the other REST
+endpoints forward to the HC3. Emulated ids (5000 and up) stay in the sim;
+offline, only emulated ids are served.
+
+In **proxy mode** a proxy QA's own variables — and its children's — route
+through the helper: reads answer from the real HC3 device, and writes run
+there first with the sim shadow mirroring on success (the property-update
+pattern, minus the event dedup — variable writes carry no refreshState
+event). The state lives on the controller and survives flua reruns without
+an explicit db (children included, so libraries like QwikChild that store
+their state in child variables keep it).
+
+```lua
+-- online mode, reading another QA's storage on the controller:
+local v = api.get("/plugins/4366/variables/x")   -- via FluaHelper, returns the var
+```
+
 The same bridge runs controller-side `fibaro.*` functions — the real HC3's
 Lua surface, for parity probes or real device actions:
 
@@ -1081,7 +1100,14 @@ HC3, and the two are treated as one device:
   an existing proxy already has are shadowed in the emulator under their HC3
   ids at startup — the QA's `initChildDevices()` finds them, their property
   updates are stored locally and forwarded, and their actions/UI events route
-  back through the proxy like the parent's. `api.delete(
+  back through the proxy like the parent's.
+- Internal storage (`self:internalStorageSet/Get`, `api.*` on
+  `/plugins/<id>/variables`): reads go to the HC3 device via the FluaHelper
+  bridge (authoritative), and writes update both — the controller first,
+  then the sim shadow mirrors on success, exactly like property updates.
+  Variable writes carry no refreshState event, so there is no event dedup
+  to do. The proxy (and each child) keeps the state on the controller, so
+  it survives flua reruns without a db. `api.delete(
   '/plugins/removeChildDevice/' .. id)` deletes a child on the HC3 and drops
   its emulated shadow (offline it just removes the local child).
 

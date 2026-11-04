@@ -30,6 +30,21 @@ logger = logging.getLogger(__name__)
 
 Handler = Callable[[SimState, ApiRequest], tuple[Any, int]]
 
+# The HC3 refuses external REST callers for the single-key QA variable
+# endpoints and for every variable write (list GET is the only one that
+# works from outside) — those routes go through the FluaHelper bridge in
+# online/proxy mode instead of the plain REST fallback.
+_VARIABLES_KEY_RE = re.compile(r"^/plugins/\d+/variables/([^/]+)$")
+_VARIABLES_LIST_RE = re.compile(r"^/plugins/\d+/variables$")
+
+
+def _variables_via_helper(method: str, path: str) -> bool:
+    """True when this variables call must reach the controller through the
+    helper QA (the REST transport would get a 500)."""
+    if _VARIABLES_KEY_RE.match(path):
+        return True
+    return _VARIABLES_LIST_RE.match(path) is not None and method != "GET"
+
 
 def compile_pattern(pattern: str) -> tuple[re.Pattern[str], dict[str, int]]:
     """One route pattern -> (regex, params): ``{name}`` segments become
@@ -169,6 +184,11 @@ class Api:
     def __init__(self, engine: LuaEngine | None = None, seed: dict[str, Any] | None = None) -> None:
         self._engine = engine  # M2+: event enqueue (device actions); None in unit tests
         self._remote = engine.hc3 if engine is not None else None  # M3: the real HC3
+        # online mode: the FluaHelper bridge for the variables endpoints the
+        # HC3 refuses to external REST callers (engine-wired; None offline)
+        self._helper_bridge = (
+            engine._helper_bridge if engine is not None and engine.hc3 is not None else None
+        )
         self.state = SimState(seed)
         self.emitted: list[dict[str, Any]] = []  # every event enqueued (tests/introspection)
         # SimState access is serialized: remote-mode QA api calls run in
@@ -317,6 +337,7 @@ class Api:
                 remote_cached=self._remote_cached if remote_hook is not None else None,
                 restart_qa=self._restart_qa,
                 fetch=self._fetch,
+                helper=self._helper_bridge if remote_hook is not None else None,
             )
             try:
                 data, status = handler(self.state, req)
@@ -329,7 +350,14 @@ class Api:
                 and self.state.is_flua_id(segments[1])
             )
             if data is None and status == 404 and remote_hook is not None and not flua_id:
-                # the sim doesn't own this entity — ask the real HC3
+                # the sim doesn't own this entity — ask the real HC3. The
+                # variables endpoints it refuses to external REST callers
+                # go through the FluaHelper QA (the controller's local
+                # context) instead of the plain REST transport.
+                if _variables_via_helper(method, path):
+                    if self._helper_bridge is not None:
+                        return self._helper_bridge(method, path, body)
+                    return None, 404
                 return self._remote.request(method, path, query, body)
             return data, status
         logger.debug("no offline route for %s %s", method, url)

@@ -55,6 +55,11 @@ class ApiRequest:
     # (the HC3's UI helper). Returns (status, body, headers), status None on
     # transport failure. None outside dispatch.
     fetch: Callable[[str], tuple[int | None, str, dict]] | None = None
+    # Filled by Api.dispatch in online/proxy mode: the FluaHelper bridge —
+    # the variables endpoints the HC3 refuses to external REST callers, and
+    # the whole variables surface of PROXY devices (which own their state on
+    # the controller). None offline / in unit tests.
+    helper: Callable[[str, str, Any], tuple[Any, int]] | None = None
 
     @property
     def path(self) -> str:

@@ -108,6 +108,8 @@ src/flua/
                    the HC3 poller, the auth-lockout guard
   api/             the REST surface: one dispatcher, two backends
     __init__.py      Api.dispatch: regex route table -> handlers -> hybrid forward
+                     (variables on HC3-namespace ids and on PROXY devices route
+                     via the FluaHelper bridge — the controller owns the state)
     state.py         SimState: devices/rooms/scenes/globals, change & event feeds
     routes/*.py      pure handlers: (state, request) -> (data, status)
   hc3.py           Hc3Remote: blocking urllib client, basic auth, raw-body import
