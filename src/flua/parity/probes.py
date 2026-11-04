@@ -73,6 +73,7 @@ class Probe:
     live_resolve: LiveResolve | None = None  # resolves the live path at capture
     live_filter: LiveFilter | None = None  # house normalizer on captured data
     note: str = ""  # why the probe is shaped the way it is
+    known_drift: str = ""  # documented divergence — replay reports, not fails
 
     def live(self, client: Any) -> str | None:
         """The concrete path on the HC3, or None when the house cannot
@@ -114,7 +115,16 @@ _CONFIG: dict[str, dict[str, Any]] = {
         "sim": "/sections/219",
         "resolve": lambda c: _first_listed_id(c, "/sections"),
     },
-    "/scenes/{id}": {"sim": "/scenes/5", "resolve": lambda c: _first_listed_id(c, "/scenes")},
+    "/scenes": {
+        # the sim exposes a running field the HC3's dto lacks — scene QAs
+        # observe running state via GET (flua extension)
+        "known_drift": "sim-only 'running' field (scene QAs observe running state via GET)",
+    },
+    "/scenes/{id}": {
+        "sim": "/scenes/5",
+        "resolve": lambda c: _first_listed_id(c, "/scenes"),
+        "known_drift": "sim-only 'running' field (scene QAs observe running state via GET)",
+    },
     "/alarms/v1/partitions/{id}": {
         "sim": "/alarms/v1/partitions/1",
         "resolve": lambda c: _first_listed_id(c, "/alarms/v1/partitions"),
@@ -145,6 +155,14 @@ _CONFIG: dict[str, dict[str, Any]] = {
     "/panels/climate/{id}": {
         "sim": "/panels/climate/1",
         "resolve": lambda c: _first_listed_id(c, "/panels/climate"),
+    },
+    "/panels/family": {
+        # 501 on the capture house (no family panels); the sim answers the
+        # empty list — house-state-dependent, not a shape contract
+        "known_drift": "house-state: 501 without family panels, the sim returns []",
+    },
+    "/panels/humidity": {
+        "known_drift": "house-state: 501 without humidity panels, the sim returns []",
     },
     "/customEvents/{name}": {
         # a fixed absent name on both sides: pins the 404 contract without
@@ -178,6 +196,7 @@ def _build() -> list[Probe]:
                 live_resolve=cfg.get("resolve"),
                 live_filter=cfg.get("filter"),
                 note=cfg.get("note", ""),
+                known_drift=cfg.get("known_drift", ""),
             )
         )
     return probes

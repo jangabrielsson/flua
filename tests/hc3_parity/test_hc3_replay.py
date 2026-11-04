@@ -37,6 +37,10 @@ PROBE_QA = Path(__file__).parent / "probe_qa" / "main.lua"
 def _sim_api() -> Api:
     api = Api(seed=json.loads((REPO_ROOT / "examples/house.json").read_text()))
     api.register_qa(5000, "compat-qa", None, {})
+    # drain the registration events: the capture side was idle, so the sim
+    # must be too — /refreshStates only gains keys when activity is pending
+    api.state.events.clear()
+    api.state.changes.clear()
     return api
 
 
@@ -52,20 +56,24 @@ def _load(fixture_dir: Path) -> tuple[dict, list[dict]]:
     return meta, entries
 
 
-def _compare_entry(api: Api, entry: dict) -> tuple[list[str], list[str]]:
-    """(problems, gaps) — replay one captured probe against the sim."""
+def _compare_entry(api: Api, entry: dict) -> tuple[list[str], list[str], str]:
+    """(problems, gaps, known_drift) — replay one captured probe against
+    the sim. known_drift is the probe's documented divergence (reported,
+    not failed)."""
     pattern = entry["pattern"]
     probe = PROBES_BY_PATTERN.get(pattern)
     if probe is None:
-        return [f"{pattern}: no probe in the current table (route removed?)"], []
+        return [f"{pattern}: no probe in the current table (route removed?)"], [], ""
     data, status = api.dispatch("GET", probe.sim_path)
     problems: list[str] = []
     if status != entry["status"]:
-        return [f"{pattern}: status {status} != captured {entry['status']}"], []
+        return [f"{pattern}: status {status} != captured {entry['status']}"], [], probe.known_drift
     if entry["shape"] is not None and 200 <= status < 300:
+        if probe.live_filter is not None:
+            data = probe.live_filter(data)  # the same house normalizer the capture used
         problems, gaps = drift(shape(data), entry["shape"], pattern)
-        return problems, gaps
-    return problems, []
+        return problems, gaps, probe.known_drift
+    return problems, [], probe.known_drift
 
 
 def _cases(config: pytest.Config) -> list[tuple[str, dict]]:
@@ -99,7 +107,12 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
 )
 def test_replay(case: tuple[str, dict]) -> None:
     _name, entry = case
-    problems, gaps = _compare_entry(_sim_api(), entry)
+    problems, gaps, known_drift = _compare_entry(_sim_api(), entry)
+    if known_drift:
+        print(f"info: {entry['pattern']} — known divergence: {known_drift}")
+        if problems:
+            print("  observed drift: " + "; ".join(problems))
+            problems = []
     detail = "\n".join(problems)
     assert not problems, f"{entry['pattern']}: parity drift vs the captured HC3 fixture:\n{detail}"
     if gaps:
@@ -117,25 +130,26 @@ def test_replay_machinery_reports_drift() -> None:
     api = _sim_api()
     data, status = api.dispatch("GET", "/devices")
     assert status == 200
+    filtered = PROBES_BY_PATTERN["/devices"].live_filter(data)
 
-    good = {"pattern": "/devices", "status": 200, "shape": shape(data), "path": "/devices"}
-    problems, gaps = _compare_entry(api, good)
-    assert problems == [] and gaps == []
+    good = {"pattern": "/devices", "status": 200, "shape": shape(filtered), "path": "/devices"}
+    problems, gaps, known = _compare_entry(api, good)
+    assert problems == [] and gaps == [] and known == ""
 
     # a live-side shape with an unmodeled field (gap) and a type mismatch
     # (problem) on the first device. The mismatch must be a real JSON type
     # change: shape() erases values, so the string "str" and the number 1
     # both become "str" — mutate to a bool, whose marker differs.
-    device_shape = shape(data)[0]
+    device_shape = shape(filtered)[0]
     drifted = {"pattern": "/devices", "status": 200, "path": "/devices"}
     drifted["shape"] = [{**device_shape, "id": False, "batteryLevel": "number"}]
-    problems, gaps = _compare_entry(api, drifted)
+    problems, gaps, _known = _compare_entry(api, drifted)
     assert any(".id:" in problem for problem in problems), problems
     assert any("batteryLevel" in gap for gap in gaps), gaps
 
     # status drift is a problem even when the shapes would agree
     status_drifted = {"pattern": "/devices", "status": 404, "shape": None, "path": "/devices"}
-    problems, _gaps = _compare_entry(api, status_drifted)
+    problems, _gaps, _known = _compare_entry(api, status_drifted)
     assert any("status" in problem for problem in problems), problems
 
 

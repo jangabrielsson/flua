@@ -426,10 +426,7 @@ def _effective_weather(state: SimState) -> dict[str, Any]:
         "Humidity": 62.0,
         "Temperature": 12.5,
         "TemperatureUnit": state.location.get("temperatureUnit", "C"),
-        # raw is the provider-style name, Converted the HC3's own condition
-        # vocabulary (the weather QA template's: clear, partlyCloudy, ...)
         "WeatherCondition": "Partly cloudy",
-        "WeatherConditionConverted": "partlyCloudy",
         "Wind": 4.2,
         "WindUnit": state.location.get("windUnit", "km/h"),
     }
@@ -487,6 +484,7 @@ def profile_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     if profile is None:
         return None, 404
     out = dict(profile)
+    out.pop("active", None)  # the live HC3's single-profile dto has no active
     out.setdefault("iconId", out["id"])
     for key in ("climateZones", "devices", "partitions", "scenes"):
         out.setdefault(key, [])
@@ -615,7 +613,7 @@ def panels_notifications(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     remote = remote_get(req, "/panels/notifications")
     if remote is not None:
         return remote
-    return public({"notifications": []}), 200
+    return public([]), 200  # a list, like the live HC3
 
 
 def panels_family(state: SimState, req: ApiRequest) -> tuple[Any, int]:

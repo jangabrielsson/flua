@@ -1135,9 +1135,8 @@ def test_sim_world_default_shapes() -> None:
     weather, _ = api.dispatch("GET", "/weather")
     assert weather["Temperature"] is not None
     assert weather["WindUnit"] == "km/h"
-    # raw provider-style name vs the HC3 condition vocabulary in Converted
     assert weather["WeatherCondition"] == "Partly cloudy"
-    assert weather["WeatherConditionConverted"] == "partlyCloudy"
+    assert "WeatherConditionConverted" not in weather  # sim-only field, removed for parity
     assert weather["ConditionCode"] == 30  # partlyCloudy's code
 
 
