@@ -37,7 +37,7 @@ $ flua --api remote /tmp/probe.lua
 serialNumber: HC3-00000000          # <-- the SIM's serial
 
 $ flua --api remote -D mode:online /tmp/probe.lua
-serialNumber: HC3-00000422          # <-- the real HC3's serial
+serialNumber: HC3-XXXXXXXX          # <-- the real HC3's serial (redacted)
 ```
 
 `_FLUA.mode` also reports `"offline"` for the QA in the first run.

@@ -440,7 +440,6 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     meta = {
         "captured": datetime.now(UTC).isoformat(),
         "softVersion": info.get("softVersion"),
-        "serial": info.get("serialNumber"),
         "fluaVersion": __version__,
         "probeCount": len(entries),
         "skipped": skipped,

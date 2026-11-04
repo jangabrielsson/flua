@@ -234,7 +234,7 @@ class _MockHc3(BaseHTTPRequestHandler):
             )
             return
         if self.path.startswith("/api/settings/info"):
-            self._send_json({"serialNumber": "HC3-00000422", "softVersion": "5.210.12"})
+            self._send_json({"serialNumber": "HC3-00000001", "softVersion": "5.210.12"})
             return
         if self.path.startswith("/api/refreshStates"):
             if type(self).auth_all and not self._authed():
@@ -656,7 +656,7 @@ async def test_base_structs_merge_hc3_online(
         await engine.stop()
     assert "D1 hc3-controller 7 true hc3-controller" in out
     assert "L1 hc3-controller true" in out
-    assert "INFO HC3-00000422 5.210.12 true" in out
+    assert "INFO HC3-00000001 5.210.12 true" in out
     assert "HOME SEK hc3-home" in out
     # the lazy cache: three /devices/1 reads, exactly one controller fetch
     assert _MockHc3.requests_seen.count("/api/devices/1") == 1
@@ -1649,4 +1649,4 @@ def test_api_remote_overrides_main_qa_offline_pin(
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "MODE online" in result.stdout  # the pin no longer applies
-    assert "SERIAL HC3-00000422" in result.stdout  # the MOCK HC3's serial, not the sim's
+    assert "SERIAL HC3-00000001" in result.stdout  # the MOCK HC3's serial, not the sim's
