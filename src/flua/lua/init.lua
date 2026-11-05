@@ -1307,12 +1307,24 @@ end
 handlers.deviceAction = function(msg)
   local qa, qaId = qaForDevice(msg.id)
   if sleeping[qaId] then queueFor(qaId, msg) return end -- delivered on wake
-  if qa and type(qa.callAction) == "function" then
+  if qa and qa.booting then
+    -- the identity stub: the target's boot is still in flight (online
+    -- mode suspends onInit) and onAction needs the constructed instance —
+    -- hold the action like the HC3 queues startup actions, bounded.
+    msg._tries = (msg._tries or 0) + 1
+    if msg._tries <= 600 then  -- ~30 s at 50 ms
+      setTimeout(function() handlers.deviceAction(msg) end, 50)
+      return
+    end
+    _PY.flua_log("warning", nil, "deviceAction for " .. tostring(msg.id) .. " timed out during boot")
+    return
+  end
+  if qaId then
     -- the HC3's entry point is the QA's global onAction, not callAction:
-    -- it dispatches to the action method, routes child-device actions to
-    -- the right child, and a QA-defined actionHandler intercepts FIRST
-    -- (the proxy pattern). Call the QA's own copy (quickapp.lua loads
-    -- per-QA into its boot environment).
+    -- it dispatches to the action method (missing methods warn inside),
+    -- routes child-device actions to the right child, and a QA-defined
+    -- actionHandler intercepts FIRST (the proxy pattern). Call the QA's
+    -- own copy (quickapp.lua loads per-QA into its boot environment).
     local env = qaEnvs[qaId] or qaEnvFor(qaId)
     runInQa(qaId, function()
       env.onAction(msg.id, {
