@@ -4,6 +4,14 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.133] - 2026-11-05
+
+### Added
+- a friendly goodbye on Ctrl-C (👋 Goodbye!)
+
+### Fixed
+- proxy updateView now reaches the live HC3 UI via the proxy's own QA
+
 ## [0.1.132] - 2026-11-05
 
 ### Changed
