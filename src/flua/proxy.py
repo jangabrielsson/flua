@@ -206,7 +206,9 @@ def deploy_proxy(
     if skeleton is None:
         raise ValueError(f"unknown device type: {device_type!r}")
     fqa = build_proxy_fqa(name, device_type, device_properties, skeleton.get("interfaces") or [])
-    raw = json.dumps(fqa).encode("utf-8")
+    raw = json.dumps(fqa, ensure_ascii=False).encode(
+        "utf-8"
+    )  # raw UTF-8: the HC3 stores escapes as Latin-1
     encoded = base64.b64encode(raw).decode("ascii")
     device, status = engine.api.dispatch_hc3("POST", "/quickApp", {"file": encoded})
     if status not in (200, 201):
@@ -216,10 +218,7 @@ def deploy_proxy(
         # (400 'map::at'), and the broken device stays behind. Say so, so
         # the repeated 'cannot create proxy' + accumulating duplicates make
         # sense at a glance.
-        leftovers = [
-            str(dev.get("id"))
-            for dev in _devices_by_name(engine, f"{name}_Proxy")
-        ]
+        leftovers = [str(dev.get("id")) for dev in _devices_by_name(engine, f"{name}_Proxy")]
         if leftovers:
             detail += (
                 f"; note: the HC3 created {len(leftovers)} same-named device(s) "
@@ -305,8 +304,7 @@ def existing_proxy(engine: LuaEngine, proxy_name: str, device_type: str) -> dict
             )
         engine.post_log(
             "info",
-            f"flua: existing proxy of wrong type, deleted: "
-            f"{device.get('id')} {device.get('name')}",
+            f"flua: existing proxy of wrong type, deleted: {device.get('id')} {device.get('name')}",
         )
         return None
     device["id"] = int(device["id"])

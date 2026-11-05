@@ -47,9 +47,7 @@ def _filter_helpers(devices: list[dict[str, Any]], uuid: str) -> list[dict[str, 
     """The deployed helpers among the device list, matched ONLY by the
     quickAppUuid property — never by name (users rename QAs in the web UI)."""
     return [
-        device
-        for device in devices
-        if (device.get("properties") or {}).get("quickAppUuid") == uuid
+        device for device in devices if (device.get("properties") or {}).get("quickAppUuid") == uuid
     ]
 
 
@@ -106,9 +104,7 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     # [quickAppUuid,flua-00-01] matches, quoting the value returns empty
     # (verified live on 5.221). The client-side filter stays as the
     # authority either way.
-    devices, status = engine.api.dispatch_hc3(
-        "GET", f"/devices?property=[quickAppUuid,{uuid}]"
-    )
+    devices, status = engine.api.dispatch_hc3("GET", f"/devices?property=[quickAppUuid,{uuid}]")
     if status != 200 or not isinstance(devices, list):
         parser.error(f"cannot list HC3 devices (HTTP {status})")
     helpers = _filter_helpers(devices, uuid)
@@ -140,7 +136,9 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         fqa, _ = build_fqa(str(_helper_source()))
         body: dict[str, Any] = {
             "file": base64.b64encode(
-                json.dumps(fqa).encode("utf-8")  # ASCII-escaped: the HC3 reads raw UTF-8 as Latin-1
+                json.dumps(fqa, ensure_ascii=False).encode(
+                    "utf-8"
+                )  # raw UTF-8: the HC3 stores escapes as Latin-1
             ).decode("ascii")
         }
         device, upload_status = engine.api.dispatch_hc3("POST", "/quickApp", body)

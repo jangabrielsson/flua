@@ -26,12 +26,15 @@ NAME = "uploadQA"
 
 
 def _upload_body(fqa: dict[str, Any], room: int | None = None) -> dict[str, Any]:
-    """The POST /quickApp body: the .fqa as ASCII-escaped JSON in the
-    {file: base64} envelope. The escaping matters — the HC3 reads raw
-    UTF-8 bytes as Latin-1 (the 'Test åäöÅÄÖ' garbling report), so the
-    JSON on the wire must stay pure ASCII."""
+    """The POST /quickApp body: the .fqa in the {file: base64} envelope.
+    The JSON is raw UTF-8 (ensure_ascii=False) — the HC3 stores the
+    bytes it receives, and ASCII-escaped names get re-encoded as
+    Latin-1 (mojibake in the UTF-8 UI; plua's raw UTF-8 stores
+    correctly)."""
     body: dict[str, Any] = {
-        "file": base64.b64encode(json.dumps(fqa).encode("utf-8")).decode("ascii")
+        "file": base64.b64encode(
+            json.dumps(fqa, ensure_ascii=False).encode("utf-8")  # raw UTF-8 (see _upload_body)
+        ).decode("ascii")
     }
     if room is not None:
         body["roomId"] = room

@@ -39,7 +39,9 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     engine = hc3_engine(parser)
     body: dict[str, object] = {
         "file": base64.b64encode(
-            json.dumps(fqa).encode("utf-8")  # ASCII-escaped: the HC3 reads raw UTF-8 as Latin-1
+            json.dumps(fqa, ensure_ascii=False).encode(
+                "utf-8"
+            )  # raw UTF-8: the HC3 stores escapes as Latin-1
         ).decode("ascii")
     }
     if args.room is not None:

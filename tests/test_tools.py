@@ -1286,10 +1286,11 @@ def test_migrate_tool_flags_legacy_file_colon_form(tmp_path, capsys) -> None:
     assert "--%%file:path,name" in out
 
 
-def test_upload_body_is_ascii_on_the_wire() -> None:
-    # the HC3 reads raw UTF-8 bytes as Latin-1 — the {file: base64}
-    # envelope must carry ASCII-escaped JSON so non-ASCII QA names survive
-    # the round trip (the 'Test åäöÅÄÖ' garbling report)
+def test_upload_body_carries_raw_utf8_names() -> None:
+    # the HC3 stores whatever bytes arrive: ASCII-escaped names get
+    # re-encoded as Latin-1 (mojibake in the UTF-8 UI), raw UTF-8 passes
+    # through intact (plua-verified). The {file: base64} envelope must
+    # carry the raw UTF-8 bytes.
     import base64
     import json
 
@@ -1298,6 +1299,6 @@ def test_upload_body_is_ascii_on_the_wire() -> None:
     fqa = {"name": "Test åäöÅÄÖ", "type": "com.fibaro.binarySwitch", "files": []}
     body = _upload_body(fqa, 7)
     wire = base64.b64decode(body["file"])
-    assert all(b < 128 for b in wire)  # pure ASCII on the wire
+    assert "åäöÅÄÖ".encode() in wire  # raw UTF-8 on the wire
     assert json.loads(wire)["name"] == "Test åäöÅÄÖ"  # and the name survives
     assert body["roomId"] == 7
