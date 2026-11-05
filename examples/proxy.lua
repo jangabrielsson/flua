@@ -20,6 +20,7 @@ end
 
 function QuickApp:slider(e)
   print("Slider changed to", e.values and e.values[1])
+  self:updateView("s1", "value", tostring(e.values[1]))
 end
 
 function QuickApp:selectChanged(e)
