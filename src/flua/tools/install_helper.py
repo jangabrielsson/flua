@@ -140,7 +140,7 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         fqa, _ = build_fqa(str(_helper_source()))
         body: dict[str, Any] = {
             "file": base64.b64encode(
-                json.dumps(fqa, ensure_ascii=False).encode("utf-8")
+                json.dumps(fqa).encode("utf-8")  # ASCII-escaped: the HC3 reads raw UTF-8 as Latin-1
             ).decode("ascii")
         }
         device, upload_status = engine.api.dispatch_hc3("POST", "/quickApp", body)

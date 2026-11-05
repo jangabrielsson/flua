@@ -1284,3 +1284,20 @@ def test_migrate_tool_flags_legacy_file_colon_form(tmp_path, capsys) -> None:
     out = capsys.readouterr().out
     assert "legacy --%%file:path:name spelling" in out
     assert "--%%file:path,name" in out
+
+
+def test_upload_body_is_ascii_on_the_wire() -> None:
+    # the HC3 reads raw UTF-8 bytes as Latin-1 — the {file: base64}
+    # envelope must carry ASCII-escaped JSON so non-ASCII QA names survive
+    # the round trip (the 'Test åäöÅÄÖ' garbling report)
+    import base64
+    import json
+
+    from flua.tools.upload_qa import _upload_body
+
+    fqa = {"name": "Test åäöÅÄÖ", "type": "com.fibaro.binarySwitch", "files": []}
+    body = _upload_body(fqa, 7)
+    wire = base64.b64decode(body["file"])
+    assert all(b < 128 for b in wire)  # pure ASCII on the wire
+    assert json.loads(wire)["name"] == "Test åäöÅÄÖ"  # and the name survives
+    assert body["roomId"] == 7

@@ -23,6 +23,19 @@ from ..engine import IDENTITY_PROPERTIES, sanitize_filename
 from .common import build_fqa, fqa_files, hc3_engine
 
 NAME = "uploadQA"
+
+
+def _upload_body(fqa: dict[str, Any], room: int | None = None) -> dict[str, Any]:
+    """The POST /quickApp body: the .fqa as ASCII-escaped JSON in the
+    {file: base64} envelope. The escaping matters — the HC3 reads raw
+    UTF-8 bytes as Latin-1 (the 'Test åäöÅÄÖ' garbling report), so the
+    JSON on the wire must stay pure ASCII."""
+    body: dict[str, Any] = {
+        "file": base64.b64encode(json.dumps(fqa).encode("utf-8")).decode("ascii")
+    }
+    if room is not None:
+        body["roomId"] = room
+    return body
 HELP = (
     "package an unpacked QA project and upload it to the HC3 "
     "(new QA, or the id in a downloaded <Name>_main_<id>.lua)"
@@ -147,13 +160,7 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     if qa_id is not None:
         # the target names an existing QA: sync files, name, properties, UI
         return _update_existing(engine, parser, qa_id, fqa)
-    body: dict[str, Any] = {
-        "file": base64.b64encode(
-            json.dumps(fqa, ensure_ascii=False).encode("utf-8")
-        ).decode("ascii")
-    }
-    if args.room is not None:
-        body["roomId"] = args.room
+    body = _upload_body(fqa, args.room)
     device, status = engine.api.dispatch_hc3("POST", "/quickApp", body)
     if status not in (200, 201) or not isinstance(device, dict):
         parser.error(f"cannot upload QA to the HC3 (HTTP {status})")
