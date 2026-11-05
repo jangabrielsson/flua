@@ -4,6 +4,18 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.134] - 2026-11-05
+
+### Added
+- add _FLUA.mainPath for accessing sibling files in QA directory
+- proxy example echoes slider value back with updateView
+
+### Changed
+- note the HC3 classic-UI slider updateView render bug
+
+### Fixed
+- enhance debug output in UPDATEVIEW for better value tracking
+
 ## [0.1.133] - 2026-11-05
 
 ### Added
