@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.131] - 2026-11-05
+
+### Fixed
+- route device actions through the QA's global onAction
+
 ## [0.1.130] - 2026-11-05
 
 ### Changed
