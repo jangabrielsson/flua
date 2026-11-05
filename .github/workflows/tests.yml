@@ -31,7 +31,7 @@ jobs:
       # slower, exactly when it matters.
       - name: Cache built lupa wheel (3.15 only)
         if: matrix.python-version == '3.15'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: wheels
           key: lupa-cp315-${{ hashFiles('pyproject.toml') }}
