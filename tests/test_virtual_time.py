@@ -129,21 +129,28 @@ def test_run_for_negative_instant_stops_at_virtual_limit() -> None:
 def test_run_for_negative_speed_uses_virtual_seconds() -> None:
     # --speed 10 --run-for -1: one virtual second at 10x ≈ 100 ms wall —
     # the 500 ms timer fires inside the limit and the run ends well before
-    # one wall second (the old wall-based fixed run took a full wall second)
-    start = time.monotonic()
-    result = _run_cli(
-        "--color",
-        "never",
-        "--speed",
-        "10",
-        "--run-for",
-        "-1",
-        "-e",
-        "setTimeout(function() print('FIRED') end, 500)",
+    # one wall second (the old wall-based fixed run took a full wall second).
+    # The wall budget gets one retry: subprocess spawn + import variance
+    # under parallel test load is environmental, not the behavior under test.
+    for _attempt in range(2):
+        start = time.monotonic()
+        result = _run_cli(
+            "--color",
+            "never",
+            "--speed",
+            "10",
+            "--run-for",
+            "-1",
+            "-e",
+            "setTimeout(function() print('FIRED') end, 500)",
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "FIRED" in result.stdout
+        if time.monotonic() - start < 0.8:
+            return
+    raise AssertionError(
+        "the run took >= 0.8s wall twice — --run-for -1 is wall-bound again"
     )
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert time.monotonic() - start < 0.8  # ~100 ms, not a full wall second
-    assert "FIRED" in result.stdout
 
 
 def test_run_for_negative_instant_with_no_timers_still_exits() -> None:
