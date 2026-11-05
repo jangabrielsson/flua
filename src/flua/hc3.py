@@ -109,7 +109,11 @@ class Hc3Remote:
                         query, quote_via=urllib.parse.quote
                     )
             else:
-                payload = json.dumps(body).encode("utf-8")
+                # raw UTF-8, not \uXXXX escapes: the HC3 stores JSON escapes
+                # as Latin-1 (live-verified — same reason the .fqa upload in
+                # proxy.py ships raw UTF-8). Escaped non-ASCII (arrows, °C,
+                # emoji in UI labels) would come back mangled.
+                payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
                 headers["Content-Type"] = "application/json"
         request = urllib.request.Request(url, data=payload, headers=headers, method=method.upper())
         return self._exchange(request, method, path, url, timeout)

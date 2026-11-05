@@ -37,6 +37,7 @@ class _MockHc3(BaseHTTPRequestHandler):
     devices: dict[int, dict] = {}
     next_id: int = 100
     requests: list[tuple[str, str, object]] = []  # (method, path, body)
+    raw_bodies: list[bytes] = []  # every request body as it arrived on the wire
     refresh_events: list[dict] = []  # served on the next refreshStates poll
     uploaded: list[dict] = []  # decoded .fqa packages (POST /quickApp)
     reject_name_filter: bool = False  # a firmware that 400s the unofficial ?name=
@@ -63,6 +64,7 @@ class _MockHc3(BaseHTTPRequestHandler):
     def _read_body(self):
         length = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(length) if length else b""
+        type(self).raw_bodies.append(raw)  # the wire bytes, before parsing
         if not raw:
             return None
         try:
@@ -75,6 +77,7 @@ class _MockHc3(BaseHTTPRequestHandler):
         cls.devices = {}
         cls.next_id = 100
         cls.requests = []
+        cls.raw_bodies = []
         cls.queries = []  # the decoded query dicts of every GET, in order
         cls.raw_queries = []  # the raw query strings, as they arrived on the wire
         cls.refresh_events = []
@@ -530,6 +533,42 @@ async def test_proxy_existing_reused_and_wrong_type_replaced(
     assert qa_id == 100  # the fresh proxy's id
     assert _MockHc3.seen("DELETE", "/api/devices/57")
     assert len(_MockHc3.uploaded) == 1
+
+
+@pytest.mark.asyncio
+async def test_proxy_ui_sync_sends_raw_utf8(tmp_path, capsys, mock_hc3, monkeypatch) -> None:
+    # non-ASCII UI text (arrows, °C, ∞) must arrive as raw UTF-8, never as
+    # \uXXXX escapes — the HC3 stores JSON escapes as Latin-1 and the UI
+    # comes back mangled (arrows broken in the classic view). Same wire
+    # rule as the .fqa upload path in proxy.py.
+    set_hc3_env(monkeypatch, tmp_path, mock_hc3)
+    script = write_script(
+        tmp_path,
+        "--%%name:sw\n"
+        "--%%mode:proxy\n"
+        '--%%u:{label="l1",text="▲ Up ▼ Down °C ∞"}\n'
+        "-- --------------- EOH ---------------\n"
+        'function QuickApp:onInit()\n  print("INIT", self.id)\nend\n',
+    )
+    add_existing_proxy(57, "sw_Proxy", "com.fibaro.binarySwitch")
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        qa_id, err = engine.load_qa_file(str(script))
+        assert err is None, err
+        # the reconnect UI sync (sync_proxy_ui) rides the loop
+        await wait_until(lambda: _MockHc3.seen("PUT", "/api/devices/57"))
+    finally:
+        await engine.stop()
+    assert qa_id == 57
+    ui_puts = [raw for raw in _MockHc3.raw_bodies if b"viewLayout" in raw]
+    assert ui_puts, "the UI sync PUT was not recorded"
+    for raw in ui_puts:
+        assert "▲".encode() in raw  # raw UTF-8 on the wire
+        assert "▼".encode() in raw
+        assert "°".encode() in raw
+        assert "∞".encode() in raw
+        assert b"\\u25b2" not in raw  # never the escaped form
 
 
 @pytest.mark.asyncio
