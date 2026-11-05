@@ -1,0 +1,189 @@
+<h2>flua troubleshooting — when it doesn't work, start here</h2>
+
+<p>flua is usually quiet when things go well and loud when they do not.
+This post is the short version of the troubleshooting skill: the most
+common problems, what they mean, and the fix — for Windows and macOS.
+No programming background required.</p>
+
+<h3>1. First stop: one command that explains itself</h3>
+
+<p>Before anything else, run:</p>
+
+<pre>
+flua doctor
+</pre>
+
+<p>It checks the nine things that usually go wrong — the flua install, the
+Python environment, the HC3 credentials and whether the controller is
+reachable (without ever printing your password), the VS Code setup, and
+more. Each line is a ✓ or ✗ with the reason. If doctor is all green and
+something still fails, the sections below cover the usual suspects.</p>
+
+<h3>2. "online mode requires HC3_URL"</h3>
+
+<pre>
+flua: error: online mode requires HC3_URL (or HC3_HOST) in the environment
+</pre>
+
+<p>flua runs offline against a simulated HC3 by default — no controller
+needed. This error means something asked for the <i>real</i> controller:
+<code>--api remote</code> on the command line, or <code>--%%mode:online</code> /
+<code>--%%mode:proxy</code> in the QA file's header — but flua could not find
+the controller's address.</p>
+
+<p>Two fixes:</p>
+
+<ul>
+<li>Put the address and credentials in a <code>.env</code> file (in the
+project folder, in your home folder, or as environment variables):
+<code>HC3_URL</code>, <code>HC3_USER</code>, <code>HC3_PASSWORD</code>.</li>
+<li>Or run offline on purpose: <code>flua --api local myqa.lua</code>, or
+<code>--%%mode:offline</code> in the QA header.</li>
+</ul>
+
+<h3>3. Wrong password? The HC3 locks itself</h3>
+
+<p>If the credentials are wrong, flua stops immediately instead of
+retrying — the HC3 locks itself after 4 failed attempts, and flua will not
+burn those on your behalf. Fix the password in <code>.env</code>, wait for
+the lock to clear, and run again: exactly one attempt was spent.</p>
+
+<h3>4. flua --version crashes after an upgrade</h3>
+
+<p>Symptom: you upgraded flua, something went wrong, and now every command
+dies with a Python traceback like:</p>
+
+<pre>
+ImportError: cannot import name '__version__' from 'flua'
+</pre>
+
+<p>What happened: the upgrade was interrupted halfway — often a running flua
+process (or an antivirus scan) locked files on Windows — so the install
+folder now holds a mix of new and old files. Re-running the upgrade says
+"all requirements already satisfied", because pip only compares version
+numbers, not files.</p>
+
+<p>The fix is a forced reinstall. Close all flua windows and VS Code debug
+sessions first, then:</p>
+
+<pre>
+python3 -m pip install --upgrade --force-reinstall --no-cache-dir fibaro-flua
+</pre>
+
+<p>On Windows, use <code>python -m pip ...</code> and add <code>--user</code>
+if your error path mentions <code>AppData\Roaming\Python</code> (that is
+the "user install" location — it must match how you installed flua the
+first time). <code>--force-reinstall</code> overrides "already satisfied",
+and <code>--no-cache-dir</code> rules out a corrupted download. Verify with
+<code>flua --version</code>.</p>
+
+<h3>5. Proxy mode: the device is on the HC3, but buttons do nothing</h3>
+
+<p>Proxy mode (<code>--%%mode:proxy</code>) runs your QA on the laptop while
+the device lives on the HC3. Button presses travel <i>from the HC3 back to
+your computer</i> — so two things must be true:</p>
+
+<ul>
+<li><b>flua is running.</b> The proxy posts every press to your computer.
+If flua is not running, those posts go nowhere — and they are not
+buffered, so presses during downtime are lost. Start flua, then press
+again.</li>
+<li><b>The HC3 can reach your computer.</b> flua listens on port 8080 and
+tells the controller where to call back. When the connection is set up,
+the log shows the address — check it:</li>
+</ul>
+
+<pre>
+flua: proxy connected — MyQA_Proxy (57) sends actions and UI events to http://192.168.1.23:8080
+</pre>
+
+<p>The IP must be your computer's real network address. On Windows compare
+with <code>ipconfig</code>, on macOS with <code>ipconfig getifaddr en0</code>.
+If it shows a VPN or virtual-machine address instead, that is the problem:
+the HC3 cannot route to it. (Running flua inside WSL on Windows has the
+same effect — run it in normal Windows Python.)</p>
+
+<p>If the address looks right but presses still do nothing, it is almost
+always the firewall — the most common cause on both systems, because
+everything flua <i>sends</i> works while everything <i>incoming</i> is
+silently blocked:</p>
+
+<ul>
+<li><b>Windows.</b> Windows Firewall only shows the "Allow access?" prompt
+when your network is classified <b>Private</b>. If it is <b>Public</b>
+(Windows changes this silently after network changes), incoming
+connections are blocked without any prompt. Fix: Windows Security →
+Firewall &amp; network protection → Allow an app through firewall → find
+Python → allow on Private networks. Or add a rule from an admin
+PowerShell:</li>
+</ul>
+
+<pre>
+netsh advfirewall firewall add rule name="flua proxy" dir=in action=allow protocol=TCP localport=8080
+</pre>
+
+<p>The rule belongs to one Python installation — a new venv or a new Python
+version needs its own. Change the port with <code>FLUA_PROXY_PORT</code> in
+<code>.env</code> if 8080 is taken (flua silently moves to the next free
+port — the log line above always names the real one).</p>
+
+<ul>
+<li><b>macOS.</b> The first time flua's proxy server starts, macOS asks
+"allow Python to accept incoming network connections?" — if that was
+denied (or never appeared), open System Settings → Network → Firewall →
+Options and allow the Python entry (remove it and re-add if it is stuck
+on blocked). Make sure "Block all incoming connections" is off.</li>
+</ul>
+
+<p>Quick test for both systems: while flua runs, open
+<code>http://&lt;your-ip&gt;:8080/</code> in a browser on your <i>phone</i>
+(same Wi-Fi). Any answer — even "not found" — proves the network path is
+open; a timeout means the firewall (or the router's Wi-Fi client
+isolation) is still in the way. To see whether flua is listening: on
+Windows <code>netstat -ano | findstr :8080</code>, on macOS
+<code>lsof -nP -iTCP:8080 -sTCP:LISTEN</code>.</p>
+
+<h3>6. The run ends right away</h3>
+
+<p>flua exits when nothing is pending — no timers, no messages, no
+connections. A QA that just waits for HC3 events needs to say so:
+<code>--%%keep-alive:true</code> in the header (proxy QAs do this
+automatically), or run with <code>flua --run-for 0</code> /
+<code>flua --ui</code> to stay alive while you experiment.</p>
+
+<h3>7. Odd warnings about directives and device types</h3>
+
+<pre>
+WARNING flua.config: unknown --%% directive: --%%instnat:true
+</pre>
+
+<p>That is a typo in a <code>--%%</code> header line (here:
+<code>instant</code>). flua parses it anyway and warns at runtime;
+<code>flua --check myqa.lua</code> reports it with the file name. And
+if startup fails with <code>unknown device type</code>, the error names the
+closest matches — the full list of supported types is one command away:</p>
+
+<pre>
+flua --tool catalog
+</pre>
+
+<h3>8. Still stuck? The diagnostic loop</h3>
+
+<p>Three things, in order:</p>
+
+<ul>
+<li><code>flua --check myqa.lua</code> — static problems, named and
+located.</li>
+<li><code>flua --log json myqa.lua</code> — one JSON object per log line,
+easy to search; and the engine keeps its own diary at
+<code>http://localhost:&lt;ui-port&gt;/flua/systemLog</code> when the
+viewer runs.</li>
+<li>Your QA's own <code>self:debug("...")</code> lines — plus
+<code>--%%debug:refreshState=true,api=true,http=true,ws=true</code> in the
+header to see every event and API call the emulator sees.</li>
+</ul>
+
+<p>If you work with an agent (Claude, Copilot, …), point it at the
+<code>flua-troubleshooting</code> skill — it carries the deeper sections
+(bridge errors, virtual-time surprises, the debugger) with the exact
+remedies.</p>
