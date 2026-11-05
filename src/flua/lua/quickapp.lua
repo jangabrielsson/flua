@@ -419,7 +419,7 @@ end
 -- @param event - Event object containing action details
 function onAction(id,event) -- { deviceID = 1234, actionName = "test", args = {1,2,3} }
   --if Emu:DBGFLAG('onAction') then print("onAction: ", json.encode(event)) end
-  -- if quickApp then quickApp:trace("onAction: ", json.encode(event)) end
+  if quickApp then quickApp:trace("onAction: ", json.encode(event)) end
   setTimeout(function()
   local self = plugin.mainQA
   ---@diagnostic disable-next-line: undefined-field
