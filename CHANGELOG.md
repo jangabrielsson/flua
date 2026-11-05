@@ -4,6 +4,17 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.130] - 2026-11-05
+
+### Changed
+- test: retry the wall-clock budget in the virtual-second run-for test
+
+### Fixed
+- enable tracing in onAction function for better event logging
+- upload raw UTF-8 fqa bodies — the HC3 stores escapes as Latin-1
+- upload .fqa bodies as ASCII-escaped JSON (non-ASCII names garbled)
+- tolerate the HC3's Latin-1 and string-wrapped upload responses
+
 ## [0.1.129] - 2026-11-04
 
 ### Fixed
