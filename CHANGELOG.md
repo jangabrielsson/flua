@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.135] - 2026-11-05
+
+### Added
+- ensure non-ASCII UI text is sent as raw UTF-8 in proxy mode
+
 ## [0.1.134] - 2026-11-05
 
 ### Added
