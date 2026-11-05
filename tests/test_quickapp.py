@@ -951,3 +951,31 @@ async def test_declared_file_names_must_pass_the_hc3_editor_rule(tmp_path) -> No
         assert qa_id is not None and err is None
     finally:
         await engine.stop()
+
+
+async def test_device_actions_route_through_the_qa_onAction(tmp_path, capsys) -> None:
+    # the HC3's device-action entry point is the QA's GLOBAL onAction, not
+    # a direct callAction: a QA-defined actionHandler intercepts FIRST (the
+    # proxy pattern) and the action method must not run
+    main = tmp_path / "main.lua"
+    main.write_text(
+        "--%%name:onact\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() end\n"
+        "function QuickApp:turnOn() print('METHOD turnOn') end\n"
+        "function QuickApp:actionHandler(action)\n"
+        "  print('HANDLER', action.actionName)\n"
+        "end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        qa_id, err = engine.load_qa_file(str(main))
+        assert err is None, err
+        engine.api.dispatch("POST", f"/devices/{qa_id}/action/turnOn", {"args": []})
+        await asyncio.sleep(0.4)
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "HANDLER turnOn" in out
+    assert "METHOD turnOn" not in out

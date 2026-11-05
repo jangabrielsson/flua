@@ -334,6 +334,7 @@ local pendingUserCalls = {}  -- qaId -> true while its registered handler runs
 -- forward slots: handlers, qaInstances and the mutually recursive runners
 -- are declared later in this chunk
 local handlers, qaInstances, resumeQa, runInQa, processWork
+local qaEnvs = {}  -- qaId -> the QA's boot environment (quickapp.lua etc.)
 
 local function queueFor(qaId, msg)
   local q = workQueues[qaId]
@@ -1028,6 +1029,7 @@ end
 -- run the chunk + construct the QuickApp instance. Used by both the CLI
 -- start path (timer-wrapped) and dynamic loading (eager, via startQA).
 local function startQaInEnv(env, qaId, config, args, loader, sourceName)
+  qaEnvs[qaId] = env  -- the QA's boot environment, reachable by handlers
   -- require() finds files next to the QA (test helpers, local libraries)
   -- without packaging them into the .fqa — only --%%file files are shipped
   local dir = qaSourceDir(sourceName)
@@ -1306,8 +1308,18 @@ handlers.deviceAction = function(msg)
   local qa, qaId = qaForDevice(msg.id)
   if sleeping[qaId] then queueFor(qaId, msg) return end -- delivered on wake
   if qa and type(qa.callAction) == "function" then
+    -- the HC3's entry point is the QA's global onAction, not callAction:
+    -- it dispatches to the action method, routes child-device actions to
+    -- the right child, and a QA-defined actionHandler intercepts FIRST
+    -- (the proxy pattern). Call the QA's own copy (quickapp.lua loads
+    -- per-QA into its boot environment).
+    local env = qaEnvs[qaId] or qaEnvFor(qaId)
     runInQa(qaId, function()
-      qa:callAction(msg.action, table.unpack(msg.args or {}))
+      env.onAction(msg.id, {
+        deviceId = msg.id,
+        actionName = msg.action,
+        args = msg.args or {},
+      })
     end)
   elseif qa == nil then
     -- Online mode suspends onInit on every api.* call, so actions a QA
