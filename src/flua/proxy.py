@@ -226,6 +226,13 @@ def deploy_proxy(
                 f"anyway (ids {', '.join(leftovers)}) — the next run reuses the newest"
             )
         raise ValueError(f"cannot create proxy {name}_Proxy on the HC3 (HTTP {status}: {detail})")
+    # some firmware string-wraps the JSON response (the transport decoded
+    # it as text) — unwrap before the shape checks
+    if isinstance(device, str):
+        try:
+            device = json.loads(device)
+        except ValueError:
+            device = None
     # the HC3 answers either the DeviceDto or a bare integer id (the live
     # suite handles both) — normalize to the device id
     if isinstance(device, dict) and device.get("id") is not None:

@@ -43,9 +43,15 @@ class _MockHc3(BaseHTTPRequestHandler):
     fail_upload: bool = False  # a controller that rejects the proxy upload
     bare_id_upload: bool = False  # a firmware answering POST /quickApp with a bare int id
     fail_delete: bool = False  # a controller whose DELETE /devices/{id} fails
+    latin1_response: bool = False  # a firmware serving non-ASCII names as Latin-1 bytes
 
     def _send_json(self, data, status: int = 200) -> None:
-        payload = json.dumps(data).encode()
+        payload = json.dumps(data)
+        if type(self).latin1_response:
+            # some firmware serves non-ASCII names as Latin-1 bytes
+            payload = payload.encode("latin-1")
+        else:
+            payload = payload.encode()
         try:
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
@@ -77,6 +83,7 @@ class _MockHc3(BaseHTTPRequestHandler):
         cls.fail_upload = False
         cls.bare_id_upload = False
         cls.fail_delete = False
+        cls.latin1_response = False
 
     @classmethod
     def seen(cls, method: str, path: str) -> list:
@@ -1055,3 +1062,56 @@ async def test_proxy_cleanup_failure_aborts_instead_of_piling_on(
     finally:
         await engine.stop()
     assert _MockHc3.uploaded == []  # nothing new was deployed on top
+
+
+async def test_proxy_deploy_tolerates_latin1_response_names(
+    tmp_path, mock_hc3, monkeypatch
+) -> None:
+    # a QA named 'P ö test' uploads fine, but some firmware answers with
+    # the name as Latin-1 bytes — the response must still parse (the
+    # 'unexpected 2xx response: ...\ufffd...' report)
+    set_hc3_env(monkeypatch, tmp_path, mock_hc3)
+    _MockHc3.latin1_response = True
+    script = write_script(
+        tmp_path,
+        content="--%%name:P ö test\n"
+        "--%%mode:proxy\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() print('INIT', self.id) end\n",
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        qa_id, err = engine.load_qa_file(str(script))
+        assert err is None, err
+        await wait_until(lambda: _MockHc3.seen("POST", "/api/devices/100/action/CONNECT"))
+    finally:
+        await engine.stop()
+    assert qa_id == 100  # the deploy parsed the Latin-1 response and ran
+
+
+async def test_proxy_deploy_unwraps_a_string_wrapped_response(
+    tmp_path, mock_hc3, monkeypatch
+) -> None:
+    # some firmware answers 2xx with the JSON body wrapped in a JSON string
+    # — the deploy must unwrap it (belt-and-braces beside the Latin-1 fix)
+    set_hc3_env(monkeypatch, tmp_path, mock_hc3)
+    script = write_script(tmp_path)
+
+    original = _MockHc3._send_json
+
+    def _string_wrapped(self, data, status: int = 200) -> None:
+        if self.command == "POST" and self.path.split("?")[0] == "/api/quickApp":
+            data = json.dumps(data)  # the body is a JSON string containing JSON
+        original(self, data, status)
+
+    monkeypatch.setattr(_MockHc3, "_send_json", _string_wrapped)
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        qa_id, err = engine.load_qa_file(str(script))
+        assert err is None, err
+        await wait_until(lambda: _MockHc3.seen("POST", "/api/devices/100/action/CONNECT"))
+    finally:
+        await engine.stop()
+    assert qa_id == 100

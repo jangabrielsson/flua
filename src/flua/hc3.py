@@ -146,4 +146,11 @@ class Hc3Remote:
         try:
             return json.loads(raw.decode("utf-8")), status
         except ValueError:
-            return raw.decode("utf-8", errors="replace"), status
+            # some firmware serves non-ASCII names as Latin-1 bytes — a
+            # broken UTF-8 byte fails the first parse (the 'P ö test'
+            # report: the upload succeeded but the response did not parse).
+            # Decode Latin-1 before giving up on JSON.
+            try:
+                return json.loads(raw.decode("latin-1")), status
+            except ValueError:
+                return raw.decode("utf-8", errors="replace"), status
