@@ -1037,7 +1037,15 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return asyncio.run(_run(parser, args))
     except KeyboardInterrupt:
-        print("flua: interrupted", file=sys.stderr)
+        # eat the echoed ^C (clear the current terminal line) and leave a
+        # friendly goodbye instead of a bare interrupt; pipes see the plain
+        # message, and a legacy codepage cannot crash the exit path
+        if sys.stderr.isatty():
+            sys.stderr.write("\r\x1b[2K")
+        try:
+            sys.stderr.write("👋 Goodbye!\n")
+        except UnicodeEncodeError:
+            sys.stderr.write("Goodbye!\n")
         return 130
 
 

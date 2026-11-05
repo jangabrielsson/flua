@@ -1155,7 +1155,7 @@ def test_ctrl_c_terminates_promptly_mid_long_poll(tmp_path, mock_hc3) -> None:
     # while still being far from the mock's hold time
     assert time.monotonic() - started < 8.0
     assert proc.returncode == 130
-    assert "flua: interrupted" in err.decode()
+    assert "Goodbye!" in err.decode()  # the friendly Ctrl-C farewell (pipes: no ANSI)
 
 
 def test_cli_main_file_offline_directive_forces_sim(tmp_path, mock_hc3) -> None:
