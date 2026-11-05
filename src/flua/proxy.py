@@ -82,7 +82,9 @@ function QuickApp:UPDATEVIEW(uv)
   uv = uv or {}
   self:updateView(uv.componentName, uv.propertyName, uv.newValue)
   self:debug(
-    "UPDATEVIEW applied: " .. tostring(uv.componentName) .. "." .. tostring(uv.propertyName)
+    "UPDATEVIEW applied: " .. tostring(uv.componentName) .. "."
+    .. tostring(uv.propertyName) .. " = " .. tostring(uv.newValue)
+    .. " (" .. type(uv.newValue) .. ")"
   )
 end
 
