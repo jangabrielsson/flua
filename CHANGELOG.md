@@ -4,6 +4,14 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.132] - 2026-11-05
+
+### Changed
+- ci: bump actions/cache to v5 (Node 20 deprecation)
+
+### Fixed
+- deviceAction dispatches by id through onAction; hold booting targets
+
 ## [0.1.131] - 2026-11-05
 
 ### Fixed
