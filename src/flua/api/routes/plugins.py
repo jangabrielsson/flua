@@ -357,7 +357,26 @@ def plugin_update_view(state: SimState, req: ApiRequest) -> tuple[Any, int]:
                     # breaks on such aliases ('lost reference')
                     comp[property_name] = copy.deepcopy(new_value)
                     break
-    forward_to_proxy(req, state.is_proxy(dev["id"]))
+    if state.is_proxy(dev["id"]) and req.remote is not None:
+        # the HC3's /plugins/updateView rejects external callers (400
+        # 'The document is empty', live-verified) and cross-QA local calls
+        # (404) — only the device's own updateView reaches the live UI.
+        # Route through the proxy's own QA instead: its UPDATEVIEW action
+        # applies self:updateView natively (same channel CONNECT uses).
+        req.remote(
+            "POST",
+            f"/devices/{dev['id']}/action/UPDATEVIEW",
+            {
+                "args": [
+                    {
+                        "componentName": component_name,
+                        "propertyName": property_name,
+                        "newValue": new_value,
+                    }
+                ]
+            },
+        )
+        return None, 204
     return None, 204
 
 

@@ -1115,3 +1115,40 @@ async def test_proxy_deploy_unwraps_a_string_wrapped_response(
     finally:
         await engine.stop()
     assert qa_id == 100
+
+
+async def test_proxy_update_view_routes_through_the_proxy_action(
+    tmp_path, mock_hc3, monkeypatch
+) -> None:
+    # the HC3's /plugins/updateView rejects external callers — the emulated
+    # QA's updateView must route through the proxy's own UPDATEVIEW action
+    # (its self:updateView reaches the live UI)
+    set_hc3_env(monkeypatch, tmp_path, mock_hc3)
+    add_existing_proxy(57, "sw_Proxy", "com.fibaro.binarySwitch")
+    script = write_script(
+        tmp_path,
+        content="--%%name:sw\n"
+        "--%%mode:proxy\n"
+        '--%%u:{label="l1",text="before"}\n'
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit()\n"
+        "  self:updateView('l1', 'text', 'after')\n"
+        "end\n",
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        qa_id, err = engine.load_qa_file(str(script))
+        assert err is None, err
+        await wait_until(
+            lambda: _MockHc3.seen("POST", "/api/devices/57/action/UPDATEVIEW")
+        )
+    finally:
+        await engine.stop()
+    assert qa_id == 57
+    calls = _MockHc3.seen("POST", "/api/devices/57/action/UPDATEVIEW")
+    assert calls[0][2]["args"][0] == {
+        "componentName": "l1",
+        "propertyName": "text",
+        "newValue": "after",
+    }

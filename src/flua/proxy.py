@@ -60,7 +60,7 @@ function QuickApp:onInit()
 end
 
 -- Actions the proxy handles itself rather than forwarding to the emulator
-local IGNORE = { MEMORYWATCH = true, APIFUN = true, CONNECT = true }
+local IGNORE = { MEMORYWATCH = true, APIFUN = true, CONNECT = true, UPDATEVIEW = true }
 
 -- Store where the emulator listens for callbacks (survives proxy restarts)
 function QuickApp:CONNECT(con)
@@ -72,6 +72,18 @@ function QuickApp:CONNECT(con)
     uiUrl = "http://" .. ip .. ":" .. port .. "/api/plugins/callUIEvent"
   end
   self:debug("Connected to emulator at " .. tostring(ip) .. ":" .. tostring(port))
+end
+
+-- The emulated QA's updateView, applied by the proxy's OWN QA: the HC3's
+-- /plugins/updateView rejects external callers (400 'The document is
+-- empty') and other QAs (404) — only the device's own updateView reaches
+-- the live UI, so flua routes the update through this action.
+function QuickApp:UPDATEVIEW(uv)
+  uv = uv or {}
+  self:updateView(uv.componentName, uv.propertyName, uv.newValue)
+  self:debug(
+    "UPDATEVIEW applied: " .. tostring(uv.componentName) .. "." .. tostring(uv.propertyName)
+  )
 end
 
 -- Forward every device action to the emulator (special actions stay local)
