@@ -1044,6 +1044,10 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
     -- the effective runtime mode (offline|online|proxy) — vs
     -- config.mode/offline/proxy, which are the QA's declared directives
     mode = _PY.qa_mode(qaId),
+    -- the main QA file's directory with a trailing separator, so
+    -- io.open(_FLUA.mainPath .. "data.json") reads files shipped next to
+    -- the QA regardless of the cwd (absolute when loaded via the CLI)
+    mainPath = dir .. "/",
     -- uiEvent(elementName, eventType[, value]): inject a UI event exactly
     -- as the HC3 UI would deliver it (the same REST route the viewer uses)
     -- so verify QAs can drive and assert UI behavior without a browser.

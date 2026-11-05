@@ -232,3 +232,40 @@ def test_api_result_handoff_is_atomic() -> None:
     assert engine._api_calls_inflight == 0
     assert engine.has_pending_work()  # the result is now in the outbound queue
     assert engine._outbound.get_nowait()["type"] == messages.API_RESULT
+
+
+@pytest.mark.asyncio
+async def test_flua_main_path_reads_sibling_files(tmp_path, capsys) -> None:
+    # _FLUA.mainPath: the main QA file's directory with a trailing
+    # separator — a require'd sibling module (the climateEndPoint pattern)
+    # opens data shipped next to the QA regardless of the cwd
+    (tmp_path / "data.txt").write_text("zone-42")
+    (tmp_path / "endpoint.lua").write_text(
+        "local M = {}\n"
+        "function M.load()\n"
+        "  local f = io.open(_FLUA.mainPath .. 'data.txt', 'r')\n"
+        "  local s = f:read('*a') f:close()\n"
+        "  return s\n"
+        "end\n"
+        "return M\n"
+    )
+    script = tmp_path / "qa.lua"
+    script.write_text(
+        "local ep = require('endpoint')\n"
+        "function QuickApp:onInit()\n"
+        "  print('MAINPATH', _FLUA.mainPath)\n"
+        "  print('DATA', ep.load())\n"
+        "end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        qa_id, err = engine.load_qa_file(str(script))
+        assert err is None, err
+        assert qa_id is not None
+        await wait_until(lambda: not engine.has_pending_work())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "DATA zone-42" in out
+    assert "MAINPATH " + str(tmp_path) + "/" in out

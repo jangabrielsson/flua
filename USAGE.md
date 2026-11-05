@@ -1826,6 +1826,10 @@ live on `_FLUA` so your code stays portable:
   the directives the QA declared — a QA can pin itself offline in an online
   run)
 - `_FLUA.arg` — the file path / `-e` marker
+- `_FLUA.mainPath` — the main QA file's directory with a trailing
+  separator: `io.open(_FLUA.mainPath .. "data.json", "r")` reads files
+  shipped next to the QA regardless of the cwd (absolute when loaded via
+  the CLI; the unpack directory for `.fqa` packages)
 - `_FLUA.exit(code)` — stop the engine (vs `exit(code)` / `os.exit()` in a QA, which stop only that QA — `os.exit()` is the name real HC3 QAs use)
 - `_FLUA.keepAlive()` — keep this QA (and with it the run) alive past idle,
   like `--%%keep-alive:true` but at runtime and in every mode; the QA's
