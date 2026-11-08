@@ -28,6 +28,7 @@ DEVICES = [
         "name": "Heating",
         "type": "com.fibaro.deviceController",
         "roomID": 2,
+        "modified": 1720000000000,
         "interfaces": ["quickApp", "power"],
     },
     {
@@ -43,6 +44,16 @@ DEVICES = [
         "type": "com.fibaro.alarm",
         "roomID": None,
         "interfaces": ["quickApp"],
+    },
+    {
+        # a QuickApp CHILD: interface quickAppChild + a parentId — the
+        # HC3's discriminator (live-verified): children must never list
+        "id": 59,
+        "name": "Heating child",
+        "type": "com.fibaro.binarySwitch",
+        "roomID": 2,
+        "parentId": 57,
+        "interfaces": ["quickAppChild", "power"],
     },
 ]
 
@@ -117,9 +128,11 @@ def test_hub_list_reports_hub_and_qas(tmp_path, monkeypatch) -> None:
         assert hub["firmware"] == "5.221.22"
         qas = payload["qas"]
         assert [qa["id"] for qa in qas] == [57, 58]  # the binarySwitch is filtered out
+        # ...and so is the QuickApp CHILD (59, quickAppChild + parentId)
         assert qas[0]["name"] == "Heating"
         assert qas[0]["type"] == "com.fibaro.deviceController"
         assert qas[0]["room"] == "Living room"  # roomID resolved to its name
+        assert qas[0]["modified"] == 1720000000000  # the cache's freshness signal
         assert qas[1]["room"] is None
     finally:
         server.shutdown()

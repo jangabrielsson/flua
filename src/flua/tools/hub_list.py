@@ -4,7 +4,8 @@ The data source for the VS Code hub browser (and the same surface an agent
 can call): hub name/model/firmware/reachability from /settings/info (the
 same checks `flua doctor` performs) plus the QuickApp list from /devices
 filtered by the quickApp interface, rooms resolved by name. QAs are keyed
-by id — HC3 names are not unique.
+by id — HC3 names are not unique. QuickApp CHILDREN carry the
+quickAppChild interface (live-verified) and are never listed.
 
 Always prints one JSON document on stdout; the shape is the contract:
 
@@ -99,6 +100,9 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
                     "name": dev.get("name"),
                     "type": dev.get("type"),
                     "room": rooms.get(dev.get("roomID")) if dev.get("roomID") is not None else None,
+                    # the hub's modified timestamp (epoch ms): the extension's
+                    # cache uses it to decide freshness without extra calls
+                    "modified": dev.get("modified"),
                 }
                 qas.append(qa)
             qas.sort(key=lambda qa: (qa["id"] is None, qa["id"] or 0))
