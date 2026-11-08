@@ -7,12 +7,14 @@ import { FqaEditorProvider } from "./fqaEditor";
 import { registerHub } from "./hub";
 import { registerMcp, unregisterMcp } from "./mcp";
 import { registerRun } from "./run";
+import { registerTestAdapter } from "./testAdapter";
 
 export function activate(context: vscode.ExtensionContext) {
   registerCheckDiagnostics(context);
   registerRun(context);
   registerHub(context);
   registerCompletions(context);
+  registerTestAdapter(context);
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider(
       FqaEditorProvider.viewType,
