@@ -95,10 +95,10 @@ posted = published (fill in the forum link and date).
 
 | File | Title | Covers | Status |
 |------|-------|--------|--------|
-| promotion.html | Developing QuickApps with AI agents — and a tool that makes it fast | the agent pitch: domain knowledge via skills/AGENTS.md + the code→verify loop with flua | ready |
+| promotion.html | Developing QuickApps with AI agents — and a tool that makes it fast | the agent pitch: domain knowledge via skills/AGENTS.md + the code→verify loop with flua | posted 2026-11-08 https://forum.fibaro.com/topic/80435-developing-quickapps-with-aiagents/ |
 | whats-new.html | What's new in flua — 0.1.127 through 0.1.137 | the human changelog: the VS Code app layer (hub view, cache, completions, hub profiles), proxy-mode UTF-8 and updateView fixes, small fixes, the CI lupa-cache saga | ready |
 | compat-notes.html | flua compatibility notes — what changed to match the real HC3 | the QA api layer's 501s, updateProperty ownership, getProperty removal, status-code and name-rule corrections | ready |
 | install-macos.html | Installing flua on macOS — Python, pip, VS Code, and the usual bumps | brew/python install, pip install + upgrade/downgrade (version pinning), `which flua`/shebang, launch.json interpreter story, troubleshooting (PATH, PEP 668, lupa wheel, multi-Python) | ready |
 | troubleshooting.html | flua troubleshooting — when it doesn't work, start here | `flua doctor`, HC3_URL, HC3 auth lockout, broken upgrades (force-reinstall), proxy firewall (Windows Public profile + macOS), keep-alive, directive typos, the diagnostic loop | ready |
-| agents-future.html | Working with agents — the future of software development | the agent loop (inner: code→test→fix, outer: requirements→judgment→refine), the testbed argument (self-driving analogy, flua as the HC3 simulator), agent-friendliness (text files, one CLI surface, machine-readable verdicts, same file deploys), the non-coder's part (behavior not code, judgment, discovery) | draft |
+| agents-future.html | Working with agents — the future of software development | the agent loop (inner: code→test→fix, outer: requirements→judgment→refine), the testbed argument (self-driving analogy, flua as the HC3 simulator), agent-friendliness (text files, one CLI surface, machine-readable verdicts, same file deploys), the non-coder's part (behavior not code, judgment, discovery) | posted 2026-11-08 https://forum.fibaro.com/topic/80435-developing-quickapps-with-aiagents/#findComment-298667 |
 
