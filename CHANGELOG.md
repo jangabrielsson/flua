@@ -4,6 +4,25 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.136] - 2026-11-08
+
+### Added
+- hub-newer staleness badge and 30-day cache pruning in the hub view
+- hub resource cache for the VS Code extension (View .fqa, cached downloads)
+- hubList carries the modified timestamp for cache freshness
+- HC3 hub tree and hub-aware completions in the VS Code extension
+- hub and house data tools (--tool hubList, --tool house) with pinning tests
+
+### Changed
+- document the new tools, the hub view, and the house completions
+- position flua as the engine with apps built on top
+- design notes for the VS Code extension surfaces
+- test: ensure log tag reflects correct QA ID without duplication
+- add forum troubleshooting post (Windows + macOS)
+
+### Fixed
+- downloadFQA sends an empty-object body and falls back to the GET export
+
 ## [0.1.135] - 2026-11-05
 
 ### Added
