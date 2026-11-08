@@ -4,6 +4,22 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.138] - 2026-11-08
+
+### Added
+- enhance device id completion with name fragment matching
+- honor the Test Explorer's per-file selection (run this one)
+- Test Explorer adapter for self-asserting test QAs
+- flua test --json — the machine contract for the Test Explorer adapter
+
+### Changed
+- run Test Explorer discovery without xdist (-n 0 overrides the addopts)
+- configure the Python Test Explorer for pytest (and the venv interpreter)
+- fix the feedback-loop post date (Oct 31)
+- mark the forum series posted with links
+- forum what's-new summary for 0.1.127-0.1.137
+- forum post 32 — the VS Code extension workflow (and fix post 31's teaser)
+
 ## [0.1.137] - 2026-11-08
 
 ### Added
