@@ -78,3 +78,28 @@ def test_flua_test_discovery_and_list(tmp_path) -> None:
     result = _run("test", cwd=empty)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "no *_test.lua files found" in result.stdout
+
+
+def test_flua_test_json_is_one_document(tmp_path) -> None:
+    # the machine contract for the VS Code test adapter and agents: one
+    # JSON document on stdout, per-file statuses + failures + output, a
+    # summary, and the same exit code as the human run
+    import json
+
+    (tmp_path / "ok_test.lua").write_text(
+        '--%%name:ok_test\nlocal t = require("flua-test").new()\n'
+        't:expect(true, "always")\nt:finish()\n'
+    )
+    (tmp_path / "bad_test.lua").write_text(
+        '--%%name:bad_test\nlocal t = require("flua-test").new()\n'
+        't:expect(false, "nope")\nt:finish()\n'
+    )
+    result = _run("test", "--json", cwd=tmp_path)
+    assert result.returncode == 1, result.stdout + result.stderr
+    payload = json.loads(result.stdout)  # pure JSON, no human lines
+    by_name = {entry["file"]: entry for entry in payload["files"]}
+    assert by_name["ok_test.lua"]["status"] == "pass"
+    assert by_name["bad_test.lua"]["status"] == "fail"
+    assert by_name["bad_test.lua"]["failures"] == 1
+    assert "nope" in by_name["bad_test.lua"]["output"]
+    assert payload["summary"] == {"passed": 1, "failed": 1, "timedOut": 0}

@@ -11,12 +11,14 @@ PASS/FAIL/TIMEOUT. The process exit code is 0 only when everything passes.
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import subprocess
 import sys
 from pathlib import Path
 
 DEFAULT_TIMEOUT = 30
+_OUTPUT_CAP = 20_000
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -44,6 +46,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         "--verbose",
         action="store_true",
         help="show each failed test's output",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="one JSON document (files + results + summary) — the machine contract "
+        "for the VS Code test adapter and agents",
     )
 
 
@@ -108,27 +116,57 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         print("flua test: no *_test.lua files found")
         return 0
     passed = failed = timed_out = 0
+    results: list[dict] = []
     for path in files:
         stdout, stderr, code, status = run_one(path, args.timeout, cwd)
+        entry: dict = {
+            "file": _display(path, cwd),
+            "status": "pass",
+            "exitCode": code,
+            "failures": None,
+            "output": "",
+        }
+        output = (stderr + stdout).strip()
+        output = re.sub(r"\x1b\[[0-9;]*m", "", output)  # no ANSI in the machine output
+        if len(output) > _OUTPUT_CAP:
+            output = output[:_OUTPUT_CAP] + "\n…(truncated)"
+        entry["output"] = output
         if status == "timeout":
             timed_out += 1
-            print(
-                f"  TIME  {_display(path, cwd)}  (no exit within {args.timeout}s — "
-                "does the test end with t:finish()/exit(...)?)"
-            )
-            continue
-        if code == 0:
+            entry["status"] = "timeout"
+            if not args.json:
+                print(
+                    f"  TIME  {_display(path, cwd)}  (no exit within {args.timeout}s — "
+                    "does the test end with t:finish()/exit(...)?)"
+                )
+        elif code == 0:
             passed += 1
-            print(f"  PASS  {_display(path, cwd)}")
+            if not args.json:
+                print(f"  PASS  {_display(path, cwd)}")
         else:
             failed += 1
+            entry["status"] = "fail"
             match = re.search(r"failures: (\d+)", stdout)
-            print(
-                f"  FAIL  {_display(path, cwd)}  "
-                f"(failures: {match.group(1) if match else '?'})"
+            entry["failures"] = int(match.group(1)) if match else None
+            if not args.json:
+                print(
+                    f"  FAIL  {_display(path, cwd)}  "
+                    f"(failures: {match.group(1) if match else '?'})"
+                )
+                if args.verbose:
+                    for line in (stderr + stdout).splitlines():
+                        print(f"        {line}")
+        results.append(entry)
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "files": results,
+                    "summary": {"passed": passed, "failed": failed, "timedOut": timed_out},
+                },
+                ensure_ascii=False,
             )
-            if args.verbose:
-                for line in (stderr + stdout).splitlines():
-                    print(f"        {line}")
-    print(f"flua test: {passed} passed, {failed} failed, {timed_out} timed out")
+        )
+    else:
+        print(f"flua test: {passed} passed, {failed} failed, {timed_out} timed out")
     return 0 if not failed and not timed_out else 1
