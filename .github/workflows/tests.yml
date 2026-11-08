@@ -23,17 +23,17 @@ jobs:
       # wheel (keyed on pyproject, so a lupa bump rebuilds). The other tracks
       # install binary wheels and skip these entirely.
       #
-      # The wheel is installed BY PATH: pip's resolver ignores the restored
-      # --find-links wheel (it re-downloads the sdist and rebuilds ~2 min
-      # every run; live-verified), so the install goes straight to the
-      # artifact. A restored wheel that pip rejects (e.g. built by an older
-      # runner image) fails the install, and the fallback rebuilds it in the
-      # same run — self-healing, never wrong.
+      # The wheel is installed BY PATH with a version-pinned glob: the cache
+      # once held an UNCONSTRAINED `pip wheel lupa` artifact (2.8 — Lua 5.5,
+      # which the <2.7 pin excludes). The resolver correctly rejected it and
+      # rebuilt 2.6 from source every run (~2 min, live-verified) — so the
+      # glob names the pinned version, a poisoned cache triggers the
+      # constrained rebuild, and the path-install never re-resolves.
       #
       # restore-keys reuses the previous wheel when the exact key misses —
       # pyproject.toml changes with EVERY release (the version bump), so a
       # strict key would force a full lupa compile per release. A restored
-      # wheel still satisfies the constraint; if it is ever raised, the
+      # wheel still satisfies the pin; if it is ever raised, the
       # path-install fails and the fallback compiles from source again —
       # correct, just slower, exactly when it matters.
       - name: Cache built lupa wheel (3.15 only)
@@ -48,10 +48,10 @@ jobs:
         if: matrix.python-version == '3.15'
         run: |
           pip install wheel
-          if ! ls wheels/lupa-*.whl >/dev/null 2>&1 || ! pip install wheels/lupa-*.whl; then
+          if ! ls wheels/lupa-2.6-*.whl >/dev/null 2>&1 || ! pip install wheels/lupa-2.6-*.whl; then
             rm -f wheels/lupa-*
-            pip wheel lupa --no-deps -w wheels
-            pip install wheels/lupa-*.whl
+            pip wheel "lupa>=2.6,<2.7" --no-deps -w wheels
+            pip install wheels/lupa-2.6-*.whl
           fi
       - name: Install
         run: pip install -e ".[dev]"
