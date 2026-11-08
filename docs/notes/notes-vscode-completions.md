@@ -1,6 +1,10 @@
 # Note: hub-aware completions in the VS Code extension (design draft)
 
-Status: design draft, not built (2026-11-08).
+Status: v1 implemented (2026-11-08) — `flua --tool house`, the completions
+provider in the VS Code extension (`vscode/src/completions.ts`), the
+`flua.house.refresh`/`flua.house.generateHomeTable` commands, and the
+`flua.houseDb`/`flua.houseRefresh` settings. Stretch items (live refresh
+against a running emulator, room filters, ht.lua regeneration) remain.
 
 ## Context and goal
 

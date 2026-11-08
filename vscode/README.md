@@ -49,6 +49,22 @@ packages without unpacking them by hand.
 - **Onboarding nudge**: a workspace with Lua files but no HC3 completion
   config (`.luarc.json`/`.luals`) gets a one-time offer to run Setup
   workspace (`flua.setupNudge` turns it off).
+- **HC3 hub view** (the flua activity-bar icon): the hub's model/firmware
+  and its QuickApps as a tree — `flua --tool hubList` under the hood,
+  refresh on demand. Clicking a QA offers the loop: Download (into
+  `<workspace>/<name>-<id>`), Update (upload local changes), Run (--ui),
+  Pack, Copy id. Run/Update/Pack remember the download folder, so the
+  loop stays in VS Code.
+- **Hub-aware completions**: inside `fibaro.call(`/`fibaro.getValue(`/
+  `fibaro.setValue(`, device ids complete with name and room; scene ids
+  after `fibaro.scene("execute", `; global variable names inside
+  `fibaro.getGlobalVariable("`/`setGlobalVariable("`; custom event names
+  inside `fibaro.emitCustomEvent("`. The data comes from `flua --tool
+  house` — the real hub when credentials exist, else `flua.houseDb` (a
+  seed/db file for the simulated house), refreshed on Lua saves
+  (`flua.houseRefresh`). "Flua: Generate home table (ht.lua)" writes a
+  LuaLS-annotated `HT` table (rooms → names → ids) for readable
+  `HT.kitchen.light` code.
 - **MCP registration**: "Flua: Register flua-mcp with Copilot" writes the
   flua-mcp stdio server into the workspace's `.vscode/mcp.json` — the venv
   python interpreter with `-m flua.mcp.server`, exactly as `docs/mcp.md`
@@ -116,3 +132,7 @@ executable.
 - `flua.codeLens` — the CodeLens links (default true).
 - `flua.codeLensInteract` — the interactive lenses: Call <method> on QA
   methods and the UI-event lens on `--%%u` lines (default true).
+- `flua.houseDb` — a seed/db file for the simulated house: the source of
+  hub-aware completions when no HC3 credentials exist.
+- `flua.houseRefresh` — refresh the house data on Lua save (`onSave`, the
+  default) or only via "Flua: Refresh house data" (`manual`).

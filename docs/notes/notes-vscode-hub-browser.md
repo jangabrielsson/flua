@@ -1,6 +1,9 @@
 # Note: the HC3 hub browser in the VS Code extension (design draft)
 
-Status: design draft, not built (2026-11-08).
+Status: v1 implemented (2026-11-08) — `flua --tool hubList`, the hub tree
+in the VS Code extension (`vscode/src/hub.ts`), the QA actions and the
+remembered download folder. Stretch items (devices section, console tail,
+freshness badge, webview dashboard) remain.
 
 ## Context and goal
 

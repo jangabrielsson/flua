@@ -462,6 +462,24 @@ from flua.tools.state_tool import scan_tree
 print(scan_tree(engine.api.state))   # {"aliases": [{"paths": [...]}], "cycles": [...]}
 ```
 
+### The house and the hub as data (`--tool house`, `--tool hubList`)
+
+Two data tools feed the VS Code extension (the HC3 hub tree and the
+hub-aware completions) and give agents/scripts the same JSON:
+
+```bash
+flua --tool hubList                 # hub info + the hub's QuickApps (ids, names, types, rooms)
+flua --tool house                   # devices/globals/scenes/customEvents — from the hub
+flua --tool house --db house.json   # ...or from a seed/db file (the simulated house)
+```
+
+`hubList` needs HC3 credentials (the `.env` chain) and prints
+`{"hub": {...}, "qas": [...]}` — QAs keyed by id, rooms resolved by name.
+`house` resolves the same priority the extension needs: HC3 credentials
+first, else `--db`, else an honest empty house (a QA-only run has none).
+Both print one JSON document on stdout; the shape is the contract the
+extension and MCP clients consume.
+
 And a route can be replayed in isolation — the handlers are pure functions
 over `SimState`:
 
