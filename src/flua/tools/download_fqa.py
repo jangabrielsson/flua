@@ -35,7 +35,13 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
 def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     engine = hc3_engine(parser)
-    fqa, status = engine.api.dispatch_hc3("POST", f"/quickApp/{args.id}/export", None)
+    # the docs' "empty body" means an empty JSON object — a bodyless POST
+    # gets HTTP 400 from the real HC3 (live-verified, same as downloadQA).
+    # Some firmware versions still reject the POST altogether; the
+    # deprecated GET is the proven fallback.
+    fqa, status = engine.api.dispatch_hc3("POST", f"/quickApp/{args.id}/export", {})
+    if status != 200:
+        fqa, status = engine.api.dispatch_hc3("GET", f"/quickApp/export/{args.id}", None)
     if status != 200 or not isinstance(fqa, dict):
         parser.error(f"cannot export QA {args.id} (HTTP {status})")
     # the HC3's export omits the identity properties (manufacturer, model,

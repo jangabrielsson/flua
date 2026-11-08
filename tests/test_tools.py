@@ -78,6 +78,7 @@ class _MockHc3(BaseHTTPRequestHandler):
     devices: dict[int, dict] = {}  # id -> device, for updateQA
     requests: list[tuple[str, str, object]] = []  # (method, path, body)
     next_id: int = 100
+    reject_export_post: bool = False  # firmware that 400s POST /quickApp/{id}/export
 
     def _read_body(self):
         length = int(self.headers.get("Content-Length", 0))
@@ -162,6 +163,14 @@ class _MockHc3(BaseHTTPRequestHandler):
             else:
                 self._send(fqa)
         elif path.startswith("/api/quickApp/") and path.endswith("/export"):
+            # the real HC3 400s a BODYLESS export POST (live-verified) —
+            # pin that contract; reject_export_post fakes the firmware that
+            # rejects the POST altogether (the tool falls back to the GET)
+            length = int(self.headers.get("Content-Length", 0))
+            raw = self.rfile.read(length) if length else b""
+            if type(self).reject_export_post or not raw:
+                self._send({}, 400)
+                return
             qa_id = int(path.split("/")[3])
             fqa = self.fqas.get(qa_id)
             if fqa is None:
@@ -525,6 +534,41 @@ def test_download_restores_identity_properties(tmp_path, monkeypatch) -> None:
         assert "--%%property:buildNumber=9" in main
         assert "--%%property:deviceRole=Fan" in main
     finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_download_fqa_falls_back_to_get_export(tmp_path, monkeypatch) -> None:
+    # some firmware 400s POST /quickApp/{id}/export altogether —
+    # downloadFQA falls back to the deprecated GET /quickApp/export/{id}
+    # (the same proven fallback downloadQA uses), so the download works
+    _MockHc3.fqas = {
+        100: {
+            "name": "fb",
+            "type": "com.fibaro.binarySwitch",
+            "initialProperties": {"quickAppVariables": []},
+            "files": [{"name": "main", "isMain": True, "content": "print('x')\n"}],
+        }
+    }
+    _MockHc3.reject_export_post = True
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _MockHc3)
+    threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
+    try:
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("HC3_URL", f"http://127.0.0.1:{server.server_port}")
+        monkeypatch.setenv("HC3_USER", "admin")
+        monkeypatch.setenv("HC3_PASSWORD", "secret")
+        monkeypatch.chdir(tmp_path)
+        module = tools._TOOLS["downloadFQA"]
+        parser = argparse.ArgumentParser()
+        module.add_arguments(parser)
+        assert module.run(parser, parser.parse_args(["100"])) == 0
+        fqa = json.loads((tmp_path / "fb.fqa").read_text())
+        assert fqa["name"] == "fb"
+    finally:
+        _MockHc3.reject_export_post = False
         server.shutdown()
         server.server_close()
 
