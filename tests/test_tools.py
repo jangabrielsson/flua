@@ -27,6 +27,8 @@ def test_registry_discovers_all_tools() -> None:
         "createDB",
         "downloadFQA",
         "downloadQA",
+        "house",
+        "hubList",
         "icons",
         "installHelper",
         "migrate",
