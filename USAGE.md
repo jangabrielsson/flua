@@ -844,22 +844,26 @@ a fully deterministic sun: a known place on a known date.
 
 The configured location is the sim's full `/settings/location` shape
 (timezone, city, units — PUT merges any scalar) and drives more than sun
-times: `/panels/location`'s home panel (219) reports its lat/long,
-`/weather` uses its units, and `/settings/info`'s `date`, `timestamp` and
-sun fields follow the **virtual clock** — all of it served by the sim even
-in online mode, so QAs reading `devices/1` see simulated time.
+times: `/panels/location`'s home panel (219) reports its lat/long, and
+`/settings/info`'s `date`, `timestamp` and sun fields follow the
+**virtual clock** — the virtual-clock fields stay sim-side even in online
+mode, so QAs reading `devices/1` see simulated time. Offline, `/weather`
+uses the location's units for its fake record (online, the real HC3's
+weather and units are served instead — see below).
 
 To set up specific controller values for a simulated run, QAs PUT the same
 endpoints the HC3 accepts: `/settings/info` (any scalar field — `hcName`
 also renames device 1), `/home` (scalar fields + `defaultSensors`/
 `notificationClient` wholesale), and `/panels/location/{id}` (name/radius/
 address/home). The virtual-clock fields (sun times, `date`, `timestamp`,
-`serverStatus`) stay computed and ignore PUTs. `PUT /weather` is a flua
-extension (the HC3's weather is provider-owned): it merges into the fake
-weather record — only the fields in the body change — and each field that
-actually changes emits one `WeatherChangedEvent` (`change`/`newValue`/
-`oldValue`) on the refreshStates feed, so scene logic can react to a fixed
-forecast; re-PUTting the same value emits nothing.
+`serverStatus`) stay computed and ignore PUTs. `GET /weather` serves the
+real HC3's weather in online mode (the provider owns it there); offline it
+is the sim's stable fake HC3-shaped record. `PUT /weather` is a flua
+extension (the HC3's weather is provider-owned): it merges overrides on
+top of the current record — only the fields in the body change — and each
+field that actually changes emits one `WeatherChangedEvent`
+(`change`/`newValue`/`oldValue`) on the refreshStates feed, so scene logic
+can react to a fixed forecast; re-PUTting the same value emits nothing.
 
 `os.getenv(name)` reads through flua's environment chain: the shell
 environment first (so explicit per-run settings like CLI flags win), then

@@ -417,11 +417,11 @@ def flua_system_log_delete(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     return None, 204
 
 
-def _effective_weather(state: SimState) -> dict[str, Any]:
+def _fake_weather(state: SimState) -> dict[str, Any]:
     """The simulated weather record: stable fake HC3-shaped data (units
-    from the configured location) with any PUT /weather overrides merged
-    in."""
-    weather = {
+    from the configured location) — the offline stand-in for the HC3's
+    weather provider."""
+    return {
         "ConditionCode": 30,  # partlyCloudy in the HC3 weather template's code table
         "Humidity": 62.0,
         "Temperature": 12.5,
@@ -430,15 +430,27 @@ def _effective_weather(state: SimState) -> dict[str, Any]:
         "Wind": 4.2,
         "WindUnit": state.location.get("windUnit", "km/h"),
     }
+
+
+def _effective_weather(state: SimState, req: ApiRequest) -> dict[str, Any]:
+    """The weather record a caller sees: the real HC3's weather when the
+    run is online (the provider owns it there), else the sim's stable fake
+    record — with any PUT /weather overrides merged on top (flua-only
+    test injections still win locally)."""
+    weather = _fake_weather(state)
+    if req.remote is not None:
+        remote = remote_get(req, "/weather")
+        if remote is not None:
+            weather = dict(remote[0])
     weather.update(state.weather_overrides)
     return weather
 
 
 def weather_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    # no weather provider in the sim: stable fake data, HC3-shaped, units
-    # from the configured location; PUT /weather overrides any field (a
-    # flua extension — the HC3's weather is provider-owned)
-    return public(_effective_weather(state)), 200
+    # online mode serves the controller's weather (the HC3's provider owns
+    # it); offline, stable fake HC3-shaped data. PUT /weather overrides
+    # any field (a flua extension — the HC3's weather is provider-owned).
+    return public(_effective_weather(state, req)), 200
 
 
 def weather_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
@@ -449,7 +461,7 @@ def weather_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     # feed — re-PUTting the same value emits nothing.
     if not isinstance(req.body, dict):
         return None, 400
-    weather = _effective_weather(state)
+    weather = _effective_weather(state, req)
     for key, value in req.body.items():
         if isinstance(value, (dict, list)):
             continue

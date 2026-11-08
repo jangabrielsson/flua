@@ -105,8 +105,10 @@ scene start with `sourceTrigger` and `_sceneId` in scope, like the HC3.
   `date + k*interval` (grid-aligned); sunrise/sunset take a minute offset
   (−before, +after).
 - **Not yet**: `getSceneVariable`/`setSceneVariable` (still stubs), the
-  allowRestart option, and weather/profile/alarm state fidelity is
-  best-effort in the sim.
+  allowRestart option. Weather/profile/alarm condition state is best-effort
+  offline (the sim's fake weather, simulated alarm partitions, seeded
+  profiles); in online mode weather, alarm partitions and profiles are
+  served from the real HC3.
 - **Seeding**: the `--seed` JSON file accepts a `"scenes"` array
   (`{id, name, ...}`) — metadata-only scenes (no runner).
 - **Reading**: `api.get("/scenes")`, `api.get("/scenes/{id}")`.

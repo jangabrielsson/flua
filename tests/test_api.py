@@ -1016,6 +1016,49 @@ def test_put_configures_sim_world_values() -> None:
     assert weather["Humidity"] == 62.0  # untouched fields keep the defaults
 
 
+def test_weather_online_serves_the_real_hc3_with_local_overrides(api: Api) -> None:
+    # online mode: the HC3's weather provider owns the record — GET /weather
+    # serves the controller's data; local PUT /weather overrides (flua-only
+    # test injections) still merge on top, and change events report the
+    # real oldValue. Offline (no remote) keeps the fake record.
+    remote_calls: list[tuple[str, str]] = []
+
+    class FakeRemote:
+        base_url = "http://hc3/"
+
+        def request(self, method: str, path: str, query=None, body=None):
+            remote_calls.append((method, path))
+            if method == "GET" and path == "/weather":
+                return {
+                    "ConditionCode": 40,
+                    "WeatherCondition": "Rain",
+                    "Temperature": 3.0,
+                    "TemperatureUnit": "C",
+                    "Humidity": 88.0,
+                    "Wind": 11.0,
+                    "WindUnit": "km/h",
+                }, 200
+            return None, 404
+
+    api._remote = FakeRemote()  # type: ignore[attr-defined]
+    weather, status = api.dispatch("GET", "/weather", None)
+    assert status == 200
+    assert weather["WeatherCondition"] == "Rain"
+    assert weather["Temperature"] == 3.0
+    # a local override still wins and reports the real oldValue
+    api.dispatch("PUT", "/weather", {"Temperature": -5})
+    weather, _ = api.dispatch("GET", "/weather", None)
+    assert weather["Temperature"] == -5 and weather["WeatherCondition"] == "Rain"
+    events = [entry for _, entry in api.state.events]
+    assert [e["type"] for e in events] == ["WeatherChangedEvent"]
+    assert events[0]["data"] == {"change": "Temperature", "oldValue": 3.0, "newValue": -5}
+    assert remote_calls == [("GET", "/weather")] * 3  # GET, PUT's oldValue read, GET
+    # a failed remote falls back to the fake record, still with overrides
+    api._remote = None  # type: ignore[attr-defined]
+    weather, _ = api.dispatch("GET", "/weather", None)
+    assert weather["Temperature"] == -5 and weather["WeatherCondition"] == "Partly cloudy"
+
+
 def test_put_weather_merges_and_emits_changed_events() -> None:
     # PUT /weather merges: only the fields in the body change, and each
     # actually-changed field emits one WeatherChangedEvent with
