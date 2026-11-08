@@ -16,7 +16,14 @@ interface HouseDoc {
   customEvents: string[];
 }
 
-const TRIGGERS = ["\"", "'", ".", " ", ...Array.from({ length: 10 }, (_, i) => String(i))];
+const TRIGGERS = [
+  "\"",
+  "'",
+  ".",
+  " ",
+  ...Array.from({ length: 10 }, (_, i) => String(i)),
+  ...Array.from("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"),
+];
 const REFRESH_MIN_INTERVAL_MS = 30_000;
 
 let house: HouseDoc | undefined;
@@ -54,25 +61,27 @@ export async function refreshHouse(): Promise<HouseDoc | undefined> {
 }
 
 /** The device-completion contexts: the first argument of these calls is a
- * device id. Already-typed digits are part of the match — the range
- * replaces them, so Ctrl+Space works both at `fibaro.call(` and at
- * `fibaro.call(4`. */
+ * device id. The already-typed word — id digits or a name fragment — is
+ * part of the match and the replace range, so the menu appears at
+ * `fibaro.call(` and narrows as you type `fibaro.call(4` or
+ * `fibaro.call(Kitchen`; accepting inserts the bare id. */
 const DEVICE_CONTEXTS = [
-  /fibaro\.call\(\s*\d*$/,
-  /fibaro\.getValue\(\s*\d*$/,
-  /fibaro\.setValue\(\s*\d*$/,
+  /fibaro\.call\(\s*[\w ]*$/,
+  /fibaro\.getValue\(\s*[\w ]*$/,
+  /fibaro\.setValue\(\s*[\w ]*$/,
 ];
-const SCENE_CONTEXT = /fibaro\.scene\(\s*["']execute["']\s*,\s*\d*$/;
+const SCENE_CONTEXT = /fibaro\.scene\(\s*["']execute["']\s*,\s*[\w ]*$/;
 const GLOBAL_GET = /fibaro\.getGlobalVariable\(\s*["']([^"']*)$/;
 const GLOBAL_SET = /fibaro\.setGlobalVariable\(\s*["']([^"']*)$/;
 const CUSTOM_EVENT = /fibaro\.emitCustomEvent\(\s*["']([^"']*)$/;
 
-/** The text range a device/scene id completion replaces: the digits
- * already typed before the cursor (or the cursor position itself). */
-function numberRange(document: vscode.TextDocument, position: vscode.Position): vscode.Range {
+/** The text range a device/scene id completion replaces: the typed word
+ * before the cursor — id digits or a name fragment — or the cursor
+ * position itself when nothing is typed yet. */
+function wordRange(document: vscode.TextDocument, position: vscode.Position): vscode.Range {
   const line = document.lineAt(position.line);
   let start = position.character;
-  while (start > 0 && /[0-9]/.test(line.text[start - 1])) {
+  while (start > 0 && /[\w ]/.test(line.text[start - 1])) {
     start--;
   }
   return new vscode.Range(position.line, start, position.line, position.character);
@@ -101,7 +110,7 @@ function deviceItems(
     item.insertText = String(dev.id);
     item.filterText = `${dev.id} ${dev.name} ${dev.room ?? ""}`;
     item.detail = dev.room ? `${dev.type} · ${dev.room}` : dev.type;
-    item.range = numberRange(document, position);
+    item.range = wordRange(document, position);
     return item;
   });
   return items;
@@ -142,7 +151,7 @@ function completionItems(
       );
       item.insertText = String(scene.id);
       item.filterText = `${scene.id} ${scene.name}`;
-      item.range = numberRange(document, position);
+      item.range = wordRange(document, position);
       return item;
     });
     return items;

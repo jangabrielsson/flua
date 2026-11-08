@@ -65,7 +65,9 @@ packages without unpacking them by hand.
   switching rewrites the `.env` chain and refreshes the tree; the
   extension never sees a password.
 - **Hub-aware completions**: inside `fibaro.call(`/`fibaro.getValue(`/
-  `fibaro.setValue(`, device ids complete with name and room; scene ids
+  `fibaro.setValue(`, device ids complete with name and room — typing id
+  digits or part of a name narrows the list and accepting inserts the bare
+  id; scene ids
   after `fibaro.scene("execute", `; global variable names inside
   `fibaro.getGlobalVariable("`/`setGlobalVariable("`; custom event names
   inside `fibaro.emitCustomEvent("`. The data comes from `flua --tool
