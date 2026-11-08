@@ -1,14 +1,18 @@
 import * as path from "path";
 import * as vscode from "vscode";
 import { checkDocument, registerCheckDiagnostics } from "./check";
+import { registerCompletions } from "./completions";
 import { execFlua, fluaExecutable, runFluaTool } from "./flua";
 import { FqaEditorProvider } from "./fqaEditor";
+import { registerHub } from "./hub";
 import { registerMcp, unregisterMcp } from "./mcp";
 import { registerRun } from "./run";
 
 export function activate(context: vscode.ExtensionContext) {
   registerCheckDiagnostics(context);
   registerRun(context);
+  registerHub(context);
+  registerCompletions(context);
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider(
       FqaEditorProvider.viewType,

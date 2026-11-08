@@ -26,7 +26,8 @@
   ],
   "activationEvents": [
     "onLanguage:lua",
-    "onLanguage:json"
+    "onLanguage:json",
+    "onView:flua.hub"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -62,6 +63,20 @@
           "type": "boolean",
           "default": true,
           "description": "Show the interactive CodeLens links: Call <action> on QuickApp methods and the UI-event lens on --%%u lines (they drive the running QA through the sim API)."
+        },
+        "flua.houseDb": {
+          "type": "string",
+          "default": "",
+          "description": "A seed/db file for the simulated house — the source of device/global/scene/customEvent completions when no HC3 credentials exist (--tool house --db)."
+        },
+        "flua.houseRefresh": {
+          "type": "string",
+          "enum": [
+            "onSave",
+            "manual"
+          ],
+          "default": "onSave",
+          "description": "When to refresh the house data behind completions: on every Lua save (throttled) or only via the Flua: Refresh house command."
         }
       }
     },
@@ -160,8 +175,62 @@
       {
         "command": "flua.uiEvent",
         "title": "Flua: Inject UI event"
+      },
+      {
+        "command": "flua.hub.refresh",
+        "title": "Flua: Refresh hub",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "flua.hub.showActions",
+        "title": "Flua: QA actions"
+      },
+      {
+        "command": "flua.hub.download",
+        "title": "Flua: Download QA"
+      },
+      {
+        "command": "flua.hub.update",
+        "title": "Flua: Update QA on HC3"
+      },
+      {
+        "command": "flua.hub.runUi",
+        "title": "Flua: Run QA (--ui)"
+      },
+      {
+        "command": "flua.hub.pack",
+        "title": "Flua: Pack QA into .fqa"
+      },
+      {
+        "command": "flua.hub.copyId",
+        "title": "Flua: Copy QA id"
+      },
+      {
+        "command": "flua.house.refresh",
+        "title": "Flua: Refresh house data"
+      },
+      {
+        "command": "flua.house.generateHomeTable",
+        "title": "Flua: Generate home table (ht.lua)"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "flua",
+          "title": "flua",
+          "icon": "$(server)"
+        }
+      ]
+    },
+    "views": {
+      "flua": [
+        {
+          "id": "flua.hub",
+          "name": "HC3 hub"
+        }
+      ]
+    },
     "submenus": [
       {
         "id": "flua.explorer",
@@ -255,6 +324,40 @@
         {
           "command": "flua.openDocs",
           "group": "6_view@3"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "flua.hub.refresh",
+          "when": "view == flua.hub",
+          "group": "navigation@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "flua.hub.download",
+          "when": "viewItem == fluaQa",
+          "group": "1_qa@1"
+        },
+        {
+          "command": "flua.hub.update",
+          "when": "viewItem == fluaQa",
+          "group": "1_qa@2"
+        },
+        {
+          "command": "flua.hub.runUi",
+          "when": "viewItem == fluaQa",
+          "group": "1_qa@3"
+        },
+        {
+          "command": "flua.hub.pack",
+          "when": "viewItem == fluaQa",
+          "group": "1_qa@4"
+        },
+        {
+          "command": "flua.hub.copyId",
+          "when": "viewItem == fluaQa",
+          "group": "2_misc@1"
         }
       ]
     }
