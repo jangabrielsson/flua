@@ -45,6 +45,7 @@ workflow: scenario parameters (clock, mode, seed) live in the QA file as
 | 29 | 29-registered-endpoints.html | Give the simulated HC3 its own REST surface | `api.registerEndpoint` (additive + `override=true`), the mock-panels module/consumer pair, handler-on-the-pump semantics (setTimeout, postRefreshEvent), the alarm-logic override loop, the weather simulator as an endpoint QA | ready |
 | 30 | 30-helper.html | The FluaHelper: the HC3's local-only API from your QA | `--tool installHelper`, `api.helper` (REST in the controller's local context), `api.helperFibaro` (fibaro.* on the real HC3), transparent variable routing, proxy state that survives restarts | ready |
 | 31 | 31-proxy-mode.html | Proxy mode deep dive: the QA runs on your laptop, the device lives on the HC3 | `--%%mode:proxy`, the proxy id, state on the controller (restart persistence), actions/UI events routed back, children, the one-event property rule, callback port | ready |
+| 32 | 32-vscode-extension-evolved.html | Your QA workflow inside VS Code — the extension grew up | the HC3 hub view (filter/sort, actions, hub-newer badge), the freshness-aware cache (View .fqa, offline), Download→edit→Run→Update loop, hub-aware completions (`--tool house`, HT table), switching controllers (`--tool hub` profiles), the CLI-first rule | ready |
 
 Status: draft = written, not verified · ready = snippets run against flua ·
 posted = published (fill in the forum link and date).
@@ -79,6 +80,8 @@ posted = published (fill in the forum link and date).
 - UI test automation (self-asserting UI-interaction pattern, data-driven whole-UI suites, `--strict-tests`)
 - simulated devices (`_FLUA.loadSimDevice`, the bundled device set, uniform fibaro.call drivers, `_FLUA.keepAlive()`)
 - registered endpoints (`api.registerEndpoint`, additive + override routes, emulation modules and deployed endpoint QAs)
+- the VS Code extension as the app layer (hub view + cache + staleness badge, hub-aware completions, `--tool hub` profiles)
+- the what's-new summary (0.1.127–0.1.137, the human version of the changelog)
 
 ## Ideas for the next series (unclaimed)
 
@@ -91,6 +94,7 @@ posted = published (fill in the forum link and date).
 | File | Title | Covers | Status |
 |------|-------|--------|--------|
 | promotion.html | Developing QuickApps with AI agents — and a tool that makes it fast | the agent pitch: domain knowledge via skills/AGENTS.md + the code→verify loop with flua | ready |
+| whats-new.html | What's new in flua — 0.1.127 through 0.1.137 | the human changelog: the VS Code app layer (hub view, cache, completions, hub profiles), proxy-mode UTF-8 and updateView fixes, small fixes, the CI lupa-cache saga | ready |
 | compat-notes.html | flua compatibility notes — what changed to match the real HC3 | the QA api layer's 501s, updateProperty ownership, getProperty removal, status-code and name-rule corrections | ready |
 | install-macos.html | Installing flua on macOS — Python, pip, VS Code, and the usual bumps | brew/python install, pip install + upgrade/downgrade (version pinning), `which flua`/shebang, launch.json interpreter story, troubleshooting (PATH, PEP 668, lupa wheel, multi-Python) | ready |
 | troubleshooting.html | flua troubleshooting — when it doesn't work, start here | `flua doctor`, HC3_URL, HC3 auth lockout, broken upgrades (force-reinstall), proxy firewall (Windows Public profile + macOS), keep-alive, directive typos, the diagnostic loop | ready |

@@ -1,0 +1,99 @@
+<h2>What's new in flua — 0.1.127 through 0.1.137</h2>
+
+<p>Eleven releases in five days — the usual changelog is in the repo, but
+here is the human version of what actually changed and why you should
+care. The short version: <b>the VS Code extension grew up</b>, proxy mode
+stopped mangling your UI text, and a pile of small things stopped being
+annoying.</p>
+
+<h3>The big one: flua lives inside VS Code now</h3>
+
+<p>flua started as a command-line engine — and stays one, because agents
+and scripts need that. But the releases from 0.1.136 on add the app layer
+on top: a flua icon in the activity bar with an <b>HC3 hub view</b>.</p>
+
+<ul>
+<li><b>Browse the controller.</b> The tree lists your hub's QuickApps —
+name, type, id, room — with filter and sort, and a refresh button. It
+shows the hub's model and firmware, and flags a QA with <b>"hub newer"</b>
+when your downloaded copy has fallen behind.</li>
+<li><b>The whole loop, without leaving the editor.</b> Click a QA: View
+(.fqa) opens it in the package viewer; Download unpacks it into your
+workspace; then edit, Run (UI) with F5's viewer, and Update uploads it
+back. Download folders are remembered, so Run/Update/Pack just work the
+second time.</li>
+<li><b>A cache that respects your controller.</b> Downloads are stored in
+the extension's local cache, keyed by hub and QA, with the hub's own
+modified-timestamp deciding freshness — repeat views and downloads never
+re-export from the HC3, cached packages open offline, and entries unused
+for 30 days prune themselves.</li>
+<li><b>Completions that know your house.</b> Inside
+<code>fibaro.call(</code>/<code>fibaro.getValue(</code>, device IDs
+complete <i>with names and rooms</i>; global variables, scene IDs, and
+custom events complete in their calls — fed by your real hub, or by a
+seed/db file for a simulated house with no controller at all. One command
+writes a <code>HT.kitchen.light</code> home table.</li>
+<li><b>Several controllers? Named profiles.</b>
+<code>flua --tool hub add cottage http://192.168.2.30 admin</code> stores
+it once; the hub view's switch button (or <code>hub switch cottage</code>)
+rewrites the .env chain — and a <code>--project</code> switch pins just
+one folder. Passwords stay in a 0600 file, never in the extension.</li>
+</ul>
+
+<p>Everything the tree does is a <code>--tool</code> command first
+(<code>hubList</code>, <code>house</code>, <code>hub</code>), so agents get
+the same surface as the GUI — that's the design rule, and it holds.</p>
+
+<h3>Proxy mode: your UI text stopped turning into garbage</h3>
+
+<p>Several releases hardened proxy mode — the QA runs on your laptop while
+the device lives on the HC3. The headline fix: <b>non-ASCII survives</b>.
+UI labels with ▲ ▼ °C ∞ were being stored by the HC3 as mangled
+Latin-1 whenever flua escaped them as JSON sequences; flua now sends raw
+UTF-8 everywhere, uploads and updates alike. Related fixes landed around
+it: <code>updateView</code> and <code>updateProperty</code> from the proxy
+now reach the live HC3 UI through the proxy's own QA, half-created devices
+from failed uploads are reported instead of piling up, proxy cleanup
+failures abort with a clear message, and a firmware that answers uploads
+with a bare id or Latin-1-encoded text is handled.</p>
+
+<p>Two developer niceties in the same stretch: <code>_FLUA.mainPath</code>
+gives a QA the directory its main file lives in, so
+<code>io.open(_FLUA.mainPath .. "zones.json")</code> finds sibling data
+files from any working directory; and one HC3 quirk is now documented in
+the notes (the classic web UI does not re-render a slider's value on
+updateView — the new mobile view does, and a reload shows the stored
+value, so it's a display bug, not your code).</p>
+
+<h3>Small fixes you will feel</h3>
+
+<ul>
+<li><b>downloadFQA works again on every firmware</b> — it now sends the
+empty-object body the HC3 expects and falls back to the deprecated export
+endpoint, like downloadQA always did.</li>
+<li><b>Device actions route correctly</b> — deviceAction dispatches by id
+through the QA's global <code>onAction</code>, and booting targets wait
+instead of vanishing.</li>
+<li><b>Ctrl-C says goodbye</b> — a friendly 👋 instead of a bare
+traceback.</li>
+<li><b>Log tags no longer double the id</b> — <code>-e</code> snippets
+log as <code>[QA5000]</code>, not <code>[QA50005000]</code>.</li>
+<li><b>--file names follow the HC3 editor's rule</b>, and
+<code>--tool ui --device</code> can fetch a device's UI back into
+<code>--%%u</code> rows.</li>
+</ul>
+
+<h3>Under the hood</h3>
+
+<p>CI runs the suite on Python 3.11–3.15; the 3.15 track was 3× slower
+because it compiled lupa from source every run — a poisoned cache held a
+lupa version flua deliberately excludes. Fixed and pinned; the track now
+runs in ~1m15s like the others. And the project's positioning got written
+down: flua is the engine, wizards and views are apps on top of it — the
+extension is the first one, not the last.</p>
+
+<p>The full series lives in the forum index (posts 01–32) — the newest,
+"Your QA workflow inside VS Code", shows the extension's pieces in action.
+If something here misbehaves for you, the troubleshooting post tells you
+where to look first, and the feedback loop post tells you how to make it
+our problem, not yours.</p>
