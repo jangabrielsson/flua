@@ -124,6 +124,29 @@ Arguments: `files` (required), `mode`, `instant`, `speed`, `start`,
 `--%%` directives reach the engine exactly as the CLI parses them, so the
 device names and properties are the run's real ones.
 
+#### `qa_test`
+
+Runs the self-asserting test QAs (`*_test.lua`, the quickapp-test pattern)
+with `flua test --json` — the same machine contract the VS Code Test
+Explorer adapter consumes.
+
+```json
+{"name": "qa_test", "arguments": {"paths": ["tests/"], "timeout": 10}}
+```
+
+Arguments: `paths` (optional — files or directories; default: the server's
+cwd, discovering `*_test.lua`), `list` (discover only, no run), `timeout`
+(wall seconds per test file, default 30). Each test QA runs in its own
+emulator process and must exit itself (`t:finish()`/`exit(...)`); a test
+that never exits is reported `TIME`, not allowed to block the rest.
+
+Result: `{"exitCode", "files": [{file, status, exitCode, failures, output}],
+"summary": {passed, failed, timedOut}}` — the `flua test --json` document
+with the process exit code added; `exitCode` is 0 only when everything
+passes. With `list: true`: `{"exitCode", "files": [paths]}`. An empty
+discovery answers `exitCode: 0` with an empty `files` list and a `notice`
+carrying the runner's prose.
+
 #### `docs_list` / `docs_read`
 
 The docs tree **as tools** — the same content `resources/*` serves, for
@@ -272,7 +295,8 @@ no extra dependencies:
   (`HC3_URL`/`HC3_USER`/`HC3_PASSWORD`, the same chain `flua` uses) — never
   tool arguments.
 - Runs are bounded (`timeout`) and capped: at most 4 concurrent one-shot
-  runs (`qa_run`/`devices`) — further ones fail fast with `isError`.
+  runs (`qa_run`/`devices`/`qa_test`) — further ones fail fast with
+  `isError`.
   Every tool failure is either an `isError` result or a JSON-RPC error —
   the server process never dies on a bad request. Engine errors are
   actionable: a wrong `--%%type` names close matches and points at
@@ -281,7 +305,7 @@ no extra dependencies:
 ## Status & next
 
 - Done: stdio core, one-shot tools (`qa_check`, `qa_run`, `qa_ui`,
-  `devices`), the session tier (`qa_start`/`qa_probe`/`qa_action`/
+  `devices`, `qa_test`, `flua_tool`), the session tier (`qa_start`/`qa_probe`/`qa_action`/
   `qa_sessions`/`qa_stop`), the resource tier (`flua://docs/*`) plus its
   tool fallback (`docs_list`/`docs_read` — hosts without resource
   support), the prompt tier (`qa_debug`/`qa_skeleton`), the Streamable

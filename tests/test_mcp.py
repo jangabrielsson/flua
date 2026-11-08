@@ -163,6 +163,7 @@ def test_tools_list_shape() -> None:
         "qa_run",
         "qa_ui",
         "devices",
+        "qa_test",
         "qa_start",
         "qa_probe",
         "qa_action",
@@ -553,6 +554,61 @@ def test_devices_times_out_on_a_qa_that_never_drains(tmp_path) -> None:
     result = _tool("devices", {"files": [str(script)], "timeout": 0.5})
     assert result["isError"] is True
     assert "timed out" in result["message"]
+
+
+# -- qa_test ----------------------------------------------------------------------
+
+
+def test_qa_test_runs_a_passing_suite(tmp_path) -> None:
+    (tmp_path / "good_test.lua").write_text(
+        "local Test = require('flua-test')\n"
+        "local t = Test.new()\n"
+        "t:expect(true, 'one is one')\n"
+        "t:finish()\n"
+    )
+    result = _tool("qa_test", {"paths": [str(tmp_path)]})
+    assert result["exitCode"] == 0
+    assert result["summary"] == {"passed": 1, "failed": 0, "timedOut": 0}
+    assert result["files"][0]["status"] == "pass"
+    assert result["files"][0]["file"].endswith("good_test.lua")
+
+
+def test_qa_test_failing_suite_sets_exit_code(tmp_path) -> None:
+    (tmp_path / "bad_test.lua").write_text(
+        "local Test = require('flua-test')\n"
+        "local t = Test.new()\n"
+        "t:expect(false, 'nope')\n"
+        "t:finish()\n"
+    )
+    result = _tool("qa_test", {"paths": [str(tmp_path)]})
+    assert result["exitCode"] == 1
+    assert result["summary"] == {"passed": 0, "failed": 1, "timedOut": 0}
+    assert result["files"][0]["status"] == "fail"
+    assert result["files"][0]["failures"] == 1
+    assert "nope" in result["files"][0]["output"]
+
+
+def test_qa_test_list_discovers_without_running(tmp_path) -> None:
+    (tmp_path / "one_test.lua").write_text("exit(0)\n")
+    result = _tool("qa_test", {"paths": [str(tmp_path)], "list": True})
+    assert result["exitCode"] == 0
+    assert len(result["files"]) == 1
+    assert result["files"][0].endswith("one_test.lua")
+
+
+def test_qa_test_empty_discovery_reports_no_files(tmp_path) -> None:
+    result = _tool("qa_test", {"paths": [str(tmp_path)]})
+    assert result["exitCode"] == 0
+    assert result["files"] == []
+    assert result["summary"] == {"passed": 0, "failed": 0, "timedOut": 0}
+    assert "no *_test.lua" in result["notice"]
+
+
+def test_qa_test_bad_args() -> None:
+    assert _tool("qa_test", {"paths": "single.lua"})["isError"] is True
+    assert _tool("qa_test", {"paths": []})["isError"] is True
+    assert _tool("qa_test", {"paths": [42]})["isError"] is True
+    assert _tool("qa_test", {"timeout": 0})["isError"] is True
 
 
 def test_qa_run_maxhours_caps_the_virtual_horizon(tmp_path) -> None:

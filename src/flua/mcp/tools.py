@@ -218,6 +218,61 @@ async def _drain_engine(engine: LuaEngine, files: list[str], timeout: float) -> 
         await engine.stop()
 
 
+def _qa_test(args: dict[str, Any]) -> dict[str, Any]:
+    """Run self-asserting test QAs (the *_test.lua quickapp-test pattern)
+    with `flua test --json` — the VS Code Test Explorer machine contract —
+    and return the JSON document plus the exit code. `list` discovers only;
+    each file is bounded by its own per-file wall-clock timeout."""
+    paths = args.get("paths")
+    if paths is not None and (
+        not isinstance(paths, list) or not paths or not all(isinstance(p, str) for p in paths)
+    ):
+        raise JsonRpcError(
+            INVALID_PARAMS,
+            "paths must be a non-empty list of files/directories "
+            "(omit to discover *_test.lua under the server's cwd)",
+        )
+    timeout = args.get("timeout")
+    if timeout is not None and (not isinstance(timeout, (int, float)) or timeout <= 0):
+        raise JsonRpcError(
+            INVALID_PARAMS, "timeout must be a positive number of seconds (per test file)"
+        )
+    command = [sys.executable, "-m", "flua", "test"]
+    command.append("--list" if args.get("list") else "--json")
+    if timeout is not None:
+        command += ["--timeout", str(timeout)]
+    if paths:
+        command += paths
+    _acquire_run_slot()
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8")
+    finally:
+        _RUN_SLOTS.release()
+    stdout = result.stdout.strip()
+    if args.get("list"):
+        return {
+            "exitCode": result.returncode,
+            "files": [line for line in stdout.splitlines() if line.strip()],
+        }
+    try:
+        document = json.loads(stdout)
+    except ValueError:
+        # the runner prints prose, not a document, when nothing is
+        # discovered; a crash surfaces as a non-zero exit code
+        if result.returncode == 0:
+            return {
+                "exitCode": 0,
+                "files": [],
+                "summary": {"passed": 0, "failed": 0, "timedOut": 0},
+                "notice": stdout,
+            }
+        raise JsonRpcError(
+            INTERNAL_ERROR,
+            f"flua test failed without a JSON document: {stdout or result.stderr.strip()[:400]}",
+        ) from None
+    return {"exitCode": result.returncode, **document}
+
+
 def _docs_list(args: dict[str, Any]) -> dict[str, Any]:
     """The docs tree as a tool: the same listing resources/list serves, for
     hosts whose MCP client only exposes tools (see the dogfood note in
@@ -604,6 +659,40 @@ TOOLS: dict[str, Tool] = {
             "required": ["files"],
         },
         "handler": _devices,
+    },
+    "qa_test": {
+        "description": (
+            "Run self-asserting test QAs (the *_test.lua quickapp-test pattern) "
+            "via `flua test --json` — the VS Code Test Explorer machine contract. "
+            "Discovers *_test.lua under paths (default: the server's cwd), runs "
+            "each file in its own emulator process with a per-file wall-clock "
+            "timeout, and returns {exitCode, files:[{file, status, exitCode, "
+            "failures, output}], summary:{passed, failed, timedOut}} — exitCode "
+            "0 only when everything passes; each test QA must exit itself "
+            "(t:finish()/exit(...)). `list` discovers only (no run)."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "paths": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "test QA files or directories (default: the server's cwd, "
+                        "discovering *_test.lua)"
+                    ),
+                },
+                "list": {
+                    "type": "boolean",
+                    "description": "list the discovered files instead of running them",
+                },
+                "timeout": {
+                    "type": "number",
+                    "description": "wall-clock seconds per test file (default 30)",
+                },
+            },
+        },
+        "handler": _qa_test,
     },
     "qa_start": {
         "description": (
