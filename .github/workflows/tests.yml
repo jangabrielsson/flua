@@ -36,14 +36,21 @@ jobs:
       # wheel still satisfies the pin; if it is ever raised, the
       # path-install fails and the fallback compiles from source again —
       # correct, just slower, exactly when it matters.
+      # save-always matters: actions/cache skips the save when the restore
+      # hit the exact key — a healed wheels/ dir (2.8 artifact replaced by a
+      # pinned rebuild) would then never be written back, and the poisoned
+      # entry would keep forcing the rebuild. The v2 key slates the old
+      # poisoned entries clean once; save-always keeps the cache
+      # self-healing from here on.
       - name: Cache built lupa wheel (3.15 only)
         if: matrix.python-version == '3.15'
         uses: actions/cache@v5
         with:
           path: wheels
-          key: lupa-cp315-${{ hashFiles('pyproject.toml') }}
+          key: lupa-cp315-v2-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
-            lupa-cp315-
+            lupa-cp315-v2-
+          save-always: true
       - name: Install lupa wheel (3.15 only)
         if: matrix.python-version == '3.15'
         run: |
