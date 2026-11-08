@@ -21,6 +21,7 @@ The flua philosophy is to keep the parts simple.
 * Preferred UI debugging is to use the proxy concept to run a QA on the HC3 that renders the real UI and sends the events back to flua
 * flua provides tools to download and upload QAs using the flua QA format (--%% directives)
 * Make it agent friendly; mcp companion, structured logs, included skills and docs
+* flua is the engine, not the app: built for agent-driven development and for programmers who want their standard toolset (VS Code, git, a debugger, tests). Wizards and GUI conveniences are apps on top of flua — the CLI and `--tool` commands are the stable surface, and the VS Code extension is the first such app.
 
 **QA developers start at [USAGE.md](USAGE.md)** — install, VS Code setup,
 directives, multi-file QAs, the offline HC3, and deploying to the HC3.

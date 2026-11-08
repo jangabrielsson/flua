@@ -10,6 +10,14 @@ The HC3 editor is tiny and debugging there means `print()` statements. flua
 exists so you can develop in your real editor, with real tooling, and upload
 when it works.
 
+flua aims at two kinds of development: **agent loops** (an agent runs the
+QA, reads PASS/FAIL, iterates — served by `flua-mcp`, structured logs, and
+the bundled skills) and **programmers** who want their standard toolset —
+VS Code, git, a debugger, tests. flua itself stays the engine; wizards and
+GUI conveniences are built as apps on top of it, and the VS Code extension
+is the first. Every app feature is a CLI or `--tool` command first, so
+agents and scripts get the same surface as the GUI.
+
 - [flua — user guide for QA developers](#flua--user-guide-for-qa-developers)
   - [Install](#install)
   - [Your first QuickApp](#your-first-quickapp)
