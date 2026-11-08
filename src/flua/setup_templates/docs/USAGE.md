@@ -481,6 +481,25 @@ credentials first, else `--db`, else an honest empty house (a QA-only run
 has none). Both print one JSON document on stdout; the shape is the
 contract the extension and MCP clients consume.
 
+### Switching controllers (`--tool hub`)
+
+Several HC3s? Give each a named profile and switch the `.env` chain with
+one command (design: `docs/notes/notes-hub-profiles.md`):
+
+```bash
+flua --tool hub add home http://192.168.1.20 admin   # prompts for the password
+flua --tool hub list --json                           # names/urls/serials, never passwords
+flua --tool hub switch home                           # ~/.env — the global default
+flua --tool hub switch home --project                 # this project's .env — a per-folder pin
+flua --tool hub remove home
+```
+
+Profiles live in `~/.flua/hubs.json` (mode 0600). The chain's precedence
+still applies — a project pin beats the global default — and `list` marks
+the profile currently matching the chain (`active`, and `*` in the human
+form). Non-interactive contexts can feed `add` via the `FLUA_HUB_PASSWORD`
+environment variable.
+
 And a route can be replayed in isolation — the handlers are pure functions
 over `SimState`:
 
