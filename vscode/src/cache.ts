@@ -21,6 +21,9 @@ export interface CachedQa {
 }
 
 export class QaCache {
+  /** Entries unused for this long are swept on extension activation. */
+  static readonly MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
   constructor(private readonly context: vscode.ExtensionContext) {}
 
   private dir(hubSerial: string): vscode.Uri {
@@ -101,5 +104,47 @@ export class QaCache {
       Buffer.from(JSON.stringify(meta), "utf8")
     );
     return fqa;
+  }
+
+  /** Sweep cache entries unused for MAX_AGE_MS (both the .fqa and its
+   * meta). Fire-and-forget on activation; never touches workspace files. */
+  async prune(): Promise<void> {
+    const root = vscode.Uri.joinPath(this.context.globalStorageUri, "hc3-cache");
+    let hubs: [string, vscode.FileType][];
+    try {
+      hubs = await vscode.workspace.fs.readDirectory(root);
+    } catch {
+      return; // no cache yet
+    }
+    const cutoff = Date.now() - QaCache.MAX_AGE_MS;
+    for (const [name, type] of hubs) {
+      if (type !== vscode.FileType.Directory) {
+        continue;
+      }
+      const hubDir = vscode.Uri.joinPath(root, name);
+      let entries: [string, vscode.FileType][];
+      try {
+        entries = await vscode.workspace.fs.readDirectory(hubDir);
+      } catch {
+        continue;
+      }
+      for (const [file, ftype] of entries) {
+        if (ftype !== vscode.FileType.File || !file.endsWith(".json")) {
+          continue;
+        }
+        const meta = await this.readMeta(vscode.Uri.joinPath(hubDir, file));
+        if (!meta || meta.fetchedAt >= cutoff) {
+          continue;
+        }
+        const id = file.slice(0, -".json".length);
+        for (const suffix of [".json", ".fqa"]) {
+          try {
+            await vscode.workspace.fs.delete(vscode.Uri.joinPath(hubDir, `${id}${suffix}`));
+          } catch {
+            // already gone — fine
+          }
+        }
+      }
+    }
   }
 }

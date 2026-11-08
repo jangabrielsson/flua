@@ -120,7 +120,22 @@ class HubProvider implements vscode.TreeDataProvider<TreeNode> {
     );
     item.contextValue = "fluaQa";
     item.description = `${qa.id} · ${qa.type}`;
+    // the staleness badge: the project was unpacked from an older hub
+    // version than the one hubList now reports — a re-download is due
+    const project = projectEntry(this.context, qa.id);
+    if (
+      project &&
+      project.modified !== null &&
+      qa.modified !== null &&
+      qa.modified !== undefined &&
+      qa.modified > project.modified
+    ) {
+      item.description += " · hub newer";
+    }
     item.tooltip = qa.room ? `${qa.name} (${qa.id}) — ${qa.room}` : `${qa.name} (${qa.id})`;
+    if (item.description.includes("hub newer")) {
+      item.tooltip += "\nThe hub has a newer version than your download — Download again";
+    }
     item.command = {
       command: "flua.hub.showActions",
       title: "QA actions",
@@ -197,14 +212,38 @@ function downloadDir(qa: QaInfo): vscode.Uri | undefined {
   return vscode.Uri.joinPath(root, `${safe}-${qa.id}`);
 }
 
-function rememberDir(context: vscode.ExtensionContext, id: number, dir: string): void {
-  const dirs = context.workspaceState.get<Record<string, string>>("hub.dirs", {});
-  dirs[String(id)] = dir;
+function rememberDir(
+  context: vscode.ExtensionContext,
+  id: number,
+  dir: string,
+  modified?: number | null
+): void {
+  const dirs = context.workspaceState.get<Record<string, unknown>>("hub.dirs", {});
+  dirs[String(id)] = { dir, modified: modified ?? null };
   void context.workspaceState.update("hub.dirs", dirs);
 }
 
+/** The unpacked project for a QA id: {dir, modified} — modified is the
+ * hub timestamp the project was unpacked from (the staleness signal). */
+function projectEntry(
+  context: vscode.ExtensionContext,
+  id: number
+): { dir: string; modified: number | null } | undefined {
+  const entry = context.workspaceState.get<Record<string, unknown>>("hub.dirs", {})[
+    String(id)
+  ];
+  if (typeof entry === "string") {
+    return { dir: entry, modified: null }; // pre-badge entries: dir only
+  }
+  if (entry && typeof entry === "object" && "dir" in entry) {
+    const e = entry as { dir: string; modified?: number | null };
+    return { dir: e.dir, modified: e.modified ?? null };
+  }
+  return undefined;
+}
+
 function knownDir(context: vscode.ExtensionContext, id: number): string | undefined {
-  return context.workspaceState.get<Record<string, string>>("hub.dirs", {})[String(id)];
+  return projectEntry(context, id)?.dir;
 }
 
 /** The QA's main Lua file in a downloaded project: the first top-level .lua. */
@@ -283,7 +322,7 @@ async function downloadForEdit(
   if (!target) {
     return;
   }
-  rememberDir(context, qa.id, target.fsPath);
+  rememberDir(context, qa.id, target.fsPath, qa.modified);
   const fqa = await new QaCache(context).ensure(provider.hubSerial(), qa);
   if (!fqa) {
     return;
@@ -381,4 +420,5 @@ export function registerHub(context: vscode.ExtensionContext): void {
   );
   registerCommands(context, provider);
   void provider.fetch();
+  void new QaCache(context).prune(); // old cache entries: fire-and-forget
 }

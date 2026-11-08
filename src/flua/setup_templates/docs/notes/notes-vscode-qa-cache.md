@@ -1,8 +1,8 @@
 # Note: the hub resource cache in the VS Code extension (design)
 
 Status: implemented (2026-11-08) — `vscode/src/cache.ts`, the View (.fqa)
-and Download flows, `modified` in `--tool hubList`. The staleness badge
-(follow-up) and cache pruning remain.
+and Download flows, `modified` in `--tool hubList`, the hub-newer staleness
+badge on tree nodes, and the 30-day pruning sweep on activation.
 
 ## Goal
 

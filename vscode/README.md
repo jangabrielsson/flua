@@ -57,8 +57,10 @@ packages without unpacking them by hand.
   `<workspace>/<name>-<id>`), Update (upload local changes), Run (--ui),
   Pack, Copy id. Downloads are cached in the extension's global storage
   keyed by hub and QA id, with the hub's `modified` timestamp deciding
-  freshness — repeat views/downloads never re-export from the HC3, and a
-  cached package views offline.
+  freshness — repeat views/downloads never re-export from the HC3, a
+  cached package views offline, and a QA whose hub version moved on shows
+  a "hub newer" badge. Cache entries unused for 30 days are pruned on
+  activation.
 - **Hub-aware completions**: inside `fibaro.call(`/`fibaro.getValue(`/
   `fibaro.setValue(`, device ids complete with name and room; scene ids
   after `fibaro.scene("execute", `; global variable names inside
