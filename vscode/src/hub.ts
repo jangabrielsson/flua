@@ -1,5 +1,6 @@
 import * as path from "path";
 import * as vscode from "vscode";
+import { QaCache } from "./cache";
 import { execFlua, fluaExecutable, runFluaTool, runInTerminal } from "./flua";
 
 /** `flua --tool hubList`'s JSON document — the contract the tree renders. */
@@ -17,6 +18,7 @@ interface QaInfo {
   name: string;
   type: string;
   room: string | null;
+  modified?: number | null;
 }
 
 interface HubListDoc {
@@ -30,6 +32,9 @@ type TreeNode =
 
 class HubProvider implements vscode.TreeDataProvider<TreeNode> {
   private doc?: HubListDoc;
+  private resolvedFlua?: string;
+  private sortMode: "name" | "id" = "name";
+  private filter = "";
   private readonly onChange = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this.onChange.event;
 
@@ -44,7 +49,9 @@ class HubProvider implements vscode.TreeDataProvider<TreeNode> {
   }
 
   async fetch(): Promise<void> {
-    const result = await execFlua(fluaExecutable(), ["--tool", "hubList"]);
+    const flua = fluaExecutable();
+    this.resolvedFlua = flua;
+    const result = await execFlua(flua, ["--tool", "hubList"]);
     if (result.code === 2) {
       // no HC3 credentials — the tree explains itself, no popup noise
       this.doc = {
@@ -66,7 +73,8 @@ class HubProvider implements vscode.TreeDataProvider<TreeNode> {
     } catch {
       if (result.code !== 0) {
         void vscode.window.showWarningMessage(
-          `flua: cannot read the hub — ${result.stderr.trim() || result.stdout.trim()}`
+          `flua: cannot read the hub (flua at ${flua}) — ` +
+            `${result.stderr.trim() || result.stdout.trim()}`
         );
         return;
       }
@@ -86,14 +94,23 @@ class HubProvider implements vscode.TreeDataProvider<TreeNode> {
         vscode.TreeItemCollapsibleState.Expanded
       );
       item.contextValue = "fluaHub";
-      item.iconPath = new vscode.ThemeIcon("server");
+      item.iconPath = new vscode.ThemeIcon("home");
       const bits: string[] = [];
       if (hub.reachable) {
         if (hub.model) bits.push(hub.model);
         if (hub.firmware) bits.push(hub.firmware);
+        const qas = this.visibleQas(node.doc.qas);
+        bits.push(`${qas.length} QAs`);
+        if (this.filter) bits.push(`filter "${this.filter}"`);
+        if (this.sortMode === "id") bits.push("by id");
       }
       item.description = bits.join(" · ") || hub.error || "";
-      item.tooltip = hub.url ? `${hub.name ?? "HC3 hub"} — ${hub.url}` : hub.error ?? "";
+      item.tooltip = hub.url
+        ? `${hub.name ?? "HC3 hub"} — ${hub.url}`
+        : hub.error ?? "";
+      if (this.resolvedFlua) {
+        item.tooltip += `\nflua: ${this.resolvedFlua}`;
+      }
       return item;
     }
     const qa = node.qa;
@@ -112,10 +129,53 @@ class HubProvider implements vscode.TreeDataProvider<TreeNode> {
     return item;
   }
 
+  /** Sort + filter, applied to the QA children of the hub node. */
+  private visibleQas(qas: QaInfo[]): QaInfo[] {
+    let out = qas;
+    const needle = this.filter.trim().toLowerCase();
+    if (needle) {
+      out = out.filter(
+        (qa) =>
+          qa.name.toLowerCase().includes(needle) ||
+          String(qa.id).includes(needle)
+      );
+    }
+    return [...out].sort((a, b) =>
+      this.sortMode === "id"
+        ? (a.id ?? 0) - (b.id ?? 0)
+        : a.name.localeCompare(b.name)
+    );
+  }
+
+  cycleSort(): void {
+    this.sortMode = this.sortMode === "name" ? "id" : "name";
+    this.onChange.fire();
+  }
+
+  /** The cache key: the hub's serial (hcName), else the URL — several
+   * hubs must never share one cache directory. */
+  hubSerial(): string {
+    const hub = this.doc?.hub;
+    return (hub?.name || hub?.url || "hub").replace(/[^A-Za-z0-9_.-]+/g, "_");
+  }
+
+  async setFilter(): Promise<void> {
+    const next = await vscode.window.showInputBox({
+      prompt: "Filter QAs by name (or id) — empty clears",
+      value: this.filter,
+      placeHolder: "e.g. heating",
+    });
+    if (next === undefined) {
+      return; // cancelled
+    }
+    this.filter = next;
+    this.onChange.fire();
+  }
+
   async getChildren(node?: TreeNode): Promise<TreeNode[]> {
     if (node) {
       return node.kind === "hub"
-        ? (node.doc.qas ?? []).map((qa) => ({ kind: "qa", qa }))
+        ? this.visibleQas(node.doc.qas ?? []).map((qa) => ({ kind: "qa", qa }))
         : [];
     }
     if (!this.doc) {
@@ -212,6 +272,38 @@ async function actionPack(context: vscode.ExtensionContext, qa: QaInfo): Promise
   runFluaTool(["--tool", "pack", main.fsPath]);
 }
 
+/** Download for editing: cache-or-fetch the .fqa (one export call at
+ * most), then unpack the cached package into the workspace project dir. */
+async function downloadForEdit(
+  context: vscode.ExtensionContext,
+  provider: HubProvider,
+  qa: QaInfo
+): Promise<void> {
+  const target = downloadDir(qa);
+  if (!target) {
+    return;
+  }
+  rememberDir(context, qa.id, target.fsPath);
+  const fqa = await new QaCache(context).ensure(provider.hubSerial(), qa);
+  if (!fqa) {
+    return;
+  }
+  runFluaTool(["--tool", "unpack", fqa.fsPath, "-d", target.fsPath]);
+}
+
+/** View: open the (cached) .fqa in the flua package editor, no unpacking. */
+async function viewFqa(
+  context: vscode.ExtensionContext,
+  provider: HubProvider,
+  qa: QaInfo
+): Promise<void> {
+  const fqa = await new QaCache(context).ensure(provider.hubSerial(), qa);
+  if (!fqa) {
+    return;
+  }
+  await vscode.commands.executeCommand("vscode.openWith", fqa, "flua.fqaViewer");
+}
+
 function registerCommands(
   context: vscode.ExtensionContext,
   provider: HubProvider
@@ -219,9 +311,14 @@ function registerCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand("flua.hub.refresh", () => provider.refresh()),
 
+    vscode.commands.registerCommand("flua.hub.sort", () => provider.cycleSort()),
+
+    vscode.commands.registerCommand("flua.hub.filter", () => void provider.setFilter()),
+
     vscode.commands.registerCommand("flua.hub.showActions", async (qa: QaInfo) => {
       const dir = knownDir(context, qa.id);
       const labels = [
+        { label: "View (.fqa)", detail: "open in the flua package editor (cached)" },
         { label: "Download", detail: dir ? `into ${dir}` : "download + unpack into the workspace" },
         { label: "Update (upload local changes)" },
         { label: "Run (UI)" },
@@ -234,13 +331,10 @@ function registerCommands(
       if (!picked) {
         return;
       }
-      if (picked.label === "Download") {
-        const target = downloadDir(qa);
-        if (!target) {
-          return;
-        }
-        rememberDir(context, qa.id, target.fsPath);
-        runFluaTool(["--tool", "downloadQA", "-d", target.fsPath, String(qa.id)]);
+      if (picked.label === "View (.fqa)") {
+        await viewFqa(context, provider, qa);
+      } else if (picked.label === "Download") {
+        await downloadForEdit(context, provider, qa);
       } else if (picked.label.startsWith("Update")) {
         await actionUpdate(context, qa);
       } else if (picked.label === "Run (UI)") {
@@ -253,14 +347,13 @@ function registerCommands(
       }
     }),
 
-    vscode.commands.registerCommand("flua.hub.download", (qa: QaInfo) => {
-      const target = downloadDir(qa);
-      if (!target) {
-        return;
-      }
-      rememberDir(context, qa.id, target.fsPath);
-      runFluaTool(["--tool", "downloadQA", "-d", target.fsPath, String(qa.id)]);
-    }),
+    vscode.commands.registerCommand("flua.hub.download", (qa: QaInfo) =>
+      void downloadForEdit(context, provider, qa)
+    ),
+
+    vscode.commands.registerCommand("flua.hub.view", (qa: QaInfo) =>
+      void viewFqa(context, provider, qa)
+    ),
 
     vscode.commands.registerCommand("flua.hub.update", (qa: QaInfo) =>
       void actionUpdate(context, qa)

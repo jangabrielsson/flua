@@ -51,10 +51,14 @@ packages without unpacking them by hand.
   workspace (`flua.setupNudge` turns it off).
 - **HC3 hub view** (the flua activity-bar icon): the hub's model/firmware
   and its QuickApps as a tree — `flua --tool hubList` under the hood,
-  refresh on demand. Clicking a QA offers the loop: Download (into
+  refresh on demand, filter by name/id and sort by name/id in the view
+  title. Clicking a QA offers the loop: View (.fqa) (opens the package
+  editor from a local cache), Download (into
   `<workspace>/<name>-<id>`), Update (upload local changes), Run (--ui),
-  Pack, Copy id. Run/Update/Pack remember the download folder, so the
-  loop stays in VS Code.
+  Pack, Copy id. Downloads are cached in the extension's global storage
+  keyed by hub and QA id, with the hub's `modified` timestamp deciding
+  freshness — repeat views/downloads never re-export from the HC3, and a
+  cached package views offline.
 - **Hub-aware completions**: inside `fibaro.call(`/`fibaro.getValue(`/
   `fibaro.setValue(`, device ids complete with name and room; scene ids
   after `fibaro.scene("execute", `; global variable names inside

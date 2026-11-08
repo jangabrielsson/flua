@@ -474,11 +474,12 @@ flua --tool house --db house.json   # ...or from a seed/db file (the simulated h
 ```
 
 `hubList` needs HC3 credentials (the `.env` chain) and prints
-`{"hub": {...}, "qas": [...]}` — QAs keyed by id, rooms resolved by name.
-`house` resolves the same priority the extension needs: HC3 credentials
-first, else `--db`, else an honest empty house (a QA-only run has none).
-Both print one JSON document on stdout; the shape is the contract the
-extension and MCP clients consume.
+`{"hub": {...}, "qas": [...]}` — QAs keyed by id, rooms resolved by name,
+and each QA's `modified` timestamp (the extension cache's freshness
+signal). `house` resolves the same priority the extension needs: HC3
+credentials first, else `--db`, else an honest empty house (a QA-only run
+has none). Both print one JSON document on stdout; the shape is the
+contract the extension and MCP clients consume.
 
 And a route can be replayed in isolation — the handlers are pure functions
 over `SimState`:

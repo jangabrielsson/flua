@@ -190,6 +190,10 @@
         "title": "Flua: Download QA"
       },
       {
+        "command": "flua.hub.view",
+        "title": "Flua: View QA (.fqa)"
+      },
+      {
         "command": "flua.hub.update",
         "title": "Flua: Update QA on HC3"
       },
@@ -206,6 +210,16 @@
         "title": "Flua: Copy QA id"
       },
       {
+        "command": "flua.hub.sort",
+        "title": "Flua: Sort QAs (name / id)",
+        "icon": "$(list-ordered)"
+      },
+      {
+        "command": "flua.hub.filter",
+        "title": "Flua: Filter QAs",
+        "icon": "$(filter)"
+      },
+      {
         "command": "flua.house.refresh",
         "title": "Flua: Refresh house data"
       },
@@ -219,7 +233,7 @@
         {
           "id": "flua",
           "title": "flua",
-          "icon": "$(server)"
+          "icon": "$(home)"
         }
       ]
     },
@@ -331,9 +345,24 @@
           "command": "flua.hub.refresh",
           "when": "view == flua.hub",
           "group": "navigation@1"
+        },
+        {
+          "command": "flua.hub.filter",
+          "when": "view == flua.hub",
+          "group": "navigation@2"
+        },
+        {
+          "command": "flua.hub.sort",
+          "when": "view == flua.hub",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [
+        {
+          "command": "flua.hub.view",
+          "when": "viewItem == fluaQa",
+          "group": "1_qa@0"
+        },
         {
           "command": "flua.hub.download",
           "when": "viewItem == fluaQa",
