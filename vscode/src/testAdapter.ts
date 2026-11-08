@@ -96,12 +96,27 @@ export function registerTestAdapter(context: vscode.ExtensionContext): void {
         run.end();
         return;
       }
-      for (const item of itemsByFile.values()) {
+      // "run this one" (or a selection): the explorer hands the chosen
+      // items over as request.include — run exactly those files. Empty
+      // include = the whole suite.
+      const selected = (request.include ?? [])
+        .filter((item) => item.uri)
+        .map((item) => item.uri!.fsPath);
+      const queued = selected.length
+        ? [...itemsByFile.entries()]
+            .filter(([, item]) => item.uri && selected.includes(item.uri.fsPath))
+            .map(([, item]) => item)
+        : [...itemsByFile.values()];
+      for (const item of queued) {
         run.enqueued(item);
       }
-      const result = await execFlua(fluaExecutable(), ["test", "--json"], root);
+      const args = ["test", "--json"];
+      if (selected.length) {
+        args.push(...selected);
+      }
+      const result = await execFlua(fluaExecutable(), args, root);
       if (result.code === -1) {
-        for (const item of itemsByFile.values()) {
+        for (const item of queued) {
           run.failed(item, new vscode.TestMessage(`cannot run: ${result.stderr}`));
         }
         run.end();
@@ -111,7 +126,14 @@ export function registerTestAdapter(context: vscode.ExtensionContext): void {
       try {
         doc = JSON.parse(result.stdout);
       } catch {
-        // e.g. "no *_test.lua files found" — nothing to report
+        // e.g. "no *_test.lua files found", or a selected file that is gone
+        const note = result.stdout.trim() || result.stderr.trim();
+        for (const item of queued) {
+          run.skipped(item);
+        }
+        if (note) {
+          void vscode.window.showWarningMessage(`flua test: ${note}`);
+        }
         run.end();
         return;
       }

@@ -77,8 +77,8 @@ packages without unpacking them by hand.
 - **Test Explorer**: self-asserting test QAs (`*_test.lua`) appear under
   the beaker as "flua tests" — refresh discovers (`flua test --list`),
   Run executes `flua test --json` and maps PASS/FAIL/TIME onto the
-  explorer's states with the failure output inline. Same CLI contract
-  agents get.
+  explorer's states with the failure output inline; "run this one" runs
+  just the selected file(s). Same CLI contract agents get.
 - **MCP registration**: "Flua: Register flua-mcp with Copilot" writes the
   flua-mcp stdio server into the workspace's `.vscode/mcp.json` — the venv
   python interpreter with `-m flua.mcp.server`, exactly as `docs/mcp.md`
