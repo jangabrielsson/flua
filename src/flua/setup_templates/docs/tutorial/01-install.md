@@ -66,7 +66,7 @@ flua --api local -e 'print("Hello HC3!")'
 
 ```text
 🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
-[04.10.2026][20:11:43][DEBUG  ][QA50005000]: Hello HC3!
+[04.10.2026][20:11:43][DEBUG  ][QA5000]: Hello HC3!
 ```
 
 Let's unpack the two lines, because you will type them a lot:

@@ -1407,6 +1407,24 @@ def test_print_binary_string_does_not_crash(tmp_path) -> None:
     assert "stack traceback" not in plain_text
 
 
+def test_e_code_log_tag_is_qa_id_not_doubled(tmp_path) -> None:
+    # -e code gets the auto-generated name QA (no file to derive one from);
+    # the log tag is <name><id>, so it must read QA5000 — not QA50005000
+    # (the name QA<id> + the appended id doubled it, a visible wart in
+    # every -e log line; docs/tutorial/01-install.md shows the tag too).
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--api", "local", "-e", "print(42)"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    plain_text = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
+    assert "[QA5000]" in plain_text
+    assert "QA50005000" not in plain_text
+
+
 def test_startup_greeting(tmp_path) -> None:
     script = tmp_path / "greet.lua"
     script.write_text("exit(0)\n")

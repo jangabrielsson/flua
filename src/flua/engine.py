@@ -850,8 +850,10 @@ class LuaEngine:
         name = qa_config.get("name")
         if name is None:
             # names need not be unique: config name, else the script's
-            # basename without path/suffix, else QA<id>
-            name = Path(arg0).stem if arg0.endswith(".lua") else f"QA{self._next_qa_id}"
+            # basename without path/suffix, else plain QA. The log tag is
+            # always <name><id>, so embedding the id here would double it
+            # (QA50005000) — "QA" alone yields the tag QA5000.
+            name = Path(arg0).stem if arg0.endswith(".lua") else "QA"
             qa_config["name"] = name
         # Proxy mode needs the real HC3; offline it degrades to a plain QA
         # with a warning ("Offline mode, proxy disabled").
