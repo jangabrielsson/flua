@@ -4,6 +4,18 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.137] - 2026-11-08
+
+### Added
+- switch-hub picker and serial-keyed per-hub state in the extension
+- hub profiles tool (--tool hub add/list/switch/remove) with pinning tests
+
+### Changed
+- hub profiles design note and USAGE section
+- ci: heal the lupa cache — save-always + a fresh key slate the poisoned entries
+- ci: pin the cached lupa wheel to <2.7 — the cache held a 2.8 artifact the resolver rightly rejected
+- ci: install the cached lupa wheel by path (3.15 resolver ignored find-links)
+
 ## [0.1.136] - 2026-11-08
 
 ### Added
