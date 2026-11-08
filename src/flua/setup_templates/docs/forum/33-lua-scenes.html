@@ -1,0 +1,257 @@
+<h2>Scenes around your QAs — the glue, tested offline</h2>
+
+<p>HC3 scenes are the easiest automation there is: draw a block scene in
+the controller's editor and it just runs. Under the hood the editor
+compiles the blocks to a Lua scene — the same format you can also write
+by hand. flua isn't a scene editor, and this post isn't pushing you to
+write more scenes: it runs the compiled format because scenes are
+<b>glue</b>. A scene watches the house and calls your QuickApps; a QA
+under development gets driven by scenes; a scene's schedule becomes your
+QA's schedule. Scenes are also where the subtle bugs live — triggers fire
+on changes only, and a scene that silently doesn't run is hard to
+diagnose on the controller. flua makes that glue deterministic and
+testable offline. Here's the file shape, and the three directions of the
+glue.</p>
+
+<h3>One file, two parts</h3>
+
+<p>A block scene's "Convert to Lua" produces exactly this shape:
+declarations above a marker line, actions below it. Save it as
+<code>bedtime.lua</code>:</p>
+
+<pre>
+--%%name:Bedtime
+--%%scene:true
+COND = {
+  operator = "any",
+  conditions = {
+    { type = "device", id = 10, property = "value",
+      operator = "==", value = true, isTrigger = true },
+  }
+}
+-- ===== SCENE ACTIONS =====
+print("SCENE_RAN", _sceneId, sourceTrigger.type, sourceTrigger.id)
+fibaro.call(10, "turnOff")
+print("LAMP_AFTER", api.get("/devices/10").properties.value)
+</pre>
+
+<p>Boot parses the declarations only — the actions never run at boot,
+like the HC3. Every scene start runs the actions fresh, with
+<code>sourceTrigger</code> and <code>_sceneId</code> in scope. The scene
+also answers <code>GET /scenes</code>, so the REST surface knows it
+exists.</p>
+
+<h3>Drive the trigger</h3>
+
+<p>The scene watches device 10 — so the sim needs a device 10. The seed
+file pre-populates the simulated house before anything runs (the same
+format <code>--tool createDB</code> writes): here, one lamp, off. Then a
+one-line driver QA flips it — and the scene's trigger fires.</p>
+
+<pre>
+house.json — the simulated house, seeded:
+{"devices": [{"id": 10, "name": "Hall lamp",
+              "type": "com.fibaro.binarySwitch",
+              "properties": {"value": false}}]}
+</pre>
+
+<pre>
+driver.lua — flips the lamp one second after boot:
+--%%name:Driver
+function QuickApp:onInit()
+  setTimeout(function()
+    api.put("/devices/10", { properties = { value = true } })
+  end, 1000)
+end
+</pre>
+
+<pre>
+flua --api local bedtime.lua driver.lua --seed house.json
+</pre>
+
+<pre>
+[Bedtime5000]: SCENE_RAN 5000 device 10
+[Bedtime5000]: LAMP_AFTER false          -- the fibaro.call took effect
+</pre>
+
+<p>One trap worth knowing immediately: triggers fire on
+<b>changes</b>. Flip a switch to the value it already has and nothing
+happens — on the HC3 and in flua alike.</p>
+
+<h3>sourceTrigger — why did the scene start?</h3>
+
+<p>The actions branch on <code>sourceTrigger.type</code>:
+<code>device</code> (with <code>.id</code>/<code>.property</code>/
+<code>.value</code>), <code>date</code>, <code>global-variable</code>, or
+<code>manual</code>. Manual means a person pressed Run — or another QA
+called it:</p>
+
+<pre>
+fibaro.scene("execute", { 5000 })     -- runs the actions now: type == "manual"
+-- or plain REST:  POST /scenes/5000/execute
+</pre>
+
+<pre>
+[Bedtime5000]: SCENE_RAN 5000 manual
+</pre>
+
+<h3>Glue, direction one: scenes calling QAs</h3>
+
+<p>The rule of thumb on the HC3: QuickApps are the drivers, scenes chain
+actions by calling QA methods. That is exactly what you want to test when
+the QA is yours and still changing — the scene stays on the controller,
+its target method gets exercised here. flua assigns QA ids from 5000 in
+load order, so put the QA first on the command line and the scene knows
+its id. Take the driver from above, give it the method under
+development, and let the scene call it:</p>
+
+<pre>
+driver.lua — the method under development:
+function QuickApp:turnOn() print("QA_TURNON") end
+
+scene.lua — the actions, when the lamp flips:
+--%%name:Scene
+--%%scene:true
+COND = {
+  operator = "any",
+  conditions = {
+    { type = "device", id = 10, property = "value",
+      operator = "==", value = true, isTrigger = true },
+  }
+}
+-- ===== SCENE ACTIONS =====
+print("SCENE_RAN", _sceneId, sourceTrigger.type, sourceTrigger.id)
+fibaro.call(5000, "turnOn")
+
+flua --api local driver.lua scene.lua --seed house.json
+
+[Scene5001]: SCENE_RAN 5001 device 10
+[Driver5000]: QA_TURNON              -- the scene reached the QA's action
+</pre>
+
+<p>On the real HC3 the scene references the QA's real id — the code is
+the same, only the number changes.</p>
+
+<h3>Glue, direction two: QAs triggering scenes</h3>
+
+<p>The reverse also works: a QA's own property update is a
+<code>DevicePropertyUpdatedEvent</code> on the refreshStates feed, so a
+scene watching that QA fires — the QA becomes the scene's trigger, no
+controller involved:</p>
+
+<pre>
+scene.lua:
+--%%name:Watcher
+--%%scene:true
+COND = {
+  operator = "any",
+  conditions = {
+    { type = "device", id = 5000, property = "value",
+      operator = "==", value = true, isTrigger = true },
+  }
+}
+-- ===== SCENE ACTIONS =====
+print("SCENE_RAN_QA", _sceneId, sourceTrigger.type, sourceTrigger.id)
+
+driver.lua:
+--%%name:Driver2
+function QuickApp:onInit()
+  setTimeout(function() self:updateProperty("value", true) end, 1000)
+end
+
+flua --api local driver.lua scene.lua --seed house.json
+
+[Watcher5001]: SCENE_RAN_QA 5001 device 5000
+</pre>
+
+<p>Global variables work the same way — a
+<code>global-variable</code> trigger leaf and
+<code>fibaro.setGlobalVariable</code> on the QA side.</p>
+
+<h3>Conditions the evaluator honors</h3>
+
+<ul>
+<li>Only <b>trigger</b> leaves (<code>isTrigger = true</code>) start a
+check; <b>filter</b> leaves gate the run. <code>operator</code> is
+<code>"all"</code> or <code>"any"</code>, groups nest.</li>
+<li><code>anyValue</code> triggers on any change;
+<code>match&gt;</code>/<code>match&gt;=</code>/<code>match&lt;</code>/
+<code>match&lt;=</code> are filters-only (a trigger flag on them warns and
+is ignored).</li>
+<li><code>duration = 60</code> defers the run and re-checks the whole
+tree at <code>now + 60</code> — a change that breaks the condition
+cancels the pending run.</li>
+<li>Date triggers arm virtual-clock timers: <code>cron</code> is
+<code>{minute, hour, dom, month, dow, year}</code> with dow 1 = Monday and
+lists like <code>"1,3"</code> allowed; <code>matchInterval</code> fires on
+the grid, <code>date + k*interval</code>; <code>sunrise</code>/
+<code>sunset</code> take a minute offset (negative = before).</li>
+</ul>
+
+<h3>Glue, direction three: scenes as schedules</h3>
+
+<p>A scene with a date trigger is the HC3's built-in scheduler — the
+easiest way to make a QA do something at 23:00, at sunrise, or every ten
+minutes. The same cron scene calling the QA under development, with the
+virtual clock doing the waiting:</p>
+
+<pre>
+--%%name:Scheduler
+--%%scene:true
+COND = {
+  operator = "any",
+  conditions = {
+    { type = "date", property = "cron", operator = "match",
+      value = {"0", "23", "*", "*", "*", "*"}, isTrigger = true },
+  }
+}
+-- ===== SCENE ACTIONS =====
+print("SCENE_RAN", _sceneId, sourceTrigger.type)
+fibaro.call(5000, "turnOn")
+</pre>
+
+<pre>
+flua --api local driver.lua cron.lua --seed house.json \
+  --start "2026/10/19 22:59:30" --speed 120 --max-hours 1
+
+[Scheduler5001]: SCENE_RAN 5001 date      -- at virtual 23:00:00
+[Driver5000]: QA_TURNON
+</pre>
+
+<p>The daily cron re-arms a day ahead; <code>--max-hours</code> caps the
+horizon so the demo ends instead of waiting for tomorrow.</p>
+
+<h3>The scene tests itself</h3>
+
+<p>The self-asserting pattern from the test post applies here unchanged:
+a driver QA flips devices, the scene's actions leave traces (a global
+variable, a property), and the driver asserts the effect and exits with
+the failure count. The bundled example does exactly that — it loads a
+scene from an inline string, triggers it by flipping a device, then
+executes it manually, checking the result each time:</p>
+
+<pre>
+flua --api local examples/scenes.lua
+
+PASS: scene in /scenes
+PASS: device trigger ran the scene
+PASS: manual execute ran the scene
+failures: 0          -- exit 0
+</pre>
+
+<p>Run it under <code>flua test</code> or in CI and a scene bug is a red
+test, not a surprise on the controller.</p>
+
+<h3>What flua does not do yet</h3>
+
+<p>Honest edges: <code>getSceneVariable</code>/<code>setSceneVariable</code>
+are still stubs (use global variables for now) and the "Allow restarting
+a running scene" option is not implemented. Weather, alarm and profile
+conditions evaluate against simulated state offline; in online mode they
+read the real HC3 — the weather record, the alarm partitions and the
+profiles come from the controller. And flua is no scene editor: draw the
+block scenes on the HC3, convert, and run the compiled Lua here — flua's
+job is making the glue testable, not replacing the editor.</p>
+
+<p>Next time: endpoint packages — wrap a simulated endpoint in a QA and
+distribute it as a .fqa, emulation like any other QA.</p>

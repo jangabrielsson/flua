@@ -46,6 +46,7 @@ workflow: scenario parameters (clock, mode, seed) live in the QA file as
 | 30 | 30-helper.html | The FluaHelper: the HC3's local-only API from your QA | `--tool installHelper`, `api.helper` (REST in the controller's local context), `api.helperFibaro` (fibaro.* on the real HC3), transparent variable routing, proxy state that survives restarts | posted 2026-11-04 https://forum.fibaro.com/topic/80420-flua-the-qa-development-tool/page/4/#findComment-298599 |
 | 31 | 31-proxy-mode.html | Proxy mode deep dive: the QA runs on your laptop, the device lives on the HC3 | `--%%mode:proxy`, the proxy id, state on the controller (restart persistence), actions/UI events routed back, children, the one-event property rule, callback port | posted 2026-11-04 https://forum.fibaro.com/topic/80420-flua-the-qa-development-tool/page/4/#findComment-298600 |
 | 32 | 32-vscode-extension-evolved.html | Your QA workflow inside VS Code — the extension grew up | the HC3 hub view (filter/sort, actions, hub-newer badge), the freshness-aware cache (View .fqa, offline), Download→edit→Run→Update loop, hub-aware completions (`--tool house`, HT table), switching controllers (`--tool hub` profiles), the CLI-first rule | posted 2026-11-08 https://forum.fibaro.com/topic/80420-flua-the-qa-development-tool/page/5/#findComment-298662 |
+| 33 | 33-lua-scenes.html | Scenes around your QAs — the glue, tested offline | `--%%scene:true` (COND declarations + marker + actions), device/global-variable/date triggers, the conditions evaluator (filters, anyValue, duration, cron grid, sunrise/sunset), sourceTrigger + manual execute, the three glue directions (scenes calling QAs, QA events triggering scenes, scenes as schedules), self-testing scenes (`examples/scenes.lua`) | post 2026-11-08 https://forum.fibaro.com/topic/80420-flua-the-qa-development-tool/page/5/#findComment-298665 |
 
 Status: draft = written, not verified · ready = snippets run against flua ·
 posted = published (fill in the forum link and date).
@@ -81,6 +82,7 @@ posted = published (fill in the forum link and date).
 - simulated devices (`_FLUA.loadSimDevice`, the bundled device set, uniform fibaro.call drivers, `_FLUA.keepAlive()`)
 - registered endpoints (`api.registerEndpoint`, additive + override routes, emulation modules and deployed endpoint QAs)
 - the VS Code extension as the app layer (hub view + cache + staleness badge, hub-aware completions, `--tool hub` profiles)
+- HC3 Lua scenes (`--%%scene:true`, the conditions evaluator, sourceTrigger, self-testing scenes)
 - the what's-new summary (0.1.127–0.1.137, the human version of the changelog)
 
 ## Ideas for the next series (unclaimed)
