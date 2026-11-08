@@ -60,7 +60,10 @@ packages without unpacking them by hand.
   freshness — repeat views/downloads never re-export from the HC3, a
   cached package views offline, and a QA whose hub version moved on shows
   a "hub newer" badge. Cache entries unused for 30 days are pruned on
-  activation.
+  activation. The view title also has **Switch hub**: a picker over the
+  `--tool hub` profiles (name + url + serial, the active one marked) —
+  switching rewrites the `.env` chain and refreshes the tree; the
+  extension never sees a password.
 - **Hub-aware completions**: inside `fibaro.call(`/`fibaro.getValue(`/
   `fibaro.setValue(`, device ids complete with name and room; scene ids
   after `fibaro.scene("execute", `; global variable names inside

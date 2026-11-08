@@ -182,6 +182,11 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "flua.hub.switch",
+        "title": "Flua: Switch hub",
+        "icon": "$(arrow-swap)"
+      },
+      {
         "command": "flua.hub.showActions",
         "title": "Flua: QA actions"
       },
@@ -341,6 +346,11 @@
         }
       ],
       "view/title": [
+        {
+          "command": "flua.hub.switch",
+          "when": "view == flua.hub",
+          "group": "navigation@0"
+        },
         {
           "command": "flua.hub.refresh",
           "when": "view == flua.hub",

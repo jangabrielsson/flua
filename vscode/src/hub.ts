@@ -122,7 +122,7 @@ class HubProvider implements vscode.TreeDataProvider<TreeNode> {
     item.description = `${qa.id} · ${qa.type}`;
     // the staleness badge: the project was unpacked from an older hub
     // version than the one hubList now reports — a re-download is due
-    const project = projectEntry(this.context, qa.id);
+    const project = projectEntry(this.context, this.hubSerial(), qa.id);
     if (
       project &&
       project.modified !== null &&
@@ -214,23 +214,25 @@ function downloadDir(qa: QaInfo): vscode.Uri | undefined {
 
 function rememberDir(
   context: vscode.ExtensionContext,
+  hubSerial: string,
   id: number,
   dir: string,
   modified?: number | null
 ): void {
   const dirs = context.workspaceState.get<Record<string, unknown>>("hub.dirs", {});
-  dirs[String(id)] = { dir, modified: modified ?? null };
+  dirs[`${hubSerial}:${id}`] = { dir, modified: modified ?? null };
   void context.workspaceState.update("hub.dirs", dirs);
 }
 
-/** The unpacked project for a QA id: {dir, modified} — modified is the
- * hub timestamp the project was unpacked from (the staleness signal). */
+/** The unpacked project for a QA, keyed hub-serial:id — QA ids collide
+ * across hubs, and the staleness signal must never leak between them. */
 function projectEntry(
   context: vscode.ExtensionContext,
+  hubSerial: string,
   id: number
 ): { dir: string; modified: number | null } | undefined {
   const entry = context.workspaceState.get<Record<string, unknown>>("hub.dirs", {})[
-    String(id)
+    `${hubSerial}:${id}`
   ];
   if (typeof entry === "string") {
     return { dir: entry, modified: null }; // pre-badge entries: dir only
@@ -242,8 +244,12 @@ function projectEntry(
   return undefined;
 }
 
-function knownDir(context: vscode.ExtensionContext, id: number): string | undefined {
-  return projectEntry(context, id)?.dir;
+function knownDir(
+  context: vscode.ExtensionContext,
+  hubSerial: string,
+  id: number
+): string | undefined {
+  return projectEntry(context, hubSerial, id)?.dir;
 }
 
 /** The QA's main Lua file in a downloaded project: the first top-level .lua. */
@@ -258,9 +264,10 @@ async function findMainLua(dir: vscode.Uri): Promise<vscode.Uri | undefined> {
 
 async function mainLuaFor(
   context: vscode.ExtensionContext,
+  provider: HubProvider,
   qa: QaInfo
 ): Promise<vscode.Uri | undefined> {
-  const known = knownDir(context, qa.id);
+  const known = knownDir(context, provider.hubSerial(), qa.id);
   if (known) {
     return findMainLua(vscode.Uri.file(known));
   }
@@ -275,7 +282,7 @@ async function mainLuaFor(
   if (!picked?.[0]) {
     return undefined;
   }
-  rememberDir(context, qa.id, picked[0].fsPath);
+  rememberDir(context, provider.hubSerial(), qa.id, picked[0].fsPath);
   return findMainLua(picked[0]);
 }
 
@@ -283,8 +290,12 @@ function viewerPort(): number {
   return vscode.workspace.getConfiguration("flua").get<number>("viewerPort", 8090);
 }
 
-async function actionRunUi(context: vscode.ExtensionContext, qa: QaInfo): Promise<void> {
-  const main = await mainLuaFor(context, qa);
+async function actionRunUi(
+  context: vscode.ExtensionContext,
+  provider: HubProvider,
+  qa: QaInfo
+): Promise<void> {
+  const main = await mainLuaFor(context, provider, qa);
   if (!main) {
     void vscode.window.showWarningMessage(
       `flua: no Lua files found for ${qa.name} — download it first`
@@ -295,16 +306,24 @@ async function actionRunUi(context: vscode.ExtensionContext, qa: QaInfo): Promis
     path.dirname(main.fsPath));
 }
 
-async function actionUpdate(context: vscode.ExtensionContext, qa: QaInfo): Promise<void> {
-  const main = await mainLuaFor(context, qa);
+async function actionUpdate(
+  context: vscode.ExtensionContext,
+  provider: HubProvider,
+  qa: QaInfo
+): Promise<void> {
+  const main = await mainLuaFor(context, provider, qa);
   if (!main) {
     return;
   }
   runFluaTool(["--tool", "updateQA", String(qa.id), main.fsPath]);
 }
 
-async function actionPack(context: vscode.ExtensionContext, qa: QaInfo): Promise<void> {
-  const main = await mainLuaFor(context, qa);
+async function actionPack(
+  context: vscode.ExtensionContext,
+  provider: HubProvider,
+  qa: QaInfo
+): Promise<void> {
+  const main = await mainLuaFor(context, provider, qa);
   if (!main) {
     return;
   }
@@ -322,7 +341,7 @@ async function downloadForEdit(
   if (!target) {
     return;
   }
-  rememberDir(context, qa.id, target.fsPath, qa.modified);
+  rememberDir(context, provider.hubSerial(), qa.id, target.fsPath, qa.modified);
   const fqa = await new QaCache(context).ensure(provider.hubSerial(), qa);
   if (!fqa) {
     return;
@@ -343,6 +362,49 @@ async function viewFqa(
   await vscode.commands.executeCommand("vscode.openWith", fqa, "flua.fqaViewer");
 }
 
+/** Switch the active hub: the extension reads the password-free profile
+ * list (`--tool hub list --json`), and the switch itself is one awaited
+ * CLI call — the extension never sees a password. */
+async function switchHub(
+  context: vscode.ExtensionContext,
+  provider: HubProvider
+): Promise<void> {
+  const result = await execFlua(fluaExecutable(), ["--tool", "hub", "list", "--json"]);
+  let profiles: Record<string, { url: string; serial?: string; active?: boolean }> = {};
+  try {
+    profiles = JSON.parse(result.stdout);
+  } catch {
+    profiles = {};
+  }
+  const names = Object.keys(profiles);
+  if (!names.length) {
+    void vscode.window.showInformationMessage(
+      "flua: no hub profiles — add one with `flua --tool hub add <name> <url> <user>`"
+    );
+    return;
+  }
+  const picked = await vscode.window.showQuickPick(
+    names.sort().map((name) => ({
+      label: profiles[name].active ? `$(check) ${name}` : name,
+      description: `${profiles[name].url}` +
+        (profiles[name].serial ? ` · ${profiles[name].serial}` : ""),
+      name,
+    })),
+    { placeHolder: "Switch the hub (writes the .env chain)" }
+  );
+  if (!picked) {
+    return;
+  }
+  const switched = await execFlua(fluaExecutable(), ["--tool", "hub", "switch", picked.name]);
+  if (switched.code !== 0) {
+    void vscode.window.showWarningMessage(
+      `flua: cannot switch to ${picked.name} — ${switched.stderr.trim() || switched.stdout.trim()}`
+    );
+    return;
+  }
+  provider.refresh();
+}
+
 function registerCommands(
   context: vscode.ExtensionContext,
   provider: HubProvider
@@ -350,12 +412,14 @@ function registerCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand("flua.hub.refresh", () => provider.refresh()),
 
+    vscode.commands.registerCommand("flua.hub.switch", () => void switchHub(context, provider)),
+
     vscode.commands.registerCommand("flua.hub.sort", () => provider.cycleSort()),
 
     vscode.commands.registerCommand("flua.hub.filter", () => void provider.setFilter()),
 
     vscode.commands.registerCommand("flua.hub.showActions", async (qa: QaInfo) => {
-      const dir = knownDir(context, qa.id);
+      const dir = knownDir(context, provider.hubSerial(), qa.id);
       const labels = [
         { label: "View (.fqa)", detail: "open in the flua package editor (cached)" },
         { label: "Download", detail: dir ? `into ${dir}` : "download + unpack into the workspace" },
@@ -375,11 +439,11 @@ function registerCommands(
       } else if (picked.label === "Download") {
         await downloadForEdit(context, provider, qa);
       } else if (picked.label.startsWith("Update")) {
-        await actionUpdate(context, qa);
+        await actionUpdate(context, provider, qa);
       } else if (picked.label === "Run (UI)") {
-        await actionRunUi(context, qa);
+        await actionRunUi(context, provider, qa);
       } else if (picked.label === "Pack into .fqa") {
-        await actionPack(context, qa);
+        await actionPack(context, provider, qa);
       } else if (picked.label === "Copy id") {
         await vscode.env.clipboard.writeText(String(qa.id));
         void vscode.window.showInformationMessage(`flua: copied QA id ${qa.id}`);
@@ -395,15 +459,15 @@ function registerCommands(
     ),
 
     vscode.commands.registerCommand("flua.hub.update", (qa: QaInfo) =>
-      void actionUpdate(context, qa)
+      void actionUpdate(context, provider, qa)
     ),
 
     vscode.commands.registerCommand("flua.hub.runUi", (qa: QaInfo) =>
-      void actionRunUi(context, qa)
+      void actionRunUi(context, provider, qa)
     ),
 
     vscode.commands.registerCommand("flua.hub.pack", (qa: QaInfo) =>
-      void actionPack(context, qa)
+      void actionPack(context, provider, qa)
     ),
 
     vscode.commands.registerCommand("flua.hub.copyId", async (qa: QaInfo) => {
