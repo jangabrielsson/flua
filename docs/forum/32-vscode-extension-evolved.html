@@ -1,0 +1,104 @@
+<h2>Your QA workflow inside VS Code — the extension grew up</h2>
+
+<p>The flua extension started as a thin layer: run tools from the explorer
+menu, check on save, read .fqa packages. It is still that thin layer —
+every feature is a <code>flua --tool</code> command with a button on top —
+but the surface now covers the whole loop: browse the controller, view,
+download, edit, test, upload, and switch controllers, all from the editor.
+This post tours it.</p>
+
+<h3>The hub view</h3>
+
+<p>Install or update the extension (GsonSoft-development.flua), and a flua
+icon appears in the activity bar. It opens the <b>HC3 hub view</b>: the
+hub's model and firmware at the top, its QuickApps as a tree — name, id,
+type, room. The title bar has filter (name or id), sort (name ↔ id), and
+refresh. The data is one command, the same one you can run yourself:</p>
+
+<pre>
+flua --tool hubList
+</pre>
+
+<p>One JSON document: the hub plus its QAs, each carrying its
+<code>modified</code> timestamp — which the tree turns into a <b>"hub
+newer"</b> badge when a downloaded copy has fallen behind.</p>
+
+<h3>View, download, edit, upload — without leaving the editor</h3>
+
+<p>Click a QA for its actions:</p>
+
+<ul>
+<li><b>View (.fqa)</b> — opens the QA in the package viewer (metadata,
+variables, a Lua preview per file). The package is downloaded into the
+extension's local cache, keyed by hub and QA id, and the hub's modified
+timestamp decides freshness: view twice, download once. A cached package
+opens even with the controller unreachable.</li>
+<li><b>Download</b> — unpacks the (cached) package into
+<code>&lt;workspace&gt;/&lt;name&gt;-&lt;id&gt;</code> for real editing.</li>
+<li><b>Run (UI)</b> — starts <code>flua --ui</code> on the project; the
+viewer opens, F5-style.</li>
+<li><b>Update</b> / <b>Pack</b> — upload the edited project back to the
+controller, or pack it as a .fqa.</li>
+</ul>
+
+<p>The loop is: browse → download → edit → test → update. The cache
+exists so the controller never re-exports what it already gave you, and
+entries unused for 30 days prune themselves.</p>
+
+<h3>Completions that know your house</h3>
+
+<p>The editor completes HC3 API shapes (LuaLS types), but IDs are just
+numbers — until now. Inside these calls, completion offers real names:</p>
+
+<pre>
+fibaro.call(45, "turnOn")        -- 45 completes as "45 — Kitchen light"
+fibaro.getValue(57, "value")     -- "57 — Heating"
+fibaro.getGlobalVariable("Ala")  -- completes the variable name
+fibaro.scene("execute", 3)       -- "3 — Evening lights"
+fibaro.emitCustomEvent("Door")   -- completes the event name
+</pre>
+
+<p>The data comes from <code>flua --tool house</code> — the real hub when
+credentials exist, or a simulated house from a seed file, so completions
+work for a house that does not exist yet:</p>
+
+<pre>
+flua --tool house --db house.json
+</pre>
+
+<p>And for readable code, one command writes a LuaLS-annotated home table
+so <code>HT.kitchen.light</code> completes room by room and means
+something to a reader:</p>
+
+<pre>
+Flua: Generate home table (ht.lua)   -- the command palette; data from --tool house
+</pre>
+
+<h3>Switching controllers</h3>
+
+<p>More than one HC3? Give each a name once, then switch from the view's
+title bar:</p>
+
+<pre>
+flua --tool hub add cottage http://192.168.2.30 admin    # prompts for the password
+flua --tool hub switch cottage                            # the global default (~/.env)
+flua --tool hub switch cottage --project                  # pin this project only
+</pre>
+
+<p>The extension's switch button lists the profiles (name, address,
+serial — the active one marked, passwords never shown) and switches the
+same .env chain every flua command reads. Project pins still win over the
+global default, so a folder can stay on the cottage while the rest of your
+work follows the switch.</p>
+
+<h3>The rule that keeps it honest</h3>
+
+<p>Nothing in the extension exists only in the extension. Every tree
+action is a <code>--tool</code> command first — <code>hubList</code>,
+<code>house</code>, <code>hub</code> — so agents and scripts get the exact
+same surface as the GUI (flua-mcp exposes it as typed tools), and the
+extension can never drift into behavior the CLI cannot reproduce. flua is
+the engine; this extension is the first app on top of it, not the last.</p>
+
+<p>Next time: endpoint packages — wrap a simulated endpoint in a QA and
+distribute it as a .fqa, emulation like any other QA.</p>
