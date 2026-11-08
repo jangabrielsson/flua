@@ -1,0 +1,5 @@
+%%{init: {"theme": "neutral", "flowchart": {"nodeSpacing": 45, "rankSpacing": 55}}}%%
+flowchart LR
+  REAL["<b>The real environment — your HC3, your house</b><br/><br/>A mistake means the lights go wild, so you can't afford many attempts"]
+  TEST["<b>The testbed — flua simulates the HC3</b><br/><br/>A mistake is a red FAIL line, so the agent can try thousands of times"]
+  REAL -. "instead of the real house" .-> TEST

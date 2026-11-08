@@ -1,0 +1,13 @@
+%%{init: {"theme": "neutral", "flowchart": {"nodeSpacing": 45, "rankSpacing": 70}}}%%
+flowchart LR
+  R(["Requirements:<br/>what you want"])
+  C(["Agent writes or<br/>fixes the code"])
+  T(["flua testbed:<br/>run, pass or fail"])
+  J{"Does it do what<br/>you wanted?"}
+  D(["Done — on the HC3"])
+  R --> C
+  C --> T
+  T -- "fail — fix it" --> C
+  T -- "pass" --> J
+  J -- "not quite — you refine<br/>the requirements" --> R
+  J -- "yes" --> D

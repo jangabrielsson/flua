@@ -1,0 +1,117 @@
+<h2>Working with agents — the future of software development</h2>
+
+<!-- Images: upload agents-loop.png and agents-testbed.png to the forum
+     post and set each img src to the uploaded URL. -->
+
+<p>For fifty years, building software meant writing code — a skill most
+people never learn. That changed, quietly, a couple of years ago: now you
+can describe what you want, and an AI agent writes the code for you.
+People call it "vibe coding", as if it were just vibes. It is not. It is
+a <b>loop</b> — and the loop has two parts people keep getting wrong:
+the agent's part (write, run, fail, fix) and your part (requirements and
+judgment). This post is about both, and about why the environment the
+agent works in matters more than the model.</p>
+
+<h3>The loop</h3>
+
+<p><img src="agents-loop.png" alt="The agent loop: you own requirements
+and judgment; the agent writes, runs and fixes code in a testbed"></p>
+
+<p>The inner loop is the agent's: write code, run it, fail, fix it,
+repeat — until the tests pass. Agents are good at this; it is mechanical,
+and they never get tired of it. The outer loop is yours: look at the
+result and ask <i>"does this do what I actually wanted?"</i> If not, you
+refine the requirements and the inner loop runs again.</p>
+
+<p>Note what the "not quite" arrow really means: refining is not failure.
+It is usually the first moment you discover what you actually wanted. The
+first version is a question, not an answer — build something small, see
+what is wrong with it, say what is wrong, build again. You do not need to
+get the requirements right the first time. You need to stay in the loop.</p>
+
+<h3>Why the testbed matters more than the model</h3>
+
+<p>Self-driving cars taught the industry this lesson the hard way: you do
+not train them on real roads, with real pedestrians. You train them in
+simulation, where a mistake is a number, not a person. The same logic
+applies to your home automation.</p>
+
+<p><img src="agents-testbed.png" alt="The real environment vs the
+testbed: a mistake in your house is chaos; a mistake in flua is a red
+FAIL line"></p>
+
+<p>Your real controller is the public road. A bad version of an
+automation means lights going wild at night, shutters opening in the
+rain, the heating doing something creative — and a family that notices.
+An agent that can only test against the real thing gets very few
+attempts, so it guesses carefully and stops. An agent with a testbed gets
+thousands of attempts, so it tries things, sees them fail, and learns.
+That is the difference between an agent that guesses once and an agent
+that iterates until it is right.</p>
+
+<p>flua is that testbed: it simulates the HC3 on your laptop. The agent
+runs the automation against a simulated house, watches it fail, fixes it,
+runs again — with no controller anywhere in the loop. And it does not
+just run the code: it <i>verifies</i> it. Every run ends in a pass/fail
+line and an exit code, which is exactly the feedback an agent is built
+to use.</p>
+
+<h3>What makes a tool agent-friendly</h3>
+
+<p>Agents have changed how software gets built, but not all tools have
+caught up. A tool is agent-friendly when it plays to what agents are good
+at — and here is what flua does about each of those:</p>
+
+<ul>
+<li><b>Text in, text out.</b> An automation in flua is a plain text
+file. Agents live in text — there is nothing hidden in menus, dialogs or
+visual editors that the agent cannot see or touch. What you read is what
+the agent writes.</li>
+<li><b>One surface for human and agent.</b> Everything flua does is a
+command on the command line. Whatever you click, the agent can run — the
+same tool, not a reduced copy with a second, weaker interface.</li>
+<li><b>Results, not vibes.</b> The agent needs feedback: pass/fail
+lines, exit codes, structured output. flua speaks exactly that language —
+a test runner for automations, machine-readable traces of what happened,
+and an MCP server that lets agents call flua itself as a tool.</li>
+<li><b>The same file goes to the controller.</b> What the agent
+developed and verified offline deploys to your real HC3 unchanged. No
+rewrite, no "it worked in the tool, now it works differently".</li>
+</ul>
+
+<h3>Your part: requirements and judgment</h3>
+
+<p>You do not need to write code. You need the two things no model has:
+knowledge of your house, and the authority to decide what "right" means.</p>
+
+<ul>
+<li><b>Describe behavior, not code.</b> Not "use fibaro.call with the
+delay parameter" but "when the door opens after sunset, turn on the hall
+light for two minutes — but not if the alarm is armed." Conditions,
+timing, exceptions. That is the part you already know.</li>
+<li><b>Judge like a boss.</b> Run the result, watch it, and say plainly
+what is wrong. "The light stays on too long" is a perfectly good
+requirement. The agent fixes it.</li>
+<li><b>Expect discovery.</b> You will often find that what you asked
+for was not quite what you wanted. Good — say so. Every round teaches
+you both something. The automation gets closer, and your requirements get
+sharper.</li>
+<li><b>You stay in control.</b> Nothing reaches your real controller
+until you say so. The agent iterates in the sandbox; you decide when it
+is good enough to ship.</li>
+</ul>
+
+<h3>The takeaway</h3>
+
+<p>For your home automation this means: you can have an agent develop the
+QuickApp that automates your specific need. You provide the goal and the
+judgment; the agent provides the code; the simulated house provides the
+safe place to iterate — and the same file goes onto your real HC3 when
+you are happy with it.</p>
+
+<p>That is the future of software development, and it has already
+started: not computers replacing developers, but everyone getting an
+engineer. The people who get the most out of it will not be the ones who
+write the best code. They will be the ones who know best what they want —
+and who keep refining it, round after round, until the thing in front of
+them finally matches the thing in their head.</p>
