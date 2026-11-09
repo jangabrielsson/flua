@@ -36,21 +36,23 @@ jobs:
       # wheel still satisfies the pin; if it is ever raised, the
       # path-install fails and the fallback compiles from source again —
       # correct, just slower, exactly when it matters.
-      # save-always matters: actions/cache skips the save when the restore
-      # hit the exact key — a healed wheels/ dir (2.8 artifact replaced by a
-      # pinned rebuild) would then never be written back, and the poisoned
-      # entry would keep forcing the rebuild. The v2 key slates the old
-      # poisoned entries clean once; save-always keeps the cache
-      # self-healing from here on.
-      - name: Cache built lupa wheel (3.15 only)
+      # save-always is deprecated (it never did what it claimed), so the
+      # cache is split: actions/cache/restore before the build and
+      # actions/cache/save (if: always()) after it. One consequence: the
+      # save action never overwrites an existing key, so a poisoned exact
+      # key is no longer healed IN PLACE — the install step still rebuilds
+      # the bad wheel each run (correct, ~2 min slower), and the healed
+      # wheels/ are re-cached when the next pyproject bump creates a new
+      # key. Worst case: one release cycle of slow rebuilds, then clean.
+      - name: Restore built lupa wheel (3.15 only)
+        id: lupa-cache
         if: matrix.python-version == '3.15'
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: wheels
           key: lupa-cp315-v2-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             lupa-cp315-v2-
-          save-always: true
       - name: Install lupa wheel (3.15 only)
         if: matrix.python-version == '3.15'
         run: |
@@ -60,6 +62,12 @@ jobs:
             pip wheel "lupa>=2.6,<2.7" --no-deps -w wheels
             pip install wheels/lupa-2.6-*.whl
           fi
+      - name: Save built lupa wheel (3.15 only)
+        if: ${{ matrix.python-version == '3.15' && always() }}
+        uses: actions/cache/save@v5
+        with:
+          path: wheels
+          key: ${{ steps.lupa-cache.outputs.cache-primary-key }}
       - name: Install
         run: pip install -e ".[dev]"
       - run: ruff check src/ tests/
