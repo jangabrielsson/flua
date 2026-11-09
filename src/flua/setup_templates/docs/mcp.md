@@ -21,7 +21,8 @@ with flua (design: `docs/notes/notes-mcp.md`, packaging: ADR 0010).
   there too (the engines run with their log stream on stderr). Agents can
   parse stdout unconditionally.
 - **Capabilities**: `tools`, `resources` (the packaged docs as
-  `flua://docs/*`), and `prompts` (`qa_debug`, `qa_skeleton`).
+  `flua://docs/*` and the skill guidance as `flua://skills/*`), and
+  `prompts` (`qa_debug`, `qa_skeleton`).
 
 | Method | Era | Purpose |
 |---|---|---|
@@ -96,7 +97,14 @@ devices/globals/scenes, …) without per-tool schemas.
 
 Arguments: `name` (required — a bare `flua --tool` lists them), `args`
 (optional list of strings, the tool's own arguments). Result:
-`{"exitCode", "stdout", "stderr"}`.
+`{"exitCode", "stdout", "stderr"}.
+
+When the user names a device or room ("the light in the bedroom"),
+resolve it with `house`: the JSON carries every device as
+`{id, name, type, room}` — match the user's words against name/room/type
+and, if several devices match, present them and ask which one; never
+pick silently. The homeTable idiom keeps ids maintainable (see
+`flua://skills/quickapp-patterns/SKILL.md`).
 
 #### `qa_ui`
 
@@ -196,7 +204,10 @@ stdio pipe closes — an agent cannot leak engines. The idle TTL is reset by
 The docs ship in the wheel (`src/flua/setup_templates/docs`, synced from the
 repo by `scripts/sync-skills.sh`) and are served as MCP resources under the
 `flua://docs/` scheme — so a host without a repo checkout can still read the
-same knowledge a local agent reads from the checkout. Text files only (the
+same knowledge a local agent reads from the checkout. The same wheel ships
+the skill guidance (`src/flua/setup_templates/github/skills` — the skills
+`--tool setup` installs for Copilot) under `flua://skills/`: the
+`docs_list`/`docs_read` tools cover both trees. Text files only (the
 tutorial PDF is not served).
 
 ```json
@@ -205,7 +216,8 @@ tutorial PDF is not served).
 
 Examples: `flua://docs/USAGE.md`, `flua://docs/ARCHITECTURE.md`,
 `flua://docs/tutorial/01-install.md`, `flua://docs/decisions/0010-mcp-ships-in-the-wheel.md`,
-`flua://docs/specs/hc3-api.json`, `flua://docs/mcp.md` (this page).
+`flua://docs/specs/hc3-api.json`, `flua://docs/mcp.md` (this page),
+`flua://skills/quickapp-patterns/SKILL.md` (the QuickApp patterns).
 `resources/list` enumerates them with mime types and curated descriptions;
 paths are canonicalized and traversal (`..`) is rejected with a JSON-RPC
 error, never a filesystem escape.

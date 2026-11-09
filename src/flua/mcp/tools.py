@@ -281,21 +281,28 @@ def _docs_list(args: dict[str, Any]) -> dict[str, Any]:
 
 
 def _docs_read(args: dict[str, Any]) -> dict[str, Any]:
-    """Read one doc: the same tree resources/read serves. Accepts both
-    "USAGE.md" and "flua://docs/USAGE.md"."""
+    """Read one doc or skill: the same trees resources/read serves.
+    Accepts "USAGE.md", "skills/quickapp-patterns/SKILL.md", and the
+    flua://docs/... or flua://skills/... URI forms."""
     path = args.get("path")
     if not isinstance(path, str) or not path.strip():
         raise JsonRpcError(INVALID_PARAMS, "path (string) is required — see docs_list")
-    uri = path.strip()
-    if not uri.startswith("flua://docs/"):
-        uri = "flua://docs/" + uri.lstrip("/")
+    stripped = path.strip().lstrip("/")
+    if stripped.startswith("flua://docs/"):
+        uri, rel = stripped, stripped[len("flua://docs/") :]
+    elif stripped.startswith("flua://skills/"):
+        uri, rel = stripped, "skills/" + stripped[len("flua://skills/") :]
+    elif stripped.startswith("skills/"):
+        uri, rel = "flua://skills/" + stripped[len("skills/") :], stripped
+    else:
+        uri, rel = "flua://docs/" + stripped, stripped
     try:
         result = read_resource({"uri": uri})
     except JsonRpcError as exc:
         raise JsonRpcError(
-            INVALID_PARAMS, f"{exc.message} — docs_list lists the available docs"
+            INVALID_PARAMS, f"{exc.message} — docs_list lists the available docs and skills"
         ) from None
-    return {"path": uri[len("flua://docs/") :], "text": result["contents"][0]["text"]}
+    return {"path": rel, "text": result["contents"][0]["text"]}
 
 
 def _session_for(args: dict[str, Any]) -> Any:
@@ -582,13 +589,13 @@ TOOLS: dict[str, Tool] = {
                             "type": "array",
                             "items": {"type": "string"},
                             "description": (
-                                "keep only these log levels (e.g. [\"ERROR\", \"WARNING\"])"
+                                'keep only these log levels (e.g. ["ERROR", "WARNING"])'
                             ),
                         },
                         "match": {
                             "type": "string",
                             "description": (
-                                "regex matched against the log message (e.g. \"FAIL|Schedule:\")"
+                                'regex matched against the log message (e.g. "FAIL|Schedule:")'
                             ),
                         },
                     },
@@ -784,22 +791,25 @@ TOOLS: dict[str, Tool] = {
     },
     "docs_list": {
         "description": (
-            "List the flua documentation that ships with this server: "
-            "[{uri, name, title, description, mimeType}] — USAGE.md (QA "
-            "directives incl. --%%file multi-file rules, network, deploy), "
+            "List the flua documentation and skills that ship with this "
+            "server: [{uri, name, title, description, mimeType}] — USAGE.md "
+            "(QA directives incl. --%%file multi-file rules, network, deploy), "
             "ARCHITECTURE.md, the tutorial chapters (09/10: multi-file QAs "
-            "and debugging), mcp.md (this server), specs/hc3-api.json. "
-            "Read them with docs_read instead of searching the web."
+            "and debugging), mcp.md (this server), specs/hc3-api.json, and "
+            "the skill guidance (flua://skills/*: quickapp patterns, the "
+            "HC3 REST reference, scenes, write-safety, ...). Read them with "
+            "docs_read instead of searching the web."
         ),
         "inputSchema": {"type": "object", "properties": {}},
         "handler": _docs_list,
     },
     "docs_read": {
         "description": (
-            "Read one flua doc by path (e.g. 'USAGE.md', "
-            "'tutorial/09-multi-file-qas.md', 'flua://docs/mcp.md') and "
-            "return its full text. The docs ship in the wheel — this is the "
-            "authoritative local reference, no web search needed."
+            "Read one flua doc or skill by path (e.g. 'USAGE.md', "
+            "'tutorial/09-multi-file-qas.md', 'skills/quickapp-patterns/SKILL.md', "
+            "'flua://docs/mcp.md') and return its full text. The docs and "
+            "skills ship in the wheel — this is the authoritative local "
+            "reference, no web search needed."
         ),
         "inputSchema": {
             "type": "object",

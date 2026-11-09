@@ -274,6 +274,57 @@ def test_resources_read_rejects_non_docs_uri() -> None:
     assert response["error"]["code"] == core.INVALID_PARAMS
 
 
+def test_resources_list_serves_the_packaged_skills() -> None:
+    # the skill guidance ships under flua://skills/ — the same files
+    # --tool setup installs for Copilot
+    result = _call("resources/list", {})
+    uris = [r["uri"] for r in result["resources"]]
+    assert "flua://skills/quickapp-patterns/SKILL.md" in uris
+    assert "flua://skills/hc3-write-safety/SKILL.md" in uris
+    skill = next(r for r in result["resources"] if r["uri"] == "flua://skills/quickapp-patterns/SKILL.md")
+    assert skill["mimeType"] == "text/markdown"
+    assert skill["name"] == "quickapp-patterns"  # the frontmatter name, not the file name
+    assert skill["description"].startswith("Common QuickApp implementation patterns")
+
+
+def test_resources_read_serves_a_skill() -> None:
+    result = _call("resources/read", {"uri": "flua://skills/hc3-write-safety/SKILL.md"})
+    assert result["resultType"] == "complete"
+    assert result["contents"][0]["uri"] == "flua://skills/hc3-write-safety/SKILL.md"
+    packaged = (
+        REPO_ROOT
+        / "src"
+        / "flua"
+        / "setup_templates"
+        / "github"
+        / "skills"
+        / "hc3-write-safety"
+        / "SKILL.md"
+    )
+    assert result["contents"][0]["text"] == packaged.read_text(encoding="utf-8")
+
+
+def test_skills_resources_reject_traversal() -> None:
+    for uri in ("flua://skills/../pyproject.toml", "flua://skills/%2e%2e/pyproject.toml"):
+        response = _dispatch(
+            json.dumps(
+                {"jsonrpc": "2.0", "id": 1, "method": "resources/read", "params": {"uri": uri}}
+            )
+        )
+        assert response is not None
+        assert response["error"]["code"] == core.INVALID_PARAMS, uri
+
+
+def test_docs_read_serves_skills() -> None:
+    # docs_read covers both trees: bare skill paths and the flua://skills/
+    # URI form resolve like the docs do
+    read = _tool("docs_read", {"path": "skills/quickapp-patterns/SKILL.md"})
+    assert read["path"] == "skills/quickapp-patterns/SKILL.md"
+    assert "homeTable" in read["text"]
+    via_uri = _tool("docs_read", {"path": "flua://skills/hc3-lua-scenes/SKILL.md"})
+    assert "--%%scene:true" in via_uri["text"]
+
+
 # -- prompts --------------------------------------------------------------------
 
 
