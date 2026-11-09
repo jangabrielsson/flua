@@ -123,6 +123,44 @@ requirements:
   ids (triggers can't use variables); the spec model should say so
   explicitly rather than pretend.
 
+## The sub-agent framing
+
+This is the current trend made concrete: the spec/prompt is the **brief
+for a specialized QA sub-agent**. The user's everyday agent is the
+parent — it interviews the user, hands the QA sub-agent the brief, and
+shows the user the results. The sub-agent's entire world is:
+
+- the **requirements** (with ids — the acceptance vocabulary);
+- the **tool inventory** — what flua/flua-mcp expose: `qa_check`,
+  `qa_run`, `qa_test`, `--tool house` (ground truth), `--tool newQA`
+  (device templates), the sim with its bundled sim devices;
+- the **knowledge artifacts** — the skills as `flua://skills/*`
+  (best-practice code, patterns, write-safety), served resources;
+- the **loop protocol** below — including when to come back to the user.
+
+flua's role in this framing is not to write code but to be the best
+possible *environment* a sub-agent can be dropped into — ADR 0013's moat
+thesis, stated as architecture. The brief makes the sub-agent
+specialized; the environment makes it succeed.
+
+## The house in the spec = the emulator setup
+
+Part of requirements collection is the user's **home environment** —
+rooms, devices, their types. In the spec this section does double duty:
+
+- it is the **symbolic reference** the code compiles against
+  (`HT.hall.motion`);
+- it **compiles to the emulator seed** — a seed file (`--seed`/`--%%db`)
+  that stands up the simulated house with the right devices (types,
+  names, rooms; the bundled sim devices and `newQA` templates cover the
+  catalog). The testbed then mirrors the user's house *shape*, so the
+  sub-agent tests against the user's world, not an abstract one.
+
+When the user has a real HC3, `--tool house` provides the ground truth
+instead of interview answers — the house section is fetched, not guessed.
+The interview's "which rooms, which devices" questions only fire when
+that is not available.
+
 ## Compilation: spec → driving prompt + check scaffold + checklist
 
 - **The driving prompt** is the primary output. It binds the spec's
@@ -141,8 +179,12 @@ requirements:
     requirement, then ask) so the loop never spins silently;
   - *refine* — the user's answer updates the spec (a visible diff), the
     prompt re-renders, the loop resumes;
-  - *finish* — all requirements PASS + the user's explicit approval; the
-    agent never deploys (flua's standing rule, restated).
+  - *demonstrate* — when the checks pass, the sub-agent stands up the
+    simulation (seeded house + the QA running, timeline/UI in the
+    viewer) and asks the user **"is this how you want it?"** — the
+    running sim is the prototype the user reviews, not the code;
+  - *finish* — the user confirms the demonstration; the agent never
+    deploys (flua's standing rule, restated).
 - **Check scaffold**: one self-asserting check per requirement, phrased in
   the requirement's words — the starting point the agent implements
   against (the flua-test pattern; the sim's virtual clock tests the
@@ -197,6 +239,14 @@ caveat).
 7. **Scene specs** — in or out of v1? (Leaning out; QA-shaped first.)
 8. **Sharing specs** — a community spec library is the eventual network
    effect; not v1.
+9. **House collection channel** — real HC3 ground truth via `--tool
+   house`, an interview-built seed, or both (fetch when reachable, ask
+   when not)? And who compiles the seed — the spec tool or the sub-agent
+   itself from the spec's house section?
+10. **The "is this ok?" demo surface** — where does the user review the
+    prototype: the `--ui` viewer/timeline (interactive), the rendered
+    checklist, or both? The answer decides whether the viewer grows a
+    "confirm/refine" affordance.
 
 ## First slice (the vertical proof)
 
