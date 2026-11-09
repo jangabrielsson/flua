@@ -4,6 +4,21 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.139] - 2026-11-09
+
+### Added
+- GET /weather serves the real HC3 in online mode
+- qa_test — run self-asserting test QAs (flua test --json, the Test Explorer contract)
+
+### Changed
+- agents-future — the requirements-compiler analogy
+- update forum index with new post links and statuses
+- forum draft — working with agents (the loop, the testbed, and your part)
+- forum post 33 — scenes around your QAs (the glue, tested offline)
+
+### Fixed
+- clarify comment for storing shaped partition in the table
+
 ## [0.1.138] - 2026-11-08
 
 ### Added
