@@ -198,8 +198,9 @@ Hall light on motion — requirements
 - **Chained checks need the chain.** R2 alone ("light is off") can
   false-positive when an earlier check broke the state; the scaffold's
   chain structure (R1 success → R3 → R2) makes each check meaningful in
-  context. Weak checks = weak requirements — worth a schema rule ("a
-  check must verify the transition, not just the end state").
+  context. Weak checks = weak requirements — an agent-side analysis rule
+  for the checklist ("a check must verify the transition, not just the
+  end state"), not a fact flua can lint.
 - **R3's wording is a decision, not a fact.** "Manual off wins" could
   mean sticky (ignore motion until manual on) or fresh-cycle (this
   draft's reading). The spec recorded *one* reading; the other is a

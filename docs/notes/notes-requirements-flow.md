@@ -95,23 +95,36 @@ every user utterance:
    - *interactions* — other QAs and scenes touching the same devices;
      the house has actors the spec does not know yet;
    - *contradictions* — two requirements that cannot both hold (R2 vs
-     R3 shapes), detected by reasoning, and where possible
-     mechanically.
+     R3 shapes), detected by reasoning;
 3. **Ask — minimally.** Only the questions that survive the analysis
    pass reach the user, ordered by value, few per turn. The budget rule
    is explicit in the protocol: the user's answers are the scarce
    resource; every question must be one the agent could not settle
    itself.
 
-**flua's loop-1 surface grows a linter**: `--tool spec check` — static
-validation of the spec without any implementation run: every house ref
-resolves, requirement ids are unique, every requirement carries a check,
-checks verify transitions not end states, the trigger vocabulary is
-valid. The agent can run it a thousand times for free; the user only
-sees what survives. (A spec-level state-machine exploration — generate a
-model from the requirements and exhaustively probe it for
-contradictions and unreachable states — is the stretch version, deferred
-until the linter proves the need.)
+**The division of labor: flua checks facts, the agent checks
+thinking.** flua's loop-1 surface is a **fact-checker**, not an oracle of
+requirement quality: `--tool spec check` validates the spec against
+reality, with no implementation run and no opinions about what makes a
+requirement good:
+
+- *existence and identity* — every named device/room resolves against
+  the hub (the house ground truth), and the name matches a unique
+  device ("3 matches for 'hall light' — which one?");
+- *type and capability* — the referenced device type is real, and the
+  intended actions fit its capabilities (a binarySwitch has no
+  `setValue` 0–99; the catalog knows the canonical actions);
+- *vocabulary validity* — cron tuples are well-formed, sunrise/sunset
+  offsets in range, global variables referenced exist (or are flagged
+  to be created);
+- *environment facts* — the location is set (sunset math needs it),
+  the referenced globals/scenes exist.
+
+Everything else — trigger completeness, timing and failure edges,
+contradictions, interactions, whether a check verifies the transition —
+is **agent-side analysis**. The agent runs its reasoning; flua answers
+the questions of fact it can answer a thousand times for free. The user
+only sees what survives both.
 
 The resulting division of labor: **the agent explores the requirement
 space; the user decides.** The spec is where the exploration is
@@ -398,12 +411,11 @@ caveat).
     flua. Open: pin the exact Tasks tool shapes against the extension
     spec; decide whether the job-id/polling fallback reuses the session
     tier machinery directly (leaning: yes).
-13. **The analysis checklist** — an agent-side template entry (skill) or
-    baked into the spec tool's `check` output (or both — the skill
-    teaches the classes, the linter enforces the machine-checkable
-    ones)? And can the linter ever detect *contradictions* (two
-    requirements that cannot both hold), or is that permanently
-    agent-reasoning?
+13. **The analysis checklist** — an agent-side template entry (skill),
+    with the fact checks above as the flua-side `spec check` surface.
+    Which facts are checkable keeps growing as the house ground truth
+    and the device catalog deepen — the linter's scope is whatever flua
+    can answer *about the world*, never about requirement quality.
 
 ## First slice (the vertical proof)
 
