@@ -4,6 +4,27 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.140] - 2026-11-09
+
+### Added
+- serve the skill guidance as resources, and the house-resolution rules
+
+### Changed
+- update .gitignore to include .vscode/mcp.json
+- requirements flow — flua checks facts, the agent checks thinking
+- requirements flow — loop 1 is analysis, not transcription
+- requirements flow — spec format draft v0.1 (worked example)
+- requirements flow — the state machine: two loops, two human gates
+- requirements flow — the agent drives the interview via MCP Tasks
+- requirements flow — the editor: chat in, interpretation out
+- requirements flow — the sub-agent brief, the house as emulator setup, the demo gate
+- reframe the requirements flow — the spec compiles to the agent's driving prompt
+- design note — the requirements flow (elicitation + verification)
+- ADR 0013 — no wizard app; the agent loop is the product surface
+- quickapp-patterns — name/room resolution, the homeTable, and sunset scheduling
+- teach agents about controller switching (hub profiles)
+- ci: migrate the lupa cache off the deprecated save-always input
+
 ## [0.1.139] - 2026-11-09
 
 ### Added
