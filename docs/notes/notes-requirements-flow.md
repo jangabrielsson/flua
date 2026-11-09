@@ -16,24 +16,55 @@ loop** — build, test in the testbed, verify against the requirements, and
 loop back to the user (or the requirements editor) for refinements until
 the product is solved. The forum post said "the requirement is the
 product; the code is just how it compiles" — this is that made
-mechanical:
+mechanical.
+
+## The state machine: two loops, two human gates
+
+The whole process is one state machine, driven by a single initial
+prompt — the **brief** — that tells the agent how to interact with flua
+through every state until "done":
 
 ```
-elicit ──▶ spec ──▶ driving prompt ──▶ agent loops in flua (testbed) ──▶ checklist
-  ▲            │                          │                                │
-  │            │                          └── blocked/ambiguous? ──ask──▶ user
-  │            │                                                     │
-  └── user refines the spec ◀── requirements editor ◀──────────────────┘
+                 LOOP 1 — requirements (user ⇄ agent ⇄ flua)
+                 user speaks in natural language; the agent
+                 formalizes it into the spec (rendered, diffed);
+                 repeat until the user APPROVES the spec
+                              │ spec approved
+                 ┌────────────▼────────────┐
+                 │ LOOP 2 — implementation  │
+                 │ (agent ⇄ flua testbed)   │
+                 │ write → run → R1..Rn    │
+                 │ PASS/FAIL → fix, until  │
+                 │ every check passes      │
+                 └────────────┬────────────┘
+                              │ all checks pass
+                 ┌────────────▼────────────┐
+                 │ 3. "is this ok?" — the  │
+                 │    demo gate            │
+                 └────────────┬────────────┘
+                 "not quite"  │    "yes"
+   (back to loop 1 with the   │
+    correction, as a spec     ▼
+    diff)                  4b. done — the user
+                            approves; the agent
+                            never deploys
 ```
 
-The user edits the *spec*, never the code. The spec renders as the
-agent's driving prompt; the agent implements and loops against flua's
-testbed; when a requirement is ambiguous, contradictory, or missing house
-information, the agent stops and asks — with concrete candidates — and the
-requirements editor re-opens at the blocking requirement. The checklist
-renders from the spec, so the user judges in their own words. That closed
-loop is the innovative part — the pieces all exist separately; nobody
-owns the loop.
+Three things fall out of this shape:
+
+- **Two human gates, one mechanical loop.** The user approves the *spec*
+  (words) at the end of loop 1 and the *behavior* (the demo) at step 3.
+  Between them, loop 2 is fully mechanical and agent-owned. The user is
+  in control exactly twice — the two places judgment cannot be delegated.
+- **The spec is the only artifact that crosses a loop boundary.** Loop 1
+  produces it; loop 2 consumes it (checks derive from requirements); a
+  "not quite" at the demo gate re-enters loop 1 as a *spec change* (a
+  visible diff), and loop 2 re-runs from the updated spec. Code never
+  travels back — it is disposable; requirements are not.
+- **The initial prompt IS the state machine.** One brief encodes: iterate
+  loop 1 until the user approves; run loop 2 until every requirement
+  check passes; ask at the gate; route 4a/4b. That is exactly what
+  `--tool spec prompt` renders.
 
 ## Existing pieces this builds on
 
