@@ -11,20 +11,29 @@ elicitation** (spec + skeleton + test scaffold, CLI-first) and
 non-coders). This note explores what those are, and picks directions.
 
 The core idea in one sentence: **make the requirement a first-class,
-versioned artifact that everything downstream compiles from.** The forum
-post said "the requirement is the product; the code is just how it
-compiles" — this is that made mechanical:
+versioned artifact that compiles to the prompt driving an agent's whole
+loop** — build, test in the testbed, verify against the requirements, and
+loop back to the user (or the requirements editor) for refinements until
+the product is solved. The forum post said "the requirement is the
+product; the code is just how it compiles" — this is that made
+mechanical:
 
 ```
-elicit ──▶ spec ──▶ code + test scaffold ──▶ run (flua test) ──▶ checklist ──▶ refine
-  ▲                                                                        │
-  └────────────────────────── the user's loop ◀─────────────────────────────┘
+elicit ──▶ spec ──▶ driving prompt ──▶ agent loops in flua (testbed) ──▶ checklist
+  ▲            │                          │                                │
+  │            │                          └── blocked/ambiguous? ──ask──▶ user
+  │            │                                                     │
+  └── user refines the spec ◀── requirements editor ◀──────────────────┘
 ```
 
-The user edits the *spec*, never the generated code. The agent (or the
-template engine) recompiles. The checklist renders from the spec, so the
-user judges in their own words. That closed loop is the innovative part —
-the pieces all exist separately; nobody owns the loop.
+The user edits the *spec*, never the code. The spec renders as the
+agent's driving prompt; the agent implements and loops against flua's
+testbed; when a requirement is ambiguous, contradictory, or missing house
+information, the agent stops and asks — with concrete candidates — and the
+requirements editor re-opens at the blocking requirement. The checklist
+renders from the spec, so the user judges in their own words. That closed
+loop is the innovative part — the pieces all exist separately; nobody
+owns the loop.
 
 ## Existing pieces this builds on
 
@@ -114,59 +123,86 @@ requirements:
   ids (triggers can't use variables); the spec model should say so
   explicitly rather than pretend.
 
-## Compilation: spec → skeleton + tests + checklist
+## Compilation: spec → driving prompt + check scaffold + checklist
 
-- **Skeleton**: `--tool setup`-style project from the template with the
-  spec's slots filled (names, devices, times) — or, for the non-template
-  long tail, a spec-aware prompt emitted for the agent (the spec *is* the
-  prompt; the agent fills the rest).
-- **Test scaffold**: one self-asserting check per requirement, phrased in
-  the requirement's words: `R1: motion after sunset turns the hall light
-  on — PASS`. Generated from the spec's `requirements`, run by `flua
-  test`, verified in the sim (virtual clock tests the sunset case).
-- **Checklist render**: `--tool spec render` → HTML/MD of the spec with
-  each requirement's last verdict — the judgment surface. A non-coder
-  reads "R2: PASS" and knows what to say next; they never read Lua.
+- **The driving prompt** is the primary output. It binds the spec's
+  requirements, the house snapshot, and the **loop protocol** into one
+  brief the agent executes:
+  - *implement* — write the QA against the sim (offline; no controller
+    unless mode=remote is explicit);
+  - *verify* — run `flua test`/`qa_run`; every requirement maps to a
+    check that prints `R<n>: <requirement> — PASS/FAIL`;
+  - *fix* — iterate in the testbed until all checks pass; a failed check
+    is a bug to fix, not a report to file;
+  - *ask, don't guess* — when a requirement is ambiguous, contradictory,
+    or the house data lacks the device/room it names, stop and ask the
+    user: the requirement id, the concrete question, and the candidates
+    from `--tool house`. Bounded retries (e.g. three attempts on one
+    requirement, then ask) so the loop never spins silently;
+  - *refine* — the user's answer updates the spec (a visible diff), the
+    prompt re-renders, the loop resumes;
+  - *finish* — all requirements PASS + the user's explicit approval; the
+    agent never deploys (flua's standing rule, restated).
+- **Check scaffold**: one self-asserting check per requirement, phrased in
+  the requirement's words — the starting point the agent implements
+  against (the flua-test pattern; the sim's virtual clock tests the
+  sunset/schedule cases).
+- **Checklist render**: `--tool spec report` → the spec with each
+  requirement's latest verdict — the judgment surface. A non-coder reads
+  "R2: PASS" and knows what to say next; they never read Lua.
+- **Templates** now do double duty: they seed the *requirement set* at
+  elicitation time and contribute a reference approach to the *prompt* at
+  compile time (a known-good pattern for the agent to start from, not a
+  straightjacket).
 
 ## Form factor
 
-CLI-first throughout (`--tool spec new|ask|render|verify`), so agents get
-the identical surface via `flua_tool`/MCP — the app discipline from ADR
-0013. A thin web form for the interview can come later under the existing
-`--ui` server; it must emit the same spec format.
+CLI-first throughout (`--tool spec ask|prompt|report`), so agents get the
+identical surface via `flua_tool`/MCP — the app discipline from ADR 0013.
+The driving prompt may also ship as an MCP **prompt** (the existing prompt
+tier: `qa_spec` taking the spec and rendering the bound brief), so
+MCP-only hosts get the loop protocol without installing anything. A thin
+web form for the interview/editor can come later under the existing
+`--ui` server; it must emit and read the same spec format.
 
 ## What this is NOT
 
-Not a visual editor. Not a full code-generation platform — the agent
-handles the long tail; templates cover the standard patterns. Not a
-block-scene clone — the HC3's block editor owns that; our specs that
-compile to scenes do so deliberately (literal-id caveat).
+Not a visual editor. Not a code-generation platform — **flua generates
+zero code**; it elicits the spec, renders the driving prompt, and reports
+the verdicts. The agent writes the code; templates give the agent a
+reference approach. Not a block-scene clone — the HC3's block editor owns
+that; our specs that compile to scenes do so deliberately (literal-id
+caveat).
 
 ## Open questions (the iteration surface)
 
 1. **Spec schema** — markdown+YAML frontmatter vs pure YAML/JSON with a
    markdown render? The former reads better to humans; the latter is
    easier to validate. Leaning frontmatter.
-2. **How much codegen?** Templates fill slots; the agent writes the long
-   tail. Where's the line? Start with "skeleton + filled template, agent
-   does the rest" and let the template library grow.
-3. **Spec↔code drift** — what happens when a user or agent edits the
-   generated code directly (the normal programmer path)? Options: spec
-   owns requirements and code is disposable; or a `spec sync` that
-   back-annotates. This is the hardest design question.
-4. **Template library home** — skills tree (agent-installable, already
-   synced) vs a new `setup_templates/specs` dir vs both (source in one,
-   sync to the other)?
-5. **Interview UX** — terminal Q&A first, web form later? How many
+2. **Protocol home** — the loop protocol in the spec file itself, or a
+   stable template (skill/MCP prompt) the spec references? Leaning the
+   latter: specs stay clean, the protocol evolves without touching every
+   spec.
+3. **Spec↔code drift** — the spec owns requirements and the agent writes
+   code; what happens when a user or agent edits the generated code
+   directly (the normal programmer path)? Requirements stay in the spec;
+   code edits are free, but the checklist always re-derives from the
+   spec. This is the hardest design question.
+4. **Who edits the spec on refinement** — the user, or the agent with
+   user approval (the diff as the review surface)?
+5. **Template library home** — skills tree (agent-installable, already
+   synced) vs a new `setup_templates/specs` dir vs both?
+6. **Interview UX** — terminal Q&A first, web form later? How many
    questions before it feels like a wizard again (the thing we rejected)?
-6. **Scene specs** — in or out of v1? (Leaning out; QA-shaped first.)
-7. **Sharing specs** — a community spec library is the eventual network
+7. **Scene specs** — in or out of v1? (Leaning out; QA-shaped first.)
+8. **Sharing specs** — a community spec library is the eventual network
    effect; not v1.
 
 ## First slice (the vertical proof)
 
 `--tool spec ask --from-template motion-light` against a `--tool house`
-snapshot: emit the spec markdown, the project skeleton with filled slots,
-and the test scaffold; run it under `flua test` in the sim; render the
-checklist. One template, end to end, proves the loop. Everything else
-grows from there.
+snapshot → emit the spec markdown and `--tool spec prompt` renders the
+driving brief (spec + house refs + loop protocol) → hand it to an agent
+(Copilot/Claude/MCP) that loops in the sim → `--tool spec report` renders
+the checklist from the last `flua test` run. One template, end to end,
+proves the loop — with flua generating zero code.
