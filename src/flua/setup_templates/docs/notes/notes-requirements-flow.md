@@ -140,40 +140,45 @@ spec edits: the top pane updates, the user sees their words reflected
 (or mis-reflected — which is the point: the interpretation is visible and
 correctable, not hidden).
 
-**The interpreter is pluggable** — there is no standard agent API (MCP
-defines tools for clients; nothing defines client→agent calls), so two
-backends:
+**Who asks the questions: the agent, via MCP Tasks.** The interview is
+agent-driven work — the *agent* asks the user questions and translates
+the answers into spec edits, and the user answers in the chat UI they
+already have. flua's role shrinks to the part only flua can do: hold the
+spec state, validate edits, and render it. Two mechanisms, primary and
+fallback:
 
-1. **Direct LLM call** — the editor calls a configured OpenAI-compatible
-   endpoint with a fixed interpreter prompt ("you update this spec from
-   this chat line; return the spec"). Keys ride the same `.env` chain
-   flua already uses. This is what the live two-pane interaction
-   requires: synchronous interpretation. One new dependency (an HTTP
-   client to the LLM — the standard library suffices).
-2. **Sub-agent handoff** — no LLM call; the editor emits the transcript
-   + current spec as a prompt block the user's own agent session
-   consumes, and the agent writes the spec back (possibly via flua-mcp).
-   Zero credentials, but interpretation is no longer synchronous — the
-   editor becomes a file + chat UI around the user's agent.
+1. **MCP Tasks (`io.modelcontextprotocol/tasks`, the official way)** —
+   the spec becomes a long-running task: the agent starts it, drives the
+   dialogue through the task's input request, writes spec edits through
+   its update tool, and flua validates + persists + renders each state.
+   The capability is announced in the session capability exchange, so
+   agents discover the task surface. **flua holds no LLM keys** — the
+   user's own agent account does the interpretation; flua never asks for
+   access tokens. Exact tool shapes are pinned against the Tasks
+   extension spec when implemented, not here.
+2. **Job-id / polling (the manual, backward-compatible way)** —
+   `spec/start` returns a `specId`, `spec/update`/`spec/state` carry the
+   conversation and a `spec/stop` closes it. This is precisely the
+   pattern flua-mcp's session tier already proves (`qa_start` →
+   `{sessionId, qaIds}`, `qa_probe`, `qa_action`, TTL reaping,
+   transport-stateless) — the spec task reuses the same machinery.
 
-v1 leans backend 1 (the two-pane magic dies without synchronous
-interpretation); backend 2 is the fallback for users who keep the keys
-to themselves.
+The trust argument settles the earlier interpreter question: with Tasks
+(or the fallback), the interpreter is **always the user's agent**, never
+flua — no LLM endpoint config, no `.env` keys, no dependency. The direct
+LLM backend (open question 12) is dropped unless a standalone editor
+without any agent ever materializes.
 
-**Form factor — two honest candidates:**
+**The two panes become two windows.** The interaction model is still
+"requirements on top, chat below" — but the chat pane is the user's
+agent UI, and the top pane is flua's rendered spec (the checklist page
+under `--ui`, or the terminal render). The cost: no single integrated
+surface. The gain: nothing new to build for the chat half, and the
+rendered spec is the same artifact the demo gate reviews. A later TUI or
+a spec page with a chat box is an optional integration, not v1.
 
-- **TUI** (the "cursor magic" version): input field pinned at the
-  bottom, scrollable requirements view above — a classic split-screen
-  TUI. The trade-off is a real one: `textual` would be flua's first
-  runtime dependency beyond lupa (worth an ADR of its own); the stdlib
-  curses route is dependency-free but hand-rolled.
-- **Web page under `--ui`**: the viewer already serves HTML (and will
-  host the "is this ok?" demo gate). The same split layout is a trivial
-  page, zero new dependencies, and the editor + demo live in one
-  surface. Costs the terminal aesthetic.
-
-Either way it is a built-in `--tool spec edit` launcher — a separate app
-would violate the ship-in-the-wheel discipline (ADR 0010/0013).
+Launcher discipline unchanged: `--tool spec ...` first (ask/prompt/report
++ the task/session tools), apps on top.
 
 ## The sub-agent framing
 
@@ -301,14 +306,14 @@ caveat).
     prototype: the `--ui` viewer/timeline (interactive), the rendered
     checklist, or both? The answer decides whether the viewer grows a
     "confirm/refine" affordance.
-11. **Editor form factor** — TUI (accept `textual` as the first runtime
-    dependency beyond lupa, or hand-roll curses) vs web under `--ui`
-    (zero new deps, shares the demo surface)? This is an ADR-sized
-    dependency call either way.
-12. **Interpreter backend** — direct LLM call (which provider-neutral
-    endpoint, and where the key lives in the .env chain) vs sub-agent
-    handoff? And should the interpreter prompt be user-visible/editable
-    (trust) or fixed (consistency)?
+11. **Editor form factor** — v1: no chat surface at all (the agent UI is
+    the chat; flua renders the spec). Does the terminal `--tool spec`
+    render suffice, or does the `--ui` viewer get the spec page early so
+    the demo gate and the spec share a surface?
+12. **Interpreter backend** — resolved by Tasks: the user's agent, never
+    flua. Open: pin the exact Tasks tool shapes against the extension
+    spec; decide whether the job-id/polling fallback reuses the session
+    tier machinery directly (leaning: yes).
 
 ## First slice (the vertical proof)
 
