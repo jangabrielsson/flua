@@ -33,7 +33,7 @@ local function shape(id)
     devices = p.devices or {},
     lastActionAt = p.lastActionAt or 0,
   }
-  partitions[id] = p
+  partitions[id] = p -- store the shaped partition back into the table
   return p
 end
 
