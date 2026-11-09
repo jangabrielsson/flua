@@ -66,6 +66,59 @@ Three things fall out of this shape:
   check passes; ask at the gate; route 4a/4b. That is exactly what
   `--tool spec prompt` renders.
 
+## Loop 1 is analysis, not transcription
+
+The two loops are not equal in importance. Loop 2 is becoming commodity
+— agents implement against a testbed in their own ways, and flua already
+makes that mechanical. Loop 1 is where the value is, because the two
+participants have wildly different budgets: **the agent can run a
+thousand analysis iterations, the user can answer a handful of
+questions.** A requirements tool that makes the user do the agent's work
+is a typing monkey; the whole point of treating the requirement as a
+first-class artifact is that the agent can think about it *before*
+anything runs.
+
+The loop-1 protocol therefore gains an analyze-before-ask phase, on
+every user utterance:
+
+1. **Formalize** — translate the user's words into spec edits (the
+   rendered diff, as before).
+2. **Analyze** — work the spec as an artifact, not as prose. A
+   requirement-analysis checklist (a template-library entry, agent-side)
+   enumerates the question classes:
+   - *trigger completeness* — what starts it, what stops it, what
+     re-arms it (R3's "manual off wins" ambiguity);
+   - *timing and failure edges* — DST, controller/QA restart (state is
+     lost!), device offline, sunset data missing, power loss;
+   - *scope and identity* — which of the matching devices, which rooms,
+     which exceptions ("but not if the alarm is armed");
+   - *interactions* — other QAs and scenes touching the same devices;
+     the house has actors the spec does not know yet;
+   - *contradictions* — two requirements that cannot both hold (R2 vs
+     R3 shapes), detected by reasoning, and where possible
+     mechanically.
+3. **Ask — minimally.** Only the questions that survive the analysis
+   pass reach the user, ordered by value, few per turn. The budget rule
+   is explicit in the protocol: the user's answers are the scarce
+   resource; every question must be one the agent could not settle
+   itself.
+
+**flua's loop-1 surface grows a linter**: `--tool spec check` — static
+validation of the spec without any implementation run: every house ref
+resolves, requirement ids are unique, every requirement carries a check,
+checks verify transitions not end states, the trigger vocabulary is
+valid. The agent can run it a thousand times for free; the user only
+sees what survives. (A spec-level state-machine exploration — generate a
+model from the requirements and exhaustively probe it for
+contradictions and unreachable states — is the stretch version, deferred
+until the linter proves the need.)
+
+The resulting division of labor: **the agent explores the requirement
+space; the user decides.** The spec is where the exploration is
+recorded, so the user can review *thinking*, not just conclusions — a
+decision the user accepts is one line; a question the user asked the
+agent to settle is a diff.
+
 ## Existing pieces this builds on
 
 - `--tool newQA` — device-*type* templates (30 types) with substitution:
@@ -287,7 +340,7 @@ that is not available.
 
 ## Form factor
 
-CLI-first throughout (`--tool spec ask|prompt|report`), so agents get the
+CLI-first throughout (`--tool spec ask|prompt|check|report`), so agents get the
 identical surface via `flua_tool`/MCP — the app discipline from ADR 0013.
 The driving prompt may also ship as an MCP **prompt** (the existing prompt
 tier: `qa_spec` taking the spec and rendering the bound brief), so
@@ -345,6 +398,12 @@ caveat).
     flua. Open: pin the exact Tasks tool shapes against the extension
     spec; decide whether the job-id/polling fallback reuses the session
     tier machinery directly (leaning: yes).
+13. **The analysis checklist** — an agent-side template entry (skill) or
+    baked into the spec tool's `check` output (or both — the skill
+    teaches the classes, the linter enforces the machine-checkable
+    ones)? And can the linter ever detect *contradictions* (two
+    requirements that cannot both hold), or is that permanently
+    agent-reasoning?
 
 ## First slice (the vertical proof)
 
