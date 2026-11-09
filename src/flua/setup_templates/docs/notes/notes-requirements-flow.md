@@ -123,6 +123,58 @@ requirements:
   ids (triggers can't use variables); the spec model should say so
   explicitly rather than pretend.
 
+## The requirements editor
+
+The user edits the spec by *dialogue*, not by editing files. Shape: two
+panes in one surface.
+
+- **Top**: the requirements as the agent currently interprets them — the
+  rendered spec, requirement ids visible, changes highlighted as they
+  land (the diff IS the feedback). This pane is the ground truth; the
+  user reads it and corrects it.
+- **Bottom**: a chat field — the user specifies requirements in natural
+  language ("no, the hall light, not the kitchen — and only after dark").
+
+Each chat turn flows through the **interpreter**, which turns prose into
+spec edits: the top pane updates, the user sees their words reflected
+(or mis-reflected — which is the point: the interpretation is visible and
+correctable, not hidden).
+
+**The interpreter is pluggable** — there is no standard agent API (MCP
+defines tools for clients; nothing defines client→agent calls), so two
+backends:
+
+1. **Direct LLM call** — the editor calls a configured OpenAI-compatible
+   endpoint with a fixed interpreter prompt ("you update this spec from
+   this chat line; return the spec"). Keys ride the same `.env` chain
+   flua already uses. This is what the live two-pane interaction
+   requires: synchronous interpretation. One new dependency (an HTTP
+   client to the LLM — the standard library suffices).
+2. **Sub-agent handoff** — no LLM call; the editor emits the transcript
+   + current spec as a prompt block the user's own agent session
+   consumes, and the agent writes the spec back (possibly via flua-mcp).
+   Zero credentials, but interpretation is no longer synchronous — the
+   editor becomes a file + chat UI around the user's agent.
+
+v1 leans backend 1 (the two-pane magic dies without synchronous
+interpretation); backend 2 is the fallback for users who keep the keys
+to themselves.
+
+**Form factor — two honest candidates:**
+
+- **TUI** (the "cursor magic" version): input field pinned at the
+  bottom, scrollable requirements view above — a classic split-screen
+  TUI. The trade-off is a real one: `textual` would be flua's first
+  runtime dependency beyond lupa (worth an ADR of its own); the stdlib
+  curses route is dependency-free but hand-rolled.
+- **Web page under `--ui`**: the viewer already serves HTML (and will
+  host the "is this ok?" demo gate). The same split layout is a trivial
+  page, zero new dependencies, and the editor + demo live in one
+  surface. Costs the terminal aesthetic.
+
+Either way it is a built-in `--tool spec edit` launcher — a separate app
+would violate the ship-in-the-wheel discipline (ADR 0010/0013).
+
 ## The sub-agent framing
 
 This is the current trend made concrete: the spec/prompt is the **brief
@@ -236,6 +288,8 @@ caveat).
    synced) vs a new `setup_templates/specs` dir vs both?
 6. **Interview UX** — terminal Q&A first, web form later? How many
    questions before it feels like a wizard again (the thing we rejected)?
+   (The requirements editor above is the intended answer — dialogue, not
+   a form.)
 7. **Scene specs** — in or out of v1? (Leaning out; QA-shaped first.)
 8. **Sharing specs** — a community spec library is the eventual network
    effect; not v1.
@@ -247,6 +301,14 @@ caveat).
     prototype: the `--ui` viewer/timeline (interactive), the rendered
     checklist, or both? The answer decides whether the viewer grows a
     "confirm/refine" affordance.
+11. **Editor form factor** — TUI (accept `textual` as the first runtime
+    dependency beyond lupa, or hand-roll curses) vs web under `--ui`
+    (zero new deps, shares the demo surface)? This is an ADR-sized
+    dependency call either way.
+12. **Interpreter backend** — direct LLM call (which provider-neutral
+    endpoint, and where the key lives in the .env chain) vs sub-agent
+    handoff? And should the interpreter prompt be user-visible/editable
+    (trust) or fixed (consistency)?
 
 ## First slice (the vertical proof)
 
