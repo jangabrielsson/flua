@@ -87,7 +87,8 @@ nonzero `exitCode` is a failed run.
 
 Runs one `flua --tool` command and returns its exit code and output — the
 whole tool registry (`migrate`, `icons download`, `state`, `pack`, `unpack`,
-…) without per-tool schemas.
+`hub` — controller profiles and switching, `house` — the controller's
+devices/globals/scenes, …) without per-tool schemas.
 
 ```json
 {"name": "flua_tool", "arguments": {"name": "migrate", "args": ["."]}}

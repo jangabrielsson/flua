@@ -817,7 +817,9 @@ TOOLS: dict[str, Tool] = {
         "description": (
             "Run one `flua --tool` command and return its exit code and "
             "output — the whole tool registry (migrate, icons download, "
-            "state, pack, unpack, ...) without per-tool schemas. "
+            "state, pack, unpack, hub — controller profiles and switching, "
+            "house — the controller's devices/globals/scenes, ...) without "
+            "per-tool schemas. "
             "`name` is the tool name; `args` the tool's own arguments as "
             "strings (e.g. ['migrate', ['.']])."
         ),

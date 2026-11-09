@@ -37,6 +37,27 @@ the guards.
 
 ---
 
+## 0. Which controller are you writing to?
+
+Every write below lands on whatever controller the environment's `.env`
+chain points at — confirm that is the controller you mean **before** any
+`api.put`/`api.post` or `--tool` run against a real HC3. flua's hub
+profiles make this explicit (a flua-side concept — the controller itself
+has no such notion):
+
+```bash
+flua --tool hub list            # names, urls, serials — never passwords
+flua --tool hub switch home     # repoint the global default (~/.env)
+flua --tool hub switch home --project   # pin this project only
+```
+
+The serial in `hub list` lets you verify you are pointed at the physical
+controller you think you are. In remote/proxy mode the QA's `api.*` calls
+follow the same chain — switching profiles is how you test the same code
+against a different controller.
+
+---
+
 ## 1. `PUT /api/devices/{id}` — top-level merges, nested `properties.*` arrays fully replace
 
 Top-level fields (`name`, `roomID`, `enabled`, `visible`, etc.) are
