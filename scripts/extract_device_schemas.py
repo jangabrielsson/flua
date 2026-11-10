@@ -58,7 +58,9 @@ def parse_property(elem: ET.Element) -> dict:
 
 def parse_action(elem: ET.Element) -> dict:
     action: dict = {"argc": int(elem.get("argc", 0))}
-    args = [{"name": a.get("name"), "type": a.get("type", "string")} for a in elem if a.tag == "arg"]
+    args = [
+        {"name": a.get("name"), "type": a.get("type", "string")} for a in elem if a.tag == "arg"
+    ]
     if args:
         action["args"] = args
     return action
@@ -84,7 +86,9 @@ def load_enums() -> dict[str, list]:
             if isinstance(enum, list):
                 enums[f"properties/{name}"] = enum
         # array property: the item vocabulary lives in another property file
-        items_ref = ((doc.get("items") or {}).get("$ref")) if isinstance(doc.get("items"), dict) else None
+        items_ref = (
+            ((doc.get("items") or {}).get("$ref")) if isinstance(doc.get("items"), dict) else None
+        )
         if isinstance(items_ref, str) and "#/definitions/" in items_ref:
             target_name = items_ref.split("#", 1)[0].rstrip("/").split("/")[-1]
             target = docs.get(target_name, {})
@@ -164,7 +168,9 @@ def flatten(types: dict[str, dict]) -> None:
 
 def main() -> int:
     if not TYPES_DIR.is_dir() or not INTERFACES_DIR.is_dir():
-        print(f"error: sources not found — expected {TYPES_DIR} and {INTERFACES_DIR}", file=sys.stderr)
+        print(
+            f"error: sources not found — expected {TYPES_DIR} and {INTERFACES_DIR}", file=sys.stderr
+        )
         return 1
     enums = load_enums()
     types = {}

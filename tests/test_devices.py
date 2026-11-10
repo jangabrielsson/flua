@@ -189,7 +189,7 @@ def test_schema_for_known_type() -> None:
     assert skeleton["interfaces"] == ["light", "autoTurnOff"]
     assert skeleton["properties"]["deviceIcon"] == 301  # overrides device's 389
     assert skeleton["properties"]["deviceRole"] == "Light"  # in the enum
-    assert skeleton["actions"]["turnOn"] == {"argc": 1}
+    assert skeleton["actions"]["turnOn"] == 1  # the HC3 serves name -> argc
     assert schema_for("com.fibaro.doesNotExist") is None
     assert schema_for(None) is None
 
@@ -219,7 +219,7 @@ async def test_qa_interface_directive_applies_schema() -> None:
             assert "autoTurnOff" in device["interfaces"]
             assert device["properties"]["autoOffTimestamp"] == 0
             assert device["properties"]["autoOffDefaultTime"] == 900
-            assert device["actions"]["setAutoOff"]["argc"] == 3
+            assert device["actions"]["setAutoOff"] == 3
         finally:
             await engine.stop()
 

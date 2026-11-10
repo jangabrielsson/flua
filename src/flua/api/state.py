@@ -97,6 +97,10 @@ def _device_skeleton(device_id: int, name: str, device_type: str | None) -> dict
         # the legacy layout as the skeleton default (the capture path's
         # behavior) — a QA opts in with --%%useUiView:true
         base["properties"]["useUiView"] = False
+        # the quickApp interface declares mainFunction, but the live HC3
+        # does not serve it on the QA create/read device shapes (the
+        # hc3_parity fixture) — the skeleton mirrors what the HC3 serves
+        base["properties"].pop("mainFunction", None)
     else:
         base = skeleton_for(resolved)
         if base is None:

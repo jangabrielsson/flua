@@ -528,7 +528,7 @@ def test_update_interfaces_applies_schema_semantics(api: Api) -> None:
     assert "autoTurnOff" in data["interfaces"]  # the type declares it
     assert data["properties"]["autoOffTimestamp"] == 0  # interface defaults
     assert data["properties"]["autoOffDefaultTime"] == 900
-    assert data["actions"]["setAutoOff"]["argc"] == 3
+    assert data["actions"]["setAutoOff"] == 3
     # removing the type's own interface drops the interface-owned
     # properties and action metadata
     assert api.dispatch(
