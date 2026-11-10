@@ -538,6 +538,24 @@ local val = fibaro.getValue(42, "value")
 self:turnOn()  -- prefer self:method() over fibaro.call(self.id, ...) for self
 ```
 
+### Interface changes restart the QA — guard with hasInterface
+
+`addInterfaces`/`deleteInterfaces` restart the plugin **unconditionally**
+— even when the interface is already present (or absent), so a QA that
+adds its own interfaces in `onInit` loops forever. Gate every change:
+
+```lua
+function QuickApp:onInit()
+    if not self:hasInterface("autoTurnOff") then
+        self:addInterfaces({"autoTurnOff"})
+    end
+end
+```
+
+Only add what is missing (and check before removing); a re-boot after a
+real change is a one-time event, not a loop. The same holds in flua's
+sim.
+
 ---
 
 ## Scheduler / Time-Based Actions

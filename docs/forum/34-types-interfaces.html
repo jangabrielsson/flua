@@ -70,6 +70,30 @@ flua --api local lamp.lua driver.lua
 interface name flua does not know is still stored plainly, with no
 invented properties.</p>
 
+<h3>Best practice: guard before you add</h3>
+
+<p>An interface change restarts the plugin — <b>even when nothing
+changes</b>: adding an interface the QA already has still restarts it.
+A QA that adds its own interfaces in <code>onInit</code> therefore
+loops forever unless it checks first:</p>
+
+<pre>
+function QuickApp:onInit()
+  if not self:hasInterface("autoTurnOff") then
+    self:addInterfaces({"autoTurnOff"})
+  end
+end
+
+flua --api local guard.lua
+
+[GuardDemo5000]: BOOT          -- once: hasInterface said true, nothing to add
+[GuardDemo5000]: HAS true
+</pre>
+
+<p><code>hasInterface</code> is the gate: add only what is missing, and
+a re-boot after a real change is a one-time event, not a loop. The
+remove side is symmetrical — check before you remove.</p>
+
 <h3>Your values get checked</h3>
 
 <p>Because the properties are typed, flua can check what you put in them.
