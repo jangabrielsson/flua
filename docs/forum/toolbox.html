@@ -1,0 +1,128 @@
+<h2>The flua toolbox — every <code>--tool</code> command</h2>
+
+<p>Everything flua does is a command: <code>flua --tool &lt;name&gt;</code>.
+The VS Code extension's buttons are these commands with a GUI on top, the
+MCP server exposes them to agents, and a bare <code>flua --tool</code>
+lists them all (each with <code>--help</code>). This post is the tour —
+all 24 tools, grouped by what they do, as of flua 0.1.142.</p>
+
+<h3>Scaffold and understand your devices</h3>
+
+<ul>
+<li><b><code>setup</code></b> — scaffold a QA project: <code>.vscode</code>
+configs, agent files and per-file policies. The first command in a new
+workspace.</li>
+<li><b><code>newQA</code></b> — scaffold a QA from one of the 30 standard
+device-type templates (the type's canonical actions and properties, ready
+to run):</li>
+</ul>
+
+<pre>
+flua --tool newQA binarySwitch "Demo switch"   # -> binarySwitch.lua
+</pre>
+
+<ul>
+<li><b><code>catalog</code></b> — list the 190 device types the sim
+supports (the <code>--%%type</code> catalog); <code>--json</code> for the
+machine shape.</li>
+<li><b><code>typeinfo</code></b> — the implementation contract of one type
+or interface: its properties (types, defaults, enums), the interfaces it
+carries, and the actions a QA should implement as
+<code>QuickApp:&lt;name&gt;</code> methods — each tagged with where it
+comes from (the type, a base type, an interface).</li>
+<li><b><code>ui</code></b> — print a QA's declared UI as text (elements,
+callbacks, options); <code>--json</code> for the structured payload,
+<code>--device ID</code> to fetch a real HC3 device's UI and render it
+back to <code>--%%u</code> rows.</li>
+</ul>
+
+<h3>The house and the controller</h3>
+
+<ul>
+<li><b><code>house</code></b> — the house as one JSON document: devices
+(id, name, type, room), global variables, scenes, custom events. The
+data behind the extension's completions and the agent's ground truth.</li>
+<li><b><code>hubList</code></b> — the hub and its QuickApps as one JSON
+document (ids, names, types, rooms, modified timestamps) — what the
+extension's hub view renders.</li>
+<li><b><code>hub</code></b> — named controller profiles:
+<code>add</code>/<code>list</code>/<code>switch</code>/<code>remove</code>
+for the <code>.env</code> chain. <code>list</code> shows names, urls and
+serials — never passwords:</li>
+</ul>
+
+<pre>
+flua --tool hub add home http://192.168.1.20 admin   # prompts for the password
+flua --tool hub switch home                          # repoint the global default
+flua --tool hub switch home --project                # pin this project only
+</pre>
+
+<ul>
+<li><b><code>state</code></b> — inspect simulator state from a seed/db
+file: dump, alias scan, tree check — what the simulated house will look
+like before you run.</li>
+<li><b><code>createDB</code></b> — build an offline db from the HC3
+(device 1, location, panels): a snapshot to develop against without the
+controller.</li>
+<li><b><code>icons</code></b> — populate the icon cache
+(<code>icons download</code>) — the catalog of controller icons the
+sim serves.</li>
+</ul>
+
+<h3>Package and deploy</h3>
+
+<ul>
+<li><b><code>pack</code></b> — package a QA project (main file +
+<code>--%%file</code> extras) into a <code>.fqa</code> file on disk:</li>
+</ul>
+
+<pre>
+flua --tool pack binarySwitch.lua          # -> Demo_switch.fqa
+</pre>
+
+<ul>
+<li><b><code>unpack</code></b> — the reverse: a <code>.fqa</code> back
+into a flua project (<code>&lt;name&gt;_main.lua</code> plus one file per
+packaged QA file):</li>
+</ul>
+
+<pre>
+flua --tool unpack Demo_switch.fqa -d unpacked   # -> unpacked/Demo_switch_main.lua
+</pre>
+
+<ul>
+<li><b><code>uploadQA</code></b> — package an unpacked project and upload
+it (new QA, or the id in a downloaded <code>&lt;Name&gt;_main_&lt;id&gt;.lua</code>).</li>
+<li><b><code>updateQA</code></b> — update an existing QA on the HC3 from
+an unpacked project (all files at once).</li>
+<li><b><code>uploadFile</code></b> — push one QA file (reads
+<code>--%%deviceId</code>/<code>--%%qaFile</code> from the file).</li>
+<li><b><code>uploadFQA</code></b> — upload a <code>.fqa</code> package as
+a NEW QuickApp.</li>
+<li><b><code>downloadQA</code></b> — download a QA from the HC3 and unpack
+it into individual Lua files (the start of the edit → test → update
+loop).</li>
+<li><b><code>downloadFQA</code></b> — the same download as a
+<code>.fqa</code> file.</li>
+<li><b><code>installHelper</code></b> — deploy the FluaHelper QA to the
+HC3 and point it at this machine (the controller-local API bridge).</li>
+</ul>
+
+<h3>Inspect and diagnose</h3>
+
+<ul>
+<li><b><code>migrate</code></b> — scan a project for plua leftovers and
+migration hazards (the checklist when a QA moves from the old tooling).</li>
+<li><b><code>ws</code></b> — probe a WebSocket endpoint: handshake, send
+frames, soak with pings — debugging socket QAs without a second tool.</li>
+<li><b><code>parityCapture</code></b> / <b><code>parityCleanup</code></b> —
+capture REST shape fixtures from a real HC3 for offline parity replay,
+and list/remove the <code>flua_p_*</code> artifacts afterwards.</li>
+</ul>
+
+<p>Two commands cover the rest of the surface: a bare
+<code>flua --tool</code> lists every tool with its one-line purpose, and
+<code>flua --tool &lt;name&gt; --help</code> gives the tool's own usage.
+Agents get the same tools through <code>flua-mcp</code>'s
+<code>flua_tool</code>, so anything this page shows is something an agent
+can run.</p>
