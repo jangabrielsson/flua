@@ -4,6 +4,26 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.141] - 2026-11-10
+
+### Added
+- property type/enum checks against the distilled schema (Phase 2)
+- device structures and interface semantics from the distilled type/interface schema (ADR 0014)
+
+### Changed
+- soften ADR 0014's source description
+- demote devices.json — the schema answers, the capture only falls back
+- ADR 0014 — setVariable's coercion is a different surface
+- updateProperty mismatches — the HC3 ignores, flua warns and applies
+- test: the interface-conflict pin compares only the interfaces a type declares
+- record the mined type-system oddities; pin the conflict-free interface layer
+- plan — device schemas from the HC3 type/interface XML
+- update .gitignore to include HC3_info directory
+- park the requirements flow — mark the design notes as the resume point
+
+### Fixed
+- match the HC3's served device shapes (parity alignment)
+
 ## [0.1.140] - 2026-11-09
 
 ### Added
