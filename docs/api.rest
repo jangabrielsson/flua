@@ -1,11 +1,295 @@
+# API REST endpoints for Fibaro HC3
+# This document provides the REST API endpoints for interacting with the Fibaro HC3 system.
+# Install vscode extension for REST API testing (e.g., REST Client)
+# Setup Preferences: User Settings for REST Client extension in VSCode
+# "rest-client.environmentVariables": {
+#    "$shared": {
+#        "host": "192.168.50.57",
+#    },
+#    "local": {
+#        "host": "192.168.50.57",
+#    }
+# },
+# "rest-client.defaultHeaders": {
+#    "User-Agent": "vscode-restclient",
+#    "Authorization": "Basic xxxxxxxxxxxx",
+#    "X-Fibaro-Version": 2
+#},
+# You get the Basic xxxxxxxxxxxx by encoding "user:password" in Base64 format. Use HC3 Swagger and make call to see the encoded value.
+
+
 #### Get all devices
 GET http://{{host}}/api/devices 
 
 ### Get device with ID 1
 GET http://{{host}}/api/devices/1 
 
+### Get device property of device with ID 1
+GET http://{{host}}/api/devices/1/properties/sunsetHour
+
 ### Get events
 GET http://{{host}}/api/refreshStates?last=0&lang=en&rand=0
 
+### Send push notification to device with ID 2
+POST http://{{host}}/api/devices/2/action/sendPush
+content-type: application/json
+
+{
+  "args": ["Your push message here"]
+}
+
+### Get all custom events
+GET http://{{host}}/api/customEvents
+
+### Get custom event with name <name>
+GET http://{{host}}/api/customEvents/<name>
+
+### Create custom event
+POST http://{{host}}/api/customEvents
+content-type: application/json
+
+{
+  "name": "your_custom_event_name",
+  "userDescription": "Your description here"
+}
+
+### Emit custom event
+POST http://{{host}}/api/customEvents/<name>
+content-type: application/json
+
+### Modify custom event
+PUT http://{{host}}/api/customEvents/<name>
+content-type: application/json
+
+{
+  "userDescription": "Your updated description here"
+}
+
+### Delete custom event
+DELETE http://{{host}}/api/customEvents/<name>
+
+### Get weather
+GET http://{{host}}/api/weather
+
+### Update weather (for debugging)
+PUT http://{{host}}/api/weather
+content-type: application/json
+
+{
+  "Temperature": 6.2,
+  "TemperatureUnit": "C",
+  "Humidity": 72.1,
+  "Wind": 7.92,
+  "WindUnit": "km/h",
+  "WeatherCondition": "cloudy",
+  "ConditionCode": 30
+}
+
+### Update device property
+POST http://{{host}}/plugins/updateProperty
+content-type: application/json
+
+{
+  "deviceId": 1,
+  "propertyName": "sunsetHour",
+  "value": "18:30"
+}
+
+### Update view
+POST http://{{host}}/plugins/updateView
+content-type: application/json
+
+{
+  "deviceId": 1,
+  "componentName": "componentName",
+  "propertyName": "propertyName",
+  "newValue": "newValue"
+}
+
+### Update interface
+POST http://{{host}}/plugins/interfaces
+content-type: application/json
+
+{
+  "deviceId": 1,
+  "action": "add", # add or delete 
+  "interfaces" : ["interface1", "interface2"]
+}
+
+### Plugin restart
+POST http://{{host}}/plugins/restart
+content-type: application/json
+
+{
+  "deviceId": 42
+}
+
+### Create child device
+POST http://{{host}}/plugins/createChildDevice
+content-type: application/json
+
+{
+  "parentId": 1,
+  "name": "Child Device Name"
+}
+
+### Remove child device
+DELETE http://{{host}}/plugins/removeChildDevice/<id>
 
 
+### Debug messages
+POST http://{{host}}/debugMessages
+
+
+### Publish event
+POST http://{{host}}/plugins/publishEvent
+content-type: application/json
+
+{
+  "deviceId": 1,
+  "eventName": "your_event_name",
+  "eventData": {}
+}
+
+### Get panels location
+GET http://{{host}}/panels/location
+
+
+### Get panels location by ID
+GET http://{{host}}/panels/location/<id>
+
+
+### Create panels location
+POST http://{{host}}/panels/location
+content-type: application/json
+
+{
+  "name": "Location Name"
+}
+
+### Update panels location
+PUT http://{{host}}/panels/location/<id>
+content-type: application/json
+
+{
+  "name": "Updated Location Name"
+}
+
+### Delete panels location
+DELETE http://{{host}}/panels/location/<id>
+
+### Get settings location
+GET http://{{host}}/settings/location
+
+### Get settings info
+GET http://{{host}}/settings/info
+
+### Get all users
+GET http://{{host}}/users
+
+### Get a specific user by ID
+GET http://{{host}}/users/<id>
+
+### Create a new user
+POST http://{{host}}/users
+content-type: application/json
+
+{
+  "name": "User Name"
+}
+
+### Update a specific user by ID
+PUT http://{{host}}/users/<id>
+content-type: application/json
+
+{
+  "name": "Updated User Name"
+}
+
+### Delete a specific user by ID
+DELETE http://{{host}}/users/<id>
+content-type: application/json
+
+### Get all files for a quickApp
+GET http://{{host}}/quickApp/<id>/files
+content-type: application/json
+
+### Create a new file for a quickApp
+POST http://{{host}}/quickApp/<id>/files
+content-type: application/json
+
+{
+  "name": "file_name",
+  "content": "file_content"
+}
+
+### Get a specific file for a quickApp
+GET http://{{host}}/quickApp/<id>/files/<name>
+
+### Update a specific file for a quickApp
+PUT http://{{host}}/quickApp/<id>/files/<name>
+content-type: application/json
+
+{
+  "name": "file_name",
+  "content": "file_content"
+}
+
+### Update a several file for a quickApp
+PUT http://{{host}}/quickApp/<id>/files
+content-type: application/json
+
+[
+  {
+    "name": "file_name",
+    "content": "file_content"
+  }
+]
+
+### Delete a specific file for a quickApp
+DELETE http://{{host}}/quickApp/<id>/files/<name>
+content-type: application/json
+  
+### Export a quickApp
+GET http://{{host}}/quickApp/export/<id>
+
+
+### Install a new quickApp
+POST http://{{host}}/quickApp/
+content-type: application/json
+
+{
+  "data": "your_data_here"
+}
+  
+
+### Get all variables for a plugin
+GET http://{{host}}/plugins/<id>/variables
+
+### Get a specific variable for a plugin
+GET http://{{host}}/plugins/<id>/variables/<name>
+
+### Create a new variable for a plugin
+POST http://{{host}}/plugins/<id>/variables
+content-type: application/json
+
+{
+  "name": "variable_name",
+  "value": "variable_value"
+}
+
+### Update a specific variable for a plugin
+PUT http://{{host}}/plugins/<id>/variables/<name>
+content-type: application/json
+
+{
+  "value": "new_value"
+}
+
+### Delete a specific variable for a plugin
+DELETE http://{{host}}/plugins/<id>/variables/<name>
+content-type: application/json
+
+
+### Delete all variables for a plugin
+DELETE http://{{host}}/plugins/<id>/variables
