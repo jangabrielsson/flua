@@ -1,8 +1,9 @@
-"""catalog: list the device types the sim supports (devices.json).
+"""catalog: list the device types the sim supports.
 
-The HC3 device catalog the sim builds skeletons from — the answer to
-"unknown device type" errors and the reference for ``--%%type``. One type
-per line; ``--json`` gives a JSON array. Agents prefer the JSON shape.
+The distilled type schema (plus capture-only fallback types) — the answer
+to "unknown device type" errors and the reference for ``--%%type``. One
+type per line; ``--json`` gives a JSON array. Agents prefer the JSON
+shape.
 """
 
 from __future__ import annotations

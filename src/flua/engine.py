@@ -59,7 +59,7 @@ from .config import (
     split_annotations,
     warn_enabled,
 )
-from .devices import apply_interface, catalog_types, skeleton_for
+from .devices import apply_interface, catalog_types, property_specs_for
 from .environment import EnvChain
 from .hc3 import Hc3Remote
 from .helper import (
@@ -1563,7 +1563,11 @@ class LuaEngine:
         if info is None:
             return None
         device = self.api.state.devices.get(int(qa_id)) or {}
-        skeleton_properties = (skeleton_for(device.get("type")) or {}).get("properties") or {}
+        # the export whitelist compares against the schema's DECLARED
+        # defaults (authoritative), not the demoted capture
+        specs = property_specs_for(
+            device.get("type"), device.get("interfaces")
+        )
         properties: dict[str, Any] = {}
         for key, value in (device.get("properties") or {}).items():
             if key not in _EXPORT_PROPERTIES:
@@ -1575,7 +1579,8 @@ class LuaEngine:
                 # device's live values when updateQA syncs the package
                 if value in (None, ""):
                     continue
-                if skeleton_properties.get(key) == value:
+                default = (specs.get(key) or {}).get("default")
+                if default is not None and default == value:
                     continue
             properties[key] = value
         # private (__-prefixed) UI callbacks never travel

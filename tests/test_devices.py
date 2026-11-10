@@ -19,7 +19,8 @@ def test_catalog_has_expected_types() -> None:
     types = catalog_types()
     assert "com.fibaro.binarySwitch" in types
     assert "com.fibaro.remoteColorController" in types
-    assert len(types) > 100
+    assert "com.fibaro.pko" in types  # capture-only, kept as the fallback
+    assert len(types) >= 189  # the schema; the capture only adds fallback types
 
 
 def test_skeleton_for_known_type() -> None:

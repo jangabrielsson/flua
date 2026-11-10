@@ -32,7 +32,7 @@ def test_audit_pins_the_coverage_floor() -> None:
     assert route_match("DELETE", "/quickApp/5000/files/other.lua")
     assert not route_match("GET", "/quickApp/nonsense")
     devices = device_coverage()
-    assert devices["total"] == 176
+    assert devices["total"] == 190  # 189 schema types + the capture-only fallback (pko)
     assert len(devices["lightModeled"]) >= 26
     hierarchy = hierarchy_coverage()
     assert hierarchy["total"] == 175  # exact, like the spec: regeneration is noticed
@@ -65,7 +65,7 @@ def test_audit_command_runs(tmp_path) -> None:
     assert payload["routes"]["total"] == 356
     assert payload["routes"]["simulated"] >= 78
     assert isinstance(payload["routes"]["missing"], int)  # the plain JSON keeps the count
-    assert payload["devices"]["total"] == 176
+    assert payload["devices"]["total"] == 190
     assert payload["devices"]["lightModeled"] >= 26
     assert payload["hierarchy"]["total"] == 175
     assert payload["templates"]["total"] == 30

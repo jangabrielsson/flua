@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from .api import route_match
-from .devices import skeleton_for
+from .devices import catalog_entries, type_schemas
 
 # the spec ships in the wheel as setup_templates package data (the same
 # copy the sync test pins against docs/specs/hc3-api.json)
@@ -35,7 +35,6 @@ _SPEC_PATH = (
     / "specs"
     / "hc3-api.json"
 )
-_CATALOG_PATH = Path(__file__).resolve().parent / "devices" / "devices.json"
 _HIERARCHY_PATH = Path(__file__).resolve().parent / "devices" / "hierarchy.json"
 _TEMPLATES_PATH = (
     Path(__file__).resolve().parent
@@ -81,14 +80,14 @@ def route_coverage() -> dict[str, Any]:
 
 
 def device_coverage() -> dict[str, Any]:
-    catalog = json.loads(_CATALOG_PATH.read_text(encoding="utf-8"))
+    entries = catalog_entries()
     modeled: list[str] = []
     light_gap: list[str] = []
     other_actions: list[str] = []
     inert: list[str] = []
-    for type_name, device in catalog.items():
-        interfaces = device.get("interfaces") or []
-        actions = device.get("actions") or {}
+    for type_name, entry in entries.items():
+        interfaces = entry.get("interfaces") or []
+        actions = entry.get("actions") or {}
         if "light" in interfaces:
             modeled.append(type_name)
         elif any(action in actions for action in _LIGHT_ACTIONS):
@@ -98,7 +97,7 @@ def device_coverage() -> dict[str, Any]:
         else:
             inert.append(type_name)
     return {
-        "total": len(catalog),
+        "total": len(entries),
         "lightModeled": modeled,
         "lightActionsWithoutInterface": light_gap,
         "otherActions": other_actions,
@@ -116,7 +115,7 @@ def hierarchy_coverage() -> dict[str, Any]:
     parents = raw.get("parents")
     if not isinstance(parents, dict):
         parents = {}
-    catalog = json.loads(_CATALOG_PATH.read_text(encoding="utf-8"))
+    schema_types = set(type_schemas().get("types", {}))
     resolvable = 0
     for child in parents:
         current = child
@@ -124,12 +123,12 @@ def hierarchy_coverage() -> dict[str, Any]:
         while current in parents and current not in seen:
             seen.add(current)
             current = parents[current]
-            if current in catalog:
+            if current in schema_types:
                 resolvable += 1
                 break
     return {
         "total": len(parents),
-        "inCatalog": sum(1 for type_name in parents if type_name in catalog),
+        "inCatalog": sum(1 for type_name in parents if type_name in schema_types),
         "resolvable": resolvable,
         "firmware": (raw.get("meta") or {}).get("firmware"),
     }
@@ -144,7 +143,7 @@ def template_coverage() -> dict[str, Any]:
     for path in sorted(_TEMPLATES_PATH.glob("*.lua")):
         match = re.search(r"--%%type:(\S+)", path.read_text(encoding="utf-8"))
         declared = match.group(1) if match else None
-        if declared and skeleton_for(declared) is not None:
+        if declared and declared in type_schemas().get("types", {}):
             resolvable.append(path.stem)
         else:
             unresolvable.append(path.stem)
