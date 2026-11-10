@@ -174,6 +174,28 @@ def test_type_schemas_are_self_consistent() -> None:
             assert ptype in KNOWN_PROPERTY_TYPES or ptype.startswith("com.fibaro."), (
                 f"{name}.{prop}: unexpected type {ptype}"
             )
+    # the interface layer is conflict-free (mined from the sources): no
+    # interface re-declares a property with a different type than another
+    # interface or than any type that carries it — pin it, so extraction
+    # regressions cannot silently introduce contradictory specs
+    iface_props: dict[str, dict[str, str]] = {}
+    for iname, ischema in interfaces.items():
+        for prop, spec in (ischema.get("properties") or {}).items():
+            ptype = spec.get("type", "string")
+            prior = iface_props.get(prop)
+            assert prior is None or prior[0] == ptype, (
+                f"interface conflict: {prop} declared {prior[0]} ({prior[1]}) "
+                f"and {ptype} ({iname})"
+            )
+            iface_props[prop] = (ptype, iname)
+    for name, entry in types.items():
+        for prop, spec in (entry.get("properties") or {}).items():
+            prior = iface_props.get(prop)
+            if prior is not None:
+                assert prior[0] == spec.get("type", "string"), (
+                    f"type/interface conflict: {name}.{prop} declares "
+                    f"{spec.get('type')} but interface {prior[1]} declares {prior[0]}"
+                )
 
 
 def test_schema_for_known_type() -> None:

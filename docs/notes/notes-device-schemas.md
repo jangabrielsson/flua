@@ -117,6 +117,30 @@ leaning yes), or kept local alongside the sources?
   device types with their own properties/actions — feeding the catalog
   and the sim-device set.
 
+## Known type-system oddities (mined 2026-11-10)
+
+The 15-year-old type system is cleaner than expected, with drift
+concentrated in a few places:
+
+- The **interface layer is conflict-free**: no interface↔type or
+  interface↔interface property conflicts (pinned by the consistency
+  test) — a device can never get a contradictory spec through its
+  interfaces.
+- Base-chain overrides that change a type: only two, both sensible
+  (`multilevelSwitch.value` bool→int, `temperatureSensor.value`
+  real→temperature).
+- Legitimate polymorphism: `value` (bool/int/real/temperature across
+  families), `state` (bool for switches, string for shutters/multimedia,
+  int for the CO detector).
+- Drift candidates (same domain, different declaration): `exitTime`
+  (bool vs int across two alarm partitions), `port` (int vs string —
+  two alarm integrations say string), `input1`/`input2` (bool vs
+  string), `Temperature` (real on `weather`, temperature on the other
+  weather providers).
+- Flua-side impact: none at runtime — the checks are per-device. The
+  drift matters only for cross-family work (catalog, template
+  verification).
+
 ## Open questions
 
 1. Commit the extraction script? (pure logic, no data — leaning yes;
