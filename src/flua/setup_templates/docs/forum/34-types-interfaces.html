@@ -1,0 +1,123 @@
+<h2>Interfaces that work — flua's device model grows up</h2>
+
+<p>Every HC3 device has a type, and types have structure: properties with
+types and defaults, interfaces that add more of them, actions the device
+answers. Until now flua's emulator kept the plumbing but not the meaning
+— an interface on a QA was stored and that was that. No more: flua now
+models the device catalog properly. Your QA boots with the properties its
+type declares, interfaces compose for real, and flua checks your values
+against the declared types. This post tours the three behaviors.</p>
+
+<h3>The type skeleton is real now</h3>
+
+<p>A QA's device structure comes from the catalog: typed properties at
+their declared defaults, the interfaces the type carries, and the
+actions it answers. The <code>--%%interface:</code> directive adds an
+interface the type does not already have — and the interface's
+properties arrive with it:</p>
+
+<pre>
+--%%name:Autolight
+--%%type:com.fibaro.binarySwitch
+--%%interface:autoTurnOff
+function QuickApp:onInit()
+  local d = api.get("/devices/" .. self.id)
+  print("INTERFACES", table.concat(d.interfaces, ","))
+  print("OFF", d.properties.autoOffTimestamp, d.properties.autoOffDefaultTime)
+  print("SET_AUTOOFF", d.actions.setAutoOff)
+  exit(0)
+end
+
+flua --api local autolight.lua
+
+[Autolight5000]: INTERFACES light,autoTurnOff,quickApp
+[Autolight5000]: OFF 0 900          -- the interface's defaults
+[Autolight5000]: SET_AUTOOFF 3      -- the action, with its arg count
+</pre>
+
+<p>Every type in the catalog composes this way — properties from the type,
+extra properties and actions from each interface it declares.</p>
+
+<h3>Interfaces at runtime, the HC3 way</h3>
+
+<p>The REST route behaves too: <code>POST /plugins/interfaces</code>
+adds the interface's properties and actions, remove takes them away
+again — and, like on the HC3, an interface change <b>restarts the
+plugin</b>. The demo therefore uses a driver QA so the target's restarts
+don't interfere:</p>
+
+<pre>
+driver.lua — flips interfaces on the Lamp QA:
+api.post("/plugins/interfaces", {action = "add", deviceId = lamp,
+                                 interfaces = {"energy"}})
+local d = api.get("/devices/" .. lamp)
+print("ADDED", d.properties.energy, d.properties.storeEnergyData, d.actions.reset)
+api.post("/plugins/interfaces", {action = "remove", deviceId = lamp,
+                                 interfaces = {"energy"}})
+d = api.get("/devices/" .. lamp)
+print("REMOVED", d.properties.energy, d.actions.reset)
+
+flua --api local lamp.lua driver.lua
+
+[Lamp5000]: LAMP_BOOT
+[Driver5001]: ADDED 0.0 true 1
+[Driver5001]: REMOVED nil nil
+[Lamp5000]: LAMP_BOOT           -- the add restarted the plugin
+[Lamp5000]: LAMP_BOOT           -- and so did the remove
+</pre>
+
+<p>Adding a type's own interface back later restores its defaults; an
+interface name flua does not know is still stored plainly, with no
+invented properties.</p>
+
+<h3>Your values get checked</h3>
+
+<p>Because the properties are typed, flua can check what you put in them.
+The emulator warns when <code>updateProperty</code> sets a value that
+does not fit the declaration — the kind of mismatch the controller
+silently ignores, leaving you to wonder why nothing happened:</p>
+
+<pre>
+self:updateProperty("value", true)
+self:updateProperty("value", "yes")   -- the type declares bool
+
+flua --api local warn.lua
+
+[WarnDemo5000]: updateProperty: property 'value' is declared bool, got str
+                 (the real HC3 silently ignores the update)
+[WarnDemo5000]: DONE yes              -- flua warns and applies, never rejects
+</pre>
+
+<p>Warnings fire once per property and are on by default —
+<code>--%%warn:propertyType=false</code> silences them. And the same
+check runs statically, before anything executes:</p>
+
+<pre>
+flua --check warn.lua
+
+warn.lua: warning: updateProperty: property 'value' is declared bool,
+          the literal "yes" does not fit (the real HC3 silently ignores the update)
+</pre>
+
+<p>Enum-valued properties (like <code>deviceRole</code>) are checked
+against their vocabulary too. The check is deliberately conservative:
+literal arguments only, warn-only, never a rejection — flua never breaks
+a QA the controller would accept.</p>
+
+<h3>The bigger picture</h3>
+
+<p>The catalog behind all this is larger than before — 190 device types,
+one command away:</p>
+
+<pre>
+flua --tool catalog          # one type per line
+flua --tool catalog --json   # the machine-readable list
+</pre>
+
+<p>Honest edges: the checks are guidance, not enforcement — flua warns
+and applies, and an interface it does not know stays plain storage. The
+action arg counts are metadata for now, not enforced call shapes. The
+model is the foundation; the checks are the first thing built on it.</p>
+
+<p>Next time: endpoint packages — wrap a simulated endpoint in a QA and
+distribute it as a .fqa, emulation like any other QA.</p>
