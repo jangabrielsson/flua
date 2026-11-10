@@ -13,7 +13,6 @@ build/
 .DS_Store
 .env
 fibaro_api_docs/
-www/
 claude-skills-fibaro-hc3/
 dev/
 testQAs/
@@ -24,3 +23,4 @@ tmp/
 .codewhale/
 .deepseek/
 .vscode/mcp.json
+HC3_info/
