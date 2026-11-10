@@ -26,6 +26,11 @@ def main() -> int:
     for entry in list(schemas["types"].values()) + list(schemas["interfaces"].values()):
         for name, spec in (entry.get("actions") or {}).items():
             if name not in found:
+                # argc=1 actions take no arguments — nothing to name, so
+                # they stay out of the starter (a hand-added entry is never
+                # pruned by the merge)
+                if int(spec.get("argc", 0)) <= 1:
+                    continue
                 found[name] = {
                     "argc": spec.get("argc", 0),
                     **({"args": spec["args"]} if spec.get("args") else {}),

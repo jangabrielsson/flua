@@ -2,47 +2,14 @@
  "abortUpdate": {
   "argc": 2
  },
- "acquireBBData": {
-  "argc": 0
- },
- "addCamera": {
-  "argc": 1
- },
- "addDevice": {
-  "argc": 1
- },
  "addDeviceBySerial": {
   "argc": 2
  },
- "addNvr": {
-  "argc": 1
- },
  "arm": {
-  "argc": 1
- },
- "armAll": {
-  "argc": 1
- },
- "back": {
-  "argc": 1
- },
- "bindDevice": {
-  "argc": 1
- },
- "changeActivityState": {
-  "argc": 1
- },
- "changeLockState": {
-  "argc": 1
+  "argc": 2
  },
  "clearAlarm": {
   "argc": 2
- },
- "clearAlarmAll": {
-  "argc": 1
- },
- "close": {
-  "argc": 1
  },
  "closeWithSpeed": {
   "argc": 2,
@@ -63,123 +30,16 @@
   "argc": 2
  },
  "disarm": {
-  "argc": 1
- },
- "disarmAll": {
-  "argc": 1
- },
- "down": {
-  "argc": 1
- },
- "forceArm": {
-  "argc": 1
+  "argc": 2
  },
  "forceWatering": {
   "argc": 3
  },
- "forward": {
-  "argc": 1
- },
- "getDiscoveryResults": {
-  "argc": 1
- },
- "getLastWorkingRoute": {
-  "argc": 1
- },
- "getMaxUsers": {
-  "argc": 1
- },
- "getNeighborList": {
-  "argc": 1
- },
  "getParameter": {
   "argc": 2
  },
- "getSupportedCommands": {
-  "argc": 0
- },
  "getUserCode": {
   "argc": 2
- },
- "identify": {
-  "argc": 1
- },
- "info": {
-  "argc": 1
- },
- "left": {
-  "argc": 1
- },
- "loadAudioClip": {
-  "argc": 0,
-  "args": [
-   {
-    "name": null,
-    "type": "string"
-   },
-   {
-    "name": null,
-    "type": "string"
-   },
-   {
-    "name": null,
-    "type": "object"
-   }
-  ]
- },
- "meetArmConditions": {
-  "argc": 1
- },
- "menu": {
-  "argc": 1
- },
- "minus": {
-  "argc": 1
- },
- "moveDown": {
-  "argc": 1
- },
- "moveLeft": {
-  "argc": 1
- },
- "moveRight": {
-  "argc": 1
- },
- "moveStop": {
-  "argc": 1
- },
- "moveUp": {
-  "argc": 1
- },
- "mute": {
-  "argc": 1
- },
- "next": {
-  "argc": 1
- },
- "open": {
-  "argc": 1
- },
- "openDoor": {
-  "argc": 1
- },
- "openDoor1": {
-  "argc": 0
- },
- "openDoor2": {
-  "argc": 0
- },
- "openDoor3": {
-  "argc": 1
- },
- "openDoor4": {
-  "argc": 1
- },
- "openGate": {
-  "argc": 1
- },
- "openLock": {
-  "argc": 1
  },
  "openWithSpeed": {
   "argc": 2,
@@ -190,107 +50,14 @@
    }
   ]
  },
- "park12h": {
-  "argc": 0
- },
- "park3h": {
-  "argc": 0
- },
- "park6h": {
-  "argc": 0
- },
- "parkUntilFurtherNotice": {
-  "argc": 0
- },
- "parkUntilNextSchedule": {
-  "argc": 0
- },
- "partialOpen": {
-  "argc": 1
- },
- "pause": {
-  "argc": 1
- },
- "play": {
-  "argc": 1
- },
- "playExternalAudioSource": {
-  "argc": 0,
-  "args": [
-   {
-    "name": null,
-    "type": "string"
-   }
-  ]
- },
- "playPlaylist": {
-  "argc": 0,
-  "args": [
-   {
-    "name": null,
-    "type": "string"
-   }
-  ]
- },
- "playScene": {
-  "argc": 0
- },
- "playerMute": {
-  "argc": 0,
-  "args": [
-   {
-    "name": null,
-    "type": "string"
-   }
-  ]
- },
- "playerUnmute": {
-  "argc": 0,
-  "args": [
-   {
-    "name": null,
-    "type": "string"
-   }
-  ]
- },
- "plus": {
-  "argc": 1
- },
- "poll": {
-  "argc": 1
- },
- "prev": {
-  "argc": 1
- },
- "previous": {
-  "argc": 1
- },
- "pullSpring": {
-  "argc": 1
- },
  "readValue": {
   "argc": 2
- },
- "reconfigure": {
-  "argc": 1
  },
  "registerListener": {
   "argc": 2
  },
- "reloadConfiguration": {
-  "argc": 1
- },
  "removeChildDevice": {
   "argc": 2
- },
- "removeClimatePanelOverrideSchedule": {
-  "argc": 0
- },
- "removeDevice": {
-  "argc": 1
- },
- "removeOverrideSchedule": {
-  "argc": 1
  },
  "removeSchedule": {
   "argc": 3
@@ -311,9 +78,6 @@
    }
   ]
  },
- "requestNodeNeighborUpdate": {
-  "argc": 1
- },
  "requestPropertiesChange": {
   "argc": 2,
   "args": [
@@ -323,56 +87,11 @@
    }
   ]
  },
- "reset": {
-  "argc": 1
- },
- "resume": {
-  "argc": 0
- },
- "retryScheduleSynchronization": {
-  "argc": 0
- },
  "retryUpdate": {
   "argc": 2
  },
- "rewind": {
-  "argc": 1
- },
- "right": {
-  "argc": 1
- },
- "rotateSlatsDown": {
-  "argc": 1
- },
- "rotateSlatsUp": {
-  "argc": 1
- },
- "scan": {
-  "argc": 1
- },
- "sceneActivationSet": {
-  "argc": 1
- },
- "secure": {
-  "argc": 1
- },
- "seek": {
-  "argc": 0,
-  "args": [
-   {
-    "name": null,
-    "type": "int"
-   }
-  ]
- },
- "select": {
-  "argc": 1
- },
  "sendAVControl": {
   "argc": 6
- },
- "sendCameraImageToAdminEmail": {
-  "argc": 0
  },
  "sendCommand": {
   "argc": 8
@@ -642,9 +361,6 @@
  "setDisabled": {
   "argc": 2
  },
- "setDoorLockMode": {
-  "argc": 1
- },
  "setDryAirThermostatModeAndSetpoint": {
   "argc": 6,
   "args": [
@@ -893,9 +609,6 @@
  "setNetworkSettings": {
   "argc": 3
  },
- "setNoMedia": {
-  "argc": 1
- },
  "setOutputsOff": {
   "argc": 2
  },
@@ -908,37 +621,8 @@
  "setParameter": {
   "argc": 4
  },
- "setPlayerRelativeVolume": {
-  "argc": 0,
-  "args": [
-   {
-    "name": null,
-    "type": "string"
-   },
-   {
-    "name": null,
-    "type": "int"
-   }
-  ]
- },
- "setPlayerVolume": {
-  "argc": 0,
-  "args": [
-   {
-    "name": null,
-    "type": "string"
-   },
-   {
-    "name": null,
-    "type": "int"
-   }
-  ]
- },
  "setPosition": {
   "argc": 2
- },
- "setPower": {
-  "argc": 1
  },
  "setProtection": {
   "argc": 6,
@@ -955,24 +639,6 @@
  },
  "setR": {
   "argc": 2
- },
- "setRelativeVolume": {
-  "argc": 0,
-  "args": [
-   {
-    "name": null,
-    "type": "int"
-   }
-  ]
- },
- "setRepeatMode": {
-  "argc": 0,
-  "args": [
-   {
-    "name": null,
-    "type": "string"
-   }
-  ]
  },
  "setRingBrightness": {
   "argc": 2
@@ -1009,15 +675,6 @@
  "setSequence": {
   "argc": 4
  },
- "setShuffle": {
-  "argc": 0,
-  "args": [
-   {
-    "name": null,
-    "type": "bool"
-   }
-  ]
- },
  "setSipDisplayName": {
   "argc": 2
  },
@@ -1035,9 +692,6 @@
     "type": "string"
    }
   ]
- },
- "setTamperMode": {
-  "argc": 1
  },
  "setTargetLevelDry": {
   "argc": 2
@@ -1114,27 +768,6 @@
  "setW": {
   "argc": 2
  },
- "silentClose": {
-  "argc": 1
- },
- "silentOpen": {
-  "argc": 1
- },
- "sourceTV": {
-  "argc": 0
- },
- "start": {
-  "argc": 1
- },
- "start12h": {
-  "argc": 0
- },
- "start3h": {
-  "argc": 0
- },
- "start6h": {
-  "argc": 0
- },
  "startCalibration": {
   "argc": 2,
   "args": [
@@ -1150,20 +783,8 @@
  "startColorFade": {
   "argc": 2
  },
- "startDiscovery": {
-  "argc": 1
- },
- "startLevelDecrease": {
-  "argc": 1
- },
- "startLevelIncrease": {
-  "argc": 1
- },
  "startProgram": {
   "argc": 2
- },
- "startRecording": {
-  "argc": 0
  },
  "startUpdate": {
   "argc": 2
@@ -1171,83 +792,11 @@
  "startWatering": {
   "argc": 3
  },
- "step": {
-  "argc": 1
- },
- "stop": {
-  "argc": 1
- },
  "stopColorChange": {
   "argc": 2
  },
- "stopLevelChange": {
-  "argc": 1
- },
- "stopRecording": {
-  "argc": 0
- },
- "stopSlats": {
-  "argc": 1
- },
- "switchAllOff": {
-  "argc": 1
- },
- "switchAllOn": {
-  "argc": 1
- },
- "synchronize": {
-  "argc": 1
- },
- "toggle": {
-  "argc": 1
- },
- "toggleMute": {
-  "argc": 0
- },
- "togglePlayPause": {
-  "argc": 0
- },
- "togglePlayerMute": {
-  "argc": 0,
-  "args": [
-   {
-    "name": null,
-    "type": "string"
-   }
-  ]
- },
- "turnOff": {
-  "argc": 1
- },
- "turnOffCameraAlarmLight": {
-  "argc": 1
- },
- "turnOffCameraSiren": {
-  "argc": 1
- },
- "turnOffCameraWhiteLight": {
-  "argc": 1
- },
- "turnOn": {
-  "argc": 1
- },
- "turnOnCameraAlarmLight": {
-  "argc": 1
- },
  "turnOnCameraSiren": {
   "argc": 2
- },
- "turnOnCameraWhiteLight": {
-  "argc": 1
- },
- "unmute": {
-  "argc": 1
- },
- "unsecure": {
-  "argc": 1
- },
- "up": {
-  "argc": 1
  },
  "updateFirmware": {
   "argc": 2
