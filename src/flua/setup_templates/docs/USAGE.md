@@ -312,7 +312,8 @@ Parsing stops at the end-of-header marker:
 | Directive | Meaning |
 |---|---|
 | `--%%name:x` | the device/QA name (`_FLUA.config.name`) |
-| `--%%type:com.fibaro.binarySwitch` | device type (defaults to binarySwitch; a type the catalog does not know falls back to its nearest hierarchy ancestor — `devices/hierarchy.json`, distilled from the HC3; only types the hierarchy never heard of are an error) |
+| `--%%type:com.fibaro.binarySwitch` | device type (defaults to binarySwitch; the device structure comes from the distilled type schema — typed properties at their defaults, the type's interfaces expanded — with the catalog capture and the hierarchy as fallbacks; only types the hierarchy never heard of are an error) |
+| `--%%interface:autoTurnOff,light` | interfaces the QA's device gets: their properties join at their defaults and their actions join the device's action surface (comma-separated, repeatable; same semantics as `POST /plugins/interfaces`) |
 | `--%%properties:value=false` | default device properties (plural form) |
 | `--%%property:value=true` | raw property, scalar values; repeatable, merges |
 | `--%%var:name=expr` | initializes a **QuickApp variable**; `expr` is a Lua expression — `'text'`, `42`, `{a=1}`, `config.color`, `os.getenv("X")` (one per line). An optional quoted string after a top-level comma is the **package value** distribution packages get: `--%%var:name=expr,"<placeholder>"` |
@@ -340,7 +341,7 @@ Parsing stops at the end-of-header marker:
 | `--%%debug:ws=true` | debug logging: byte-level `net.WebSocketClient` traffic — handshake leftovers, per-frame rx/tx with masked previews, close codes (global) |
 | `--%%debug:true` | shorthand for all three debug channels (`:false` disables them) |
 | `--%%loglength:120` | debug line length cap (default 120) |
-| `--%%warn:true` | extra runtime warnings for things the HC3 stays silent about: the `status` channel (api error codes, off by default); the `stubApi` channel (shape-only stub calls, **on by default**, `--%%warn:stubApi=false` to silence) (global) |
+| `--%%warn:true` | extra runtime warnings for things the HC3 stays silent about: the `status` channel (api error codes, off by default); the `stubApi` channel (shape-only stub calls, **on by default**, `--%%warn:stubApi=false` to silence); the `propertyType` channel (updateProperty values that do not fit the schema's declared type/enum, **on by default** — the HC3 coerces silently) (global) |
 | `--%%trace:api,ui` | the `--trace` categories (api, ui, net, timer, `all`) as a directive (global) |
 | `--%%syslog:run.json` | the `--syslog` file — one JSON line per system/trace event (global) |
 | `--%%strict-tests:true` | the `--strict-tests` CI mode as a directive (global): unhandled callback errors fail the run with exit 1, sticky |

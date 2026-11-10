@@ -59,6 +59,35 @@ def test_luals_library_files_parse() -> None:
         assert not errors, f"{path.name}: {errors}"
 
 
+def test_property_type_literals_checked_against_the_schema() -> None:
+    # --check compares updateProperty literals with the distilled type
+    # schema (declared type + --%%interface): type mismatches and
+    # out-of-enum strings warn; fitting literals stay silent
+    engine = LuaEngine()
+    lua = engine.lua_runtime()
+    source = (
+        "--%%name:Checked\n"
+        "--%%type:com.fibaro.binarySwitch\n"
+        "--%%interface:autoTurnOff\n"
+        "function QuickApp:onInit()\n"
+        "  self:updateProperty('value', true)         -- bool: fine\n"
+        "  self:updateProperty('value', 'yes')        -- bool: mismatch\n"
+        "  self:updateProperty('deviceRole', 'Light') -- in the enum\n"
+        "  self:updateProperty('deviceRole', 'Lamp')  -- out of enum\n"
+        "  self:updateProperty('autoOffTimestamp', 900) -- int: fine\n"
+        "  self:updateProperty('autoOffTimestamp', 'now') -- int: mismatch\n"
+        "end\n"
+    )
+    findings = check_source(source, "checked.lua", lua)
+    messages = [f["message"] for f in findings]
+    assert any("property 'value' is declared bool" in m for m in messages)
+    assert any("property 'deviceRole' value 'Lamp'" in m for m in messages)
+    assert any("property 'autoOffTimestamp' is declared int" in m for m in messages)
+    # the fitting literals produced no findings
+    assert not any("'Light'" in m for m in messages)
+    assert len(findings) == 3
+
+
 def test_all_templates_pass_check() -> None:
     engine = LuaEngine()
     lua = engine.lua_runtime()

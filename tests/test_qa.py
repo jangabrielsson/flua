@@ -777,6 +777,34 @@ async def test_load_sim_device_alarm_panel(capsys) -> None:
 
 
 @pytest.mark.asyncio
+async def test_updateproperty_type_mismatch_warns(capsys) -> None:
+    # updateProperty with a value that does not fit the schema's declared
+    # type/enum warns (the HC3 coerces silently); fitting values stay quiet
+    loader_code = (
+        "--%%name:TypeWarn\n"
+        "--%%type:com.fibaro.binarySwitch\n"
+        "function QuickApp:onInit()\n"
+        "  self:updateProperty('value', true)      -- bool: fine\n"
+        "  self:updateProperty('value', 'yes')     -- mismatch\n"
+        "  self:updateProperty('deviceRole', 'Lamp') -- out of enum\n"
+        "  print('DONE', tostring(self.properties.value))\n"
+        "  exit(0)\n"
+        "end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(None, loader_code, {}, "typewarn")
+        await wait_until(lambda: not engine.has_pending_work())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "DONE yes" in out  # the HC3-style coercion still happened
+    assert "property 'value' is declared bool, got str" in out
+    assert "property 'deviceRole' value 'Lamp'" in out
+
+
+@pytest.mark.asyncio
 async def test_stub_api_warning_default_on_and_deduped(capsys) -> None:
     # a QA calling a shape-only stub route gets ONE warning per route (the
     # stubs answer 200 with plausible empty data); real routes stay silent

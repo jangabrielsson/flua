@@ -1,8 +1,10 @@
 # Note: device schemas — type composition, interface semantics, property type checks (plan)
 
-Status: plan draft (2026-11-10) — nothing implemented. Supersedes the
-premise of ADR 0012 (interfaces were "undocumented"; the sources below
-document them).
+Status: implemented 2026-11-10 — phases 0–2 done (extraction + artifact,
+schema-first skeletons + interface semantics + `--%%interface:`, and the
+warn-only property type/enum checks). ADR 0014 is the decision record;
+phase 3 (catalog/template verification, device-specific types feeding the
+catalog) stays unplanned.
 
 ## Context and goal
 

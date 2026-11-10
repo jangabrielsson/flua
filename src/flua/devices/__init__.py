@@ -114,7 +114,11 @@ def schema_for(device_type: str | None) -> dict[str, Any] | None:
         "properties": {
             name: _default_value(spec) for name, spec in (entry.get("properties") or {}).items()
         },
-        "actions": copy.deepcopy(entry.get("actions") or {}),
+        # the HC3 serves actions as name -> argc (the parity fixture's
+        # shape); the full arg metadata stays in type_schemas()/interface_schema()
+        "actions": {
+            name: int(spec.get("argc", 0)) for name, spec in (entry.get("actions") or {}).items()
+        },
     }
 
 
@@ -125,6 +129,49 @@ def interface_schema(name: str) -> dict[str, Any] | None:
     if entry is None:
         return None
     return copy.deepcopy(entry)
+
+
+def property_specs_for(
+    device_type: str | None, interfaces: list[str] | None = None
+) -> dict[str, dict[str, Any]]:
+    """Property name -> spec (type/default/enum) for a device type plus
+    any extra interfaces — the lookup the runtime warning and the static
+    check both use. Types contribute their flattened base-chain specs;
+    interfaces contribute their own."""
+    specs: dict[str, dict[str, Any]] = {}
+    entry = type_schemas().get("types", {}).get(device_type or "")
+    if entry:
+        specs.update(entry.get("properties") or {})
+    for name in interfaces or []:
+        ischema = interface_schema(name)
+        if ischema:
+            specs.update(ischema.get("properties") or {})
+    return specs
+
+
+def property_type_mismatch(
+    device_type: str | None, interfaces: list[str] | None, name: str, value: Any
+) -> str | None:
+    """A human-readable mismatch when the schema knows `name`'s type/enum
+    and `value` does not fit it — the HC3 would silently coerce, flua warns."""
+    spec = property_specs_for(device_type, interfaces).get(name)
+    if spec is None:
+        return None
+    ptype = spec.get("type")
+    fits = {
+        "int": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool),
+        "real": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool),
+        "bool": lambda v: isinstance(v, bool),
+        "string": lambda v: isinstance(v, str),
+        "array": lambda v: isinstance(v, list),
+        "object": lambda v: isinstance(v, dict),
+    }.get(ptype)
+    if fits is not None and not fits(value):
+        return f"property {name!r} is declared {ptype}, got {type(value).__name__}"
+    enum = spec.get("enum")
+    if enum and isinstance(value, str) and value not in enum:
+        return f"property {name!r} value {value!r} is not one of its declared enum"
+    return None
 
 
 def apply_interface(device: dict[str, Any], name: str, action: str) -> None:
@@ -146,7 +193,7 @@ def apply_interface(device: dict[str, Any], name: str, action: str) -> None:
         for prop, spec in (schema.get("properties") or {}).items():
             properties.setdefault(prop, _default_value(spec))
         for action_name, spec in (schema.get("actions") or {}).items():
-            actions.setdefault(action_name, spec)
+            actions.setdefault(action_name, int(spec.get("argc", 0)))
     else:
         for prop in (schema.get("properties") or {}):
             if prop not in type_properties:

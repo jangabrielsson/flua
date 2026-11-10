@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import KNOWN_DIRECTIVES, expand_includes, file_name_error, parse_annotations
+from .devices import property_specs_for
 
 # (http method, path prefix, advice) — derived from the distilled API
 # reference, docs/specs/hc3-api.json.
@@ -117,6 +118,66 @@ def check_source(
                 *_line_col(source, loc.start()) if loc else (None, None),
             )
         )
+    # property type checks against the distilled schema: updateProperty
+    # with a literal that does not fit the declared type/enum (the HC3
+    # coerces silently — flua warns statically too). Only literal
+    # arguments match; expressions stay unchecked.
+    qa_type = annotations.get("type")
+    prop_specs = property_specs_for(
+        qa_type if isinstance(qa_type, str) else None, annotations.get("interface")
+    )
+    if prop_specs:
+        literal_re = r"(?:true|false|\d+(?:\.\d+)?|['\"][^'\"]*['\"])"
+        pattern = (
+            rf"self\s*:\s*updateProperty\s*\(\s*['\"]([A-Za-z0-9_]+)['\"]"
+            rf"\s*,\s*({literal_re})\s*\)"
+        )
+        for match in re.finditer(pattern, source):
+            prop_name, literal = match.group(1), match.group(2)
+            spec = prop_specs.get(prop_name)
+            if spec is None:
+                continue
+            if literal in ("true", "false"):
+                lua_kind = "bool"
+            elif re.fullmatch(r"\d+(?:\.\d+)?", literal):
+                lua_kind = "number"
+            else:
+                lua_kind = "string"
+            fits = {
+                "int": lua_kind == "number",
+                "real": lua_kind == "number",
+                "bool": lua_kind == "bool",
+                "string": lua_kind == "string",
+                # a scalar literal never fits an array/object property
+                "array": False,
+                "object": False,
+            }.get(spec.get("type"))
+            if fits is False:
+                line, column = _line_col(source, match.start())
+                findings.append(
+                    finding(
+                        name,
+                        "warning",
+                        f"updateProperty: property {prop_name!r} is declared "
+                        f"{spec['type']}, the literal {literal!r} does not fit "
+                        "(the HC3 coerces silently)",
+                        line,
+                        column,
+                    )
+                )
+            enum = spec.get("enum")
+            if enum and lua_kind == "string" and literal[1:-1] not in enum:
+                line, column = _line_col(source, match.start())
+                findings.append(
+                    finding(
+                        name,
+                        "warning",
+                        f"updateProperty: property {prop_name!r} value "
+                        f"{literal[1:-1]!r} is not one of its declared enum",
+                        line,
+                        column,
+                    )
+                )
     # plua-era spelling: a space between the comment dashes and %%. flua's
     # parser only matches "--%%" with no space, so these lines are silently
     # ignored — say so, it is almost always a stale plua directive.

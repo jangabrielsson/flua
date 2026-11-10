@@ -15,13 +15,15 @@ import json
 import logging
 import os
 import pickle
+import re
 import tempfile
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from . import __version__
 from .config import debug_flag, warn_enabled
+from .devices import property_type_mismatch
 
 logger = logging.getLogger(__name__)
 
@@ -327,6 +329,60 @@ def install_bindings(engine: "LuaEngine") -> None:
             "or run online/proxy for real controller data",
         )
 
+    def warn_property_type(
+        method: str, url: str, body: object, qa_id: int | None
+    ) -> None:
+        """Default-on: the QA's own updateProperty with a value that does
+        not fit the schema's declared type/enum warns once per property
+        (the HC3 coerces silently). --%%warn:propertyType=false (or
+        --%%warn:false) silences it."""
+        if qa_id is None:
+            return
+        device_id: int | None = None
+        name: Any = None
+        value: Any = None
+        if method == "POST" and url == "/plugins/updateProperty":
+            parsed = lua_to_python(body, lua)
+            if not isinstance(parsed, dict):
+                return
+            device_id = parsed.get("deviceId")
+            name = parsed.get("propertyName")
+            value = parsed.get("value")
+        elif method == "PUT":
+            match = re.match(r"^/plugins/(\d+)/properties/([A-Za-z0-9_]+)$", url)
+            if match is None:
+                return
+            device_id, name = int(match.group(1)), match.group(2)
+            parsed = lua_to_python(body, lua)
+            value = parsed.get("value") if isinstance(parsed, dict) else parsed
+        else:
+            return
+        if not isinstance(device_id, int) or not isinstance(name, str):
+            return
+        device = engine.api.state.devices.get(device_id)
+        if device is None or int(qa_id) not in (device_id, int(device.get("parentId") or 0)):
+            return
+        config: dict[str, object] = dict(engine.config)
+        info = engine.qa_info(int(qa_id))
+        if info is not None:
+            config.update(info.get("config", {}))
+        if not warn_enabled(config, "propertyType", True):
+            return
+        key = (int(qa_id), name)
+        if key in engine._stub_warned:
+            return
+        mismatch = property_type_mismatch(
+            device.get("type"), device.get("interfaces"), name, value
+        )
+        if mismatch is None:
+            return
+        engine._stub_warned.add(key)
+        engine.flua_log(
+            "warning",
+            int(qa_id),
+            f"updateProperty: {mismatch} (the HC3 coerces silently)",
+        )
+
     def api_call(
         method: str, url: str, body: object, qa_id: int | None = None
     ) -> tuple[object, int]:
@@ -334,6 +390,7 @@ def install_bindings(engine: "LuaEngine") -> None:
             engine.debug_log(f"api {method.upper()} {url}")
         if qa_id is not None:
             warn_stub_api(method, url, int(qa_id))
+            warn_property_type(method, url, body, int(qa_id))
         data, status = engine.api.dispatch(method, url, lua_to_python(body, lua), qa_id=qa_id)
         warn_api(method, url, status, qa_id)
         if data is None:
