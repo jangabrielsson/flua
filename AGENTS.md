@@ -6,7 +6,7 @@ USAGE.md.
 
 ## What this repo is
 
-flua is a Lua engine for Fibaro HC3 QuickApps: `lupa` (bundled Lua) hosted in
+flua is a Lua engine for Fibaro HC3 QuickApps: `lupa` (bundled Lua) hosted in 
 Python with an asyncio pump, a virtual clock, a message-passing bridge, and a
 simulated HC3 REST API. The same QA file runs offline in the sim, online
 against a real HC3, or in proxy mode (a mirror QA on the HC3).
