@@ -1,0 +1,11 @@
+#### Get all devices
+GET http://{{host}}/api/devices 
+
+### Get device with ID 1
+GET http://{{host}}/api/devices/1 
+
+### Get events
+GET http://{{host}}/api/refreshStates?last=0&lang=en&rand=0
+
+
+
