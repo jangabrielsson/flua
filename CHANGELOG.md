@@ -4,6 +4,19 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.142] - 2026-11-10
+
+### Added
+- --tool typeinfo — a type's or interface's implementation contract
+
+### Changed
+- forum post 34 posted
+- post 34 + quickapp-patterns — guard interface changes with hasInterface
+- forum post 34 draft — interfaces that work (types, interfaces, checked values)
+
+### Fixed
+- --check shows the updateProperty literal as written, not its repr
+
 ## [0.1.141] - 2026-11-10
 
 ### Added
