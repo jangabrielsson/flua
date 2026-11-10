@@ -275,7 +275,13 @@
   "argc": 2
  },
  "setBrightness": {
-  "argc": 2
+  "argc": 2,
+  "args": [
+   {
+    "name": "value",
+    "type": "int"
+   }
+  ]
  },
  "setClimatePanelOverrideSchedule": {
   "argc": 6,
@@ -306,7 +312,13 @@
   ]
  },
  "setColorTemperature": {
-  "argc": 2
+  "argc": 2,
+  "args": [
+   {
+    "name": "value",
+    "type": "int"
+   }
+  ]
  },
  "setCoolingThermostatHysteresis": {
   "argc": 2,
@@ -557,13 +569,25 @@
   ]
  },
  "setIdleTimeout": {
-  "argc": 2
+  "argc": 2,
+  "args": [
+   {
+    "name": "value",
+    "type": "int"
+   }
+  ]
  },
  "setIndicatorValue": {
   "argc": 2
  },
  "setInterval": {
-  "argc": 2
+  "argc": 2,
+  "args": [
+   {
+    "name": "value",
+    "type": "int"
+   }
+  ]
  },
  "setLockKey": {
   "argc": 2
@@ -604,7 +628,13 @@
   ]
  },
  "setMute": {
-  "argc": 2
+  "argc": 2,
+  "args": [
+   {
+    "name": "value",
+    "type": "bool"
+   }
+  ]
  },
  "setNetworkSettings": {
   "argc": 3
@@ -763,7 +793,13 @@
   ]
  },
  "setVolume": {
-  "argc": 2
+  "argc": 2,
+    "args": [
+   {
+    "name": "volume",
+    "type": "int"
+   }
+  ]
  },
  "setW": {
   "argc": 2
