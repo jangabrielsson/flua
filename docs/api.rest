@@ -22,10 +22,13 @@
 GET http://{{host}}/api/devices 
 
 ### Get device with ID 1
-GET http://{{host}}/api/devices/1 
+# @prompt id Device ID
+GET http://{{host}}/api/devices/{{id}} 
 
 ### Get device property of device with ID 1
-GET http://{{host}}/api/devices/1/properties/sunsetHour
+# @prompt id Device ID
+# @prompt prop Property name of the device
+GET http://{{host}}/api/devices/{{id}}/properties/{{prop}}
 
 ### Get events
 GET http://{{host}}/api/refreshStates?last=0&lang=en&rand=0
