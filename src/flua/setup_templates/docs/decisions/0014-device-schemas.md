@@ -49,6 +49,11 @@ setup from it.
   knowledge, not yet captured from a live controller; the documented
   coercion case is the setVariable endpoint instead). The sim applies
   the value either way, so the mismatch stays visible.
+- `setVariable` is a different surface: `quickAppVariables` is an array
+  of `{name = string, value = anything}` entries — the value slot is
+  polymorphic by design, which is why the documented value coercion
+  (numeric-looking strings become numbers) exists there and the schema
+  type checks stop at the array boundary.
 
 ## Consequences
 
