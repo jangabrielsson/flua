@@ -120,7 +120,7 @@ def check_source(
         )
     # property type checks against the distilled schema: updateProperty
     # with a literal that does not fit the declared type/enum (the HC3
-    # coerces silently — flua warns statically too). Only literal
+    # is believed to ignore the update — flua warns statically too). Only literal
     # arguments match; expressions stay unchecked.
     qa_type = annotations.get("type")
     prop_specs = property_specs_for(
@@ -160,7 +160,7 @@ def check_source(
                         "warning",
                         f"updateProperty: property {prop_name!r} is declared "
                         f"{spec['type']}, the literal {literal!r} does not fit "
-                        "(the HC3 coerces silently)",
+                        "(the real HC3 silently ignores the update)",
                         line,
                         column,
                     )

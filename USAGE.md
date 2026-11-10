@@ -341,7 +341,7 @@ Parsing stops at the end-of-header marker:
 | `--%%debug:ws=true` | debug logging: byte-level `net.WebSocketClient` traffic — handshake leftovers, per-frame rx/tx with masked previews, close codes (global) |
 | `--%%debug:true` | shorthand for all three debug channels (`:false` disables them) |
 | `--%%loglength:120` | debug line length cap (default 120) |
-| `--%%warn:true` | extra runtime warnings for things the HC3 stays silent about: the `status` channel (api error codes, off by default); the `stubApi` channel (shape-only stub calls, **on by default**, `--%%warn:stubApi=false` to silence); the `propertyType` channel (updateProperty values that do not fit the schema's declared type/enum, **on by default** — the HC3 coerces silently) (global) |
+| `--%%warn:true` | extra runtime warnings for things the HC3 stays silent about: the `status` channel (api error codes, off by default); the `stubApi` channel (shape-only stub calls, **on by default**, `--%%warn:stubApi=false` to silence); the `propertyType` channel (updateProperty values that do not fit the schema's declared type/enum, **on by default** — the real HC3 silently ignores the update) (global) |
 | `--%%trace:api,ui` | the `--trace` categories (api, ui, net, timer, `all`) as a directive (global) |
 | `--%%syslog:run.json` | the `--syslog` file — one JSON line per system/trace event (global) |
 | `--%%strict-tests:true` | the `--strict-tests` CI mode as a directive (global): unhandled callback errors fail the run with exit 1, sticky |

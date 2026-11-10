@@ -44,8 +44,11 @@ setup from it.
 - **Property types and enums are checked, warn-only.** The runtime warns
   when `updateProperty` sets a known-typed property to a mismatching
   type or an out-of-enum value; `flua --check` flags literal mismatches
-  statically. flua never rejects — the real HC3 silently coerces, and
-  flua must not break QAs the controller accepts.
+  statically. flua never rejects and never drops the update — the real
+  HC3 is believed to silently ignore mismatched updates (field
+  knowledge, not yet captured from a live controller; the documented
+  coercion case is the setVariable endpoint instead). The sim applies
+  the value either way, so the mismatch stays visible.
 
 ## Consequences
 

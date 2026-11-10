@@ -380,7 +380,7 @@ def install_bindings(engine: "LuaEngine") -> None:
         engine.flua_log(
             "warning",
             int(qa_id),
-            f"updateProperty: {mismatch} (the HC3 coerces silently)",
+            f"updateProperty: {mismatch} (the real HC3 silently ignores the update)",
         )
 
     def api_call(
