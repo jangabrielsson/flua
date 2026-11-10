@@ -172,7 +172,11 @@ def type_info(name: str) -> dict[str, Any] | None:
                 for key, spec in (ischema.get("properties") or {}).items()
             },
             "actions": {
-                key: {**copy.deepcopy(spec), "from": "interface"}
+                key: {
+                    **copy.deepcopy(spec),
+                    "from": "interface",
+                    "params": action_params(key, spec),
+                }
                 for key, spec in (ischema.get("actions") or {}).items()
             },
         }
@@ -220,8 +224,52 @@ def type_info(name: str) -> dict[str, Any] | None:
         "baseType": entry.get("baseType"),
         "interfaces": list(entry.get("interfaces") or []),
         "properties": proven("properties", base_props, iface_props),
-        "actions": proven("actions", base_actions, iface_actions),
+        "actions": _with_params(proven("actions", base_actions, iface_actions)),
     }
+
+
+def _with_params(actions: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Resolve each action's parameters (argc - 1, named from the schema
+    or the hand-maintained overrides, placeholders for the rest)."""
+    for key, spec in actions.items():
+        spec["params"] = action_params(key, spec)
+    return actions
+
+
+_ACTION_OVERRIDES_PATH = Path(__file__).parent / "action_overrides.json"
+
+
+@functools.lru_cache(maxsize=1)
+def action_overrides() -> dict[str, dict[str, Any]]:
+    """The hand-maintained action-argument knowledge (generated starter,
+    merged by scripts/gen_action_overrides.py; never overwrites hand
+    edits). Maps action name -> {argc, args?}."""
+    try:
+        raw = json.loads(_ACTION_OVERRIDES_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
+def action_params(
+    name: str, spec: dict[str, Any], overrides: dict[str, dict[str, Any]] | None = None
+) -> list[dict[str, Any]]:
+    """An action's parameters for signature rendering: argc counts the
+    implicit self, so an action takes argc - 1 arguments. Named entries
+    come from the override (hand-maintained knowledge) else the schema's
+    args; unnamed slots fill with a, b, c, ... placeholders."""
+    if overrides is None:
+        overrides = action_overrides()
+    count = max(int(spec.get("argc", 0)) - 1, 0)
+    override = overrides.get(name)
+    args = override.get("args") if isinstance(override, dict) and override.get("args") else None
+    if args is None:
+        args = spec.get("args") or []
+    params = [dict(entry) for entry in args]
+    placeholders = iter("abcdefghijklmnopqrstuvwxyz")
+    while len(params) < count:
+        params.append({"name": next(placeholders), "type": None})
+    return params[:count]
 
 
 def property_type_mismatch(

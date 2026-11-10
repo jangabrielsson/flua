@@ -451,3 +451,24 @@ def test_icon_default_file_prefers_base_then_off_state(monkeypatch) -> None:
     assert devices.icon_default_file("BaseSet", "svg") == "BaseSet.svg"
     assert devices.icon_default_file("NoBaseSet", "svg") == "NoBaseSet0.svg"
     assert devices.icon_default_file("EmptySet", "svg") is None
+
+
+def test_action_params_and_overrides() -> None:
+    from flua.devices import action_params
+
+    # argc counts the implicit self: argc - 1 arguments
+    assert action_params("turnOn", {"argc": 1}) == []
+    assert action_params("setValue", {"argc": 2}, {}) == [{"name": "a", "type": None}]
+    # named schema args fill first, placeholders take the rest
+    params = action_params("setAutoOff", {"argc": 3, "args": [{"name": "time", "type": "int"}]}, {})
+    assert params == [{"name": "time", "type": "int"}, {"name": "a", "type": None}]
+    # the hand-maintained override wins over the schema's args
+    overrides = {"setAutoOff": {"args": [{"name": "time", "type": "int"}, {"name": "manual", "type": "bool"}]}}
+    params = action_params("setAutoOff", {"argc": 3, "args": []}, overrides)
+    assert params == [{"name": "time", "type": "int"}, {"name": "manual", "type": "bool"}]
+    # and the loaded overrides file exists with every distinct action
+    from flua.devices import action_overrides
+
+    loaded = action_overrides()
+    assert len(loaded) >= 250
+    assert "turnOn" in loaded and "setAutoOff" in loaded

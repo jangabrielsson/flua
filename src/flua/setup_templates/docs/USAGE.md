@@ -1653,7 +1653,11 @@ the sim supports (`--json` for a JSON array). `flua --tool typeinfo
 <type-or-interface>` is the deeper answer: the type's properties (with
 types, defaults and enums), its interfaces, and the actions a QA of that
 type should implement as `QuickApp:<name>` methods — each entry tagged
-with where it comes from (the type, a base type, or an interface).
+with where it comes from (the type, a base type, or an interface). Action
+signatures render as `name(a, b)` — `argc` counts the implicit self, so
+an action takes `argc - 1` arguments, named (with types) where the schema
+or the hand-maintained `devices/action_overrides.json` knows them, else
+`a, b, c, ...` placeholders.
 
 ### Self-testing a QA (no repo needed)
 

@@ -67,10 +67,14 @@ def _human(info: dict) -> str:
         lines.append("actions:")
     if info["actions"]:
         for name, spec in sorted(info["actions"].items()):
-            args = ""
-            if spec.get("args"):
-                args = "(" + ",".join(f"{a['name']}:{a['type']}" for a in spec["args"]) + ")"
-            lines.append(f"  {name}{args}  [{spec['from']}]")
+            params = spec.get("params") or []
+            args = ",".join(
+                f"{p['name']}:{p['type']}"
+                if p.get("name") and p.get("type")
+                else str(p.get("name") or "?")
+                for p in params
+            )
+            lines.append(f"  {name}({args})  [{spec['from']}]")
     else:
         lines.append("  (none)")
     return "\n".join(lines)
