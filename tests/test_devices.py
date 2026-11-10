@@ -189,12 +189,17 @@ def test_type_schemas_are_self_consistent() -> None:
             )
             iface_props[prop] = (ptype, iname)
     for name, entry in types.items():
+        declared = set(entry.get("interfaces") or [])
         for prop, spec in (entry.get("properties") or {}).items():
-            prior = iface_props.get(prop)
-            if prior is not None:
-                assert prior[0] == spec.get("type", "string"), (
-                    f"type/interface conflict: {name}.{prop} declares "
-                    f"{spec.get('type')} but interface {prior[1]} declares {prior[0]}"
+            ptype = spec.get("type", "string")
+            for iname in declared:
+                ischema = interfaces.get(iname)
+                if not ischema or prop not in (ischema.get("properties") or {}):
+                    continue
+                itype = ischema["properties"][prop].get("type", "string")
+                assert itype == ptype, (
+                    f"type/interface conflict: {name}.{prop} declares {ptype} "
+                    f"but interface {iname} declares {itype}"
                 )
 
 
