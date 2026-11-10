@@ -828,6 +828,7 @@ TOOLS: dict[str, Tool] = {
             "Run one `flua --tool` command and return its exit code and "
             "output — the whole tool registry (migrate, icons download, "
             "state, pack, unpack, hub — controller profiles and switching, "
+            "typeinfo — a type's or interface's properties and actions, "
             "house — the controller's devices/globals/scenes, ...) without "
             "per-tool schemas. "
             "`name` is the tool name; `args` the tool's own arguments as "

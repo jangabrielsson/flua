@@ -1649,7 +1649,11 @@ diagnostics) instead of prose — the agent/CI form.
 
 A wrong `--%%type` is an error with directions: it names close matches
 (typos) and points at `flua --tool catalog`, which lists every device type
-the sim supports (`--json` for a JSON array).
+the sim supports (`--json` for a JSON array). `flua --tool typeinfo
+<type-or-interface>` is the deeper answer: the type's properties (with
+types, defaults and enums), its interfaces, and the actions a QA of that
+type should implement as `QuickApp:<name>` methods — each entry tagged
+with where it comes from (the type, a base type, or an interface).
 
 ### Self-testing a QA (no repo needed)
 

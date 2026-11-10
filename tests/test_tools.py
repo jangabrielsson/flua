@@ -39,6 +39,7 @@ def test_registry_discovers_all_tools() -> None:
         "parityCleanup",
         "setup",
         "state",
+        "typeinfo",
         "ui",
         "unpack",
         "updateQA",
@@ -1349,3 +1350,40 @@ def test_upload_body_carries_raw_utf8_names() -> None:
     assert "åäöÅÄÖ".encode() in wire  # raw UTF-8 on the wire
     assert json.loads(wire)["name"] == "Test åäöÅÄÖ"  # and the name survives
     assert body["roomId"] == 7
+
+
+def test_typeinfo_reports_the_qa_contract(tmp_path) -> None:
+    # a type: flattened properties/actions with provenance, and the
+    # QuickApp-methods framing; an interface: what it contributes
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--tool", "typeinfo", "com.fibaro.binarySwitch"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "com.fibaro.binarySwitch" in result.stdout
+    assert "autoOffTimestamp" in result.stdout  # from the autoTurnOff interface
+    assert "dead" in result.stdout  # from the base chain
+    assert "QuickApp:<name>" in result.stdout
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--tool", "typeinfo", "autoTurnOff", "--json"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["kind"] == "interface"
+    assert payload["properties"]["autoOffDefaultTime"]["default"] == 900
+    assert payload["actions"]["setAutoOff"]["from"] == "interface"
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--tool", "typeinfo", "com.fibaro.bogusType"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 2

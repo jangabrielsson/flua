@@ -149,6 +149,81 @@ def property_specs_for(
     return specs
 
 
+def type_info(name: str) -> dict[str, Any] | None:
+    """Structured facts for a type or interface — the contract `--tool
+    typeinfo` renders and future surfaces (extension, MCP guidance)
+    consume. Types: the flattened property/action set with per-entry
+    provenance (``type`` = the type's own declaration, ``base:<type>`` =
+    inherited, ``interface:<name>`` = contributed by an interface).
+    Interfaces: their own properties and actions."""
+    schemas = type_schemas()
+    types = schemas.get("types", {})
+    interfaces = schemas.get("interfaces", {})
+    entry = types.get(name)
+    if entry is None:
+        ischema = interfaces.get(name)
+        if ischema is None:
+            return None
+        return {
+            "kind": "interface",
+            "name": name,
+            "properties": {
+                key: {**copy.deepcopy(spec), "from": "interface"}
+                for key, spec in (ischema.get("properties") or {}).items()
+            },
+            "actions": {
+                key: {**copy.deepcopy(spec), "from": "interface"}
+                for key, spec in (ischema.get("actions") or {}).items()
+            },
+        }
+
+    def own_base_specs(kind: str) -> dict[str, dict[str, Any]]:
+        base = types.get(entry.get("baseType") or "")
+        return dict(base.get(kind) or {}) if base else {}
+
+    base_props = own_base_specs("properties")
+    base_actions = own_base_specs("actions")
+    iface_props: dict[str, dict[str, Any]] = {}
+    iface_actions: dict[str, dict[str, Any]] = {}
+    for iname in entry.get("interfaces") or []:
+        ischema = interfaces.get(iname)
+        if ischema:
+            iface_props.update(ischema.get("properties") or {})
+            iface_actions.update(ischema.get("actions") or {})
+
+    def merged(kind: str, ifaces: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+        """The full view: the flattened declaration plus the type's
+        interfaces' contributions (the declared-conflict pin guarantees
+        they agree where both exist)."""
+        full = dict(entry.get(kind) or {})
+        for key, spec in ifaces.items():
+            if key not in full or full[key] == spec:
+                full[key] = spec
+        return full
+
+    def proven(kind: str, bases: dict[str, dict[str, Any]], ifaces: dict[str, dict[str, Any]]):
+        out: dict[str, dict[str, Any]] = {}
+        own = entry.get(kind) or {}
+        for key, spec in merged(kind, ifaces).items():
+            ispec = ifaces.get(key)
+            if ispec is not None and ispec == spec and (key not in own or own[key] == spec):
+                out[key] = {**copy.deepcopy(spec), "from": "interface"}
+            elif key in bases and bases[key] == spec:
+                out[key] = {**copy.deepcopy(spec), "from": "base"}
+            else:
+                out[key] = {**copy.deepcopy(spec), "from": "type"}
+        return out
+
+    return {
+        "kind": "type",
+        "name": name,
+        "baseType": entry.get("baseType"),
+        "interfaces": list(entry.get("interfaces") or []),
+        "properties": proven("properties", base_props, iface_props),
+        "actions": proven("actions", base_actions, iface_actions),
+    }
+
+
 def property_type_mismatch(
     device_type: str | None, interfaces: list[str] | None, name: str, value: Any
 ) -> str | None:
