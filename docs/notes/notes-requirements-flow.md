@@ -1,7 +1,12 @@
 # Note: the requirements flow — elicitation and verification on the agent loop (design draft)
 
-Status: design draft — nothing implemented (2026-11-09). ADR 0013 is the
-mandate; this note is the shape exploration.
+Status: design draft — nothing implemented (2026-11-09); **parked
+2026-11-10** for the owner to think through. ADR 0013 is the mandate;
+this note is the shape exploration. The state machine, the sub-agent
+brief, the house-as-seed, the Tasks-driven interview, the
+fact/thinking division, and the spec-format draft
+(`requirements-flow-spec-format.md`) are all captured here — resume
+from these files.
 
 ## Context and goal
 
