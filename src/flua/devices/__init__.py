@@ -64,6 +64,97 @@ def _hierarchy() -> dict[str, str]:
     return dict(parents) if isinstance(parents, dict) else {}
 
 
+_SCHEMA_PATH = Path(__file__).parent / "type_schemas.json"
+
+_ZERO_VALUES: dict[str, Any] = {
+    "bool": False,
+    "int": 0,
+    "real": 0.0,
+    "string": "",
+    "array": [],
+    "object": {},
+}
+
+
+@functools.lru_cache(maxsize=1)
+def type_schemas() -> dict[str, Any]:
+    """The distilled device-type/interface schema (the "compiled" artifact
+    scripts/extract_device_schemas.py generates from the local HC3_info
+    sources). Types carry their flattened base-type chain: typed
+    properties with defaults/enums, the interfaces a device of the type
+    gets, and action metadata (argc/args)."""
+    with open(_SCHEMA_PATH, encoding="utf-8") as handle:
+        schemas = json.load(handle)
+    if not isinstance(schemas, dict):
+        raise ValueError(f"invalid device type schemas: {_SCHEMA_PATH}")
+    return schemas
+
+
+def _default_value(spec: dict[str, Any]) -> Any:
+    """A property's starting value: its declared default, else the type's
+    zero value."""
+    if "default" in spec:
+        return copy.deepcopy(spec["default"])
+    return _ZERO_VALUES.get(spec.get("type"), "")
+
+
+def schema_for(device_type: str | None) -> dict[str, Any] | None:
+    """The schema-derived skeleton for a device type: interfaces, typed
+    properties at their defaults, and action metadata — or None when the
+    schema does not know the type (the capture + hierarchy fallback in
+    skeleton_for still applies then)."""
+    if not device_type:
+        return None
+    entry = type_schemas().get("types", {}).get(device_type)
+    if entry is None:
+        return None
+    return {
+        "baseType": entry.get("baseType"),
+        "interfaces": list(entry.get("interfaces") or []),
+        "properties": {
+            name: _default_value(spec) for name, spec in (entry.get("properties") or {}).items()
+        },
+        "actions": copy.deepcopy(entry.get("actions") or {}),
+    }
+
+
+def interface_schema(name: str) -> dict[str, Any] | None:
+    """One interface's structural facts (typed properties with defaults,
+    action metadata), or None when unknown."""
+    entry = type_schemas().get("interfaces", {}).get(name)
+    if entry is None:
+        return None
+    return copy.deepcopy(entry)
+
+
+def apply_interface(device: dict[str, Any], name: str, action: str) -> None:
+    """Add/remove an interface with schema semantics.
+
+    On add: the interface's properties join at their defaults (existing
+    values stay) and its actions become part of the device's action
+    metadata. On remove: the interface's own properties and actions drop —
+    except properties the device's TYPE also declares (the type keeps
+    those). Unknown interfaces stay the ADR 0012 plumbing: stored, no
+    semantics."""
+    schema = interface_schema(name)
+    if schema is None:
+        return
+    properties = device.setdefault("properties", {})
+    actions = device.setdefault("actions", {})
+    type_properties = set((schema_for(device.get("type")) or {}).get("properties") or ())
+    if action == "add":
+        for prop, spec in (schema.get("properties") or {}).items():
+            properties.setdefault(prop, _default_value(spec))
+        for action_name, spec in (schema.get("actions") or {}).items():
+            actions.setdefault(action_name, spec)
+    else:
+        for prop in (schema.get("properties") or {}):
+            if prop not in type_properties:
+                properties.pop(prop, None)
+        for action_name in (schema.get("actions") or {}):
+            actions.pop(action_name, None)
+
+
 def skeleton_for(device_type: str | None) -> dict[str, Any] | None:
     """Scrubbed deep copy of the type's skeleton, or None for unknown types.
 

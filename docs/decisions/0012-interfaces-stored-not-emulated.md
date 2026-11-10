@@ -1,6 +1,8 @@
 # 0012 — device interfaces are stored, not emulated
 
-- **Status:** active
+- **Status:** active, **amended by ADR 0014** (known interfaces now carry
+  schema-derived semantics; this decision governs unknown interface
+  names only)
 - **Date:** 2026-10-23
 
 ## Context

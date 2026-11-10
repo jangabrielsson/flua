@@ -59,7 +59,7 @@ from .config import (
     split_annotations,
     warn_enabled,
 )
-from .devices import catalog_types, skeleton_for
+from .devices import apply_interface, catalog_types, skeleton_for
 from .environment import EnvChain
 from .hc3 import Hc3Remote
 from .helper import (
@@ -1023,6 +1023,21 @@ class LuaEngine:
                 for interface in interfaces:
                     if interface != "quickApp" and interface not in current:
                         current.append(interface)
+        # --%%interface:name[,name...] — the QA's device gets the
+        # interface's properties (at their defaults) and action metadata
+        # (schema semantics, ADR 0014)
+        interfaces = qa_config.get("interface")
+        if isinstance(interfaces, list):
+            device = self.api.state.devices.get(qa_id)
+            if device is not None:
+                current = device.get("interfaces")
+                if not isinstance(current, list):
+                    current = []
+                    device["interfaces"] = current
+                for interface in interfaces:
+                    if interface != "quickApp" and interface not in current:
+                        current.append(interface)
+                    apply_interface(device, interface, "add")
         self.mark_db_dirty()
         if proxy_enabled:
             # the sim only shadows the HC3's device from here on

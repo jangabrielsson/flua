@@ -134,6 +134,96 @@ def test_create_child_device_uses_type_skeleton() -> None:
     assert child["interfaces"] == ["light"]  # the lib controls child interfaces
 
 
+# -- type schemas (the distilled HC3 type/interface artifact) -------------------
+
+
+KNOWN_PROPERTY_TYPES = {
+    "bool",
+    "int",
+    "real",
+    "string",
+    "array",
+    "object",
+    "temperature",
+    "weather",
+    "iOS_device",
+}
+
+
+def test_type_schemas_are_self_consistent() -> None:
+    from flua.devices import type_schemas
+
+    schemas = type_schemas()
+    types = schemas["types"]
+    interfaces = schemas["interfaces"]
+    assert len(types) > 100 and len(interfaces) > 100
+    # every base type resolves and inheritance never cycles
+    for name, entry in types.items():
+        seen = set()
+        current = entry.get("baseType")
+        while current:
+            assert current in types, f"{name}: unknown baseType {current}"
+            assert current not in seen, f"{name}: inheritance cycle via {current}"
+            seen.add(current)
+            current = types[current].get("baseType")
+        # every referenced interface exists; property types are known
+        for interface in entry.get("interfaces") or []:
+            assert interface in interfaces, f"{name}: unknown interface {interface}"
+        for prop, spec in (entry.get("properties") or {}).items():
+            ptype = spec.get("type", "string")
+            assert ptype in KNOWN_PROPERTY_TYPES or ptype.startswith("com.fibaro."), (
+                f"{name}.{prop}: unexpected type {ptype}"
+            )
+
+
+def test_schema_for_known_type() -> None:
+    from flua.devices import schema_for
+
+    skeleton = schema_for("com.fibaro.binarySwitch")
+    assert skeleton is not None
+    # the base-type chain is flattened in: com.fibaro.device's dead/log
+    # plus the type's own declarations
+    assert "dead" in skeleton["properties"]
+    assert "value" in skeleton["properties"]
+    # the type's interface list, with defaults from the declaration
+    assert skeleton["interfaces"] == ["light", "autoTurnOff"]
+    assert skeleton["properties"]["deviceIcon"] == 301  # overrides device's 389
+    assert skeleton["properties"]["deviceRole"] == "Light"  # in the enum
+    assert skeleton["actions"]["turnOn"] == {"argc": 1}
+    assert schema_for("com.fibaro.doesNotExist") is None
+    assert schema_for(None) is None
+
+
+@pytest.mark.asyncio
+async def test_qa_interface_directive_applies_schema() -> None:
+    # --%%interface:autoTurnOff — the QA's device gets the interface's
+    # properties (at their defaults) and action metadata, like the REST
+    # route
+    import tempfile
+
+    from flua.engine import LuaEngine
+
+    with tempfile.TemporaryDirectory() as d:
+        script = Path(d) / "qa.lua"
+        script.write_text(
+            "--%%name:IfaceQA\n"
+            "--%%interface:autoTurnOff\n"
+            "function QuickApp:onInit() exit(0) end\n"
+        )
+        engine = LuaEngine()
+        await engine.start()
+        try:
+            qa_id, err = engine.load_qa_file(str(script))
+            assert err is None, err
+            device = engine.api.state.devices[qa_id]
+            assert "autoTurnOff" in device["interfaces"]
+            assert device["properties"]["autoOffTimestamp"] == 0
+            assert device["properties"]["autoOffDefaultTime"] == 900
+            assert device["actions"]["setAutoOff"]["argc"] == 3
+        finally:
+            await engine.stop()
+
+
 @pytest.mark.asyncio
 async def test_qa_instance_built_from_type_skeleton(tmp_path, capsys) -> None:
     # The Lua QuickApp instance must see the same enriched device the API

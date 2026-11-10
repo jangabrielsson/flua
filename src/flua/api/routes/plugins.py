@@ -14,6 +14,7 @@ import time
 from typing import Any
 
 from ... import messages
+from ...devices import apply_interface
 from ...devices.uielements import embedded_view
 from ..request import ApiRequest, forward_to_proxy
 from ..state import SimState, public
@@ -437,6 +438,10 @@ def plugin_update_interfaces(state: SimState, req: ApiRequest) -> tuple[Any, int
             current.append(interface)
         elif action == "remove" and interface in current:
             current.remove(interface)
+        # schema semantics: adding an interface brings its properties (at
+        # their defaults) and action metadata; removing drops them — except
+        # properties the device's type itself declares (ADR 0014)
+        apply_interface(dev, interface, action)
     forward_to_proxy(req, state.is_proxy(dev["id"]))
     # interface changes restart the plugin on the HC3 (the proxy path
     # forwards above — the HC3 restarts its own plugin there)

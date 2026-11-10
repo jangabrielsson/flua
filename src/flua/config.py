@@ -512,6 +512,14 @@ def parse_annotations(source: str, warn_unknown: bool = True) -> dict[str, Any]:
             if key:
                 sub[key] = val.strip()
             config["clobber"] = sub
+        elif name == "interface":
+            # --%%interface:autoTurnOff,light — interface names, comma
+            # separated; repeated directives merge
+            existing = config.get("interface")
+            if not isinstance(existing, list):
+                existing = []
+            existing.extend(part.strip() for part in value.split(",") if part.strip())
+            config["interface"] = existing
         elif name == "property":
             # --%%property:name=value — raw device property initializers
             # (e.g. value=true). Values parse as scalars; repeated
@@ -637,6 +645,7 @@ KNOWN_DIRECTIVES = frozenset(
         "name",
         "type",
         "properties",
+        "interface",  # --%%interface:name[,name...] — interfaces the QA's device gets
         "property",
         "var",
         "svar",  # --%%svar:name=expr — secret QuickApp variables (type='password')

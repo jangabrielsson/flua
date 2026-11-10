@@ -520,6 +520,44 @@ def test_update_interfaces(api: Api) -> None:
     assert "power" not in data["interfaces"]
 
 
+def test_update_interfaces_applies_schema_semantics(api: Api) -> None:
+    # ADR 0014: adding an interface brings its properties (at their
+    # defaults) and action metadata; removing drops them again
+    api.register_qa(5000, "qa", "com.fibaro.binarySwitch", {})
+    data, _ = api.dispatch("GET", "/devices/5000")
+    assert "autoTurnOff" in data["interfaces"]  # the type declares it
+    assert data["properties"]["autoOffTimestamp"] == 0  # interface defaults
+    assert data["properties"]["autoOffDefaultTime"] == 900
+    assert data["actions"]["setAutoOff"]["argc"] == 3
+    # removing the type's own interface drops the interface-owned
+    # properties and action metadata
+    assert api.dispatch(
+        "POST",
+        "/plugins/interfaces",
+        {"action": "remove", "deviceId": 5000, "interfaces": ["autoTurnOff"]},
+    ) == (None, 204)
+    data, _ = api.dispatch("GET", "/devices/5000")
+    assert "autoTurnOff" not in data["interfaces"]
+    assert "autoOffTimestamp" not in data["properties"]
+    assert "setAutoOff" not in data["actions"]
+    # re-adding restores the defaults
+    assert api.dispatch(
+        "POST",
+        "/plugins/interfaces",
+        {"action": "add", "deviceId": 5000, "interfaces": ["autoTurnOff"]},
+    ) == (None, 204)
+    data, _ = api.dispatch("GET", "/devices/5000")
+    assert data["properties"]["autoOffTimestamp"] == 0
+    # an unknown interface stays the ADR 0012 plumbing: stored, no semantics
+    assert api.dispatch(
+        "POST",
+        "/plugins/interfaces",
+        {"action": "add", "deviceId": 5000, "interfaces": ["nonsenseIface"]},
+    ) == (None, 204)
+    data, _ = api.dispatch("GET", "/devices/5000")
+    assert "nonsenseIface" in data["interfaces"]
+
+
 def test_plugin_restart_is_simulated(api: Api) -> None:
     assert api.dispatch("POST", "/plugins/restart", {"deviceId": 10}) == (None, 204)
 

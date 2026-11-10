@@ -19,3 +19,4 @@ decision changes.
 | [0011](0011-streamable-http-transport.md) | flua-mcp serves Streamable HTTP in stateless mode, opt-in, loopback + token-guarded | active |
 | [0012](0012-interfaces-stored-not-emulated.md) | device interfaces are stored, not emulated — no properties, actions, or UI effects | active |
 | [0013](0013-no-wizard-app.md) | no wizard app; the agent loop is the product surface — elicitation and verification instead | active |
+| [0014](0014-device-schemas.md) | device structures and interface semantics derive from the distilled type/interface schema | active |

@@ -16,7 +16,13 @@ from collections import deque
 from datetime import datetime
 from typing import Any
 
-from ..devices import catalog_types, skeleton_for
+from ..devices import (
+    DEFAULT_ROOM_ID,
+    apply_interface,
+    catalog_types,
+    schema_for,
+    skeleton_for,
+)
 from ..suncalc import sunrise_sunset
 
 FIRST_RUNTIME_ID = 900000
@@ -60,14 +66,41 @@ def _type_error(device_type: str) -> ValueError:
 
 
 def _device_skeleton(device_id: int, name: str, device_type: str | None) -> dict[str, Any]:
-    # No --%%type defaults to com.fibaro.binarySwitch. A type the catalog
-    # does not know falls back to its nearest hierarchy ancestor's skeleton
-    # (devices/skeleton_for); only types the hierarchy never heard of are an
-    # error (the HC3 would not have them either).
+    # No --%%type defaults to com.fibaro.binarySwitch. The schema
+    # (devices/type_schemas.json — typed properties at defaults, the
+    # type's interfaces, action metadata) is the primary source; a type it
+    # does not know falls back to the catalog capture, then its nearest
+    # hierarchy ancestor's skeleton. Only types the hierarchy never heard
+    # of are an error (the HC3 would not have them either).
     resolved = device_type or DEFAULT_DEVICE_TYPE
-    base = skeleton_for(resolved)
-    if base is None:
-        raise _type_error(resolved)
+    schema = schema_for(resolved)
+    if schema is not None:
+        base = {
+            "interfaces": [*schema["interfaces"], "quickApp"],
+            "properties": dict(schema["properties"]),
+            "actions": dict(schema["actions"]),
+            "baseType": schema["baseType"],
+            "enabled": True,
+            "visible": True,
+            "isPlugin": True,
+            "parentId": 0,
+            "roomID": DEFAULT_ROOM_ID,
+            "view": [],
+            "hasUIView": False,
+        }
+        # every interface the type declares (plus quickApp, the QA-device
+        # marker) contributes its properties and actions — the same
+        # mechanism --%%interface: and POST /plugins/interfaces use
+        for interface in [*schema["interfaces"], "quickApp"]:
+            apply_interface(base, interface, "add")
+        # the schema declares useUiView=true (the HC3 default); flua keeps
+        # the legacy layout as the skeleton default (the capture path's
+        # behavior) — a QA opts in with --%%useUiView:true
+        base["properties"]["useUiView"] = False
+    else:
+        base = skeleton_for(resolved)
+        if base is None:
+            raise _type_error(resolved)
     base["id"] = device_id
     base["name"] = name
     base["type"] = resolved  # the device keeps the requested type
