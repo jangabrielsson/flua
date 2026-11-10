@@ -6,10 +6,9 @@
 ## Context
 
 The HC3's device-type and interface definitions exist as local sources
-(device-type XML with base-type chains, typed properties, defaults and
-enum schemas; interface XML with the properties/actions an interface
-adds). The sources are **not announceable** (access to them must not
-become public precedent), so they stay gitignored and local-only.
+(device-type with base-type chains, typed properties, defaults and
+enum schemas; interfaces with the properties/actions an interface
+adds).
 
 ADR 0012 deferred all interface semantics on the grounds that the
 behavior was undocumented. Those sources document it. flua therefore
