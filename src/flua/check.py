@@ -159,7 +159,7 @@ def check_source(
                         name,
                         "warning",
                         f"updateProperty: property {prop_name!r} is declared "
-                        f"{spec['type']}, the literal {literal!r} does not fit "
+                        f"{spec['type']}, the literal {literal} does not fit "
                         "(the real HC3 silently ignores the update)",
                         line,
                         column,
