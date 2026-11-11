@@ -13,6 +13,7 @@ import base64
 import json
 from pathlib import Path
 
+from ..engine import sanitize_filename
 from .common import hc3_engine
 
 NAME = "uploadFQA"
@@ -42,10 +43,14 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         # custom uiCallbacks handler names included. The JSON POST /quickApp
         # create re-derives uiCallbacks with generated defaults (ui<b2>
         # OnReleased), breaking button actions (live-verified 5.22x).
-        fields = [("file", json.dumps(fqa, ensure_ascii=False))]
-        if args.room is not None:
-            fields.append(("roomId", str(args.room)))
-        device, status = engine.hc3.multipart("POST", "/quickApp/import", fields)
+        filename = f"{sanitize_filename(str(fqa.get('name') or 'QuickApp'))}.fqa"
+        fields = [] if args.room is None else [("roomId", str(args.room))]
+        device, status = engine.hc3.multipart(
+            "POST",
+            "/quickApp/import",
+            fields=fields,
+            files=[("file", filename, json.dumps(fqa, ensure_ascii=False))],
+        )
     else:
         body: dict[str, object] = {
             "file": base64.b64encode(

@@ -34,11 +34,15 @@ action ignored".
 
 - `Hc3Remote.multipart()` — the web UI's wire format (multipart/form-data,
   `file`/`roomId` fields, `X-Fibaro-Version: 2` like the browser's
-  interceptor).
+  interceptor). The `file` part must carry a **filename** — a
+  filename-less part crashes the HC3's import handler with a bodyless
+  HTTP 500 (live-verified; the browser uploads a File, so its part always
+  has one).
 - `uploadFQA` and `uploadQA` (new-QA path) now use
   `POST /quickApp/import` against a real HC3 — the package is preserved
-  verbatim, custom handler names included. The offline sim keeps the JSON
-  `POST /quickApp` path (the sim never re-derives).
+  verbatim, custom handler names included (live-verified: device 4447
+  stored all 23 custom callbacks after a tool upload). The offline sim
+  keeps the JSON `POST /quickApp` path (the sim never re-derives).
 
 Also kept from the earlier rounds (export-shape parity, harmless and
 matching the HC3's own exports): `qa_export` emits `viewLayout` +

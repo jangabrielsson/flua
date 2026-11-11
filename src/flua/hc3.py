@@ -66,7 +66,8 @@ class Hc3Remote:
         self,
         method: str,
         path: str,
-        fields: list[tuple[str, str]],
+        fields: list[tuple[str, str]] | None = None,
+        files: list[tuple[str, str, str]] | None = None,
         timeout: float | None = None,
     ) -> tuple[Any, int]:
         """One multipart/form-data call — the HC3 web UI's wire format for
@@ -74,15 +75,26 @@ class Hc3Remote:
         (custom uiCallbacks names included) where the JSON POST /quickApp
         create re-derives them with generated defaults (live-verified
         5.22x, the mangled-button bug). ``fields`` are (name, value) form
-        fields; ``X-Fibaro-Version: 2`` rides along like the web UI's
-        interceptor adds it."""
+        fields; ``files`` are (name, filename, content) file parts — the
+        backend requires a filename on the file part (a filename-less part
+        crashes the import handler with a bodyless 500, live-verified).
+        ``X-Fibaro-Version: 2`` rides along like the web UI's interceptor."""
         boundary = "----flua" + uuid.uuid4().hex
-        parts = [
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
-            f"{value}\r\n"
-            for name, value in fields
-        ]
+        parts: list[str] = []
+        for name, value in fields or []:
+            parts.append(
+                f"--{boundary}\r\n"
+                f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+                f"{value}\r\n"
+            )
+        for name, filename, content in files or []:
+            parts.append(
+                f"--{boundary}\r\n"
+                f'Content-Disposition: form-data; name="{name}"; '
+                f'filename="{filename}"\r\n'
+                f"Content-Type: application/octet-stream\r\n\r\n"
+                f"{content}\r\n"
+            )
         payload = ("".join(parts) + f"--{boundary}--\r\n").encode("utf-8")
         url = self._base + "/api" + path
         headers = {

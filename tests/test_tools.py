@@ -168,6 +168,7 @@ class _MockHc3(BaseHTTPRequestHandler):
                 return
             boundary = match.group(1).strip().encode()
             fields: dict[str, str] = {}
+            filenames: dict[str, str] = {}
             for part in raw.split(b"--" + boundary):
                 part = part.strip(b"\r\n")
                 if not part or part == b"--":
@@ -176,6 +177,9 @@ class _MockHc3(BaseHTTPRequestHandler):
                 name = re.search(rb'name="([^"]+)"', head)
                 if name:
                     fields[name.group(1).decode()] = content.decode("utf-8")
+                    file_name = re.search(rb'filename="([^"]*)"', head)
+                    if file_name:
+                        filenames[name.group(1).decode()] = file_name.group(1).decode()
             try:
                 fqa = json.loads(fields.get("file", ""))
             except Exception:
@@ -183,7 +187,15 @@ class _MockHc3(BaseHTTPRequestHandler):
                 return
             self.fqas[self.next_id] = fqa
             type(self).requests.append(
-                ("POST", path, {"file": fqa, "roomId": fields.get("roomId")})
+                (
+                    "POST",
+                    path,
+                    {
+                        "file": fqa,
+                        "roomId": fields.get("roomId"),
+                        "filename": filenames.get("file"),
+                    },
+                )
             )
             self._send({"id": self.next_id, "name": fqa["name"]}, 201)
             self.next_id += 1
@@ -593,6 +605,9 @@ def test_upload_fqa_uses_the_web_import_endpoint(tmp_path, monkeypatch, capsys) 
         ]
         assert len(posts) == 1
         assert posts[0][2]["roomId"] == "7"
+        # the file part carries a filename — a filename-less part crashes
+        # the HC3's import handler with a bodyless 500 (live-verified)
+        assert posts[0][2]["filename"] == "uiflow.fqa"
         fqa = posts[0][2]["file"]
         callbacks = {
             (c["name"], c["eventType"]): c["callback"]

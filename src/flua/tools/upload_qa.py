@@ -167,10 +167,14 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         # the web-import path preserves the package verbatim (custom UI
         # handler names included); the JSON POST /quickApp re-derives
         # uiCallbacks with generated defaults (live-verified 5.22x)
-        fields = [("file", json.dumps(fqa, ensure_ascii=False))]
-        if args.room is not None:
-            fields.append(("roomId", str(args.room)))
-        device, status = engine.hc3.multipart("POST", "/quickApp/import", fields)
+        filename = f"{sanitize_filename(str(fqa.get('name') or 'QuickApp'))}.fqa"
+        fields = [] if args.room is None else [("roomId", str(args.room))]
+        device, status = engine.hc3.multipart(
+            "POST",
+            "/quickApp/import",
+            fields=fields,
+            files=[("file", filename, json.dumps(fqa, ensure_ascii=False))],
+        )
     else:
         body = _upload_body(fqa, args.room)
         device, status = engine.api.dispatch_hc3("POST", "/quickApp", body)
