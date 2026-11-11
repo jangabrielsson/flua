@@ -125,7 +125,7 @@ fibaro.call(HT.bedroom.lamp, "turnOn")
 ### Polling loop (setInterval)
 ```lua
 function QuickApp:onInit()
-    self.pollInterval = tonumber(self:getVariable("interval")) * 1000 or 30000
+    self.pollInterval = (tonumber(self:getVariable("interval")) or 30) * 1000
     setInterval(function() self:poll() end, self.pollInterval)
     self:poll()  -- also run immediately on start
 end
@@ -435,6 +435,22 @@ end
 | **internalStorage** | No | No | No | Private runtime state that must survive QA restarts but should not be visible or user-editable (e.g. last-seen timestamps, cached values, counters) |
 
 > **Fibaro Global Variables** are the right choice when a value needs to be read or written by more than one QuickApp or Scene. Note. They need to be created before they can be set, otherwise attempts to read or write them will fail. api.post("/globalVariables", { name = "HomeMode", value = "Away" }) can be used to create them programmatically.
+
+> **Config fallbacks — the empty-string trap.** `self:getVariable(name)`
+> returns `""` (not nil) when the variable is unset, and `""` is
+> **truthy** in Lua — so `getVariable("url") or default` silently yields
+> the empty string, and the QA then calls the API with a broken url.
+> Check explicitly:
+>
+> ```lua
+> local function first(v, fallback)
+>     if v == nil or v == "" then return fallback end
+>     return v
+> end
+> local url = first(self:getVariable("url"), "http://default")
+> -- numbers are safe through tonumber: tonumber("") is nil
+> local port = tonumber(self:getVariable("port")) or 8190
+> ```
 
 > **QuickApp variables** are the right choice for settings the user may want to change — they appear in the HC3 UI under the device panel and are bundled into the QA when it is downloaded as a `.fqa` file.
 
