@@ -228,6 +228,34 @@ async def test_quickapp_export_filters_and_arrayifies(tmp_path, capsys) -> None:
         await engine.stop()
 
 
+@pytest.mark.asyncio
+async def test_create_without_apiversion_marker_warns(tmp_path, capsys) -> None:
+    # a QA installing an .fqa through the JSON create without the
+    # initialProperties.apiVersion marker: the sim preserves it (like any
+    # package), but the REAL HC3 re-derives uiCallbacks with generated
+    # ui<b2>OnReleased names — warn so the QA author adds the marker
+    loader = tmp_path / "loader.lua"
+    loader.write_text(
+        "setTimeout(function()\n"
+        "  local fqa = {\n"
+        "    type = 'QuickApp', name = 'no-marker',\n"
+        "    files = { { name = 'main', isMain = true, content = \"print('X')\\n\" } },\n"
+        "  }\n"
+        "  api.post('/quickApp/', fqa)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(loader), None, {}, str(loader))
+        await asyncio.sleep(0.4)
+        out = capsys.readouterr().out
+        assert "without initialProperties.apiVersion" in out
+        assert 5001 in engine.api.state.devices  # the create still ran
+    finally:
+        await engine.stop()
+
+
 def test_example_multifile_runs() -> None:
     # fully deterministic: the extra file loads and the helper answers
     result = subprocess.run(

@@ -161,11 +161,15 @@ api.put("/quickApp/42/files/main", {
 ### Creating a QuickApp — use the IMPORT endpoint
 
 **`POST /api/quickApp/import` preserves an .fqa package verbatim — use it
-to create QAs. The JSON `POST /api/quickApp` create RE-DERIVES the UI
+to create QAs.** The JSON `POST /api/quickApp` create RE-DERIVES the UI
 callbacks with generated default names (`ui<b2>OnReleased`) on recent
-firmware (live-verified 5.22x): custom `onReleased='zoneDownButton'`
-handlers get dropped, buttons die with "Class does not have
-uib2OnReleased function defined - action ignored".**
+firmware (live-verified 5.22x) **when the package lacks
+`initialProperties.apiVersion`** — the controller treats it as legacy
+format. WITH `initialProperties.apiVersion: "1.3"` the JSON create
+preserves the package too (the actual trigger, found by bisection), so a
+package carrying the marker installs fine through either endpoint.
+Symptom: buttons die with "Class does not have uib2OnReleased function
+defined - action ignored".
 
 The import endpoint is what the HC3 web UI's Import button uses — the
 wire format is `multipart/form-data`:
@@ -178,13 +182,17 @@ wire format is `multipart/form-data`:
 flua's tools already do this: `--tool uploadFQA`, `--tool uploadQA` (new
 QA), `--tool installHelper`, and the proxy deploy all use the import
 endpoint against a real HC3 (the offline sim keeps the JSON create, which
-never re-derives). Symptom elsewhere: a QA whose buttons call
-`uib2OnReleased` was created through the JSON API-create — re-import it.
+never re-derives), and flua-packed .fqas carry the apiVersion marker.
+Symptom elsewhere: a QA whose buttons call `uib2OnReleased` was created
+from a package without the marker through the JSON API-create — re-import
+it or add the marker.
 
-A QA can install another .fqa itself (QA-installs-QA) — the multipart
-body is hand-built and sent via net.HTTPClient to the loopback
-`http://127.0.0.1:11111/api/quickApp/import`; see the quickapp-patterns
-skill for the ready-made recipe.
+A QA can install another .fqa itself (QA-installs-QA): with an
+apiVersion-carrying package, a plain
+`api.post('/quickApp/', json.encode(fqa))` works; for any other package,
+hand-build the multipart body and send it via net.HTTPClient to the
+loopback `http://127.0.0.1:11111/api/quickApp/import` — see the
+quickapp-patterns skill for both ready-made recipes.
 
 ---
 

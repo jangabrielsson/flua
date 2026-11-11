@@ -354,7 +354,7 @@ class Api:
         if segments[:1] == ["quickApp"]:
             # /api/quickApp/* — QA source files + export, engine-backed
             # (they mutate the running QAs, not the static sim state)
-            return self._quickapp(method, segments, body)
+            return self._quickapp(method, segments, body, qa_id)
         path = "/" + "/".join(segments)
         # A QA pinned offline (--%%mode:offline) never sees the HC3: its
         # remote hook is None, so handlers (list unions, proxy forwarding)
@@ -460,13 +460,49 @@ class Api:
 
     # -- /api/quickApp/* (multi-file QAs: files + export, offline) --------------
 
-    def _quickapp(self, method: str, segments: list[str], body: Any) -> tuple[Any, int]:
+    def _quickapp(
+        self, method: str, segments: list[str], body: Any, qa_id: int | None = None
+    ) -> tuple[Any, int]:
         if self._engine is None:
             return None, 404  # unit tests without an engine
         try:
             if len(segments) == 1 and method == "POST":
-                # POST /quickApp — create a QuickApp device (empty main);
-                # 201 like the live HC3's upload
+                # POST /quickApp — the real HC3 takes the .fqa as the raw
+                # JSON body (its api-create path), flua's base64 envelope,
+                # or a CreateQuickAppRequest (name/type, no files — an empty
+                # QA shell). A body with files imports the package.
+                fqa = None
+                if isinstance(body, dict) and "file" in body:
+                    fqa = self._parse_fqa_body(body)
+                elif isinstance(body, dict) and isinstance(body.get("files"), list):
+                    fqa = body
+                if fqa is not None:
+                    if (
+                        not (fqa.get("initialProperties") or {}).get("apiVersion")
+                        and qa_id is not None
+                    ):
+                        # parity warning: the real HC3 treats a package without
+                        # initialProperties.apiVersion as legacy and re-derives
+                        # its uiCallbacks with generated ui<b2>OnReleased names
+                        # (live-verified 5.221.22) — the sim preserves it, so
+                        # say so BEFORE the QA ships a mangling installer
+                        self._engine.flua_log(
+                            "warning",
+                            int(qa_id),
+                            "installing an .fqa without initialProperties.apiVersion: "
+                            "the real HC3's JSON create re-derives uiCallbacks with "
+                            "generated names (buttons get ui<b2>OnReleased) — add "
+                            "apiVersion='1.3' to the package or use /quickApp/import",
+                        )
+                    imported_id, err = self._engine.import_qa(fqa)
+                    if err is not None:
+                        return None, 400
+                    device = self._engine.api.state.devices.get(imported_id)
+                    if device is None:
+                        return None, 400
+                    if isinstance(body, dict) and body.get("roomId") is not None:
+                        device["roomID"] = int(body["roomId"])
+                    return public(device), 201
                 device = self._engine.create_qa(body)
                 return (device, 201) if device is not None else (None, 400)
             if segments[1] == "availableTypes" and method == "GET":

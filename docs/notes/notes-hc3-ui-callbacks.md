@@ -15,81 +15,80 @@ action ignored".
    descrambled fengari runtime (`dev/fengari_runtime.formatted.lua`)
    builds `UICB[name .. "|" .. eventType] = callback` and calls
    `qa[cb]` — no name generation there.
-3. **The mangling is a property of the API-create endpoint, not the
-   package.** Four package-shape variants were uploaded via
-   `POST /quickApp` (flua's uploadFQA/uploadQA) — all mangled; the
-   controller also converted the UI to uiView and set `useUiView: true`
-   during import. Meanwhile, the same HC3 holds QAs with intact custom
-   callbacks (the Dirigera QA, and the proxy QA which re-applies
-   uiCallbacks via updateProperty after deploy).
-4. **The decisive test: the HC3 web UI's Import button.** Importing the
-   same .fqa through the web UI preserved every custom handler name. The
-   browser posts to **`POST /quickApp/import`** as `multipart/form-data`
-   with a `file` field (+ optional `roomId`) — a different pipeline than
-   the JSON `POST /quickApp` API-create, which re-derives uiCallbacks
-   from its converted UI model with generated defaults regardless of the
-   package's contents.
+3. **The actual trigger: `initialProperties.apiVersion`.** The HC3's
+   JSON create (`POST /quickApp`) decides the package's format by that
+   field. WITHOUT it, the package is treated as legacy: the controller
+   converts the UI to uiView (useUiView becomes true) and re-derives
+   uiCallbacks with generated default names. WITH it (`"1.3"`) the
+   create preserves the package verbatim. Live-verified by bisection on
+   5.221.22: `UP.fqa + apiVersion` survives the JSON create; the same
+   package without it mangles. Headers (including plua's full set +
+   Fibaro-User-PIN), Host header, trailing slash, useUiView/uiView,
+   typeTemplateInitialized and useEmbededView were all probed and ruled
+   out. plua worked all along because its fqa builder copies `apiVersion`
+   into initialProperties — its packages carried the marker, flua's
+   didn't.
+4. **The web UI's Import button** (`POST /quickApp/import`, multipart)
+   preserves ANY package — that is a separate pipeline, which is why the
+   tools switching to it also fixed the symptom (and remains the tools'
+   path).
 
 ## The fix
 
-- `Hc3Remote.multipart()` — the web UI's wire format (multipart/form-data,
-  `file`/`roomId` fields, `X-Fibaro-Version: 2` like the browser's
-  interceptor). The `file` part must carry a **filename** — a
-  filename-less part crashes the HC3's import handler with a bodyless
-  HTTP 500 (live-verified; the browser uploads a File, so its part always
-  has one).
-- Every QA-create path in flua now uses `POST /quickApp/import` against a
-  real HC3: `uploadFQA`, `uploadQA` (new-QA path), `installHelper`, and
-  the proxy deploy. The offline sim keeps the JSON `POST /quickApp` path
-  (the sim never re-derives). `parity_capture` deliberately stays on the
-  JSON create — it pins that endpoint's contract for the parity suite.
-- Live-verified on HC3 firmware **5.221.22 (beta)**: a tool upload stored
-  all 23 custom callbacks intact on the controller. The re-derivation is
-  recent-firmware behavior — plausible it did not exist in older 5.2xx
-  builds, which would explain why QAs uploaded through the API years ago
-  still work while new uploads broke.
+- **`qa_export` carries `initialProperties.apiVersion: "1.3"`** — the
+  real fix: any importer that posts the .fqa to the JSON create preserves
+  it, including a QA doing a plain
+  `api.post("/quickApp/", json.encode(fqa))` — no multipart needed.
+- The tools also use `POST /quickApp/import` (multipart, `file` part with
+  a **filename** — a filename-less part crashes the handler with a
+  bodyless 500, live-verified) — belt-and-braces plus web-UI parity.
+  Every QA-create path goes through it: uploadFQA, uploadQA (new QA),
+  installHelper, proxy deploy. The offline sim keeps the JSON create (the
+  sim never re-derives).
+- The sim parses the multipart import format too (`_fqa_from_multipart`
+  + the ApiServer's multipart passthrough) and offline loopback
+  `127.0.0.1:11111` rewrites to the sim's `--ui` server, so both
+  install flows are testable in the emulator. The sim's JSON create also
+  imports `.fqa` bodies (raw or `{file: base64}`) like the real HC3, and
+  warns when a QA installs a package WITHOUT the apiVersion marker (the
+  real HC3 would re-derive its callbacks).
 
 ### The import endpoint's parser is strictly multipart
 
 A raw JSON .fqa body at `POST /quickApp/import` dies with HTTP 500
 `{"reason":"Network error","message":"Field name too long"}` — the handler
-parses ANY body as multipart form fields (live-verified). So a QA cannot
-install an .fqa with a plain `api.post` (JSON): it must hand-build the
-multipart body and send it with `net.HTTPClient` (Content-Type
-`multipart/form-data`, a `file` part with filename). flua's sim parses
-that multipart format too (`_fqa_from_multipart` + the ApiServer's
-multipart body passthrough), so the QA-installs-QA flow is testable
-offline — pinned by `tests/test_ui_server.py::test_import_accepts_multipart_body_over_http`.
+parses ANY body as multipart form fields (live-verified). So the
+multipart recipe (quickapp-patterns skill) is for packages WITHOUT
+`initialProperties.apiVersion`; with the marker, plain `api.post` to
+`/quickApp/` suffices.
 
 ### Why the proxy never showed the problem
 
 Two reasons, both visible in the code:
 
-1. **The proxy's dispatch bypasses uiCallbacks.** `onUIEvent` in the
-   runtime (the HC3 plua contract flua ports) checks
+1. **The proxy's dispatch bypasses uiCallbacks.** `onUIEvent` checks
    `quickApp.UIHandler` FIRST — the proxy shim defines
    `QuickApp:UIHandler(ev)` and forwards every UI event to the emulator
-   over HTTP, so the mangled uiCallbacks table is never consulted.
+   over HTTP, so the uiCallbacks table is never consulted.
 2. **The mirror re-syncs the UI properties anyway.** On proxy runs flua
    PUTs the correct `viewLayout`/`uiView`/`uiCallbacks` to the HC3 device
-   (`sync_proxy_ui`), overwriting the import's mangled table — which is
-   why the proxy device's stored properties always looked intact.
+   (`sync_proxy_ui`), overwriting the import's mangled table.
 
-Also kept from the earlier rounds (export-shape parity, harmless and
-matching the HC3's own exports): `qa_export` emits `viewLayout` +
-`uiCallbacks` only for legacy QAs (no uiView/useUiView), no event fields
-on the elements, `typeTemplateInitialized: true`, empty
-userDescription/initialInterfaces omitted. These were not the trigger,
-but they make flua's packages byte-shape-identical to an HC3 export.
+Also kept from the earlier rounds (export-shape parity, harmless):
+`qa_export` emits `viewLayout` + `uiCallbacks` only for legacy QAs (no
+uiView/useUiView), no event fields on the elements,
+`typeTemplateInitialized: true`, empty userDescription/initialInterfaces
+omitted. None of these were the trigger, but they keep flua's packages
+close to the HC3's own export shape.
 
-Pinned by `tests/test_tools.py::test_upload_fqa_uses_the_web_import_endpoint`
-and the pack-shape tests from the earlier rounds.
+Pinned by `tests/test_tools.py::test_upload_fqa_uses_the_web_import_endpoint`,
+`test_pack_legacy_ui_matches_the_hc3_export_shape` (apiVersion asserted),
+and the ui_server loopback/multipart tests.
 
 ## Open verification
 
-- The uiView-active case (`--%%useUiView:true`) — unverified on the HC3,
-  but the import endpoint preserves the package verbatim so the same fix
-  covers it.
+- The uiView-active case (`--%%useUiView:true`) — the apiVersion marker
+  applies the same way; not separately probed.
 - The proxy's deploy still uses JSON `POST /quickApp` and repairs
-  uiCallbacks via updateProperty afterwards — works today; could switch
-  to the import endpoint for parity.
+  uiCallbacks via updateProperty afterwards — with the apiVersion marker
+  its create would now also preserve; switching is optional parity.

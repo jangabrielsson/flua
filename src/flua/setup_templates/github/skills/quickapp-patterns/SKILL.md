@@ -265,18 +265,32 @@ api.put("/devices/" .. self.id, { name = "New Name" })
 ### Installing another .fqa from a QA (QA-installs-QA)
 
 A QA can install another QuickApp package on the controller through
-`POST /quickApp/import` — the endpoint the HC3 web UI's Import button
-uses, which preserves the package verbatim (the JSON `POST /quickApp`
-create re-derives uiCallbacks with generated `ui<b2>OnReleased` names on
-recent firmware — never use it). The import handler is **strictly
-multipart**: a plain `api.post` (JSON) dies with HTTP 500 "Field name too
-long", so hand-build the multipart body and send it with net.HTTPClient
-to the loopback API (port 11111 — the HC3's own, credential-free; flua
-rewrites it to the controller online and to the sim's `--ui` server
-offline, so the same code runs in the emulator):
+`POST /quickApp`. The simplest form — a package carrying
+`initialProperties.apiVersion` (flua-packed .fqas do) — is a plain
+synchronous `api.post`:
 
 ```lua
-function QuickApp:installFqa(fqa, filename, cb)
+function QuickApp:installFqa(fqa, cb)
+    -- fqa: the PACKAGE table; must carry initialProperties.apiVersion
+    -- ("1.3") — the JSON create preserves such packages verbatim, custom
+    -- uiCallbacks included. Without the marker the controller re-derives
+    -- uiCallbacks with generated ui<b2>OnReleased names (live-verified
+    -- 5.221.22) — use the multipart recipe below for those.
+    local dev, status = api.post("/quickApp/", json.encode(fqa))
+    if status and status <= 201 then cb(dev and dev.id, status) else cb(nil, status) end
+end
+```
+
+For packages WITHOUT the marker (arbitrary third-party .fqas), the web
+UI's import endpoint is the preserving path — but it is **strictly
+multipart**: a JSON body dies with HTTP 500 "Field name too long", so
+hand-build the multipart body and send it with net.HTTPClient to the
+loopback API (port 11111 — the HC3's own, credential-free; flua rewrites
+it to the controller online and to the sim's `--ui` server offline, so
+the same code runs in the emulator):
+
+```lua
+function QuickApp:installFqaMultipart(fqa, filename, cb)
     -- fqa must be the PACKAGE STRING (json.encode(table)), not the table
     local boundary = "----qaDist" .. string.format("%08x", os.time())
         .. string.format("%08x", math.random(0x7FFFFFFF))

@@ -506,6 +506,10 @@ def test_pack_legacy_ui_matches_the_hc3_export_shape(tmp_path, capsys, monkeypat
     assert "viewLayout" in props
     assert "uiView" not in props  # the uiView presence triggers the HC3's regeneration
     assert "useUiView" not in props
+    # initialProperties.apiVersion marks the package as current-format: the
+    # HC3's JSON create preserves the package verbatim only WITH it
+    # (live-verified — the mangled-buttons saga's actual trigger)
+    assert props["apiVersion"] == "1.3"
     callbacks = {(c["name"], c["eventType"]): c["callback"] for c in props["uiCallbacks"]}
     assert callbacks[("b2", "onReleased")] == "zoneDownButton"
     assert callbacks[("dim", "onChanged")] == "setLevel"

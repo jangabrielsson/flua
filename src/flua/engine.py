@@ -1604,6 +1604,14 @@ class LuaEngine:
             # (no uiView, no useUiView). Match the standard legacy shape.
             properties.pop("uiView", None)
             properties.pop("useUiView", None)
+        # initialProperties.apiVersion marks the package as current-format for
+        # the HC3's JSON create (POST /quickApp): WITHOUT it the controller
+        # treats the package as legacy and re-derives uiCallbacks with
+        # generated default names (ui<b2>OnReleased), dropping custom
+        # handlers — the mangled-buttons saga, live-verified 5.221.22.
+        # WITH it the create preserves the package verbatim (plua has always
+        # shipped this field; that is why its uploads survived).
+        properties["apiVersion"] = "1.3"
         # the package's properties are final: a false typeTemplateInitialized
         # makes the HC3's import re-run its type-template initialization, which
         # re-derives uiCallbacks from the UI with generated default names
