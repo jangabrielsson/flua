@@ -37,16 +37,26 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     if not isinstance(fqa, dict) or not isinstance(fqa.get("files"), list):
         parser.error("fqa file must contain a JSON object with a files array")
     engine = hc3_engine(parser)
-    body: dict[str, object] = {
-        "file": base64.b64encode(
-            json.dumps(fqa, ensure_ascii=False).encode(
-                "utf-8"
-            )  # raw UTF-8: the HC3 stores escapes as Latin-1
-        ).decode("ascii")
-    }
-    if args.room is not None:
-        body["roomId"] = args.room
-    device, status = engine.api.dispatch_hc3("POST", "/quickApp", body)
+    if engine.hc3 is not None:
+        # the HC3's web-import endpoint preserves the package verbatim —
+        # custom uiCallbacks handler names included. The JSON POST /quickApp
+        # create re-derives uiCallbacks with generated defaults (ui<b2>
+        # OnReleased), breaking button actions (live-verified 5.22x).
+        fields = [("file", json.dumps(fqa, ensure_ascii=False))]
+        if args.room is not None:
+            fields.append(("roomId", str(args.room)))
+        device, status = engine.hc3.multipart("POST", "/quickApp/import", fields)
+    else:
+        body: dict[str, object] = {
+            "file": base64.b64encode(
+                json.dumps(fqa, ensure_ascii=False).encode(
+                    "utf-8"
+                )  # raw UTF-8: the HC3 stores escapes as Latin-1
+            ).decode("ascii")
+        }
+        if args.room is not None:
+            body["roomId"] = args.room
+        device, status = engine.api.dispatch_hc3("POST", "/quickApp", body)
     if status not in (200, 201) or not isinstance(device, dict):
         parser.error(f"cannot upload QA to the HC3 (HTTP {status})")
     print(f"uploaded {fqa.get('name')} — HC3 device id {device.get('id')}")

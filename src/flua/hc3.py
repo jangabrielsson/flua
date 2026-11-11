@@ -19,6 +19,7 @@ import logging
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from collections.abc import Callable
 from typing import Any
 
@@ -60,6 +61,40 @@ class Hc3Remote:
             return None
         token = base64.b64encode(f"{self._user}:{self._password or ''}".encode()).decode()
         return f"Basic {token}"
+
+    def multipart(
+        self,
+        method: str,
+        path: str,
+        fields: list[tuple[str, str]],
+        timeout: float | None = None,
+    ) -> tuple[Any, int]:
+        """One multipart/form-data call — the HC3 web UI's wire format for
+        POST /quickApp/import, which preserves an .fqa package verbatim
+        (custom uiCallbacks names included) where the JSON POST /quickApp
+        create re-derives them with generated defaults (live-verified
+        5.22x, the mangled-button bug). ``fields`` are (name, value) form
+        fields; ``X-Fibaro-Version: 2`` rides along like the web UI's
+        interceptor adds it."""
+        boundary = "----flua" + uuid.uuid4().hex
+        parts = [
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+            f"{value}\r\n"
+            for name, value in fields
+        ]
+        payload = ("".join(parts) + f"--{boundary}--\r\n").encode("utf-8")
+        url = self._base + "/api" + path
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "X-Fibaro-Version": "2",
+        }
+        auth = self._auth_header()
+        if auth:
+            headers["Authorization"] = auth
+        request = urllib.request.Request(url, data=payload, headers=headers, method=method.upper())
+        return self._exchange(request, method, path, url, timeout)
 
     def request(
         self,

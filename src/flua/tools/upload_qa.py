@@ -163,8 +163,17 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     if qa_id is not None:
         # the target names an existing QA: sync files, name, properties, UI
         return _update_existing(engine, parser, qa_id, fqa)
-    body = _upload_body(fqa, args.room)
-    device, status = engine.api.dispatch_hc3("POST", "/quickApp", body)
+    if engine.hc3 is not None:
+        # the web-import path preserves the package verbatim (custom UI
+        # handler names included); the JSON POST /quickApp re-derives
+        # uiCallbacks with generated defaults (live-verified 5.22x)
+        fields = [("file", json.dumps(fqa, ensure_ascii=False))]
+        if args.room is not None:
+            fields.append(("roomId", str(args.room)))
+        device, status = engine.hc3.multipart("POST", "/quickApp/import", fields)
+    else:
+        body = _upload_body(fqa, args.room)
+        device, status = engine.api.dispatch_hc3("POST", "/quickApp", body)
     if status not in (200, 201) or not isinstance(device, dict):
         parser.error(f"cannot upload QA to the HC3 (HTTP {status})")
     print(f"uploaded {fqa['name']} — HC3 device id {device.get('id')}")

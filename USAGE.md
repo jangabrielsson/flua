@@ -666,12 +666,17 @@ device's `properties.viewLayout`, `properties.uiView`, and
 Declared event handlers (`onReleased`, `onChanged`, `onToggled`, …) live
 in `uiCallbacks` — the table both flua and the HC3 dispatch through. For
 the legacy layout (the default) the .fqa follows the HC3's own export
-shape exactly: `viewLayout` + `uiCallbacks` only, **no `uiView`, no event
-fields on the elements**, `typeTemplateInitialized: true`, empties
-omitted. Any deviation makes the HC3's import re-derive `uiCallbacks`
-with generated default names (`ui<b2>OnReleased`) and silently drop your
-handlers. The uiView format travels only when it is the active one
+shape exactly: `viewLayout` + `uiCallbacks` only, no `uiView`, no event
+fields on the elements, `typeTemplateInitialized: true`, empties omitted.
+The uiView format travels only when it is the active one
 (`--%%useUiView:true`).
+
+**Upload**: `uploadFQA`/`uploadQA` create the QA through the HC3's web-import
+endpoint (`POST /quickApp/import`, multipart) — the path the HC3's own UI
+uses, which preserves the package verbatim. The JSON `POST /quickApp`
+API-create path re-derives `uiCallbacks` with generated default names
+(`ui<b2>OnReleased`) and silently drops your handlers (live-verified
+5.22x), so the tools never use it against a real controller.
 
 At runtime a single select is set with `updateView(elm, "selectedItem", value)`
 and a multi select with `updateView(elm, "selectedItems", {value1, value2, …})`.

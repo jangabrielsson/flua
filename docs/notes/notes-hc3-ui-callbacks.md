@@ -15,50 +15,46 @@ action ignored".
    descrambled fengari runtime (`dev/fengari_runtime.formatted.lua`)
    builds `UICB[name .. "|" .. eventType] = callback` and calls
    `qa[cb]` — no name generation there.
-3. **The HC3's import re-derives uiCallbacks when the package deviates
-   from the HC3's own export shape.** Live-verified by downloading device
-   4441's stored package after upload: the viewLayout was byte-identical
-   to what flua packed (element `onReleased` fields intact, and the HC3
-   even propagated them onto its uiView components), but `uiCallbacks`
-   had been rebuilt — every custom callback replaced by the generated
-   `ui<name><event>` default, long-press/onToggled entries dropped.
-4. **The control experiment:** `testQAs/HC3_Diagnostics_V2.10.fqa`, a QA
-   exported from a real HC3, imports with its custom handlers intact.
-   Its shape differs from what flua packed in three ways, all fixed
-   across the three upload rounds that still mangled:
-   - flua packed **`uiView`** for a legacy QA (round 1) — the HC3's
-     legacy export carries none;
-   - flua packed **`onReleased` etc. on the legacy viewLayout elements**
-     (round 2–3) — the HC3's export elements carry no event fields (the
-     binding lives in uiCallbacks only);
-   - flua packed **`typeTemplateInitialized: false`** (all rounds) — the
-     HC3's export carries true; false makes the import re-run its
-     type-template initialization, which is what re-derives uiCallbacks
-     with generated defaults.
+3. **The mangling is a property of the API-create endpoint, not the
+   package.** Four package-shape variants were uploaded via
+   `POST /quickApp` (flua's uploadFQA/uploadQA) — all mangled; the
+   controller also converted the UI to uiView and set `useUiView: true`
+   during import. Meanwhile, the same HC3 holds QAs with intact custom
+   callbacks (the Dirigera QA, and the proxy QA which re-applies
+   uiCallbacks via updateProperty after deploy).
+4. **The decisive test: the HC3 web UI's Import button.** Importing the
+   same .fqa through the web UI preserved every custom handler name. The
+   browser posts to **`POST /quickApp/import`** as `multipart/form-data`
+   with a `file` field (+ optional `roomId`) — a different pipeline than
+   the JSON `POST /quickApp` API-create, which re-derives uiCallbacks
+   from its converted UI model with generated defaults regardless of the
+   package's contents.
 
 ## The fix
 
-`qa_export` now emits the HC3's own legacy export shape byte-for-byte on
-every axis: `viewLayout` + `uiCallbacks` only (no `uiView`, no
-`useUiView`, no event fields on the elements), `typeTemplateInitialized:
-true`, and empty `userDescription`/`initialInterfaces` omitted. The
-uiView format travels only when it is the active one
-(`--%%useUiView:true`).
+- `Hc3Remote.multipart()` — the web UI's wire format (multipart/form-data,
+  `file`/`roomId` fields, `X-Fibaro-Version: 2` like the browser's
+  interceptor).
+- `uploadFQA` and `uploadQA` (new-QA path) now use
+  `POST /quickApp/import` against a real HC3 — the package is preserved
+  verbatim, custom handler names included. The offline sim keeps the JSON
+  `POST /quickApp` path (the sim never re-derives).
 
-`ui_to_u_rows` (downloadQA/`--tool ui --device`) still reads
-element-declared event fields first — real HC3 devices carry them after
-an editor save — so a device whose callbacks were mangled by an earlier
-upload still exports its handlers from the element fields (the HC3
-preserved those).
+Also kept from the earlier rounds (export-shape parity, harmless and
+matching the HC3's own exports): `qa_export` emits `viewLayout` +
+`uiCallbacks` only for legacy QAs (no uiView/useUiView), no event fields
+on the elements, `typeTemplateInitialized: true`, empty
+userDescription/initialInterfaces omitted. These were not the trigger,
+but they make flua's packages byte-shape-identical to an HC3 export.
 
-Pinned by `tests/test_tools.py::test_pack_legacy_ui_matches_the_hc3_export_shape`,
-`tests/test_ui.py::test_legacy_layout_has_no_event_fields`, and
-`test_legacy_layout_events_roundtrip_without_ui_callbacks`.
+Pinned by `tests/test_tools.py::test_upload_fqa_uses_the_web_import_endpoint`
+and the pack-shape tests from the earlier rounds.
 
 ## Open verification
 
-- A re-upload of the user's QA with the 0.1.148-shape package is the
-  live confirmation.
-- The uiView-active case (`--%%useUiView:true`) is unverified on the
-  HC3: packages carry uiView there, and the import may apply the same
-  re-derivation. No live evidence either way yet.
+- The uiView-active case (`--%%useUiView:true`) — unverified on the HC3,
+  but the import endpoint preserves the package verbatim so the same fix
+  covers it.
+- The proxy's deploy still uses JSON `POST /quickApp` and repairs
+  uiCallbacks via updateProperty afterwards — works today; could switch
+  to the import endpoint for parity.

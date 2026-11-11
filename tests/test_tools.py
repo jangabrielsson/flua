@@ -7,6 +7,7 @@ add_arguments() and run() — no other file changes.
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -155,6 +156,36 @@ class _MockHc3(BaseHTTPRequestHandler):
                 return
             self.fqas[self.next_id] = fqa
             self._send({"id": self.next_id, "name": fqa["name"]})
+            self.next_id += 1
+        elif path == "/api/quickApp/import":
+            # the web UI's wire format: multipart/form-data with file + roomId
+            ctype = self.headers.get("Content-Type", "")
+            match = re.search(r"boundary=(.+)$", ctype)
+            length = int(self.headers.get("Content-Length", 0))
+            raw = self.rfile.read(length)
+            if not match:
+                self._send({}, 400)
+                return
+            boundary = match.group(1).strip().encode()
+            fields: dict[str, str] = {}
+            for part in raw.split(b"--" + boundary):
+                part = part.strip(b"\r\n")
+                if not part or part == b"--":
+                    continue
+                head, _, content = part.partition(b"\r\n\r\n")
+                name = re.search(rb'name="([^"]+)"', head)
+                if name:
+                    fields[name.group(1).decode()] = content.decode("utf-8")
+            try:
+                fqa = json.loads(fields.get("file", ""))
+            except Exception:
+                self._send({}, 400)
+                return
+            self.fqas[self.next_id] = fqa
+            type(self).requests.append(
+                ("POST", path, {"file": fqa, "roomId": fields.get("roomId")})
+            )
+            self._send({"id": self.next_id, "name": fqa["name"]}, 201)
             self.next_id += 1
         elif path.startswith("/api/quickApp/export/"):
             # downloadQA's export-by-id endpoint
@@ -517,6 +548,57 @@ def test_upload_and_download_fqa_tools(tmp_path, monkeypatch, capsys) -> None:
         assert "downloaded roundtrip (id 100)" in capsys.readouterr().out
         fqa = json.loads((tmp_path / "roundtrip.fqa").read_text())
         assert fqa["name"] == "roundtrip"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_upload_fqa_uses_the_web_import_endpoint(tmp_path, monkeypatch, capsys) -> None:
+    # regression: POST /quickApp (the API-create path) makes the HC3
+    # re-derive uiCallbacks with generated defaults, breaking custom button
+    # handlers; the web UI's POST /quickApp/import (multipart) preserves the
+    # package verbatim — uploadFQA/uploadQA must use it when the HC3 is real
+    _MockHc3.fqas = {}
+    _MockHc3.next_id = 100
+    _MockHc3.requests = []
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _MockHc3)
+    threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
+    try:
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("HC3_URL", f"http://127.0.0.1:{server.server_port}")
+        monkeypatch.setenv("HC3_USER", "admin")
+        monkeypatch.setenv("HC3_PASSWORD", "secret")
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "app.lua").write_text(
+            "--%%name:uiflow\n--%%type:com.fibaro.binarySwitch\n"
+            '--%%u:{button="b2",text="Go",onReleased="zoneDownButton"}\n'
+            "function QuickApp:onInit() end\n"
+        )
+        pack = tools._TOOLS["pack"]
+        parser = argparse.ArgumentParser()
+        pack.add_arguments(parser)
+        assert pack.run(parser, parser.parse_args(["app.lua", "-o", "app.fqa"])) == 0
+        capsys.readouterr()
+        upload = tools._TOOLS["uploadFQA"]
+        parser = argparse.ArgumentParser()
+        upload.add_arguments(parser)
+        assert upload.run(parser, parser.parse_args(["app.fqa", "--room", "7"])) == 0
+        out = capsys.readouterr().out
+        assert "uploaded uiflow — HC3 device id 100" in out
+        # the multipart import path was used, carrying the fqa verbatim
+        posts = [
+            r for r in _MockHc3.requests if r[0] == "POST" and r[1] == "/api/quickApp/import"
+        ]
+        assert len(posts) == 1
+        assert posts[0][2]["roomId"] == "7"
+        fqa = posts[0][2]["file"]
+        callbacks = {
+            (c["name"], c["eventType"]): c["callback"]
+            for c in fqa["initialProperties"]["uiCallbacks"]
+        }
+        assert callbacks[("b2", "onReleased")] == "zoneDownButton"
     finally:
         server.shutdown()
         server.server_close()
