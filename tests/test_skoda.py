@@ -33,8 +33,22 @@ async def wait_for(capsys, needle: str, timeout: float = 5.0) -> str:
 async def wait_property(
     engine: LuaEngine, qa_id: int, prop: str, wanted, timeout: float = 5.0
 ) -> None:
+    """Wait for a device property — or a QuickApp variable of that name
+    (the Skoda QA keeps state/climate/target in the quickAppVariables
+    property; variable values are strings)."""
     deadline = time.monotonic() + timeout
-    while engine.api.state.devices[qa_id]["properties"].get(prop) != wanted:
+    while True:
+        device = engine.api.state.devices[qa_id]
+        if prop in device["properties"]:
+            current = device["properties"].get(prop)
+        else:
+            qvars = {
+                v["name"]: v["value"]
+                for v in device["properties"].get("quickAppVariables") or []
+            }
+            current = qvars.get(prop)
+        if current == wanted:
+            return
         if time.monotonic() > deadline:
             raise AssertionError(f"{prop} never became {wanted!r}")
         await asyncio.sleep(0.02)
@@ -62,10 +76,14 @@ async def test_skoda_pair_runs_offline(capsys) -> None:
     try:
         engine, _mock_id, control_id = await start_pair(capsys, ['var:once="true"'])
         dev = engine.api.state.devices[control_id]
-        assert dev["properties"]["batteryLevel"] == 71
-        assert dev["properties"]["chargingState"] == "READY_FOR_CHARGING"
-        assert dev["properties"]["targetCharge"] == 80
-        assert dev["properties"]["climateState"] == "OFF"
+        assert dev["properties"]["value"] is False  # not charging
+        assert dev["properties"]["batteryLevel"] == 71  # the battery interface
+        qvars = {
+            v["name"]: v["value"]
+            for v in dev["properties"].get("quickAppVariables") or []
+        }
+        assert qvars["state"] == "READY_FOR_CHARGING"
+        assert qvars["target"] == "80"
     finally:
         if engine is not None:
             await engine.stop()
@@ -81,21 +99,21 @@ async def test_skoda_actions_drive_the_mock(capsys) -> None:
         vin = "TMBMOCK123456789"
         engine.api.dispatch("POST", f"/devices/{control_id}/action/startCharging", {"args": []})
         await wait_for(capsys, f"MOCK POST /api/v1/vehicles/{vin}/charging/start")
-        await wait_property(engine, control_id, "chargingState", "CHARGING")
+        await wait_property(engine, control_id, "value", True)
 
         engine.api.dispatch(
             "POST", f"/devices/{control_id}/action/setChargingLimit", {"args": ["90"]}
         )
         await wait_for(capsys, f"MOCK PUT /api/v1/vehicles/{vin}/charging/limit")
-        await wait_property(engine, control_id, "targetCharge", 90)
+        await wait_property(engine, control_id, "target", "90")
 
         engine.api.dispatch("POST", f"/devices/{control_id}/action/startAC", {"args": []})
         await wait_for(capsys, f"MOCK POST /api/v1/vehicles/{vin}/air-conditioning/start")
-        await wait_property(engine, control_id, "climateState", "ON")
+        await wait_property(engine, control_id, "climate", "ON")
 
         engine.api.dispatch("POST", f"/devices/{control_id}/action/stopCharging", {"args": []})
         await wait_for(capsys, f"MOCK POST /api/v1/vehicles/{vin}/charging/stop")
-        await wait_property(engine, control_id, "chargingState", "READY_FOR_CHARGING")
+        await wait_property(engine, control_id, "value", False)
     finally:
         if engine is not None:
             await engine.stop()

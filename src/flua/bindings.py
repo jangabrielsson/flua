@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any
 
 from . import __version__
 from .config import debug_flag, warn_enabled
-from .devices import property_type_mismatch
+from .devices import property_specs_for, property_type_mismatch, schema_for
 
 logger = logging.getLogger(__name__)
 
@@ -374,6 +374,16 @@ def install_bindings(engine: "LuaEngine") -> None:
         mismatch = property_type_mismatch(
             device.get("type"), device.get("interfaces"), name, value
         )
+        if mismatch is None and schema_for(device.get("type")) is not None:
+            declared = property_specs_for(device.get("type"), device.get("interfaces"))
+            if name not in declared:
+                # a property the type does not declare: the sim stores it,
+                # the real HC3 silently ignores the update — the QA would
+                # work here and do nothing on the controller
+                mismatch = (
+                    f"property {name!r} is not declared by {device.get('type')} "
+                    "(the real HC3 silently ignores the update)"
+                )
         if mismatch is None:
             return
         engine._stub_warned.add(key)

@@ -6,10 +6,14 @@ pair runs and tests fully offline.
 
 Files:
 
-- `myskoda.lua` — the control QA: maps the car onto device properties
-  (`batteryLevel`, `chargingState`, `climateState`, `targetCharge`) and
-  actions (`turnOn`/`turnOff` = start/stop charging, `setChargingLimit`,
-  `startAC`, `stopAC`, `refresh`), with a small UI.
+- `myskoda.lua` — the control QA: the declared properties `value`
+  (charging on/off) and `batteryLevel` (from the `battery` interface)
+  mirror the car; the remaining state (charging state, climate, target)
+  lives in QuickApp variables and the UI labels. The actions
+  (`turnOn`/`turnOff` = start/stop charging, `setChargingLimit`,
+  `startAC`, `stopAC`, `refresh`) drive the car. The property set is
+  fixed by the type — the real HC3 silently ignores updates to
+  undeclared properties, so the QA never invents any.
 - `myskoda_mock.lua` — a `net.HTTPServer` mock of the API subset the
   control QA uses (vehicle state, charging start/stop/limit,
   air-conditioning start/stop). Prints every request as

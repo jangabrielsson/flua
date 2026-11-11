@@ -41,6 +41,17 @@ self:updateProperty("log", "status msg") -- update log field
 ```
 Common property names: `value`, `dead`, `log`, `userDescription`.
 
+> **The property set is fixed by the type.** `updateProperty` on a
+> property the device type (and its interfaces) does not declare is
+> **silently ignored on the real HC3** — the QA looks like it works in
+> flua (the sim stores it, with a warning) and does nothing on the
+> controller. Declare what you need: the right `--%%type` or
+> `--%%interface:` (e.g. the `battery` interface declares
+> `batteryLevel`), QuickApp variables for dynamic values
+> (`self:setVariable`/`getVariable`), and `updateView` labels for
+> display. flua warns on both the runtime update and the `--check`
+> literal.
+
 ### QuickApp Variables
 ```lua
 local v = self:getVariable("myKey")   -- returns "" if not found (not nil!)

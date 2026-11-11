@@ -1,5 +1,6 @@
 --%%name:Skoda
 --%%type:com.fibaro.binarySwitch
+--%%interface:battery
 -- myskoda.lua — a Skoda car control QA against the MyŠkoda Public API.
 --
 -- Controls charging and air conditioning through the public REST API
@@ -14,10 +15,13 @@
 --   key    the X-API-Key from the MyŠkoda app
 --   once   "true" = refresh once, print, exit (tests); unset = poll every minute
 --
--- The QA maps the car onto device properties and actions:
---   properties: batteryLevel, chargingState, climateState, targetCharge
---   actions:    turnOn/turnOff (start/stop charging), setChargingLimit,
---               startAC, stopAC, refresh
+-- The QA maps the car onto the declared device properties (`value` =
+-- charging on/off, `batteryLevel` from the battery interface) plus
+-- QuickApp variables (state, climate, target) and the UI labels — the
+-- property set is fixed by the type; the real HC3 silently ignores
+-- updates to properties it does not declare.
+--   actions: turnOn/turnOff (start/stop charging), setChargingLimit,
+--            startAC, stopAC, refresh
 
 --%%u:{label='battery',text='Battery'}
 --%%u:{label='state',text='State'}
@@ -80,10 +84,15 @@ function QuickApp:refresh()
     local battery = status.battery or {}
     local settings = charging.settings or {}
     local ac = data.airConditioning or {}
+    -- the device property set is fixed by the type: the declared `value`
+    -- mirrors charging, the dynamic state lives in QuickApp variables,
+    -- and the UI labels show it (the real HC3 ignores updates to
+    -- properties the type does not declare)
+    qa:updateProperty("value", status.state == "CHARGING")
     qa:updateProperty("batteryLevel", battery.stateOfChargeInPercent)
-    qa:updateProperty("chargingState", status.state)
-    qa:updateProperty("climateState", ac.state)
-    qa:updateProperty("targetCharge", settings.targetStateOfChargeInPercent)
+    qa:setVariable("state", tostring(status.state or ""))
+    qa:setVariable("climate", tostring(ac.state or ""))
+    qa:setVariable("target", tostring(settings.targetStateOfChargeInPercent or ""))
     qa:updateView("battery", "text", tostring(battery.stateOfChargeInPercent or "?") .. " %")
     qa:updateView("state", "text", tostring(status.state or "?"))
     qa:updateView("climate", "text", tostring(ac.state or "?"))

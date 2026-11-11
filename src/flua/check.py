@@ -127,6 +127,7 @@ def check_source(
         qa_type if isinstance(qa_type, str) else None, annotations.get("interface")
     )
     if prop_specs:
+        seen_unknown: set[str] = set()
         literal_re = r"(?:true|false|\d+(?:\.\d+)?|['\"][^'\"]*['\"])"
         pattern = (
             rf"self\s*:\s*updateProperty\s*\(\s*['\"]([A-Za-z0-9_]+)['\"]"
@@ -136,6 +137,19 @@ def check_source(
             prop_name, literal = match.group(1), match.group(2)
             spec = prop_specs.get(prop_name)
             if spec is None:
+                if prop_name not in seen_unknown:
+                    seen_unknown.add(prop_name)
+                    line, column = _line_col(source, match.start())
+                    findings.append(
+                        finding(
+                            name,
+                            "warning",
+                            f"updateProperty: property {prop_name!r} is not declared "
+                            f"by {qa_type} (the real HC3 silently ignores the update)",
+                            line,
+                            column,
+                        )
+                    )
                 continue
             if literal in ("true", "false"):
                 lua_kind = "bool"
