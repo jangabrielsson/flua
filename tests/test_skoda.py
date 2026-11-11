@@ -7,6 +7,7 @@ mock state -> device properties, actions -> mock request log + state.
 
 import asyncio
 import re
+import socket
 import time
 from pathlib import Path
 
@@ -124,16 +125,27 @@ async def test_skoda_actions_drive_the_mock(capsys) -> None:
 @pytest.mark.asyncio
 async def test_skoda_embeds_the_mock_when_no_url_is_set(capsys) -> None:
     # the pip-user shape: myskoda.lua alone, no url configured — the QA
-    # embeds the bundled mock (lua/lib/myskoda-mock.lua) and tests itself
+    # loads the bundled mock QA and tests against it. The mock port is
+    # overridden to a fresh one (the fixed default is for users; a live
+    # instance or a parallel worker may hold 18290).
+    def free_port() -> int:
+        probe = socket.socket()
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+        probe.close()
+        return port
+
     engine = LuaEngine()
     await engine.start()
     try:
+        port = free_port()
         control_id, err = engine.load_qa_file(
-            str(EXAMPLES / "myskoda.lua"), ['var:once="true"']
+            str(EXAMPLES / "myskoda.lua"),
+            ['var:once="true"', "var:mockPort=" + str(port)],
         )
         assert err is None, err
         out = await wait_for(capsys, "SKODA 71 READY_FOR_CHARGING")
-        assert "using the MySkoda mock on 18290" in out
+        assert f"using the MySkoda mock on {port}" in out
         assert "MOCK GET /api/v1/vehicles/TMBMOCK123456789" in out
         dev = engine.api.state.devices[control_id]
         assert dev["properties"]["batteryLevel"] == 71

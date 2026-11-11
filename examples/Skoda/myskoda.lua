@@ -49,13 +49,17 @@ function QuickApp:onInit()
   self.url = first(self:getVariable("url"), nil)
   if not self.url and _FLUA then
     -- no API configured, running under flua: point at the mock's fixed
-    -- port and load the bundled mock QA (one file is the whole pair for
-    -- pip users). If a mock already serves the port, the loaded one
-    -- stands down quietly. On a real HC3 this is skipped — _FLUA is
-    -- flua's extension and the real url is configured instead.
-    self.url = "http://127.0.0.1:" .. MOCK_PORT
-    print("using the MySkoda mock on " .. MOCK_PORT)
-    pcall(_FLUA.loadQAfromFile, _PY.examples_dir .. "/Skoda/myskoda_mock.lua", {})
+    -- port (overridable via the `mockPort` variable — tests use their own
+    -- free port so parallel runs and a live instance never collide) and
+    -- load the bundled mock QA (one file is the whole pair for pip
+    -- users). If a mock already serves the port, the loaded one stands
+    -- down quietly. On a real HC3 this is skipped — _FLUA is flua's
+    -- extension and the real url is configured instead.
+    local mockPort = tonumber(self:getVariable("mockPort")) or MOCK_PORT
+    self.url = "http://127.0.0.1:" .. mockPort
+    print("using the MySkoda mock on " .. mockPort)
+    pcall(_FLUA.loadQAfromFile, _PY.examples_dir .. "/Skoda/myskoda_mock.lua",
+      { "var:port=" .. mockPort })
   elseif not self.url then
     self:warning("no API url configured")
   end
