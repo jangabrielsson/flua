@@ -27,7 +27,26 @@ local state = {
   charging = "READY_FOR_CHARGING", -- the ChargingStatus.state vocabulary
   target = 80,                     -- target SOC, percent
   climate = "OFF",                 -- air-conditioning state
+  chargingSince = nil,             -- os.time() when CHARGING started
 }
+
+-- the battery charges while CHARGING until the target: chargeRate percent
+-- per (virtual) hour — set the `chargeRate` variable to speed the
+-- simulation up (the mock's os.time() is flua's virtual clock, so the
+-- run's --%%speed/--speed accelerates it too)
+local chargeRate = 10
+
+local function advance()
+  if state.charging == "CHARGING" and state.soc < state.target and state.chargingSince then
+    local elapsed = os.time() - state.chargingSince
+    state.soc = math.min(state.target, state.soc + (chargeRate / 3600) * elapsed)
+    if state.soc >= state.target then
+      state.soc = state.target
+      state.charging = "READY_FOR_CHARGING"
+      state.chargingSince = nil
+    end
+  end
+end
 
 local function vehicle()
   return {
@@ -82,6 +101,7 @@ end
 
 local function handle(req)
   print("MOCK", req.method, req.url)
+  advance()
   rate.count = rate.count + 1
   if rate.count > 20 then
     local extra = rateHeaders()
@@ -102,8 +122,10 @@ local function handle(req)
   end
   if action == "charging/start" and method == "POST" then
     state.charging = "CHARGING"
+    state.chargingSince = os.time()
   elseif action == "charging/stop" and method == "POST" then
     state.charging = "READY_FOR_CHARGING"
+    state.chargingSince = nil
   elseif action == "charging/limit" and method == "PUT" then
     local ok, body = pcall(json.decode, req.body)
     if ok and type(body) == "table" and body.targetStateOfChargeInPercent then
@@ -126,6 +148,7 @@ local MOCK_PORT = 18290
 
 function QuickApp:onInit()
   qa = self
+  chargeRate = tonumber(self:getVariable("chargeRate")) or chargeRate
   updateMockUI()
   local port = tonumber(self:getVariable("port")) or MOCK_PORT
   local ok, srv = pcall(function()

@@ -58,6 +58,12 @@ once, prints, and exits — the smoke-test mode. The mock serves a fixed
 port (18290, overridable via its `port` variable) and stands down with a
 warning when that port is taken.
 
+The mock simulates charging: while CHARGING, the battery rises at
+`chargeRate` percent per **virtual** hour (default 10) until the target,
+then flips back to READY_FOR_CHARGING. Speed the simulation up with the
+mock's `chargeRate` variable and/or the run's `--speed`/`--%%speed` —
+the mock's `os.time()` is flua's virtual clock.
+
 ## Pinned
 
 `tests/test_skoda.py` pins three shapes: the two-QA pair in one engine

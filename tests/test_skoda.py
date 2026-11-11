@@ -196,3 +196,37 @@ async def test_mock_enforces_the_real_rate_limit(capsys) -> None:
         assert results[20][2] is not None  # Retry-After
     finally:
         await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_mock_charges_to_target_at_the_charge_rate(capsys) -> None:
+    # CHARGING advances the battery at chargeRate percent per VIRTUAL hour;
+    # a high chargeRate plus the virtual clock fast-forwards the simulation
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        _mock_id, err = engine.load_qa_file(
+            str(EXAMPLES / "myskoda_mock.lua"),
+            ["var:port=0", "var:chargeRate=3600"],  # 1% per virtual second
+        )
+        assert err is None, err
+        out = await wait_for(capsys, "SKODA_MOCK listening on ")
+        port = int(re.search(r"listening on (\d+)", out).group(1))
+        control_id, err = engine.load_qa_file(
+            str(EXAMPLES / "myskoda.lua"),
+            ['var:url="http://127.0.0.1:' + str(port) + '"'],
+        )
+        assert err is None, err
+        await wait_for(capsys, "SKODA 71 READY_FOR_CHARGING")
+        engine.api.dispatch(
+            "POST", f"/devices/{control_id}/action/startCharging", {"args": []}
+        )
+        await wait_for(capsys, "MOCK POST /api/v1/vehicles/TMBMOCK123456789/charging/start")
+        # 9 virtual seconds at 1%/s: 71% reaches the 80% target and the
+        # mock flips back to READY_FOR_CHARGING on its own
+        engine.clock.time = float(engine.clock.time + 9)
+        engine.api.dispatch("POST", f"/devices/{control_id}/action/refresh", {"args": []})
+        await wait_property(engine, control_id, "batteryLevel", 80)
+        await wait_property(engine, control_id, "state", "READY_FOR_CHARGING")
+    finally:
+        await engine.stop()
