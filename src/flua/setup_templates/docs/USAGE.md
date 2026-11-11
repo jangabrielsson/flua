@@ -663,6 +663,15 @@ device's `properties.viewLayout`, `properties.uiView`, and
 `properties.uiCallbacks` hold the generated structures, and
 `self:updateView(elm, prop, value)` updates them.
 
+Declared event handlers (`onReleased`, `onChanged`, `onToggled`, …) are
+packed **twice**: into `uiCallbacks` (the runtime mirror both flua and the
+HC3 dispatch through) **and** onto the legacy `viewLayout` elements
+themselves. The HC3's canonical form carries the event → method binding on
+the element — that is what the controller's UI editor edits — and uploads
+whose elements lack it get the HC3's generated default names
+(`ui<b2>OnReleased`) instead of your handlers. Packing the targets in both
+places keeps custom handler names alive across upload and import.
+
 At runtime a single select is set with `updateView(elm, "selectedItem", value)`
 and a multi select with `updateView(elm, "selectedItems", {value1, value2, …})`.
 Like on the HC3, an **empty** list must be `json.array()` — the marked empty

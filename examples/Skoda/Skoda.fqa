@@ -116,7 +116,8 @@
                       "weight": "1.2"
                     },
                     "text": "Start charging",
-                    "type": "button"
+                    "type": "button",
+                    "onReleased": "startCharging"
                   },
                   {
                     "style": {
@@ -139,7 +140,8 @@
                       "weight": "1.2"
                     },
                     "text": "Stop charging",
-                    "type": "button"
+                    "type": "button",
+                    "onReleased": "stopCharging"
                   },
                   {
                     "style": {
@@ -162,7 +164,8 @@
                       "weight": "1.2"
                     },
                     "text": "Start A/C",
-                    "type": "button"
+                    "type": "button",
+                    "onReleased": "startAC"
                   },
                   {
                     "style": {
@@ -185,7 +188,8 @@
                       "weight": "1.2"
                     },
                     "text": "Stop A/C",
-                    "type": "button"
+                    "type": "button",
+                    "onReleased": "stopAC"
                   },
                   {
                     "style": {
@@ -235,7 +239,8 @@
                       "weight": "1.2"
                     },
                     "text": "Charge limit",
-                    "type": "slider"
+                    "type": "slider",
+                    "onChanged": "setChargingLimit"
                   },
                   {
                     "style": {

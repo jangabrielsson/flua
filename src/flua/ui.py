@@ -127,13 +127,23 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
     typ, name = el["type"], el["id"]
     style_weight = el.get("weight") or weight or "0.50"
     if typ == "button":
-        return {
+        element = {
             "name": name,
             "visible": el.get("visible", True),
             "style": {"weight": style_weight},
             "text": el["text"],
             "type": "button",
         }
+        # the HC3's canonical form: the element carries the event -> method
+        # binding (the control's edit mode), uiCallbacks is the runtime
+        # mirror. Uploads whose elements lack the binding get the HC3's
+        # generated default names (ui<b2>OnReleased) when the controller
+        # re-derives uiCallbacks from the UI — packing the targets here
+        # keeps custom handler names alive. Undeclared events stay absent.
+        for event in ("onReleased", "onLongPressDown", "onLongPressReleased"):
+            if el.get(event):
+                element[event] = el[event]
+        return element
     if typ in ("select", "multi"):
         # legacy format: the selection lives in "values" (an array), even
         # for single select — its declared initial value is el["value"]
@@ -142,7 +152,7 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
             values = [el["value"]]
         else:
             values = list(el.get("values") or [])
-        return {
+        element = {
             "name": name,
             "style": {"weight": style_weight},
             "text": el["text"],
@@ -152,8 +162,11 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
             "options": _options(el),
             "values": values,
         }
+        if el.get("onToggled"):
+            element["onToggled"] = el["onToggled"]
+        return element
     if typ == "switch":
-        return {
+        element = {
             "name": name,
             "visible": el.get("visible", True),
             "style": {"weight": style_weight},
@@ -161,6 +174,18 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
             "type": "switch",
             "value": el["value"],
         }
+        # event targets on the element (see the button comment above),
+        # including the 5.221 split toggle events
+        for event in (
+            "onReleased",
+            "onLongPressDown",
+            "onLongPressReleased",
+            "onToggleOn",
+            "onToggleOff",
+        ):
+            if el.get(event):
+                element[event] = el[event]
+        return element
     if typ == "slider":
         element = {
             "name": name,
@@ -175,6 +200,8 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
         }
         if el.get("unit"):
             element["unit"] = el["unit"]
+        if el.get("onChanged"):
+            element["onChanged"] = el["onChanged"]
         return element
     # label
     return {
@@ -331,20 +358,30 @@ def _callback_map(ui_callbacks: Any) -> dict[str, dict[str, str]]:
 
 def _element(component: dict[str, Any], callbacks: dict[str, dict[str, str]]) -> dict[str, Any]:
     """One UI component (uiView or legacy viewLayout shape) -> one --%%u
-    element dict."""
+    element dict. Event targets come from the component's own event fields
+    when present (the HC3's canonical form for legacy viewLayout elements),
+    falling back to the uiCallbacks mirror (the uiView's only form)."""
     name = str(component.get("name") or "")
     text = str(component.get("text") or "")
     events = callbacks.get(name, {})
+
+    def event_target(event: str) -> str:
+        declared = component.get(event)
+        return str(declared) if declared else events.get(event, "")
+
     typ = str(component.get("type") or "")
     if typ == "button":
         element: dict[str, Any] = {"button": name, "text": text}
         for event in ("onReleased", "onLongPressDown", "onLongPressReleased"):
-            if events.get(event):
-                element[event] = events[event]
+            target = event_target(event)
+            if target:
+                element[event] = target
     elif typ == "switch":
         element = {"switch": name, "text": text, "value": str(component.get("value", "false"))}
-        if events.get("onReleased"):
-            element["onReleased"] = events["onReleased"]
+        for event in ("onReleased", "onToggleOn", "onToggleOff"):
+            target = event_target(event)
+            if target:
+                element[event] = target
     elif typ == "slider":
         element = {
             "slider": name,
@@ -356,8 +393,8 @@ def _element(component: dict[str, Any], callbacks: dict[str, dict[str, str]]) ->
         }
         if component.get("unit"):
             element["unit"] = str(component["unit"])
-        if events.get("onChanged"):
-            element["onChanged"] = events["onChanged"]
+        if event_target("onChanged"):
+            element["onChanged"] = event_target("onChanged")
     elif typ == "select":
         multi = component.get("selectionType") == "multi"
         key = "multi" if multi else "select"
@@ -380,8 +417,8 @@ def _element(component: dict[str, Any], callbacks: dict[str, dict[str, str]]) ->
             element["value"] = component["value"]
         elif isinstance(component.get("values"), list) and component["values"]:
             element["value"] = component["values"][0]
-        if events.get("onToggled"):
-            element["onToggled"] = events["onToggled"]
+        if event_target("onToggled"):
+            element["onToggled"] = event_target("onToggled")
     else:
         # unknown component kinds degrade to a label
         element = {"label": name, "text": text}

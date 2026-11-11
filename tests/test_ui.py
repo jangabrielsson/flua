@@ -476,6 +476,84 @@ def test_select_ui_view_carries_values_array() -> None:
     assert "value" not in component  # the scalar spelling is gone from the uiView
 
 
+def test_legacy_layout_carries_event_bindings() -> None:
+    # regression: uploading a packed QA to the HC3 mangled custom handler
+    # names into generated ui<b2>OnReleased defaults. The HC3's canonical
+    # form carries the event -> method binding ON the element (the control's
+    # edit mode), uiCallbacks being the runtime mirror; re-deriving
+    # uiCallbacks from elements without bindings fills the generated names.
+    # The packed legacy viewLayout must therefore carry the declared targets.
+    rows = [
+        {"button": "b2", "text": "Zone \u25bc", "onReleased": "zoneDownButton"},
+        {
+            "button": "b10",
+            "text": "+H",
+            "onLongPressReleased": "infiniteDuration",
+            "onReleased": "timeUpButton",
+        },
+        {"switch": "auto", "value": "false", "onToggleOn": "autoOn", "onToggleOff": "autoOff"},
+        {"slider": "limit", "onChanged": "setLimit"},
+        {"select": "mode", "onToggled": "setMode"},
+    ]
+    ui = compile_ui(rows, 5000)
+    components = []
+    for item in ui["viewLayout"]["$jason"]["body"]["sections"]["items"]:
+        for c in item.get("components") or []:
+            if c.get("components"):  # a horizontal row's inner components
+                components.extend(c["components"])
+            elif c.get("name"):
+                components.append(c)
+    by_name = {c["name"]: c for c in components}
+    assert by_name["b2"]["onReleased"] == "zoneDownButton"
+    assert "onLongPressDown" not in by_name["b2"]  # undeclared events stay absent
+    assert by_name["b10"]["onLongPressReleased"] == "infiniteDuration"
+    assert by_name["auto"]["onToggleOn"] == "autoOn"
+    assert by_name["auto"]["onToggleOff"] == "autoOff"
+    assert by_name["limit"]["onChanged"] == "setLimit"
+    assert by_name["mode"]["onToggled"] == "setMode"
+    # uiCallbacks unchanged — the runtime mirror both flua and the HC3 read
+    callbacks = {(c["name"], c["eventType"]): c["callback"] for c in ui["uiCallbacks"]}
+    assert callbacks[("b2", "onReleased")] == "zoneDownButton"
+    assert callbacks[("auto", "onToggleOn")] == "autoOn"
+
+
+def test_legacy_layout_events_roundtrip_without_ui_callbacks() -> None:
+    # a real HC3 legacy viewLayout carries the bindings on the elements;
+    # ui_to_u_rows must read them from there — uiCallbacks may be missing
+    # or mangled on the device
+    layout = {
+        "$jason": {
+            "body": {
+                "sections": {
+                    "items": [
+                        {
+                            "components": [
+                                {
+                                    "name": "b2",
+                                    "visible": True,
+                                    "style": {"weight": "1.2"},
+                                    "text": "Zone",
+                                    "type": "button",
+                                    "onReleased": "zoneDownButton",
+                                },
+                                {"style": {"weight": "0.50"}, "type": "space"},
+                            ],
+                            "style": {"weight": "1.2"},
+                            "type": "vertical",
+                        }
+                    ]
+                }
+            }
+        }
+    }
+    from flua.config import parse_lua_literal
+
+    rows = ui_to_u_rows(view_layout=layout, ui_callbacks=[])
+    parsed = parse_lua_literal(rows[0])
+    assert parsed["button"] == "b2"
+    assert parsed["onReleased"] == "zoneDownButton"
+
+
 def test_device_ui_renders_from_an_hc3_device() -> None:
     # the --tool ui --device path: an HC3 device's UI properties render
     # back to --%%u rows (ui_to_u_rows, the downloadQA converter) with the
