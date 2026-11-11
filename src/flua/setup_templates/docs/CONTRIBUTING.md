@@ -22,9 +22,15 @@ Before diving in, read the orientation pair:
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"     # pytest + ruff
+git config core.hooksPath .githooks    # the pre-commit hook keeps the synced trees fresh
 ```
 
 Requires Python 3.11+; `lupa` is the only runtime dependency.
+
+The pre-commit hook runs `scripts/sync-skills.sh` and stages the
+regenerated trees (skills, docs, forum index) — commits can then never
+fail the CI sync guard because of drift. Hooks are not transferred by
+clone, which is why the `core.hooksPath` line above is part of setup.
 
 ## Development loop
 

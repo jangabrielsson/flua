@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Pre-commit: regenerate the synced trees (skills, docs, forum index) so a
+# commit can never trip the CI sync guard. The trees under
+# src/flua/setup_templates/ are generated — any change there is drift, so
+# staging them is always correct.
+#
+# Enabled per clone with:  git config core.hooksPath .githooks
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+if [ -x scripts/sync-skills.sh ]; then
+    ./scripts/sync-skills.sh >/dev/null
+fi
+
+# stage whatever the sync regenerated (modified and new files alike)
+git add -A -- src/flua/setup_templates/
