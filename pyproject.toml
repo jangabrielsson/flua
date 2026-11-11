@@ -90,6 +90,7 @@ flua = [
     "multifile/*.lua",
     "Modbus Server/*",
     "Solar Edge Modbus Demo/*",
+    "Skoda/*",
     "event_tests/*",
 ]
 

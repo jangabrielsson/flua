@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MyŠkoda Public API - Developer Documentation</title>
+<link rel="stylesheet" href="/docs/docs.css">
+<script src="/docs/docs.js"></script>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <div>
+      <h1>MyŠkoda Public API</h1>
+      <p class="tagline">Read connected-vehicle data and control your Škoda from your own integrations.</p>
+    </div>
+    <nav>
+      <a class="header-link" href="/docs/swagger-ui.html">API reference</a>
+      <a class="header-link" href="/docs/changelog">Changelog</a>
+    </nav>
+  </div>
+</header>
+<main>
+  <section id="intro">
+    <p>The MyŠkoda Public API lets third-party developers read connected-vehicle data and remotely
+    control Škoda vehicles - for example to connect a car to a smart-home platform such as Home
+    Assistant. If you own a connected Škoda and want to build on top of its data, this API is for
+    you.</p>
+  </section>
+
+  <section id="data">
+    <h2>What you get</h2>
+    <p>For each vehicle the API returns its current state:</p>
+    <ul>
+      <li>vehicle status - doors, windows and lights</li>
+      <li>fuel status (combustion engines) and odometer</li>
+      <li>air conditioning, including auxiliary heating and active ventilation</li>
+      <li>charging and charging profiles (saved charging locations)</li>
+      <li>parking position</li>
+    </ul>
+    <p>Remote commands let you start and stop charging and air conditioning, set the charging limit
+    (target state of charge) and change the charge mode. The data available for a specific vehicle
+    depends on what that vehicle supports.</p>
+  </section>
+
+  <section id="personal-use">
+    <h2>Personal use only</h2>
+    <p>The MyŠkoda Public API is provided for personal end-user use only. The API may not be used
+    to develop, provide, or operate commercial products or services, nor may it be resold,
+    redistributed, or otherwise exploited for commercial purposes.</p>
+    <p>If you require API access for commercial use cases, please refer to our official Charging
+    Data API available via the Developer Hub:
+    <a href="https://drivesomethinggreater.com/developer-hub/api-specifications/charging-data-api-specification">Charging
+    Data API Specification</a></p>
+  </section>
+
+  <section id="api-key">
+    <h2>Getting an API key</h2>
+    <p>Every request needs an API key. Keys are created and managed in the <strong>MyŠkoda
+    app</strong>.</p>
+    <p><strong>Are you on a mobile phone with MyŠkoda installed?</strong></p>
+    <p><a class="button" href="https://go.skoda.eu/api-keys">Manage API keys</a></p>
+    <p><strong>Reading this on a computer?</strong> Scan the QR code below with your phone to open
+    key management in the app:</p>
+    <div class="qr">
+      <img src="/docs/api-keys-qr.svg" alt="QR code linking to API key management in the MyŠkoda app">
+    </div>
+    <p><strong>Don't have MyŠkoda?</strong>
+    <a href="https://go.skoda.eu/myskoda">Download it here</a>.</p>
+  </section>
+
+  <section id="quickstart">
+    <h2>Quickstart</h2>
+    <p>Pass the key in the <code>X-API-Key</code> header. Fetch your vehicle and its current
+    state:</p>
+    <pre><code>curl -H "X-API-Key: YOUR_API_KEY" \
+  https://public.api.connect.skoda-auto.cz/api/v1/vehicles/YOUR_VIN</code></pre>
+    <p>A trimmed example response:</p>
+    <pre><code>{
+  "vehicle": {
+    "vin": "TMBJB9NY5RF999999",
+    "name": "My Enyaq",
+    "licensePlate": "1MB 1234",
+    "status": {
+      "overall": { "doorsLocked": "YES" }
+    },
+    "charging": { }
+  },
+  "errors": []
+}</code></pre>
+    <p>The response can be limited to selected parts of the data with the <code>include</code> query
+    parameter - see the <a href="/docs/swagger-ui.html">API reference</a> for details.</p>
+  </section>
+
+  <section id="authentication">
+    <h2>Authentication and key expiry</h2>
+    <p>Send the API key with every request in the <code>X-API-Key</code> header. Keys are bound to
+    the vehicles you selected when creating them, and they expire.</p>
+    <ul>
+      <li>Every successful response carries the <code>X-API-Key-Expires-At</code> header with the
+      key's expiry time - use it to renew keys before they lapse.</li>
+      <li>A request with an expired key fails with <strong>401</strong> and the problem type
+      <a href="/problems/api-key-expired"><code>api-key-expired</code></a>.</li>
+      <li>A request the key is not allowed to make (for example a vehicle it does not cover) fails
+      with <strong>403</strong> and the problem type
+      <a href="/problems/api-key-not-authorized"><code>api-key-not-authorized</code></a>.</li>
+    </ul>
+    <p>In both cases the fix is the same: create or update a key in the
+    <a href="https://go.skoda.eu/api-keys">MyŠkoda app</a>.</p>
+  </section>
+
+  <section id="partial-data">
+    <h2>Partial data</h2>
+    <p>A <code>200</code> response is not always complete. Parts of the data that your vehicle does
+    not support are omitted, and so are parts that could not be retrieved at that moment. Every
+    omitted part is described by an entry in the <code>errors</code> list of the response, with a
+    machine-readable <code>type</code> code. Treat the <code>errors</code> list as informational -
+    a non-empty list does not mean the request failed.</p>
+    <p>A part that is returned is not always complete either. A single field inside it is omitted
+    when the vehicle reports no usable value for it, or when the reported value has no published
+    counterpart - for example the derived charging <code>state</code> while the cable is plugged in
+    and unlocked without a running charging process. Such an omission has no entry in the
+    <code>errors</code> list; treat a missing field as unknown, never as a specific value. The field
+    descriptions in the API reference say when a field is omitted.</p>
+  </section>
+
+  <section id="rate-limits">
+    <h2>Rate limits</h2>
+    <p>Requests are rate-limited per VIN. The current limit is <strong>20 requests per
+    hour</strong>; this value is not final and may change. The response headers are the
+    authoritative source:</p>
+    <ul>
+      <li><code>RateLimit-Limit</code> - your quota</li>
+      <li><code>RateLimit-Remaining</code> - requests left in the current window</li>
+      <li><code>RateLimit-Reset</code> - seconds until the quota replenishes</li>
+    </ul>
+    <p>When the limit is exceeded the API responds with <code>429 Too Many Requests</code>; wait for
+    the period indicated by the <code>Retry-After</code> header before retrying.</p>
+    <p>Every authenticated request to a rate-limited endpoint counts against the quota, including
+    requests that end with an error response (for example a <code>5xx</code> caused by a temporary
+    outage) - such responses carry the <code>RateLimit-*</code> headers too. Requests rejected with
+    <code>401</code> or <code>403</code> do not consume quota, and requests rejected with
+    <code>429</code> do not prolong the current window.</p>
+  </section>
+
+  <section id="reference">
+    <h2>API reference</h2>
+    <p>The full contract - all endpoints, schemas and headers - lives in the interactive
+    reference:</p>
+    <p><a class="button" href="/docs/swagger-ui.html">Open the API reference</a></p>
+  </section>
+
+  <section id="errors">
+    <h2>Errors</h2>
+    <p>Error responses use the <code>application/problem+json</code> format (RFC 9457). Generic
+    errors that carry no meaning beyond their HTTP status code use the type
+    <code>about:blank</code>; specific error conditions have their own problem type URI, which
+    doubles as a link to its documentation page:</p>
+    <table>
+      <tr>
+        <th>Problem type</th>
+        <th>Status</th>
+        <th>Meaning</th>
+      </tr>
+      <tr>
+        <td><a href="/problems/api-key-expired"><code>api-key-expired</code></a></td>
+        <td>401</td>
+        <td>The API key has passed its expiry date.</td>
+      </tr>
+      <tr>
+        <td><a href="/problems/api-key-not-authorized"><code>api-key-not-authorized</code></a></td>
+        <td>403</td>
+        <td>The API key is not authorized to execute the operation.</td>
+      </tr>
+      <tr>
+        <td><a href="/problems/operation-not-authorized"><code>operation-not-authorized</code></a></td>
+        <td>403</td>
+        <td>The vehicle refused the operation for the user the API key belongs to.</td>
+      </tr>
+      <tr>
+        <td><a href="/problems/operation-not-supported"><code>operation-not-supported</code></a></td>
+        <td>422</td>
+        <td>The vehicle lacks the capability the operation needs.</td>
+      </tr>
+      <tr>
+        <td><a href="/problems/operation-disabled"><code>operation-disabled</code></a></td>
+        <td>422</td>
+        <td>The capability the operation needs is currently disabled for the vehicle.</td>
+      </tr>
+      <tr>
+        <td><a href="/problems/rate-limit-exceeded"><code>rate-limit-exceeded</code></a></td>
+        <td>429</td>
+        <td>The rate limit for the API key has been exceeded.</td>
+      </tr>
+      <tr>
+        <td><a href="/problems/vehicle-not-accepting-requests"><code>vehicle-not-accepting-requests</code></a></td>
+        <td>429</td>
+        <td>The vehicle declined the operation and it can be retried later.</td>
+      </tr>
+    </table>
+  </section>
+</main>
+</body>
+</html>
