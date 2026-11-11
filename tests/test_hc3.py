@@ -8,6 +8,7 @@ import asyncio
 import base64
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -282,8 +283,44 @@ class _MockHc3(BaseHTTPRequestHandler):
         self._send_json({"error": "not found"}, 404)
 
     def do_POST(self):
-        body = self._read_body()
         path = self.path.split("?")[0]
+        length = int(self.headers.get("Content-Length") or 0)
+        raw = self.rfile.read(length) if length else b""
+        if path == "/api/quickApp/import":
+            # the web UI's wire format (multipart/form-data: file + roomId) —
+            # the endpoint uploadQA/uploadFQA use against a real HC3: it
+            # preserves the package verbatim (custom uiCallbacks included),
+            # unlike the JSON create which re-derives them with generated names
+            match = re.search(
+                rb"boundary=(.+)$", (self.headers.get("Content-Type") or "").encode()
+            )
+            fields: dict[str, str] = {}
+            if match:
+                boundary = match.group(1).strip()
+                for part in raw.split(b"--" + boundary):
+                    part = part.strip(b"\r\n")
+                    if not part or part == b"--":
+                        continue
+                    head, _, content = part.partition(b"\r\n\r\n")
+                    name = re.search(rb'name="([^"]+)"', head)
+                    if name:
+                        fields[name.group(1).decode()] = content.decode("utf-8")
+            try:
+                fqa = json.loads(fields.get("file") or "")
+            except ValueError:
+                fqa = None
+            if fqa is None or not isinstance(fqa.get("files"), list):
+                self._send_json({"error": "bad fqa"}, 400)
+                return
+            type(self).uploaded.append(fqa)
+            self._send_json({"id": 300, "name": fqa["name"]}, 201)
+            return
+        body = None
+        if raw:
+            try:
+                body = json.loads(raw)
+            except ValueError:
+                body = raw.decode()
         if path.startswith("/api/quickApp/export/"):
             # some firmware versions reject the export POST altogether (a
             # bodyless one is always a 400 on the real HC3); the deprecated
