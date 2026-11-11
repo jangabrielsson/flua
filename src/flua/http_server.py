@@ -241,10 +241,15 @@ async def _read_request(
             payload = await reader.readexactly(length)
             text = payload.decode("utf-8", "replace")
             if text.strip():
-                try:
-                    body = json.loads(text)
-                except ValueError:
-                    raise _BadRequest(text) from None
+                if (headers.get("content-type") or "").startswith("multipart/form-data"):
+                    # the import endpoint's wire format (the HC3 web UI) —
+                    # pass the raw body through; the route parses the parts
+                    body = text
+                else:
+                    try:
+                        body = json.loads(text)
+                    except ValueError:
+                        raise _BadRequest(text) from None
     return method, target, headers, body
 
 

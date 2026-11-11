@@ -75,6 +75,47 @@ async def server(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_import_accepts_multipart_body_over_http(server) -> None:
+    # the HC3 web UI's import wire format: a multipart/form-data POST whose
+    # `file` part carries the .fqa JSON. The sim parses it like the real
+    # HC3, so a QA installing an .fqa via net.HTTPClient (hand-built
+    # multipart) can be tested offline.
+    engine, _api_server, base = server
+    fqa = json.dumps(
+        {
+            "type": "QuickApp",
+            "name": "multipart-qa",
+            "files": [
+                {"name": "main", "isMain": True, "content": "print('MP QA')\n"}
+            ],
+        }
+    )
+    boundary = "----fluaTestBoundary"
+    body = (
+        f"--{boundary}\r\n"
+        'Content-Disposition: form-data; name="file"; filename="x.fqa"\r\n'
+        "Content-Type: application/octet-stream\r\n\r\n"
+        f"{fqa}\r\n"
+        f"--{boundary}--\r\n"
+    ).encode()
+
+    def post():
+        req = urllib.request.Request(
+            f"{base}/api/quickApp/import", data=body, method="POST"
+        )
+        req.add_header(
+            "Content-Type", f"multipart/form-data; boundary={boundary}"
+        )
+        with urllib.request.urlopen(req) as res:
+            return res.status, json.loads(res.read())
+
+    status, device = await asyncio.to_thread(post)
+    assert status == 200
+    assert device["name"] == "multipart-qa"
+    assert device["id"] in engine.api.state.devices
+
+
+@pytest.mark.asyncio
 async def test_viewer_page_served_at_root(server) -> None:
     # flua --ui serves the viewer itself: GET / returns the page (same
     # origin as the API it polls), with the packaged copy synced to the repo

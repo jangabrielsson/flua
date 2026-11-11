@@ -191,6 +191,37 @@ def _trace_body(body: Any) -> str:
     return text if len(text) <= 1000 else text[:1000] + "..."
 
 
+def _fqa_from_multipart(body: str | bytes) -> dict[str, Any] | None:
+    """The multipart/form-data wire format the HC3 web UI uses for
+    POST /quickApp/import: the ``file`` part carries the .fqa JSON. The
+    dispatcher only sees the body (no headers), so the boundary is
+    recovered from the first line (``--boundary\r\n``). Parses just enough
+    — the parts and the file content."""
+    raw = body.encode("utf-8", errors="replace") if isinstance(body, str) else body
+    first_line = raw.split(b"\r\n", 1)[0]
+    if not first_line.startswith(b"--"):
+        return None
+    boundary = first_line[2:].rstrip()
+    if not boundary:
+        return None
+    for part in raw.split(b"--" + boundary):
+        part = part.strip(b"\r\n")
+        if not part or part == b"--":
+            continue
+        head, _, content = part.partition(b"\r\n\r\n")
+        name = re.search(rb'name="([^"]+)"', head)
+        if name is None or name.group(1).decode() != "file":
+            continue
+        try:
+            fqa = json.loads(content.decode("utf-8"))
+        except ValueError:
+            return None
+        if not isinstance(fqa, dict) or not isinstance(fqa.get("files"), list):
+            return None
+        return fqa
+    return None
+
+
 class Api:
     """Dispatch facade owned by the engine. Offline: everything is local."""
 
@@ -509,8 +540,13 @@ class Api:
 
     @staticmethod
     def _parse_fqa_body(body: Any) -> dict[str, Any] | None:
-        """Accept the documented base64 body ({"file": "<base64>"}) or a
-        direct .fqa table (flua convenience)."""
+        """Accept the import endpoint's bodies: the documented base64 body
+        ({"file": "<base64>"}), a direct .fqa table (flua convenience), and
+        — like the real HC3 — a multipart/form-data body (the web UI's wire
+        format: a ``file`` part carrying the .fqa JSON). The controller's
+        parser is strictly multipart; a raw JSON body there dies with a 500."""
+        if isinstance(body, (str, bytes)):
+            return _fqa_from_multipart(body)
         if not isinstance(body, dict):
             return None
         if "file" in body:

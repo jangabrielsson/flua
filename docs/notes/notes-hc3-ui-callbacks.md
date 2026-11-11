@@ -49,6 +49,18 @@ action ignored".
   builds, which would explain why QAs uploaded through the API years ago
   still work while new uploads broke.
 
+### The import endpoint's parser is strictly multipart
+
+A raw JSON .fqa body at `POST /quickApp/import` dies with HTTP 500
+`{"reason":"Network error","message":"Field name too long"}` — the handler
+parses ANY body as multipart form fields (live-verified). So a QA cannot
+install an .fqa with a plain `api.post` (JSON): it must hand-build the
+multipart body and send it with `net.HTTPClient` (Content-Type
+`multipart/form-data`, a `file` part with filename). flua's sim parses
+that multipart format too (`_fqa_from_multipart` + the ApiServer's
+multipart body passthrough), so the QA-installs-QA flow is testable
+offline — pinned by `tests/test_ui_server.py::test_import_accepts_multipart_body_over_http`.
+
 ### Why the proxy never showed the problem
 
 Two reasons, both visible in the code:
