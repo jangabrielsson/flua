@@ -31,6 +31,7 @@
 --%%u:{button='stopCharge',text='Stop charging',onReleased='stopCharging'}
 --%%u:{button='startAC',text='Start A/C',onReleased='startAC'}
 --%%u:{button='stopAC',text='Stop A/C',onReleased='stopAC'}
+--%%u:{label='l22',text='Set charging target'}
 --%%u:{slider='chargeLimit',text='Charge limit',min=50,max=100,onChanged='setChargingLimit'}
 
 -- getVariable returns "" for unset variables (flua), and "" is truthy
@@ -121,6 +122,8 @@ function QuickApp:refresh()
     qa:updateView("chargeState", "text", "Charging state: " .. colored(tostring(status.state or "?"), chargeColor))
     qa:updateView("climate", "text", "A/C Status: " .. colored(tostring(ac.state or "?"), climateColor))
     qa:updateView("target", "text", "Target charge: " .. tostring(settings.targetStateOfChargeInPercent or "?") .. " %")
+    -- the slider mirrors the API's actual target (slider values are strings)
+    qa:updateView("chargeLimit", "value", tostring(settings.targetStateOfChargeInPercent or 50))
     print("SKODA", battery.stateOfChargeInPercent or "?", status.state or "?")
     if qa:getVariable("once") == "true" then exit(0) end
   end)
