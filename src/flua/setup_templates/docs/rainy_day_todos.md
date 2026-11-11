@@ -204,3 +204,12 @@ assertion totals in `flua test --json`.
 - **Verification-layer boundaries** — tool summaries should say what each
   check proves (static ≠ runtime; mock ≠ car; `_FLUA` removal tests branch
   logic, not firmware).
+- **Simplify the upload wire format** — with `initialProperties.apiVersion`
+  in every flua-packed .fqa (the real HC3 format marker, live-verified),
+  the tools could drop the multipart `/quickApp/import` path and use the
+  plain JSON create like plua does. Parked by decision (2026-11-11): the
+  import endpoint stays as belt-and-braces. When revisited: switch
+  uploadFQA/uploadQA/installHelper/proxy to the JSON create, keep
+  `Hc3Remote.multipart` only if still needed, keep the sim's multipart
+  parsing + the skill's multipart recipe as the marker-less-package
+  fallback.
