@@ -8,6 +8,7 @@ mock state -> device properties, actions -> mock request log + state.
 import asyncio
 import re
 import socket
+import sys
 import time
 from pathlib import Path
 
@@ -239,3 +240,34 @@ async def test_mock_charges_to_target_at_the_charge_rate(capsys) -> None:
         await wait_property(engine, control_id, "state", "READY_FOR_CHARGING")
     finally:
         await engine.stop()
+
+
+def test_skoda_fqa_tracks_the_source() -> None:
+    # the checked-in package is the download artifact — it must never go
+    # stale. Pack is deterministic, so re-packing must reproduce it
+    # byte-for-byte.
+    import subprocess
+
+    packed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "flua",
+            "--tool",
+            "pack",
+            str(EXAMPLES / "myskoda.lua"),
+            "-o",
+            str(EXAMPLES / "Skoda.fqa.tmp"),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert packed.returncode == 0, packed.stdout + packed.stderr
+    try:
+        assert (EXAMPLES / "Skoda.fqa.tmp").read_bytes() == (EXAMPLES / "Skoda.fqa").read_bytes(), (
+            "Skoda.fqa is stale — rebuild it: "
+            "flua --tool pack examples/Skoda/myskoda.lua -o Skoda.fqa"
+        )
+    finally:
+        (EXAMPLES / "Skoda.fqa.tmp").unlink(missing_ok=True)

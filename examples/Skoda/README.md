@@ -25,6 +25,10 @@ Files:
   implemented by the mock, noted in its header).
 - `MyŠkoda Public API - Developer Documentation.html` — the official
   HTML documentation page.
+- `Skoda.fqa` — the packaged control QA, ready to upload to a
+  controller or share. Rebuild with `flua --tool pack examples/Skoda/
+  myskoda.lua -o Skoda.fqa` after changing the QA (a test pins the
+  artifact against the source).
 
 ## Run offline against the mock
 
