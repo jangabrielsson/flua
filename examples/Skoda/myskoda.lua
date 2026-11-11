@@ -1,5 +1,5 @@
 --%%name:Skoda
---%%type:com.fibaro.binarySwitch
+--%%type:com.fibaro.genericDevice
 --%%interface:battery
 -- myskoda.lua — a Skoda car control QA against the MyŠkoda Public API.
 --
@@ -24,13 +24,13 @@
 --            startAC, stopAC, refresh
 
 --%%u:{label='battery',text='Battery'}
---%%u:{label='state',text='State'}
---%%u:{label='climate',text='Climate'}
---%%u:{label='target',text='Target'}
+--%%u:{label='chargeState',text='Charging state'}
+--%%u:{label='climate',text='A/C Status'}
+--%%u:{label='target',text='Target charge'}
 --%%u:{button='startCharge',text='Start charging',onReleased='startCharging'}
 --%%u:{button='stopCharge',text='Stop charging',onReleased='stopCharging'}
---%%u:{button='startAC',text='Start AC',onReleased='startAC'}
---%%u:{button='stopAC',text='Stop AC',onReleased='stopAC'}
+--%%u:{button='startAC',text='Start A/C',onReleased='startAC'}
+--%%u:{button='stopAC',text='Stop A/C',onReleased='stopAC'}
 --%%u:{slider='chargeLimit',text='Charge limit',min=50,max=100,onChanged='setChargingLimit'}
 
 -- getVariable returns "" for unset variables (flua), and "" is truthy
@@ -102,19 +102,25 @@ function QuickApp:refresh()
     local battery = status.battery or {}
     local settings = charging.settings or {}
     local ac = data.airConditioning or {}
-    -- the device property set is fixed by the type: the declared `value`
-    -- mirrors charging, the dynamic state lives in QuickApp variables,
-    -- and the UI labels show it (the real HC3 ignores updates to
-    -- properties the type does not declare)
-    qa:updateProperty("value", status.state == "CHARGING")
-    qa:updateProperty("batteryLevel", battery.stateOfChargeInPercent)
+    -- the device property set is fixed by the type: batteryLevel comes
+    -- from the battery interface, the rest of the dynamic state lives in
+    -- QuickApp variables, and the UI labels show it with colors (label
+    -- text allows HTML)
+    local soc = battery.stateOfChargeInPercent
+    qa:updateProperty("batteryLevel", soc)
     qa:setVariable("state", tostring(status.state or ""))
     qa:setVariable("climate", tostring(ac.state or ""))
     qa:setVariable("target", tostring(settings.targetStateOfChargeInPercent or ""))
-    qa:updateView("battery", "text", tostring(battery.stateOfChargeInPercent or "?") .. " %")
-    qa:updateView("state", "text", tostring(status.state or "?"))
-    qa:updateView("climate", "text", tostring(ac.state or "?"))
-    qa:updateView("target", "text", tostring(settings.targetStateOfChargeInPercent or "?") .. " %")
+    local function colored(value, color)
+      return "<font color='" .. color .. "'>" .. value .. "</font>"
+    end
+    local batteryColor = (soc and soc >= 50) and "green" or "red"
+    local chargeColor = status.state == "CHARGING" and "green" or "grey"
+    local climateColor = ac.state == "ON" and "coral" or "grey"
+    qa:updateView("battery", "text", "Battery: " .. colored(tostring(soc or "?") .. " %", batteryColor))
+    qa:updateView("chargeState", "text", "Charging state: " .. colored(tostring(status.state or "?"), chargeColor))
+    qa:updateView("climate", "text", "A/C Status: " .. colored(tostring(ac.state or "?"), climateColor))
+    qa:updateView("target", "text", "Target charge: " .. tostring(settings.targetStateOfChargeInPercent or "?") .. " %")
     print("SKODA", battery.stateOfChargeInPercent or "?", status.state or "?")
     if qa:getVariable("once") == "true" then exit(0) end
   end)

@@ -1,4 +1,9 @@
 --%%name:SkodaMock
+--%%type:com.fibaro.genericDevice
+--%%u:{label='battery',text='Battery'}
+--%%u:{label='chargeState',text='Charging state'}
+--%%u:{label='climate',text='A/C Status'}
+--%%u:{label='target',text='Target charge'}
 -- myskoda_mock.lua — a mock MyŠkoda Public API server (net.HTTPServer)
 --
 -- Serves the subset of the public API the control QA
@@ -39,6 +44,18 @@ local function vehicle()
   }
 end
 
+-- the mock's own labels mirror the served state (the QA instance is
+-- captured in onInit — handlers run in the QA context)
+local qa
+local function updateMockUI()
+  if qa then
+    qa:updateView("battery", "text", "Battery: " .. tostring(state.soc) .. " %")
+    qa:updateView("chargeState", "text", "Charging state: " .. state.charging)
+    qa:updateView("climate", "text", "A/C Status: " .. state.climate)
+    qa:updateView("target", "text", "Target charge: " .. tostring(state.target) .. " %")
+  end
+end
+
 local function reply(status, body)
   return { status = status, body = body, headers = { ["Content-Type"] = "application/json" } }
 end
@@ -73,6 +90,7 @@ local function handle(req)
   else
     return reply(405, json.encode({ error = "method not allowed" }))
   end
+  updateMockUI()
   return reply(202, "")
 end
 
@@ -81,6 +99,8 @@ end
 local MOCK_PORT = 18290
 
 function QuickApp:onInit()
+  qa = self
+  updateMockUI()
   local port = tonumber(self:getVariable("port")) or MOCK_PORT
   local ok, srv = pcall(function()
     local server = net.HTTPServer()

@@ -79,7 +79,6 @@ async def test_skoda_pair_runs_offline(capsys) -> None:
     try:
         engine, _mock_id, control_id = await start_pair(capsys, ['var:once="true"'])
         dev = engine.api.state.devices[control_id]
-        assert dev["properties"]["value"] is False  # not charging
         assert dev["properties"]["batteryLevel"] == 71  # the battery interface
         qvars = {
             v["name"]: v["value"]
@@ -102,7 +101,7 @@ async def test_skoda_actions_drive_the_mock(capsys) -> None:
         vin = "TMBMOCK123456789"
         engine.api.dispatch("POST", f"/devices/{control_id}/action/startCharging", {"args": []})
         await wait_for(capsys, f"MOCK POST /api/v1/vehicles/{vin}/charging/start")
-        await wait_property(engine, control_id, "value", True)
+        await wait_property(engine, control_id, "state", "CHARGING")
 
         engine.api.dispatch(
             "POST", f"/devices/{control_id}/action/setChargingLimit", {"args": ["90"]}
@@ -116,7 +115,7 @@ async def test_skoda_actions_drive_the_mock(capsys) -> None:
 
         engine.api.dispatch("POST", f"/devices/{control_id}/action/stopCharging", {"args": []})
         await wait_for(capsys, f"MOCK POST /api/v1/vehicles/{vin}/charging/stop")
-        await wait_property(engine, control_id, "value", False)
+        await wait_property(engine, control_id, "state", "READY_FOR_CHARGING")
     finally:
         if engine is not None:
             await engine.stop()
@@ -138,6 +137,5 @@ async def test_skoda_embeds_the_mock_when_no_url_is_set(capsys) -> None:
         assert "MOCK GET /api/v1/vehicles/TMBMOCK123456789" in out
         dev = engine.api.state.devices[control_id]
         assert dev["properties"]["batteryLevel"] == 71
-        assert dev["properties"]["value"] is False
     finally:
         await engine.stop()
