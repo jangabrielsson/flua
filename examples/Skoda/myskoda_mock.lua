@@ -102,6 +102,7 @@ end
 local function handle(req)
   print("MOCK", req.method, req.url)
   advance()
+  updateMockUI()  -- the advance (charging progress) changed the state
   rate.count = rate.count + 1
   if rate.count > 20 then
     local extra = rateHeaders()
