@@ -25,24 +25,25 @@ Files:
 
 ## Run offline against the mock
 
-One file is enough — with no `url` configured, the control QA loads the
-bundled mock QA (`examples/Skoda/myskoda_mock.lua`, via
+One file is enough — with no `url` configured, the control QA loads
+the bundled mock QA (`examples/Skoda/myskoda_mock.lua`, via
 `_FLUA.loadQAfromFile`) and tests against it:
 
 ```bash
 flua --api local examples/Skoda/myskoda.lua
 ```
 
-The two-QA style also works (the standalone mock is a thin wrapper):
+The two-QA style also works — the mock publishes its port in the
+`skodaMockPort` global variable and the control QA discovers it, so no
+port or url configuration is needed either way:
 
 ```bash
 flua --api local examples/Skoda/myskoda_mock.lua examples/Skoda/myskoda.lua
 ```
 
-The mock prints its port (`SKODA_MOCK listening on <port>`); the control
-QA polls it, printing `SKODA <battery> <state>` on every refresh, and its
-device properties track the car state. Drive it from the viewer (`--ui`)
-or with actions:
+The control QA polls the mock, printing `SKODA <battery> <state>` on
+every refresh, and its device properties track the car state. Drive it
+from the viewer (`--ui`) or with actions:
 
 ```bash
 # in another terminal (the sim API is on the --ui port):

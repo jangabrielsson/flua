@@ -6,7 +6,6 @@ mock state -> device properties, actions -> mock request log + state.
 """
 
 import asyncio
-import re
 import time
 from pathlib import Path
 
@@ -59,10 +58,10 @@ async def start_pair(capsys, control_vars=None):
     await engine.start()
     mock_id, err = engine.load_qa_file(str(EXAMPLES / "myskoda_mock.lua"))
     assert err is None, err
-    out = await wait_for(capsys, "SKODA_MOCK listening on ")
-    port = int(re.search(r"listening on (\d+)", out).group(1))
-    vars_ = ['var:url="http://127.0.0.1:' + str(port) + '"', *(control_vars or [])]
-    control_id, err = engine.load_qa_file(str(EXAMPLES / "myskoda.lua"), vars_)
+    await wait_for(capsys, "SKODA_MOCK listening on ")
+    # the control QA discovers the running mock through the skodaMockPort
+    # global — no url variable needed
+    control_id, err = engine.load_qa_file(str(EXAMPLES / "myskoda.lua"), list(control_vars or []))
     assert err is None, err
     await wait_for(capsys, "SKODA 71 READY_FOR_CHARGING")
     return engine, mock_id, control_id

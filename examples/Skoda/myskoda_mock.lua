@@ -80,5 +80,12 @@ function QuickApp:onInit()
   local srv = net.HTTPServer()
   srv:listen(tonumber(self:getVariable("port")) or 0, handle)
   print("SKODA_MOCK listening on " .. srv.port)
+  -- publish the port in a global variable: the control QA discovers a
+  -- running mock instead of being told its port (the HC3's shared-state
+  -- channel between QAs). Globals must exist before they can be set.
+  if not api.get("/globalVariables/skodaMockPort") then
+    api.post("/globalVariables", { name = "skodaMockPort", value = "" })
+  end
+  fibaro.setGlobalVariable("skodaMockPort", tostring(srv.port))
   _FLUA.keepAlive()  -- serve for the whole run
 end

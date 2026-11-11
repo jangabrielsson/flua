@@ -42,34 +42,51 @@ end
 
 function QuickApp:onInit()
   self.url = first(self:getVariable("url"), first(os.getenv("MYSKODA_URL"), nil))
-  if not self.url and _FLUA then
-    -- no API configured, running under flua: load the bundled mock QA
-    -- (examples/Skoda/myskoda_mock.lua, found through the installed
-    -- examples dir — pip users get the whole pair from one file) and
-    -- point at it. On a real HC3 this block is skipped: _FLUA is flua's
-    -- extension and the QA configures the real API url instead.
-    local probe = net.TCPServer()
-    probe:listen(0, function() return nil end)
-    local port = probe.port
-    probe:close()
-    local ok, res = pcall(
-      _FLUA.loadQAfromFile,
-      _PY.examples_dir .. "/Skoda/myskoda_mock.lua",
-      {"var:port=" .. port}
-    )
-    if ok then
-      self.url = "http://127.0.0.1:" .. port
-      print("using the embedded MySkoda mock on " .. port)
-    else
-      self:warning("could not load the mock QA: " .. tostring(res))
-    end
-  end
   self.vin = first(self:getVariable("vin"), first(os.getenv("MYSKODA_VIN"), "TMBMOCK123456789"))
   self.key = first(self:getVariable("key"), first(os.getenv("MYSKODA_KEY"), "test-key"))
+  if self.url then
+    self:start()
+  elseif _FLUA then
+    -- no API configured, running under flua: use an already-running mock
+    -- QA (it publishes its port in the skodaMockPort global), or load the
+    -- bundled mock QA and wait for it. On a real HC3 this is skipped —
+    -- _FLUA is flua's extension and the real url is configured instead.
+    local port = tonumber(fibaro.getGlobalVariable("skodaMockPort") or "")
+    if port then
+      self.url = "http://127.0.0.1:" .. port
+      self:start()
+    else
+      local ok, res = pcall(
+        _FLUA.loadQAfromFile, _PY.examples_dir .. "/Skoda/myskoda_mock.lua", {}
+      )
+      if ok then
+        self:waitForMock()
+      else
+        self:warning("could not load the mock QA: " .. tostring(res))
+      end
+    end
+  else
+    self:warning("no API url configured")
+  end
+end
+
+function QuickApp:start()
   self:refresh()
   if self:getVariable("once") ~= "true" then
     setInterval(function() self:refresh() end, 60 * 1000)
   end
+end
+
+function QuickApp:waitForMock()
+  local qa = self
+  local port = tonumber(fibaro.getGlobalVariable("skodaMockPort") or "")
+  if port then
+    qa.url = "http://127.0.0.1:" .. port
+    print("using the embedded MySkoda mock on " .. port)
+    qa:start()
+    return
+  end
+  setTimeout(function() qa:waitForMock() end, 50)
 end
 
 function QuickApp:request(method, path, body, done)
