@@ -574,6 +574,17 @@ def install_bindings(engine: "LuaEngine") -> None:
     # prepends its own dir), so init.lua must not derive it from package.path.
     py["runtime_dir"] = str(runtime_dir)
 
+    # The installed examples directory (the wheel ships examples/ as the
+    # flua.examples package; a checkout resolves to the repo's examples/) —
+    # QAs locate bundled example files (e.g. the Skoda mock QA) through it.
+    try:
+        import flua.examples as examples_pkg
+
+        location = getattr(examples_pkg, "__file__", None)
+        py["examples_dir"] = str(Path(location).resolve().parent) if location else ""
+    except ImportError:
+        py["examples_dir"] = str(Path(__file__).resolve().parent.parent.parent / "examples")
+
     init_path = runtime_dir / "init.lua"
     lua.execute(f"loadfile({_lua_quote(str(init_path))})()")
     # The global config lives on the Lua-side API table _FLUA (created by

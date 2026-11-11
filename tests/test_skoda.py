@@ -25,7 +25,7 @@ async def wait_for(capsys, needle: str, timeout: float = 5.0) -> str:
     while needle not in out:
         if time.monotonic() > deadline:
             raise AssertionError(f"not seen: {needle!r}; output so far:\n{out}")
-        out = capsys.readouterr().out
+        out += capsys.readouterr().out
         await asyncio.sleep(0.01)
     return out
 
@@ -117,3 +117,24 @@ async def test_skoda_actions_drive_the_mock(capsys) -> None:
     finally:
         if engine is not None:
             await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_skoda_embeds_the_mock_when_no_url_is_set(capsys) -> None:
+    # the pip-user shape: myskoda.lua alone, no url configured — the QA
+    # embeds the bundled mock (lua/lib/myskoda-mock.lua) and tests itself
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        control_id, err = engine.load_qa_file(
+            str(EXAMPLES / "myskoda.lua"), ['var:once="true"']
+        )
+        assert err is None, err
+        out = await wait_for(capsys, "SKODA 71 READY_FOR_CHARGING")
+        assert "using the embedded MySkoda mock on" in out
+        assert "MOCK GET /api/v1/vehicles/TMBMOCK123456789" in out
+        dev = engine.api.state.devices[control_id]
+        assert dev["properties"]["batteryLevel"] == 71
+        assert dev["properties"]["value"] is False
+    finally:
+        await engine.stop()

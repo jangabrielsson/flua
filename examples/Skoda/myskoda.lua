@@ -41,7 +41,29 @@ local function first(v, fallback)
 end
 
 function QuickApp:onInit()
-  self.url = first(self:getVariable("url"), first(os.getenv("MYSKODA_URL"), "http://127.0.0.1:8190"))
+  self.url = first(self:getVariable("url"), first(os.getenv("MYSKODA_URL"), nil))
+  if not self.url and _FLUA then
+    -- no API configured, running under flua: load the bundled mock QA
+    -- (examples/Skoda/myskoda_mock.lua, found through the installed
+    -- examples dir — pip users get the whole pair from one file) and
+    -- point at it. On a real HC3 this block is skipped: _FLUA is flua's
+    -- extension and the QA configures the real API url instead.
+    local probe = net.TCPServer()
+    probe:listen(0, function() return nil end)
+    local port = probe.port
+    probe:close()
+    local ok, res = pcall(
+      _FLUA.loadQAfromFile,
+      _PY.examples_dir .. "/Skoda/myskoda_mock.lua",
+      {"var:port=" .. port}
+    )
+    if ok then
+      self.url = "http://127.0.0.1:" .. port
+      print("using the embedded MySkoda mock on " .. port)
+    else
+      self:warning("could not load the mock QA: " .. tostring(res))
+    end
+  end
   self.vin = first(self:getVariable("vin"), first(os.getenv("MYSKODA_VIN"), "TMBMOCK123456789"))
   self.key = first(self:getVariable("key"), first(os.getenv("MYSKODA_KEY"), "test-key"))
   self:refresh()

@@ -25,6 +25,16 @@ Files:
 
 ## Run offline against the mock
 
+One file is enough — with no `url` configured, the control QA loads the
+bundled mock QA (`examples/Skoda/myskoda_mock.lua`, via
+`_FLUA.loadQAfromFile`) and tests against it:
+
+```bash
+flua --api local examples/Skoda/myskoda.lua
+```
+
+The two-QA style also works (the standalone mock is a thin wrapper):
+
 ```bash
 flua --api local examples/Skoda/myskoda_mock.lua examples/Skoda/myskoda.lua
 ```
@@ -48,7 +58,7 @@ smoke-test mode.
 
 ## Pinned
 
-`tests/test_skoda.py` loads the pair into one engine: the control QA's
-refresh reads the mock's battery/state, the action round-trips
-(start charging, set the limit, start AC) change the mock and the
-device properties, and the mock's request log is asserted.
+`tests/test_skoda.py` pins three shapes: the two-QA pair in one engine
+(refresh reads the mock, the action round-trips drive it), and the
+control QA standalone — it loads the mock QA itself and tests against
+it (the pip-user shape).
