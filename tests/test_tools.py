@@ -644,6 +644,54 @@ def test_pack_proxy_mode_qa_is_silent_and_keeps_the_directive(
     assert "--%%mode:proxy" in main["content"]
 
 
+def test_icons_download_enumerates_live_custom_sets(tmp_path, monkeypatch) -> None:
+    # a live /api/icons listing a custom User set (uploadExternalIconSet)
+    # extends the download list with the pattern-derived file names — the
+    # checked-in manifest does not know those sets
+    class _IconsHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == "/api/icons":
+                payload = json.dumps(
+                    {
+                        "device": [
+                            {"id": 999, "iconSetName": "User999", "fileExtension": "svg"}
+                        ]
+                    }
+                ).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(payload)
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _IconsHandler)
+    threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
+    try:
+        monkeypatch.setenv("HC3_URL", f"http://127.0.0.1:{server.server_port}")
+        monkeypatch.setenv("HC3_USER", "admin")
+        monkeypatch.setenv("HC3_PASSWORD", "secret")
+        from flua.tools.icons import _with_live_custom_sets
+
+        wanted = [("ButtonSwitchV2", "ButtonSwitchV2.svg")]
+        extended = _with_live_custom_sets(wanted)
+        assert wanted == extended[:1]  # the manifest list stays first
+        assert ("User999", "User999.svg") in extended
+        assert ("User999", "User999Unknown.svg") in extended
+        assert ("User999", "User999255.svg") in extended
+        # a known set is not re-added
+        assert sum(1 for pair in extended if pair[0] == "ButtonSwitchV2") == 1
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
 def test_download_restores_identity_properties(tmp_path, monkeypatch) -> None:
     # the HC3's export omits manufacturer/model/... — both download tools
     # merge them back from /devices/{id} (only the identity keys, only

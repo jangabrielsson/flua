@@ -117,6 +117,31 @@ class _MockHc3(BaseHTTPRequestHandler):
                 return
             self._send_json({"latitude": 59.31, "longitude": 18.06})
             return
+        if self.path == "/api/icons":
+            # the live icon library: the captured catalog plus a custom
+            # User set (uploadExternalIconSet) the catalog does not know
+            if not self._authed():
+                self._send_json({"error": "unauthorized"}, 401)
+                return
+            self._send_json(
+                {
+                    "device": [
+                        {
+                            "id": 300,
+                            "deviceType": "com.fibaro.binarySwitch",
+                            "iconSetName": "ButtonSwitchV2",
+                            "fileExtension": "svg",
+                        },
+                        {
+                            "id": 999,
+                            "deviceType": "com.fibaro.genericDevice",
+                            "iconSetName": "User999",
+                            "fileExtension": "svg",
+                        },
+                    ]
+                }
+            )
+            return
         if (
             self.path == "/api/alarms/v1/partitions"
             or self.path == "/api/alarms/v1/partitions/breached"
@@ -466,6 +491,78 @@ async def test_hybrid_routing_local_sim_and_remote_hc3(
 
 
 @pytest.mark.asyncio
+async def test_icon_map_merges_the_live_icon_library_online(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # online: /flua/iconMap merges the LIVE HC3 icon library — custom sets
+    # uploaded with uploadExternalIconSet (User999 here) map too, with file
+    # lists derived from the uniform <set><state>.<ext> pattern; captured
+    # ids keep their richer manifest lists
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        icon_map, status = engine.api.dispatch("GET", "/flua/iconMap")
+        assert status == 200
+        assert icon_map["icons"]["999"] == {"set": "User999", "file": "User999.svg"}
+        assert "User9990.svg" in icon_map["sets"]["User999"]
+        assert "User999Unknown.svg" in icon_map["sets"]["User999"]
+        # the captured catalog entry keeps its manifest file list
+        assert icon_map["icons"]["300"] == {
+            "set": "ButtonSwitchV2",
+            "file": "ButtonSwitchV2.svg",
+        }
+    finally:
+        await engine.stop()
+
+
+async def test_icon_map_offline_has_no_live_merge(tmp_path, capsys) -> None:
+    # offline: the iconMap is the checked-in catalog only — no User sets
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        icon_map, status = engine.api.dispatch("GET", "/flua/iconMap")
+        assert status == 200
+        assert "999" not in icon_map["icons"]
+        assert "User999" not in icon_map["sets"]
+    finally:
+        await engine.stop()
+
+
+async def test_device_icon_warning_suppressed_online(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # the deviceIcon catalog warning is an OFFLINE viewer concern; online
+    # the live library is merged into the iconMap (the controller owns the
+    # id's resolution), so a QA setting an unknown id must not warn
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    script = tmp_path / "icon.lua"
+    script.write_text(
+        "--%%mode:online\n"
+        "--%%type:com.fibaro.binarySwitch\n"
+        "function QuickApp:onInit()\n"
+        "  self:updateProperty('deviceIcon', 999999)\n"
+        "end\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        engine.load_qa_file(str(script))
+        await asyncio.sleep(0.4)
+        out = capsys.readouterr().out
+        assert "not in the icon catalog" not in out
+        device = engine.api.state.devices[5000]
+        assert device["properties"]["deviceIcon"] == 999999  # applied, like the HC3
+    finally:
+        await engine.stop()
+
+
 async def test_profiles_served_from_hc3_online(tmp_path, capsys, mock_hc3, monkeypatch) -> None:
     # online: GET /profiles comes from the controller (its real profiles),
     # not the sim's single seeded "Home" — and the response carries the

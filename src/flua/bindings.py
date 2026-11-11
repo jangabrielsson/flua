@@ -374,11 +374,18 @@ def install_bindings(engine: "LuaEngine") -> None:
         mismatch = property_type_mismatch(
             device.get("type"), device.get("interfaces"), name, value
         )
-        if mismatch is None and name == "deviceIcon" and isinstance(value, (int, float)):
+        if (
+            mismatch is None
+            and name == "deviceIcon"
+            and isinstance(value, (int, float))
+            and engine.hc3 is None
+        ):
             # an icon id the checked-in catalog does not know: the sim stores
             # it (and the HC3 would render its own icon for the id), but the
-            # flua viewer has no art — a QA setting a placeholder id gets no
-            # icon in the viewer and no clue why
+            # OFFLINE flua viewer has no art — a QA setting a placeholder id
+            # gets no icon in the viewer and no clue why. Online the live
+            # icon library is merged into the viewer's iconMap, so the
+            # controller owns the resolution — no warning there.
             catalog = icon_catalog()
             entries = catalog.get("device") if isinstance(catalog, dict) else None
             known = {

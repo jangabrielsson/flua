@@ -21,13 +21,14 @@ from __future__ import annotations
 
 import argparse
 import base64
+import json
 import shutil
 import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
 
-from ..devices import icon_cache_dir, icon_manifest
+from ..devices import icon_cache_dir, icon_manifest, icon_pattern_files
 
 NAME = "icons"
 HELP = "populate the icon cache (icons download)"
@@ -67,6 +68,56 @@ def _wanted_files() -> list[tuple[str, str]]:
     if not isinstance(files, dict):
         raise SystemExit("icon manifest has no files table")
     return [(set_name, file_name) for set_name, names in files.items() for file_name in names]
+
+
+def _with_live_custom_sets(wanted: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """Extend the wanted list with the live HC3's icon sets the checked-in
+    manifest does not cover — custom sets uploaded with
+    uploadExternalIconSet (User<id>) and newer-firmware additions. Their
+    file lists derive from the uniform <set><state>.<ext> pattern. Without
+    HC3 credentials (or when the library can't be read) the manifest list
+    stands."""
+    from ..environment import EnvChain
+
+    chain = EnvChain(Path(__file__).resolve().parent.parent.parent)
+    url = chain.get("HC3_URL")
+    if not url:
+        return wanted
+    base = url.rstrip("/")
+    if base.endswith("/api"):
+        base = base[: -len("/api")]
+    auth = base64.b64encode(
+        f"{chain.get('HC3_USER')}:{chain.get('HC3_PASSWORD')}".encode()
+    ).decode()
+    try:
+        request = urllib.request.Request(
+            f"{base}/api/icons", headers={"Authorization": "Basic " + auth}
+        )
+        with urllib.request.urlopen(request, timeout=10) as response:
+            library = json.loads(response.read())
+    except (urllib.error.HTTPError, OSError, ValueError) as exc:
+        print(
+            f"warning: cannot read the live icon library ({exc}) — "
+            "downloading the manifest sets only",
+            file=sys.stderr,
+        )
+        return wanted
+    wanted_sets = {set_name for set_name, _ in wanted}
+    extra: list[tuple[str, str]] = []
+    for entry in (library or {}).get("device") or [] if isinstance(library, dict) else []:
+        if not isinstance(entry, dict):
+            continue
+        set_name = str(entry.get("iconSetName") or "")
+        if not set_name or set_name in wanted_sets:
+            continue
+        wanted_sets.add(set_name)
+        extra.extend(
+            (set_name, file_name)
+            for file_name in icon_pattern_files(
+                set_name, str(entry.get("fileExtension") or "")
+            )
+        )
+    return wanted + extra
 
 
 def _is_placeholder(path: Path) -> bool:
@@ -195,4 +246,5 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     wanted = _wanted_files()
     if args.dump:
         return _from_dump(wanted, Path(args.dump), cache, args.force)
+    wanted = _with_live_custom_sets(wanted)
     return _from_hc3(wanted, cache, args.force)

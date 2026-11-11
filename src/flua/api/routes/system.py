@@ -8,7 +8,13 @@ import time
 from typing import Any
 
 from ... import messages
-from ...devices import icon_catalog, icon_default_file, icon_manifest, skeleton_for
+from ...devices import (
+    icon_catalog,
+    icon_default_file,
+    icon_manifest,
+    icon_pattern_files,
+    skeleton_for,
+)
 from ..request import ApiRequest, remote_get
 from ..state import SimState, public
 from .plugins import VARIABLE_NAME_RE
@@ -529,25 +535,53 @@ def flua_icon_map(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     {file}), plus each set's full file list so the viewer can switch state
     files live (binary 0/100, multilevel steps, shutter/sensor named
     states). Only ids the catalog knows are mapped; the viewer hides
-    unmapped ids (an icon the controller doesn't have, or a stale capture)."""
+    unmapped ids (an icon the controller doesn't have, or a stale capture).
+
+    Online the LIVE HC3's icon library is merged in: custom sets uploaded
+    with uploadExternalIconSet and newer-firmware ids map too (their file
+    lists derive from the uniform <set><state>.<ext> pattern), so a QA
+    running online against its own controller renders its custom icon.
+    Captured ids keep their richer manifest file lists."""
     catalog = icon_catalog()
-    if catalog is None:
-        return {"icons": {}, "sets": {}}, 200
     manifest_files = (icon_manifest() or {}).get("files") or {}
-    device = catalog.get("device") if isinstance(catalog, dict) else None
     icons: dict[str, dict[str, str]] = {}
     sets: dict[str, list[str]] = {}
-    for entry in device or []:
-        icon_id = entry.get("id")
-        set_name = entry.get("iconSetName")
-        if icon_id is None or not set_name or str(icon_id) in icons:
-            continue
-        names = manifest_files.get(str(set_name)) or []
-        default = icon_default_file(str(set_name), str(entry.get("fileExtension") or ""))
-        if default is None:
-            continue
-        icons[str(icon_id)] = {"set": str(set_name), "file": default}
-        sets.setdefault(str(set_name), sorted(names))
+    if catalog is not None:
+        device = catalog.get("device") if isinstance(catalog, dict) else None
+        for entry in device or []:
+            icon_id = entry.get("id")
+            set_name = entry.get("iconSetName")
+            if icon_id is None or not set_name or str(icon_id) in icons:
+                continue
+            names = manifest_files.get(str(set_name)) or []
+            default = icon_default_file(str(set_name), str(entry.get("fileExtension") or ""))
+            if default is None:
+                continue
+            icons[str(icon_id)] = {"set": str(set_name), "file": default}
+            sets.setdefault(str(set_name), sorted(names))
+    remote = remote_get(req, "/icons")
+    if remote is not None:
+        live_data = remote[0] if isinstance(remote, tuple) else remote
+        if isinstance(live_data, dict):
+            live = live_data.get("device")
+            if isinstance(live, list):
+                for entry in live:
+                    if not isinstance(entry, dict):
+                        continue
+                    icon_id = entry.get("id")
+                    set_name = str(entry.get("iconSetName") or "")
+                    if icon_id is None or not set_name or str(icon_id) in icons:
+                        continue
+                    ext = str(entry.get("fileExtension") or "")
+                    names = manifest_files.get(set_name)
+                    default = icon_default_file(set_name, ext) if names else None
+                    if names is None:
+                        names = icon_pattern_files(set_name, ext)
+                        default = names[0] if names else None
+                    if default is None:
+                        continue
+                    icons[str(icon_id)] = {"set": set_name, "file": default}
+                    sets.setdefault(set_name, sorted(names))
     return {"icons": icons, "sets": sets}, 200
 
 

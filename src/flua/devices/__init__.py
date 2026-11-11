@@ -521,3 +521,35 @@ def icon_default_file(set_name: str, file_extension: str) -> str | None:
         if candidate in names:
             return candidate
     return names[0] if names else None
+
+
+# the uniform <set><state> state-file naming (base + 0..90 + 100 + 255 +
+# Unknown) — what the HC3 serves for icon sets without captured named
+# states (custom User sets, newer firmware additions)
+_ICON_STATE_SUFFIXES = (
+    "",
+    "0",
+    "10",
+    "20",
+    "30",
+    "40",
+    "50",
+    "60",
+    "70",
+    "80",
+    "90",
+    "100",
+    "255",
+    "Unknown",
+)
+
+
+def icon_pattern_files(set_name: str, file_extension: str) -> list[str]:
+    """The uniform state-file list for an icon set the checked-in manifest
+    does not cover — custom sets uploaded with uploadExternalIconSet and
+    firmware additions follow the same <set><state>.<ext> pattern as the
+    captured library."""
+    ext = str(file_extension or "")
+    if ext and not ext.startswith("."):
+        ext = "." + ext
+    return [f"{set_name}{suffix}{ext}" for suffix in _ICON_STATE_SUFFIXES]

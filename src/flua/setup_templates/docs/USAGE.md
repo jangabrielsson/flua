@@ -1586,7 +1586,11 @@ icon_manifest.json`, built by `scripts/extract_icon_files.py` — live-probed
 from the HC3: every set serves 14 state suffixes in both png and svg).
 `--tool icons download` fetches the images once into a machine-level cache
 (`~/.flua/icons`, `FLUA_ICON_DIR` overrides) — one cache per user, shared
-by every project, never per repo. Placeholder state files (the generic gray
+by every project, never per repo. Against a live HC3 the tool also
+enumerates the controller's icon library and downloads the sets the
+manifest does not cover — custom icons uploaded with
+`uploadExternalIconSet` and newer-firmware additions (their files follow
+the same 14-suffix pattern). Placeholder state files (the generic gray
 box the HC3 serves for states with no artwork, even under the requested
 extension) are dropped rather than cached — the viewer falls back to the
 set's default art for those states. The sim serves the cache to the viewer
@@ -1598,6 +1602,13 @@ step (binary 0/100, multilevel 0..100 in tens), and a `state` string
 matches named state files (`Opening`, `alarm`, …). Unmapped or uncached
 ids fall back to the set's default file or no icon. Later, user-uploaded
 QA icons land in the same store.
+
+Online (an HC3 backend), `GET /flua/iconMap` merges the **live** icon
+library into the checked-in catalog — custom `User<id>` sets and
+newer-firmware ids map too, so a QA running against the controller that
+owns its custom icon renders it in the viewer (after `--tool icons
+download` caches the art). Offline the map stays the checked-in catalog,
+and a QA that sets an unknown `deviceIcon` gets a one-time warning.
 
 A download names every file `<QA-name>_<file>_<id>.lua` (the QA name is
 sanitized for the file system) — `My QA_main_123.lua` for the main,
