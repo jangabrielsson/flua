@@ -262,6 +262,59 @@ local result = api.post("/customEvents/myEvent", {})
 api.put("/devices/" .. self.id, { name = "New Name" })
 ```
 
+### Installing another .fqa from a QA (QA-installs-QA)
+
+A QA can install another QuickApp package on the controller through
+`POST /quickApp/import` — the endpoint the HC3 web UI's Import button
+uses, which preserves the package verbatim (the JSON `POST /quickApp`
+create re-derives uiCallbacks with generated `ui<b2>OnReleased` names on
+recent firmware — never use it). The import handler is **strictly
+multipart**: a plain `api.post` (JSON) dies with HTTP 500 "Field name too
+long", so hand-build the multipart body and send it with net.HTTPClient
+to the loopback API (port 11111 — the HC3's own, credential-free; flua
+rewrites it to the controller online and to the sim's `--ui` server
+offline, so the same code runs in the emulator):
+
+```lua
+function QuickApp:installFqa(fqa, filename, cb)
+    -- fqa must be the PACKAGE STRING (json.encode(table)), not the table
+    local boundary = "----qaDist" .. string.format("%08x", os.time())
+        .. string.format("%08x", math.random(0x7FFFFFFF))
+    local body = "--" .. boundary .. "\r\n"
+        .. 'Content-Disposition: form-data; name="file"; filename="' .. filename .. '"\r\n'
+        .. "Content-Type: application/octet-stream\r\n"
+        .. "\r\n"
+        .. fqa .. "\r\n"
+        .. "--" .. boundary .. "--\r\n"
+    net.HTTPClient({ timeout = 30000 }):request(
+        "http://127.0.0.1:11111/api/quickApp/import",
+        {
+            options = {
+                method = "POST",
+                headers = {
+                    ["Accept"] = "application/json",
+                    ["Content-Type"] = "multipart/form-data; boundary=" .. boundary,
+                    ["X-Fibaro-Version"] = "2",
+                },
+                data = body,
+            },
+            success = function(response)
+                -- 201 Created; response.data is the RAW JSON body string —
+                -- json.decode it for the new device id
+                local ok, device = pcall(json.decode, response.data or "")
+                cb(ok and device and device.id or nil, response.status)
+            end,
+            error = function(err)
+                cb(nil, nil, tostring(err))
+            end,
+        }
+    )
+end
+```
+
+The `file` part **must carry a filename** — a filename-less part crashes
+the import handler with a bodyless HTTP 500 (live-verified 5.221.22).
+
 ---
 
 ## RefreshStates — Listening for HC3 Events

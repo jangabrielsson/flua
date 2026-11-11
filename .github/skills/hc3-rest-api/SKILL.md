@@ -181,6 +181,11 @@ endpoint against a real HC3 (the offline sim keeps the JSON create, which
 never re-derives). Symptom elsewhere: a QA whose buttons call
 `uib2OnReleased` was created through the JSON API-create — re-import it.
 
+A QA can install another .fqa itself (QA-installs-QA) — the multipart
+body is hand-built and sent via net.HTTPClient to the loopback
+`http://127.0.0.1:11111/api/quickApp/import`; see the quickapp-patterns
+skill for the ready-made recipe.
+
 ---
 
 ## Global Variables
