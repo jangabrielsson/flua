@@ -65,7 +65,12 @@ async def start_pair(capsys, control_vars=None):
     assert err is None, err
     out = await wait_for(capsys, "SKODA_MOCK listening on ")
     port = int(re.search(r"listening on (\d+)", out).group(1))
-    vars_ = ['var:url="http://127.0.0.1:' + str(port) + '"', *(control_vars or [])]
+    vars_ = [
+        'var:url="http://127.0.0.1:' + str(port) + '"',
+        'var:vin="TMBMOCK123456789"',
+        'var:key="test-key"',
+        *(control_vars or []),
+    ]
     control_id, err = engine.load_qa_file(str(EXAMPLES / "myskoda.lua"), vars_)
     assert err is None, err
     await wait_for(capsys, "SKODA 71 READY_FOR_CHARGING")
@@ -214,7 +219,11 @@ async def test_mock_charges_to_target_at_the_charge_rate(capsys) -> None:
         port = int(re.search(r"listening on (\d+)", out).group(1))
         control_id, err = engine.load_qa_file(
             str(EXAMPLES / "myskoda.lua"),
-            ['var:url="http://127.0.0.1:' + str(port) + '"'],
+            [
+                'var:url="http://127.0.0.1:' + str(port) + '"',
+                'var:vin="TMBMOCK123456789"',
+                'var:key="test-key"',
+            ],
         )
         assert err is None, err
         await wait_for(capsys, "SKODA 71 READY_FOR_CHARGING")

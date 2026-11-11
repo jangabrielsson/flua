@@ -49,14 +49,16 @@ local MOCK_PORT = 18290
 
 function QuickApp:onInit()
   self.url = first(self:getVariable("url"), nil)
-  if not self.url and _FLUA then
-    -- no API configured, running under flua: point at the mock's fixed
-    -- port (overridable via the `mockPort` variable — tests use their own
-    -- free port so parallel runs and a live instance never collide) and
-    -- load the bundled mock QA (one file is the whole pair for pip
-    -- users). If a mock already serves the port, the loaded one stands
-    -- down quietly. On a real HC3 this is skipped — _FLUA is flua's
-    -- extension and the real url is configured instead.
+  -- decide the mock context FIRST: only when no url was configured and
+  -- flua is present does the QA load the mock itself — and only then do
+  -- the mock vin/key defaults apply
+  local embeddedMock = not self.url and _FLUA ~= nil
+  if embeddedMock then
+    -- point at the mock's fixed port (overridable via the `mockPort`
+    -- variable — tests use their own free port so parallel runs and a
+    -- live instance never collide) and load the bundled mock QA (one
+    -- file is the whole pair for pip users). If a mock already serves
+    -- the port, the loaded one stands down quietly.
     local mockPort = tonumber(self:getVariable("mockPort")) or MOCK_PORT
     self.url = "http://127.0.0.1:" .. mockPort
     print("using the MySkoda mock on " .. mockPort)
@@ -64,11 +66,22 @@ function QuickApp:onInit()
       { "var:port=" .. mockPort })
   elseif not self.url then
     self:warning("no API url configured")
+    return
   end
-  -- the defaults are the mock's: against the real API, set the
-  -- QuickApp variables (vin, key — the X-API-Key from the MySkoda app)
-  self.vin = first(self:getVariable("vin"), "TMBMOCK123456789")
-  self.key = first(self:getVariable("key"), "test-key")
+  -- the mock defaults apply only in the embedded-mock case; a configured
+  -- url is the real API, and calling it with mock credentials would
+  -- silently 401/404 — require vin/key then
+  if embeddedMock then
+    self.vin = first(self:getVariable("vin"), "TMBMOCK123456789")
+    self.key = first(self:getVariable("key"), "test-key")
+  else
+    self.vin = first(self:getVariable("vin"), nil)
+    self.key = first(self:getVariable("key"), nil)
+  end
+  if not self.vin or not self.key then
+    self:warning("vin/key not configured — set the QuickApp variables")
+    return
+  end
   self:refresh()
   if self:getVariable("once") ~= "true" then
     -- poll every 5 minutes: 12 requests/hour, well under the real API's
