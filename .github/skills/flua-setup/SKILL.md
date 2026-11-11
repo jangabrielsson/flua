@@ -43,7 +43,9 @@ HC3_PIN=1111
 ```
 
 `HC3_URL` (or `HC3_HOST`) is required for online mode, which is
-**opt-in** (offline — the simulated HC3 — is the default; see Modes below). A missing `HC3_URL` is a loud startup error,
+**opt-in**: the default is **offline** (the simulated HC3), and online
+mode only activates when the credentials are set and the run asks for
+it (see Modes below). A missing `HC3_URL` is a loud startup error,
 and wrong credentials abort immediately (the HC3 locks itself after 4
 failed attempts, so flua never retries a 401/403).
 

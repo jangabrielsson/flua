@@ -1712,8 +1712,9 @@ exit code.
 .venv/bin/flua test --list                # show what would run
 .venv/bin/flua test --timeout 10 -v       # 10s per file; verbose failures
 .venv/bin/flua test --json                # one JSON document: per-file status,
-                                          # failures and output + a summary —
-                                          # the VS Code Test Explorer contract
+                                          # failures, assertion totals and output,
+                                          # plus file and assertion summaries — the
+                                          # VS Code Test Explorer contract
 ```
 
 Each file runs in its own flua process — a test that never exits hits the

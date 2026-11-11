@@ -116,6 +116,7 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         print("flua test: no *_test.lua files found")
         return 0
     passed = failed = timed_out = 0
+    passed_assertions = failed_assertions = 0
     results: list[dict] = []
     for path in files:
         stdout, stderr, code, status = run_one(path, args.timeout, cwd)
@@ -124,8 +125,20 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
             "status": "pass",
             "exitCode": code,
             "failures": None,
+            "assertionsPassed": 0,
+            "assertionsFailed": 0,
             "output": "",
         }
+        # structural assertion totals: the flua-test convention prints one
+        # "PASS: <msg>" / "FAIL: <msg>" line per assertion — counting them
+        # beats grepping the trailing "failures: N" prose (which vanishes
+        # when a QA ends differently)
+        assertion_passes = len(re.findall(r"\bPASS:\s", stdout))
+        assertion_fails = len(re.findall(r"\bFAIL:\s", stdout))
+        entry["assertionsPassed"] = assertion_passes
+        entry["assertionsFailed"] = assertion_fails
+        passed_assertions += assertion_passes
+        failed_assertions += assertion_fails
         output = (stderr + stdout).strip()
         output = re.sub(r"\x1b\[[0-9;]*m", "", output)  # no ANSI in the machine output
         if len(output) > _OUTPUT_CAP:
@@ -147,7 +160,9 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
             failed += 1
             entry["status"] = "fail"
             match = re.search(r"failures: (\d+)", stdout)
-            entry["failures"] = int(match.group(1)) if match else None
+            entry["failures"] = (
+                assertion_fails if assertion_fails else (int(match.group(1)) if match else None)
+            )
             if not args.json:
                 print(
                     f"  FAIL  {_display(path, cwd)}  "
@@ -163,6 +178,10 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
                 {
                     "files": results,
                     "summary": {"passed": passed, "failed": failed, "timedOut": timed_out},
+                    "assertions": {
+                        "passed": passed_assertions,
+                        "failed": failed_assertions,
+                    },
                 },
                 ensure_ascii=False,
             )

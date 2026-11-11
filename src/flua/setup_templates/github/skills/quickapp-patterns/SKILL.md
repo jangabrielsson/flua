@@ -369,6 +369,55 @@ self.rss:subscribe(
 
 ---
 
+## Mocking a service with a dynamically loaded QA
+
+The recipe for a client QA + a mock-service QA hosted with
+`net.HTTPServer`, loaded at runtime (the Skoda pair is the worked
+example — `examples/Skoda/`). The contracts, learned the hard way:
+
+- **The mock binds a FIXED, deliberately unlikely port** (overridable via
+  a variable). Port discovery between two QAs is the hard part — a
+  published fixed port removes it. If the bind fails, warn and exit:
+  another mock (or service) may already serve the port, and the mock
+  must not pretend.
+- **`server.port` is available immediately after `listen(port, handler)`**
+  — no waiting, no callback.
+- **The client loads the mock only when no url is configured AND `_FLUA`
+  is present** — the whole block sits inside `if _FLUA then ... end`, so
+  the same file runs on a real HC3 (where `_FLUA` is nil and the real
+  url is configured instead):
+
+```lua
+local MOCK_PORT = 18290
+
+function QuickApp:onInit()
+  self.url = first(self:getVariable("url"), nil)
+  if not self.url and _FLUA then
+    self.url = "http://127.0.0.1:" .. MOCK_PORT
+    pcall(_FLUA.loadQAfromFile, _PY.examples_dir .. "/mock.lua", {})
+  end
+  ...
+end
+```
+
+- **Resolving the mock's path**: bundled example files live under
+  `_PY.examples_dir` (the installed `flua.examples` package — pip users
+  included); files shipped next to the QA resolve through
+  `_FLUA.mainPath` (the QA's source dir, trailing slash included).
+  Never `--%%file` the mock into the client — it would ship inside the
+  `.fqa` package.
+- **Readiness**: the loaded QA boots eagerly, but treat the mock as ready
+  after the first successful request, not immediately after the load
+  returns — a nil instance right after `loadQAfromFile` is a real state,
+  not a bug. A bounded retry on the client's first request is the honest
+  pattern.
+- **Lifetime**: the mock keeps itself alive with `_FLUA.keepAlive()` and
+  dies with its QA; the client polls with `setInterval`.
+- **Mock-only defaults must not leak**: credentials defaulting to mock
+  values apply ONLY on the mock path — a configured url is the real
+  service, and missing credentials should warn, not silently call it
+  with mock values.
+
 ## Child Device Patterns
 
 > **Advanced / multi-child QAs**: prefer the **qwikchild** library

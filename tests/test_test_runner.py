@@ -101,5 +101,8 @@ def test_flua_test_json_is_one_document(tmp_path) -> None:
     assert by_name["ok_test.lua"]["status"] == "pass"
     assert by_name["bad_test.lua"]["status"] == "fail"
     assert by_name["bad_test.lua"]["failures"] == 1
+    assert by_name["bad_test.lua"]["assertionsFailed"] == 1
+    assert by_name["ok_test.lua"]["assertionsPassed"] == 1
     assert "nope" in by_name["bad_test.lua"]["output"]
     assert payload["summary"] == {"passed": 1, "failed": 1, "timedOut": 0}
+    assert payload["assertions"] == {"passed": 1, "failed": 1}
