@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.151] - 2026-11-11
+
+### Changed
+- Merge the live icon library into the viewer's iconMap online
+- Warn when a QA sets a deviceIcon outside the icon catalog
+
 ## [0.1.150] - 2026-11-11
 
 ### Changed
