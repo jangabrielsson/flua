@@ -4,6 +4,42 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.144] - 2026-11-11
+
+### Added
+- ship the packaged Skoda QA, pinned against drift
+- the mock charges the battery to the target, at chargeRate per virtual hour
+- respect the real MySkoda rate limit — 5-minute poll, 429 handling, mock parity
+- the Skoda control QA loads the mock QA itself (loadQAfromFile)
+- warn when updateProperty targets a property the type does not declare
+- Skoda control QA + MyŠkoda API mock (offline pair)
+- add comprehensive API documentation for Fibaro HC3 endpoints
+- update API documentation for device retrieval with dynamic ID and property prompts
+- expand API documentation with additional endpoints for custom events, weather, users, and quickApps
+- add API documentation for device retrieval and event refresh
+- add argument definitions for setBrightness, setColorTemperature, setIdleTimeout, setInterval, setMute, and setVolume actions
+- typeinfo action signatures — argc-1 params, hand-maintained overrides
+
+### Changed
+- the low-barrier HC3 path — download Skoda.fqa, upload, set the variables
+- refresh the Skoda README to the current pair
+- streamline the Skoda mock-context setup (user edit)
+- test: the embedded-mock test uses its own port (mockPort variable)
+- genericDevice types and livelier Skoda UIs
+- the Skoda pair runs on a fixed mock port — no global, no env dance
+- the mock publishes its port in a global — no probe, no url wiring
+- quickapp-patterns — the getVariable empty-string trap, and fix the pattern that had it
+- prune argc<=1 actions from the overrides starter
+
+### Fixed
+- the mock label follows the charging progress too
+- mock vin/key defaults apply only to the embedded mock
+- the viewer battery indicator shows one decimal for fractional levels
+- battery labels show one decimal
+- the chargeLimit slider mirrors the fetched target charge
+- guard os.getenv behind _FLUA in the Skoda QA; document the rule
+- correct formatting in AGENTS.md for improved readability
+
 ## [0.1.143] - 2026-11-10
 
 ### Changed
