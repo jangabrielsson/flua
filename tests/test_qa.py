@@ -31,6 +31,52 @@ def qa_timer_count(engine: LuaEngine, qa_id: int) -> int:
 
 
 @pytest.mark.asyncio
+async def test_update_property_device_icon_warns_on_unknown_id(tmp_path, capsys) -> None:
+    # a QA setting a deviceIcon id the icon catalog does not know gets no
+    # icon in the flua viewer — warn once so the placeholder-id case (a QA
+    # with 'enter here the iconId when QA is running') is self-explanatory.
+    # The update still applies: the HC3 renders its own icon for the id.
+    script = tmp_path / "icon.lua"
+    script.write_text(
+        "--%%type:com.fibaro.binarySwitch\n"
+        "function QuickApp:onInit()\n"
+        "  self:updateProperty('deviceIcon', 999999)\n"
+        "end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.load_qa_file(str(script))
+        await wait_until(lambda: not engine.has_pending_work())
+        out = capsys.readouterr().out
+        assert "deviceIcon 999999 is not in the icon catalog" in out
+        device = engine.api.state.devices[5000]
+        assert device["properties"]["deviceIcon"] == 999999  # applied, like the HC3
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_update_property_device_icon_known_id_is_silent(tmp_path, capsys) -> None:
+    # a catalog id (751 = the generic device icon) must not warn
+    script = tmp_path / "icon751.lua"
+    script.write_text(
+        "--%%type:com.fibaro.binarySwitch\n"
+        "function QuickApp:onInit()\n"
+        "  self:updateProperty('deviceIcon', 751)\n"
+        "end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.load_qa_file(str(script))
+        await wait_until(lambda: not engine.has_pending_work())
+        assert "deviceIcon" not in capsys.readouterr().out
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
 async def test_qa_environments_are_isolated(tmp_path, capsys) -> None:
     a = tmp_path / "a.lua"
     a.write_text("x = 'from-a'\nsetTimeout(function() print('A', x) end, 20)\n")

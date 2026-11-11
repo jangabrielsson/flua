@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any
 
 from . import __version__
 from .config import debug_flag, warn_enabled
-from .devices import property_specs_for, property_type_mismatch, schema_for
+from .devices import icon_catalog, property_specs_for, property_type_mismatch, schema_for
 
 logger = logging.getLogger(__name__)
 
@@ -374,6 +374,23 @@ def install_bindings(engine: "LuaEngine") -> None:
         mismatch = property_type_mismatch(
             device.get("type"), device.get("interfaces"), name, value
         )
+        if mismatch is None and name == "deviceIcon" and isinstance(value, (int, float)):
+            # an icon id the checked-in catalog does not know: the sim stores
+            # it (and the HC3 would render its own icon for the id), but the
+            # flua viewer has no art — a QA setting a placeholder id gets no
+            # icon in the viewer and no clue why
+            catalog = icon_catalog()
+            entries = catalog.get("device") if isinstance(catalog, dict) else None
+            known = {
+                int(entry["id"])
+                for entry in (entries or [])
+                if isinstance(entry, dict) and isinstance(entry.get("id"), (int, float))
+            }
+            if known and int(value) not in known:
+                mismatch = (
+                    f"deviceIcon {int(value)} is not in the icon catalog — "
+                    "the flua viewer shows no icon (the HC3 renders its own icon for that id)"
+                )
         if mismatch is None and schema_for(device.get("type")) is not None:
             declared = property_specs_for(device.get("type"), device.get("interfaces"))
             if name not in declared:
