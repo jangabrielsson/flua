@@ -75,6 +75,13 @@ headroom for the two-request action round-trips) and warns on 429s with
 the retry guidance; the mock enforces the same limit with the
 `RateLimit-*` headers.
 
+## Try it on your HC3
+
+The low-barrier path: download `Skoda.fqa`, upload it on the controller
+(Devices → Add → Upload QuickApp), then set the `url`, `vin`, and `key`
+variables in the device panel. The same file that runs against the mock
+is the controller package — no code editing required.
+
 ## Run against the real API
 
 Set the QuickApp variables `url`, `vin`, and `key` (the `X-API-Key`
