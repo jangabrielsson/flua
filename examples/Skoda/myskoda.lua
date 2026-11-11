@@ -61,24 +61,19 @@ function QuickApp:onInit()
     -- the port, the loaded one stands down quietly.
     local mockPort = tonumber(self:getVariable("mockPort")) or MOCK_PORT
     self.url = "http://127.0.0.1:" .. mockPort
+    self.vin = first(self:getVariable("vin"), "TMBMOCK123456789")
+    self.key = first(self:getVariable("key"), "test-key")
     print("using the MySkoda mock on " .. mockPort)
     pcall(_FLUA.loadQAfromFile, _PY.examples_dir .. "/Skoda/myskoda_mock.lua",
       { "var:port=" .. mockPort })
-  elseif not self.url then
-    self:warning("no API url configured")
-    return
-  end
-  -- the mock defaults apply only in the embedded-mock case; a configured
-  -- url is the real API, and calling it with mock credentials would
-  -- silently 401/404 — require vin/key then
-  if embeddedMock then
-    self.vin = first(self:getVariable("vin"), "TMBMOCK123456789")
-    self.key = first(self:getVariable("key"), "test-key")
   else
     self.vin = first(self:getVariable("vin"), nil)
     self.key = first(self:getVariable("key"), nil)
   end
-  if not self.vin or not self.key then
+  if not self.url then
+    self:warning("no API url configured")
+    return
+  elseif not self.vin or not self.key then
     self:warning("vin/key not configured — set the QuickApp variables")
     return
   end
