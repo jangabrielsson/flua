@@ -4,6 +4,17 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.145] - 2026-11-11
+
+### Added
+- pre-commit hook keeps the synced trees fresh
+- address the Copilot-feedback trio — clearer defaults, the mock recipe, structural assertion totals
+
+### Changed
+- park the remaining Copilot-feedback items in the rainy-day list
+- the Copilot feedback ships in the packaged docs tree too
+- feedback from the Copilot Skoda session (pip-only workspace)
+
 ## [0.1.144] - 2026-11-11
 
 ### Added
