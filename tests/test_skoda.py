@@ -6,6 +6,7 @@ mock state -> device properties, actions -> mock request log + state.
 """
 
 import asyncio
+import re
 import time
 from pathlib import Path
 
@@ -54,14 +55,17 @@ async def wait_property(
 
 
 async def start_pair(capsys, control_vars=None):
+    # the mock binds an EPHEMERAL port (tests run in parallel workers —
+    # a fixed port would collide) and the control is pointed at it; the
+    # fixed-port design is the QA's default, exercised by the embedded test
     engine = LuaEngine()
     await engine.start()
-    mock_id, err = engine.load_qa_file(str(EXAMPLES / "myskoda_mock.lua"))
+    mock_id, err = engine.load_qa_file(str(EXAMPLES / "myskoda_mock.lua"), ["var:port=0"])
     assert err is None, err
-    await wait_for(capsys, "SKODA_MOCK listening on ")
-    # the control QA discovers the running mock through the skodaMockPort
-    # global — no url variable needed
-    control_id, err = engine.load_qa_file(str(EXAMPLES / "myskoda.lua"), list(control_vars or []))
+    out = await wait_for(capsys, "SKODA_MOCK listening on ")
+    port = int(re.search(r"listening on (\d+)", out).group(1))
+    vars_ = ['var:url="http://127.0.0.1:' + str(port) + '"', *(control_vars or [])]
+    control_id, err = engine.load_qa_file(str(EXAMPLES / "myskoda.lua"), vars_)
     assert err is None, err
     await wait_for(capsys, "SKODA 71 READY_FOR_CHARGING")
     return engine, mock_id, control_id
@@ -130,7 +134,7 @@ async def test_skoda_embeds_the_mock_when_no_url_is_set(capsys) -> None:
         )
         assert err is None, err
         out = await wait_for(capsys, "SKODA 71 READY_FOR_CHARGING")
-        assert "using the embedded MySkoda mock on" in out
+        assert "using the MySkoda mock on 18290" in out
         assert "MOCK GET /api/v1/vehicles/TMBMOCK123456789" in out
         dev = engine.api.state.devices[control_id]
         assert dev["properties"]["batteryLevel"] == 71

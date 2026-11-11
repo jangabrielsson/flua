@@ -76,16 +76,24 @@ local function handle(req)
   return reply(202, "")
 end
 
+-- the mock serves a FIXED, deliberately unlikely port (the control QA
+-- defaults to the same one) — overridable via the `port` variable
+local MOCK_PORT = 18290
+
 function QuickApp:onInit()
-  local srv = net.HTTPServer()
-  srv:listen(tonumber(self:getVariable("port")) or 0, handle)
-  print("SKODA_MOCK listening on " .. srv.port)
-  -- publish the port in a global variable: the control QA discovers a
-  -- running mock instead of being told its port (the HC3's shared-state
-  -- channel between QAs). Globals must exist before they can be set.
-  if not api.get("/globalVariables/skodaMockPort") then
-    api.post("/globalVariables", { name = "skodaMockPort", value = "" })
+  local port = tonumber(self:getVariable("port")) or MOCK_PORT
+  local ok, srv = pcall(function()
+    local server = net.HTTPServer()
+    server:listen(port, handle)
+    return server
+  end)
+  if not ok then
+    -- the port is taken: an external mock (the two-QA style) or another
+    -- service serves it — stand down rather than pretend to serve
+    self:warning("cannot bind port " .. port .. " — another mock or service serves it")
+    exit(0)
+    return
   end
-  fibaro.setGlobalVariable("skodaMockPort", tostring(srv.port))
+  print("SKODA_MOCK listening on " .. srv.port)
   _FLUA.keepAlive()  -- serve for the whole run
 end

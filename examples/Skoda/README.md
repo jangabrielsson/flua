@@ -53,9 +53,10 @@ curl -X POST http://127.0.0.1:8090/devices/5001/action/startCharging -d '{"args"
 ## Run against the real API
 
 Set the QuickApp variables (`url`, `vin`, `key` — the `X-API-Key` from
-the MyŠkoda app) or the environment (`MYSKODA_URL`, `MYSKODA_VIN`,
-`MYSKODA_KEY`). `once="true"` refreshes once, prints, and exits — the
-smoke-test mode.
+the MyŠkoda app); the defaults are the mock's. `once="true"` refreshes
+once, prints, and exits — the smoke-test mode. The mock serves a fixed
+port (18290, overridable via its `port` variable) and stands down with a
+warning when that port is taken.
 
 ## Pinned
 
