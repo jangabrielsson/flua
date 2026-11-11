@@ -40,10 +40,18 @@ local function first(v, fallback)
   return v
 end
 
+-- os.getenv is a flua extension — the HC3 has no os.getenv, so the env
+-- fallbacks must stay behind the _FLUA guard (the HC3 configures the
+-- QuickApp variables instead).
+local function env(name)
+  if _FLUA then return os.getenv(name) end
+  return nil
+end
+
 function QuickApp:onInit()
-  self.url = first(self:getVariable("url"), first(os.getenv("MYSKODA_URL"), nil))
-  self.vin = first(self:getVariable("vin"), first(os.getenv("MYSKODA_VIN"), "TMBMOCK123456789"))
-  self.key = first(self:getVariable("key"), first(os.getenv("MYSKODA_KEY"), "test-key"))
+  self.url = first(self:getVariable("url"), first(env("MYSKODA_URL"), nil))
+  self.vin = first(self:getVariable("vin"), first(env("MYSKODA_VIN"), "TMBMOCK123456789"))
+  self.key = first(self:getVariable("key"), first(env("MYSKODA_KEY"), "test-key"))
   if self.url then
     self:start()
   elseif _FLUA then

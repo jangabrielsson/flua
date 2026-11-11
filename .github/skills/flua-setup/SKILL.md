@@ -162,6 +162,11 @@ A typo'd directive warns at runtime (`unknown --%% directive`) and
 - **Emulator marker**: plua code checks `if fibaro.plua then` — flua does
   NOT set `fibaro.plua` (it is nil). flua's marker is the global `_FLUA`:
   `if _FLUA then ... end` (always set by flua, absent on the HC3).
+- **flua-only APIs need that guard**: `os.getenv` (the HC3 has no
+  `os.getenv` at all — an unguarded call fails at boot), `_PY.*`,
+  `net.*Server` (HTTP/TCP/UDP/WebSocket servers), and the `_FLUA.*`
+  helpers do not exist on the HC3. A QA meant to run on both must call
+  them inside `if _FLUA then ... end`.
 - **`--%%conceal:x=<v>` → `--%%clobber:x=<v>`** — and flua takes the value
   RAW: plua evaluates it as Lua, flua bakes it verbatim. Write
   `--%%clobber:key=placeholder` without quotes — a quoted
