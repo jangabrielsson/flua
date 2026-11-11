@@ -149,9 +149,74 @@ class _MockHc3(BaseHTTPRequestHandler):
         self._send_json({"error": "not found"}, 404)
 
     def do_POST(self):
-        body = self._read_body()
         path = self.path.split("?")[0]
+        length = int(self.headers.get("Content-Length") or 0)
+        raw = self.rfile.read(length) if length else b""
+        type(self).raw_bodies.append(raw)  # the wire bytes, before parsing
+        body = None
+        if raw:
+            try:
+                body = json.loads(raw)
+            except ValueError:
+                body = raw.decode()
         type(self).requests.append((self.command, path, body))
+        if path == "/api/quickApp/import":
+            # the web UI's wire format (multipart with file + roomId) — the
+            # create endpoint flua uses: preserves the package verbatim
+            match = re.search(
+                rb"boundary=(.+)$", (self.headers.get("Content-Type") or "").encode()
+            )
+            fields: dict[str, str] = {}
+            if match:
+                boundary = match.group(1).strip()
+                for part in raw.split(b"--" + boundary):
+                    part = part.strip(b"\r\n")
+                    if not part or part == b"--":
+                        continue
+                    head, _, content = part.partition(b"\r\n\r\n")
+                    name = re.search(rb'name="([^"]+)"', head)
+                    if name:
+                        fields[name.group(1).decode()] = content.decode("utf-8")
+            try:
+                fqa = json.loads(fields.get("file") or "")
+            except ValueError:
+                fqa = None
+            if fqa is None or not isinstance(fqa.get("files"), list):
+                self._send_json({"error": "bad fqa"}, 400)
+                return
+            if type(self).fail_upload:
+                # the HC3 quirk: the device shell is created BEFORE file
+                # processing — a rejected upload can still leave it behind
+                device_id = type(self).next_id
+                type(self).next_id += 1
+                type(self).devices[device_id] = {
+                    "id": device_id,
+                    "name": fqa["name"],
+                    "type": fqa["type"],
+                    "interfaces": [],
+                    "properties": {},
+                    "parentId": 0,
+                }
+                self._send_json({"error": "upload service wedged"}, 503)
+                return
+            type(self).uploaded.append(fqa)
+            device_id = type(self).next_id
+            type(self).next_id += 1
+            device = {
+                "id": device_id,
+                "name": fqa["name"],
+                "type": fqa["type"],
+                "interfaces": list(fqa.get("initialInterfaces") or []) + ["quickApp"],
+                "properties": dict(fqa.get("initialProperties") or {}),
+                "parentId": 0,
+            }
+            type(self).devices[device_id] = device
+            if type(self).bare_id_upload:
+                # some firmware answers the import with the bare id too
+                self._send_json(device_id, 201)
+                return
+            self._send_json(device, 201)
+            return
         if path == "/api/quickApp":
             # the flua client decodes the base64 envelope and sends the raw
             # .fqa JSON body (same contract as the real HC3)

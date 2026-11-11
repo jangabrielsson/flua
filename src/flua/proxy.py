@@ -220,11 +220,31 @@ def deploy_proxy(
     if skeleton is None:
         raise ValueError(f"unknown device type: {device_type!r}")
     fqa = build_proxy_fqa(name, device_type, device_properties, skeleton.get("interfaces") or [])
-    raw = json.dumps(fqa, ensure_ascii=False).encode(
-        "utf-8"
-    )  # raw UTF-8: the HC3 stores escapes as Latin-1
-    encoded = base64.b64encode(raw).decode("ascii")
-    device, status = engine.api.dispatch_hc3("POST", "/quickApp", {"file": encoded})
+    if engine.hc3 is not None:
+        from .engine import sanitize_filename  # deferred: engine imports proxy
+
+        # the web-import endpoint preserves the package verbatim (the proxy's
+        # uiCallbacks included); the JSON create re-derives them with generated
+        # defaults on recent firmware (live-verified 5.22x). The proxy's own
+        # UIHandler forwards events regardless, and the mirror re-syncs the UI
+        # properties anyway — this just skips the mangled intermediate state.
+        device, status = engine.hc3.multipart(
+            "POST",
+            "/quickApp/import",
+            files=[
+                (
+                    "file",
+                    f"{sanitize_filename(str(name))}_Proxy.fqa",
+                    json.dumps(fqa, ensure_ascii=False),
+                )
+            ],
+        )
+    else:
+        raw = json.dumps(fqa, ensure_ascii=False).encode(
+            "utf-8"
+        )  # raw UTF-8: the HC3 stores escapes as Latin-1
+        encoded = base64.b64encode(raw).decode("ascii")
+        device, status = engine.api.dispatch_hc3("POST", "/quickApp", {"file": encoded})
     if status not in (200, 201):
         detail = json.dumps(device)[:200] if device is not None else "no response body"
         # the HC3 quirk (live-verified): a rejected upload can still CREATE

@@ -134,14 +134,32 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
                 print(f"removed duplicate FluaHelper {stale['id']}")
     if decision != "skip":
         fqa, _ = build_fqa(str(_helper_source()))
-        body: dict[str, Any] = {
-            "file": base64.b64encode(
-                json.dumps(fqa, ensure_ascii=False).encode(
-                    "utf-8"
-                )  # raw UTF-8: the HC3 stores escapes as Latin-1
-            ).decode("ascii")
-        }
-        device, upload_status = engine.api.dispatch_hc3("POST", "/quickApp", body)
+        if engine.hc3 is not None:
+            # the web-import endpoint preserves the package verbatim; the JSON
+            # create re-derives uiCallbacks with generated defaults on recent
+            # firmware (live-verified 5.22x)
+            from ..engine import sanitize_filename
+
+            device, upload_status = engine.hc3.multipart(
+                "POST",
+                "/quickApp/import",
+                files=[
+                    (
+                        "file",
+                        f"{sanitize_filename(str(fqa.get('name') or 'FluaHelper'))}.fqa",
+                        json.dumps(fqa, ensure_ascii=False),
+                    )
+                ],
+            )
+        else:
+            body: dict[str, Any] = {
+                "file": base64.b64encode(
+                    json.dumps(fqa, ensure_ascii=False).encode(
+                        "utf-8"
+                    )  # raw UTF-8: the HC3 stores escapes as Latin-1
+                ).decode("ascii")
+            }
+            device, upload_status = engine.api.dispatch_hc3("POST", "/quickApp", body)
         if upload_status not in (200, 201) or not isinstance(device, dict):
             parser.error(f"cannot upload FluaHelper to the HC3 (HTTP {upload_status})")
         helper_id = int(device["id"])

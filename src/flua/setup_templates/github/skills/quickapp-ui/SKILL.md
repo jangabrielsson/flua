@@ -96,6 +96,15 @@ function QuickApp:modeToggled(event)
 end
 ```
 
+**Buttons call `uib2OnReleased` instead of your handler?** The QA was
+created through the HC3's JSON `POST /quickApp` API-create, which
+re-derives uiCallbacks with generated default names on recent firmware
+(live-verified 5.22x) — custom handlers get dropped and taps log "Class
+does not have uib2OnReleased function defined". Re-import the package via
+the HC3 web UI's Import button or flua's `--tool uploadFQA`/`uploadQA`
+(both use `POST /quickApp/import`, which preserves the package verbatim —
+see the hc3-rest-api skill).
+
 ## Asserting and driving UI state in tests
 
 - `self:getView()` — the QA's current rendered view including all `updateView`

@@ -38,11 +38,30 @@ action ignored".
   filename-less part crashes the HC3's import handler with a bodyless
   HTTP 500 (live-verified; the browser uploads a File, so its part always
   has one).
-- `uploadFQA` and `uploadQA` (new-QA path) now use
-  `POST /quickApp/import` against a real HC3 — the package is preserved
-  verbatim, custom handler names included (live-verified: device 4447
-  stored all 23 custom callbacks after a tool upload). The offline sim
-  keeps the JSON `POST /quickApp` path (the sim never re-derives).
+- Every QA-create path in flua now uses `POST /quickApp/import` against a
+  real HC3: `uploadFQA`, `uploadQA` (new-QA path), `installHelper`, and
+  the proxy deploy. The offline sim keeps the JSON `POST /quickApp` path
+  (the sim never re-derives). `parity_capture` deliberately stays on the
+  JSON create — it pins that endpoint's contract for the parity suite.
+- Live-verified on HC3 firmware **5.221.22 (beta)**: a tool upload stored
+  all 23 custom callbacks intact on the controller. The re-derivation is
+  recent-firmware behavior — plausible it did not exist in older 5.2xx
+  builds, which would explain why QAs uploaded through the API years ago
+  still work while new uploads broke.
+
+### Why the proxy never showed the problem
+
+Two reasons, both visible in the code:
+
+1. **The proxy's dispatch bypasses uiCallbacks.** `onUIEvent` in the
+   runtime (the HC3 plua contract flua ports) checks
+   `quickApp.UIHandler` FIRST — the proxy shim defines
+   `QuickApp:UIHandler(ev)` and forwards every UI event to the emulator
+   over HTTP, so the mangled uiCallbacks table is never consulted.
+2. **The mirror re-syncs the UI properties anyway.** On proxy runs flua
+   PUTs the correct `viewLayout`/`uiView`/`uiCallbacks` to the HC3 device
+   (`sync_proxy_ui`), overwriting the import's mangled table — which is
+   why the proxy device's stored properties always looked intact.
 
 Also kept from the earlier rounds (export-shape parity, harmless and
 matching the HC3's own exports): `qa_export` emits `viewLayout` +
