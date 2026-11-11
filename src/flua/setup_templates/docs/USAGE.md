@@ -666,11 +666,13 @@ device's `properties.viewLayout`, `properties.uiView`, and
 Declared event handlers (`onReleased`, `onChanged`, `onToggled`, …) are
 packed **twice**: into `uiCallbacks` (the runtime mirror both flua and the
 HC3 dispatch through) **and** onto the legacy `viewLayout` elements
-themselves. The HC3's canonical form carries the event → method binding on
-the element — that is what the controller's UI editor edits — and uploads
-whose elements lack it get the HC3's generated default names
-(`ui<b2>OnReleased`) instead of your handlers. Packing the targets in both
-places keeps custom handler names alive across upload and import.
+themselves — the HC3's canonical element form, which keeps the handlers
+readable when a device is downloaded back. For the legacy layout (the
+default) the .fqa follows the HC3's own export shape: `viewLayout` +
+`uiCallbacks` only, **no `uiView`** — a package carrying `uiView` makes
+the HC3's import regenerate `uiCallbacks` with generated default names
+(`ui<b2>OnReleased`) and silently drops your handlers. The uiView format
+travels only when it is the active one (`--%%useUiView:true`).
 
 At runtime a single select is set with `updateView(elm, "selectedItem", value)`
 and a multi select with `updateView(elm, "selectedItems", {value1, value2, …})`.

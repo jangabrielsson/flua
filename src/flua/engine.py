@@ -1590,6 +1590,15 @@ class LuaEngine:
             if not str(c.get("name", "")).startswith("__")
         ]
         properties["uiCallbacks"] = callbacks
+        if properties.get("useUiView") is False:
+            # the HC3's own legacy export carries only viewLayout + uiCallbacks
+            # (no uiView, no useUiView). A package that DOES carry uiView makes
+            # the HC3's import take the uiView path and regenerate uiCallbacks
+            # from the bindings with generated default names (ui<b2>OnReleased),
+            # dropping the custom handlers (live-verified 5.22x). Match the
+            # standard legacy shape so custom handler names survive import.
+            properties.pop("uiView", None)
+            properties.pop("useUiView", None)
         # the HC3 expects these five fields as JSON arrays, never objects
         for key in ("quickAppVariables", "uiView", "supportedDeviceRoles"):
             if key not in properties:

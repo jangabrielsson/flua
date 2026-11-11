@@ -438,6 +438,48 @@ def test_pack_carries_identity_properties(tmp_path, capsys, monkeypatch) -> None
     assert "value" not in props  # dynamic properties still do not travel
 
 
+def test_pack_legacy_ui_matches_the_hc3_export_shape(tmp_path, capsys, monkeypatch) -> None:
+    # regression: a legacy-UI package carrying uiView made the HC3's import
+    # regenerate uiCallbacks with generated default names (ui<b2>OnReleased),
+    # dropping the custom handlers (live-verified 5.22x). The HC3's own
+    # export carries only viewLayout + uiCallbacks — pack must match it, so
+    # a package someone else installs keeps its custom handler names.
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "app.lua").write_text(
+        "--%%name:uipack\n"
+        "--%%type:com.fibaro.binarySwitch\n"
+        '--%%u:{button="b2",text="Go",onReleased="zoneDownButton"}\n'
+        '--%%u:{slider="dim",onChanged="setLevel"}\n'
+        "function QuickApp:onInit() end\n"
+    )
+    pack = tools._TOOLS["pack"]
+    parser = argparse.ArgumentParser()
+    pack.add_arguments(parser)
+    assert pack.run(parser, parser.parse_args(["app.lua"])) == 0
+    capsys.readouterr()
+    fqa = json.loads((tmp_path / "uipack.fqa").read_text())
+    props = fqa["initialProperties"]
+    assert "viewLayout" in props
+    assert "uiView" not in props  # the uiView presence triggers the HC3's regeneration
+    assert "useUiView" not in props
+    callbacks = {(c["name"], c["eventType"]): c["callback"] for c in props["uiCallbacks"]}
+    assert callbacks[("b2", "onReleased")] == "zoneDownButton"
+    assert callbacks[("dim", "onChanged")] == "setLevel"
+    # the uiView format travels when it is the active one
+    (tmp_path / "ui2.lua").write_text(
+        "--%%name:uipack2\n"
+        "--%%type:com.fibaro.binarySwitch\n"
+        "--%%useUiView:true\n"
+        '--%%u:{button="b2",text="Go",onReleased="zoneDownButton"}\n'
+        "function QuickApp:onInit() end\n"
+    )
+    assert pack.run(parser, parser.parse_args(["ui2.lua", "-o", "ui2.fqa"])) == 0
+    capsys.readouterr()
+    props = json.loads((tmp_path / "ui2.fqa").read_text())["initialProperties"]
+    assert props["useUiView"] is True
+    assert props["uiView"][0]["components"][0]["name"] == "b2"
+
+
 def test_upload_and_download_fqa_tools(tmp_path, monkeypatch, capsys) -> None:
     _MockHc3.fqas = {}
     _MockHc3.next_id = 100
@@ -624,8 +666,12 @@ def test_update_qa_syncs_files_name_properties_and_interfaces(
             r for r in _MockHc3.requests if r[0] == "POST" and r[1] == "/api/plugins/updateProperty"
         ]
         names = {r[2]["propertyName"] for r in props}
+        # uiView/useUiView are absent from a legacy package (the HC3's
+        # standard export shape — carrying uiView makes the HC3's import
+        # regenerate uiCallbacks with generated defaults), so they are not
+        # synced
         assert {
-            "viewLayout", "uiView", "uiCallbacks", "useUiView", "userDescription",
+            "viewLayout", "uiCallbacks", "userDescription",
             "manufacturer", "buildNumber",  # the declared identity properties sync too
         } <= names
         iface = [

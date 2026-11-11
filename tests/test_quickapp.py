@@ -211,11 +211,13 @@ async def test_quickapp_export_filters_and_arrayifies(tmp_path, capsys) -> None:
         assert "value" not in props
         assert props["userDescription"] == "v2"
         assert props["uiCallbacks"] == [{"name": "btn1"}]  # __-prefixed stripped
-        for key in ("quickAppVariables", "uiView", "supportedDeviceRoles"):
-            if key == "supportedDeviceRoles":
-                assert key not in props  # filtered — the real export lacks it
-            else:
-                assert isinstance(props[key], list)
+        assert isinstance(props["quickAppVariables"], list)
+        assert "supportedDeviceRoles" not in props  # filtered — the real export lacks it
+        # a legacy package matches the HC3's own export shape: no uiView, no
+        # useUiView (carrying uiView makes the HC3's import regenerate
+        # uiCallbacks with generated defaults — the mangling bug)
+        assert "uiView" not in props
+        assert "useUiView" not in props
         # the package must round-trip through import and keep the properties
         device, status = engine.api.dispatch("POST", "/quickApp/import", exported)
         assert status == 200
