@@ -171,3 +171,36 @@ and every plugin boundary risks it.
 - **Rationale**: parked at the owner's request ("we can wait a bit longer
   until we go there"); items 1-2 are worthwhile insurance before any
   configurability.
+
+## Copilot Skoda feedback — discovery and verification asks (parked 2026-11-11)
+
+From `docs/feedback/flua-feedback_copilot_skoda.md` — a from-scratch agent
+build of the Skoda pair in a pip-only workspace, with the bundled example
+excluded. Already shipped from that report: the generic mock-QA recipe in
+quickapp-patterns, the flua-setup default-mode wording fix, and structural
+assertion totals in `flua test --json`.
+
+- **Docs lookup (the #1 ask)** — `docs_search` (excerpts + stable section
+  ids), `docs_read` with heading/line ranges and output caps, task-oriented
+  entry points ("mock an HTTP service"). `docs_list` is 51 KB today; the
+  agent did filesystem archaeology instead of MCP reads.
+- **Agent-facing tool map** — one compact response listing every MCP tool
+  with exact names and example calls; invalid-argument errors should carry
+  a valid example.
+- **Virtual time vs real I/O recipe** — how `--step` advances while socket
+  I/O is pending; an `eventually(predicate, timeout)` helper and an
+  awaitable request helper for test QAs.
+- **Package inspection** — `--tool inspectFQA FILE --json` (metadata,
+  inventory, interfaces, validation) and `verifyPackage SOURCE PACKAGE`
+  (source-aware comparison; pack rewrites `--%%var` expressions as baked
+  literals, so byte-compare is wrong). The Skoda .fqa drift pin covers the
+  checked-in artifact, not user packages.
+- **Skill installation vs invocation** — workspace skill files and the
+  editor's skill loader can disagree; a setup/doctor check should report
+  which skills are local docs vs registered, and how to load each.
+- **Version-stamped agent docs** — skills/instructions carrying their
+  source version + an offline freshness check; the report found conflicting
+  default-mode statements between surfaces.
+- **Verification-layer boundaries** — tool summaries should say what each
+  check proves (static ≠ runtime; mock ≠ car; `_FLUA` removal tests branch
+  logic, not firmware).
