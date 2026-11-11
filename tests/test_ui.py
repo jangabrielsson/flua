@@ -476,13 +476,12 @@ def test_select_ui_view_carries_values_array() -> None:
     assert "value" not in component  # the scalar spelling is gone from the uiView
 
 
-def test_legacy_layout_carries_event_bindings() -> None:
-    # regression: uploading a packed QA to the HC3 mangled custom handler
-    # names into generated ui<b2>OnReleased defaults. The HC3's canonical
-    # form carries the event -> method binding ON the element (the control's
-    # edit mode), uiCallbacks being the runtime mirror; re-deriving
-    # uiCallbacks from elements without bindings fills the generated names.
-    # The packed legacy viewLayout must therefore carry the declared targets.
+def test_legacy_layout_has_no_event_fields() -> None:
+    # regression: the packed legacy viewLayout must match the HC3's own
+    # export shape — elements WITHOUT event fields; the event -> method
+    # binding lives in uiCallbacks only. Declaring onReleased on the element
+    # (like the uiView presence) makes the HC3's import re-derive uiCallbacks
+    # with generated defaults (ui<b2>OnReleased) and drop the custom names.
     rows = [
         {"button": "b2", "text": "Zone \u25bc", "onReleased": "zoneDownButton"},
         {
@@ -504,17 +503,23 @@ def test_legacy_layout_carries_event_bindings() -> None:
             elif c.get("name"):
                 components.append(c)
     by_name = {c["name"]: c for c in components}
-    assert by_name["b2"]["onReleased"] == "zoneDownButton"
-    assert "onLongPressDown" not in by_name["b2"]  # undeclared events stay absent
-    assert by_name["b10"]["onLongPressReleased"] == "infiniteDuration"
-    assert by_name["auto"]["onToggleOn"] == "autoOn"
-    assert by_name["auto"]["onToggleOff"] == "autoOff"
-    assert by_name["limit"]["onChanged"] == "setLimit"
-    assert by_name["mode"]["onToggled"] == "setMode"
-    # uiCallbacks unchanged — the runtime mirror both flua and the HC3 read
+    for event in (
+        "onReleased",
+        "onLongPressDown",
+        "onLongPressReleased",
+        "onChanged",
+        "onToggled",
+        "onToggleOn",
+        "onToggleOff",
+    ):
+        assert all(event not in c for c in by_name.values())
+    # uiCallbacks carries the bindings — the table both flua and the HC3 dispatch
     callbacks = {(c["name"], c["eventType"]): c["callback"] for c in ui["uiCallbacks"]}
     assert callbacks[("b2", "onReleased")] == "zoneDownButton"
+    assert callbacks[("b10", "onLongPressReleased")] == "infiniteDuration"
     assert callbacks[("auto", "onToggleOn")] == "autoOn"
+    assert callbacks[("limit", "onChanged")] == "setLimit"
+    assert callbacks[("mode", "onToggled")] == "setMode"
 
 
 def test_legacy_layout_events_roundtrip_without_ui_callbacks() -> None:

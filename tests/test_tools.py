@@ -465,6 +465,11 @@ def test_pack_legacy_ui_matches_the_hc3_export_shape(tmp_path, capsys, monkeypat
     callbacks = {(c["name"], c["eventType"]): c["callback"] for c in props["uiCallbacks"]}
     assert callbacks[("b2", "onReleased")] == "zoneDownButton"
     assert callbacks[("dim", "onChanged")] == "setLevel"
+    # the package describes final, initialized properties (the HC3's own
+    # exports carry true; false makes the import re-run type-template init
+    # and re-derive uiCallbacks with generated defaults)
+    assert props["typeTemplateInitialized"] is True
+    assert "userDescription" not in props  # empties stay out like the HC3's exports
     # the uiView format travels when it is the active one
     (tmp_path / "ui2.lua").write_text(
         "--%%name:uipack2\n"

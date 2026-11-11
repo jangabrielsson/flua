@@ -127,23 +127,18 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
     typ, name = el["type"], el["id"]
     style_weight = el.get("weight") or weight or "0.50"
     if typ == "button":
-        element = {
+        # NOTE: deliberately no event fields — the HC3's own legacy exports
+        # carry none (the event -> method binding lives in uiCallbacks only).
+        # Declaring onReleased etc. on the element makes the HC3's import
+        # re-derive uiCallbacks with generated default names (ui<b2>OnReleased)
+        # and drop the custom handlers.
+        return {
             "name": name,
             "visible": el.get("visible", True),
             "style": {"weight": style_weight},
             "text": el["text"],
             "type": "button",
         }
-        # the HC3's canonical form: the element carries the event -> method
-        # binding (the control's edit mode), uiCallbacks is the runtime
-        # mirror. Uploads whose elements lack the binding get the HC3's
-        # generated default names (ui<b2>OnReleased) when the controller
-        # re-derives uiCallbacks from the UI — packing the targets here
-        # keeps custom handler names alive. Undeclared events stay absent.
-        for event in ("onReleased", "onLongPressDown", "onLongPressReleased"):
-            if el.get(event):
-                element[event] = el[event]
-        return element
     if typ in ("select", "multi"):
         # legacy format: the selection lives in "values" (an array), even
         # for single select — its declared initial value is el["value"]
@@ -162,11 +157,10 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
             "options": _options(el),
             "values": values,
         }
-        if el.get("onToggled"):
-            element["onToggled"] = el["onToggled"]
         return element
     if typ == "switch":
-        element = {
+        # no event fields (see the button comment)
+        return {
             "name": name,
             "visible": el.get("visible", True),
             "style": {"weight": style_weight},
@@ -174,18 +168,6 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
             "type": "switch",
             "value": el["value"],
         }
-        # event targets on the element (see the button comment above),
-        # including the 5.221 split toggle events
-        for event in (
-            "onReleased",
-            "onLongPressDown",
-            "onLongPressReleased",
-            "onToggleOn",
-            "onToggleOff",
-        ):
-            if el.get(event):
-                element[event] = el[event]
-        return element
     if typ == "slider":
         element = {
             "name": name,
@@ -200,8 +182,6 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
         }
         if el.get("unit"):
             element["unit"] = el["unit"]
-        if el.get("onChanged"):
-            element["onChanged"] = el["onChanged"]
         return element
     # label
     return {

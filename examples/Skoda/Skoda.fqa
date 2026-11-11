@@ -3,7 +3,6 @@
   "type": "com.fibaro.genericDevice",
   "apiVersion": "1.3",
   "initialProperties": {
-    "userDescription": "",
     "viewLayout": {
       "$jason": {
         "body": {
@@ -116,8 +115,7 @@
                       "weight": "1.2"
                     },
                     "text": "Start charging",
-                    "type": "button",
-                    "onReleased": "startCharging"
+                    "type": "button"
                   },
                   {
                     "style": {
@@ -140,8 +138,7 @@
                       "weight": "1.2"
                     },
                     "text": "Stop charging",
-                    "type": "button",
-                    "onReleased": "stopCharging"
+                    "type": "button"
                   },
                   {
                     "style": {
@@ -164,8 +161,7 @@
                       "weight": "1.2"
                     },
                     "text": "Start A/C",
-                    "type": "button",
-                    "onReleased": "startAC"
+                    "type": "button"
                   },
                   {
                     "style": {
@@ -188,8 +184,7 @@
                       "weight": "1.2"
                     },
                     "text": "Stop A/C",
-                    "type": "button",
-                    "onReleased": "stopAC"
+                    "type": "button"
                   },
                   {
                     "style": {
@@ -239,8 +234,7 @@
                       "weight": "1.2"
                     },
                     "text": "Charge limit",
-                    "type": "slider",
-                    "onChanged": "setChargingLimit"
+                    "type": "slider"
                   },
                   {
                     "style": {
@@ -330,11 +324,8 @@
       }
     ],
     "quickAppVariables": [],
-    "typeTemplateInitialized": false
+    "typeTemplateInitialized": true
   },
-  "initialInterfaces": [
-    "battery"
-  ],
   "files": [
     {
       "name": "main",
@@ -342,5 +333,8 @@
       "isOpen": false,
       "content": "--%%name:Skoda\n--%%type:com.fibaro.genericDevice\n--%%interface:battery\n-- myskoda.lua — a Skoda car control QA against the MyŠkoda Public API.\n--\n-- Controls charging and air conditioning through the public REST API\n-- (X-API-Key auth; see the bundled OpenAPI spec and the HTML docs in\n-- examples/Skoda/). Runs fully offline against the bundled mock:\n--\n--   flua --api local examples/Skoda/myskoda_mock.lua examples/Skoda/myskoda.lua\n--\n-- Against the real API, set the QuickApp variables (or the environment):\n--   url    the API base url (default: the mock on 127.0.0.1:8190)\n--   vin    your vehicle's VIN\n--   key    the X-API-Key from the MyŠkoda app\n--   once   \"true\" = refresh once, print, exit (tests); unset = poll every minute\n--\n-- The QA maps the car onto the declared device properties (`value` =\n-- charging on/off, `batteryLevel` from the battery interface) plus\n-- QuickApp variables (state, climate, target) and the UI labels — the\n-- property set is fixed by the type; the real HC3 silently ignores\n-- updates to properties it does not declare.\n--   actions: turnOn/turnOff (start/stop charging), setChargingLimit,\n--            startAC, stopAC, refresh\n\n--%%u:{label='battery',text='Battery'}\n--%%u:{label='chargeState',text='Charging state'}\n--%%u:{label='climate',text='A/C Status'}\n--%%u:{label='target',text='Target charge'}\n--%%u:{button='startCharge',text='Start charging',onReleased='startCharging'}\n--%%u:{button='stopCharge',text='Stop charging',onReleased='stopCharging'}\n--%%u:{button='startAC',text='Start A/C',onReleased='startAC'}\n--%%u:{button='stopAC',text='Stop A/C',onReleased='stopAC'}\n--%%u:{label='l22',text='Set charging target'}\n--%%u:{slider='chargeLimit',text='Charge limit',min=50,max=100,onChanged='setChargingLimit'}\n\n--%%speed:60\n\n-- getVariable returns \"\" for unset variables (flua), and \"\" is truthy\n-- in Lua — so fallbacks need an explicit check, not `or`.\nlocal function first(v, fallback)\n  if v == nil or v == \"\" then return fallback end\n  return v\nend\n\n-- the mock serves a FIXED port (see myskoda_mock.lua); the control QA\n-- defaults straight to it, so no port discovery is needed\nlocal MOCK_PORT = 18290\n\nfunction QuickApp:onInit()\n  self.url = first(self:getVariable(\"url\"), nil)\n  -- decide the mock context FIRST: only when no url was configured and\n  -- flua is present does the QA load the mock itself — and only then do\n  -- the mock vin/key defaults apply\n  local embeddedMock = not self.url and _FLUA ~= nil\n  if embeddedMock then\n    -- point at the mock's fixed port (overridable via the `mockPort`\n    -- variable — tests use their own free port so parallel runs and a\n    -- live instance never collide) and load the bundled mock QA (one\n    -- file is the whole pair for pip users). If a mock already serves\n    -- the port, the loaded one stands down quietly.\n    local mockPort = tonumber(self:getVariable(\"mockPort\")) or MOCK_PORT\n    self.url = \"http://127.0.0.1:\" .. mockPort\n    self.vin = first(self:getVariable(\"vin\"), \"TMBMOCK123456789\")\n    self.key = first(self:getVariable(\"key\"), \"test-key\")\n    print(\"using the MySkoda mock on \" .. mockPort)\n    pcall(_FLUA.loadQAfromFile, _PY.examples_dir .. \"/Skoda/myskoda_mock.lua\",\n      { \"var:port=\" .. mockPort })\n  else\n    self.vin = first(self:getVariable(\"vin\"), nil)\n    self.key = first(self:getVariable(\"key\"), nil)\n  end\n  if not self.url then\n    self:warning(\"no API url configured\")\n    return\n  elseif not self.vin or not self.key then\n    self:warning(\"vin/key not configured — set the QuickApp variables\")\n    return\n  end\n  self:refresh()\n  if self:getVariable(\"once\") ~= \"true\" then\n    -- poll every 5 minutes: 12 requests/hour, well under the real API's\n    -- 20/hour/VIN quota (leaving headroom for the action round-trips,\n    -- two requests each)\n    setInterval(function() self:refresh() end, 5 * 60 * 1000)\n  end\nend\n\nfunction QuickApp:request(method, path, body, done)\n  local http = net.HTTPClient()\n  http:request(self.url .. path, {\n    options = {\n      method = method,\n      headers = { [\"X-API-Key\"] = self.key },\n      data = body and json.encode(body) or nil,\n    },\n    success = function(resp)\n      if resp.status >= 200 and resp.status < 300 then\n        if done then done(resp) end\n      elseif resp.status == 429 then\n        -- the real API allows 20 requests/hour per VIN; back off and say\n        -- how long the quota needs\n        local retry = resp.headers and resp.headers[\"Retry-After\"]\n        self:warning(method .. \" \" .. path .. \" -> 429 rate limited\"\n          .. (retry and (\"; retry after \" .. retry .. \" s\") or \"\"))\n      else\n        self:warning(method .. \" \" .. path .. \" -> \" .. tostring(resp.status))\n      end\n    end,\n    error = function(err)\n      self:error(method .. \" \" .. path .. \": \" .. tostring(err))\n    end,\n  })\nend\n\nfunction QuickApp:refresh()\n  local qa = self\n  self:request(\"GET\", \"/api/v1/vehicles/\" .. self.vin, nil, function(resp)\n    local ok, data = pcall(json.decode, resp.data)\n    if not ok or type(data) ~= \"table\" then\n      qa:warning(\"refresh: bad JSON from the API\")\n      return\n    end\n    local charging = data.charging or {}\n    local status = charging.status or {}\n    local battery = status.battery or {}\n    local settings = charging.settings or {}\n    local ac = data.airConditioning or {}\n    -- the device property set is fixed by the type: batteryLevel comes\n    -- from the battery interface, the rest of the dynamic state lives in\n    -- QuickApp variables, and the UI labels show it with colors (label\n    -- text allows HTML)\n    local soc = battery.stateOfChargeInPercent\n    qa:updateProperty(\"batteryLevel\", soc)\n    qa:setVariable(\"state\", tostring(status.state or \"\"))\n    qa:setVariable(\"climate\", tostring(ac.state or \"\"))\n    qa:setVariable(\"target\", tostring(settings.targetStateOfChargeInPercent or \"\"))\n    local function colored(value, color)\n      return \"<font color='\" .. color .. \"'>\" .. value .. \"</font>\"\n    end\n    local batteryColor = (soc and soc >= 50) and \"green\" or \"red\"\n    local chargeColor = status.state == \"CHARGING\" and \"green\" or \"grey\"\n    local climateColor = ac.state == \"ON\" and \"coral\" or \"grey\"\n    local socText = soc and string.format(\"%.1f\", soc) or \"?\"\n    qa:updateView(\"battery\", \"text\", \"Battery: \" .. colored(socText .. \" %\", batteryColor))\n    qa:updateView(\"chargeState\", \"text\", \"Charging state: \" .. colored(tostring(status.state or \"?\"), chargeColor))\n    qa:updateView(\"climate\", \"text\", \"A/C Status: \" .. colored(tostring(ac.state or \"?\"), climateColor))\n    qa:updateView(\"target\", \"text\", \"Target charge: \" .. tostring(settings.targetStateOfChargeInPercent or \"?\") .. \" %\")\n    -- the slider mirrors the API's actual target (slider values are strings)\n    qa:updateView(\"chargeLimit\", \"value\", tostring(settings.targetStateOfChargeInPercent or 50))\n    print(\"SKODA\", battery.stateOfChargeInPercent or \"?\", status.state or \"?\")\n    if qa:getVariable(\"once\") == \"true\" then exit(0) end\n  end)\nend\n\nfunction QuickApp:startCharging(event)\n  self:request(\"POST\", \"/api/v1/vehicles/\" .. self.vin .. \"/charging/start\", nil, function()\n    self:refresh()\n  end)\nend\n\nfunction QuickApp:stopCharging(event)\n  self:request(\"POST\", \"/api/v1/vehicles/\" .. self.vin .. \"/charging/stop\", nil, function()\n    self:refresh()\n  end)\nend\n\nfunction QuickApp:setChargingLimit(arg)\n  local value = tonumber(type(arg) == \"table\" and (arg.values and arg.values[1] or arg) or arg)\n  if not value then return end\n  self:request(\"PUT\", \"/api/v1/vehicles/\" .. self.vin .. \"/charging/limit\",\n    { targetStateOfChargeInPercent = value }, function()\n    self:refresh()\n  end)\nend\n\nfunction QuickApp:startAC(event)\n  self:request(\"POST\", \"/api/v1/vehicles/\" .. self.vin .. \"/air-conditioning/start\", nil, function()\n    self:refresh()\n  end)\nend\n\nfunction QuickApp:stopAC(event)\n  self:request(\"POST\", \"/api/v1/vehicles/\" .. self.vin .. \"/air-conditioning/stop\", nil, function()\n    self:refresh()\n  end)\nend\n\nfunction QuickApp:turnOn() self:startCharging() end\nfunction QuickApp:turnOff() self:stopCharging() end\n"
     }
+  ],
+  "initialInterfaces": [
+    "battery"
   ]
 }

@@ -663,16 +663,15 @@ device's `properties.viewLayout`, `properties.uiView`, and
 `properties.uiCallbacks` hold the generated structures, and
 `self:updateView(elm, prop, value)` updates them.
 
-Declared event handlers (`onReleased`, `onChanged`, `onToggled`, …) are
-packed **twice**: into `uiCallbacks` (the runtime mirror both flua and the
-HC3 dispatch through) **and** onto the legacy `viewLayout` elements
-themselves — the HC3's canonical element form, which keeps the handlers
-readable when a device is downloaded back. For the legacy layout (the
-default) the .fqa follows the HC3's own export shape: `viewLayout` +
-`uiCallbacks` only, **no `uiView`** — a package carrying `uiView` makes
-the HC3's import regenerate `uiCallbacks` with generated default names
-(`ui<b2>OnReleased`) and silently drops your handlers. The uiView format
-travels only when it is the active one (`--%%useUiView:true`).
+Declared event handlers (`onReleased`, `onChanged`, `onToggled`, …) live
+in `uiCallbacks` — the table both flua and the HC3 dispatch through. For
+the legacy layout (the default) the .fqa follows the HC3's own export
+shape exactly: `viewLayout` + `uiCallbacks` only, **no `uiView`, no event
+fields on the elements**, `typeTemplateInitialized: true`, empties
+omitted. Any deviation makes the HC3's import re-derive `uiCallbacks`
+with generated default names (`ui<b2>OnReleased`) and silently drop your
+handlers. The uiView format travels only when it is the active one
+(`--%%useUiView:true`).
 
 At runtime a single select is set with `updateView(elm, "selectedItem", value)`
 and a multi select with `updateView(elm, "selectedItems", {value1, value2, …})`.

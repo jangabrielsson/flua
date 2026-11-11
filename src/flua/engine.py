@@ -1592,13 +1592,18 @@ class LuaEngine:
         properties["uiCallbacks"] = callbacks
         if properties.get("useUiView") is False:
             # the HC3's own legacy export carries only viewLayout + uiCallbacks
-            # (no uiView, no useUiView). A package that DOES carry uiView makes
-            # the HC3's import take the uiView path and regenerate uiCallbacks
-            # from the bindings with generated default names (ui<b2>OnReleased),
-            # dropping the custom handlers (live-verified 5.22x). Match the
-            # standard legacy shape so custom handler names survive import.
+            # (no uiView, no useUiView). Match the standard legacy shape.
             properties.pop("uiView", None)
             properties.pop("useUiView", None)
+        # the package's properties are final: a false typeTemplateInitialized
+        # makes the HC3's import re-run its type-template initialization, which
+        # re-derives uiCallbacks from the UI with generated default names
+        # (ui<b2>OnReleased) and drops the custom handlers (live-verified
+        # 5.22x). The HC3's own exports carry true.
+        properties["typeTemplateInitialized"] = True
+        # empties stay out, like the HC3's own exports
+        if properties.get("userDescription") == "":
+            properties.pop("userDescription", None)
         # the HC3 expects these five fields as JSON arrays, never objects
         for key in ("quickAppVariables", "uiView", "supportedDeviceRoles"):
             if key not in properties:
@@ -1615,7 +1620,6 @@ class LuaEngine:
             "type": device.get("type") or "com.fibaro.binarySwitch",
             "apiVersion": "1.3",
             "initialProperties": properties,
-            "initialInterfaces": interfaces,
             "files": [
                 {
                     "name": f["name"],
@@ -1626,6 +1630,8 @@ class LuaEngine:
                 for f in info["files"]
             ],
         }
+        if interfaces:
+            fqa["initialInterfaces"] = interfaces
         return self._arrayify_fqa(fqa)
 
     @staticmethod

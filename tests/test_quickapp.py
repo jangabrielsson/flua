@@ -165,7 +165,7 @@ async def test_quickapp_export(tmp_path, capsys) -> None:
         # dynamic properties (value, state, ...) never travel in the package
         props = exported["initialProperties"]
         assert "value" not in props and "deviceControlType" not in props
-        assert "userDescription" in props  # the real export's field set
+        assert "userDescription" not in props  # empties stay out, like the real export
         # the identity properties travel only when declared: the catalog
         # skeleton's defaults (empty model/manufacturer, buildNumber 1, the
         # type's deviceRole) stay out of the package
