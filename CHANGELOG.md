@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.150] - 2026-11-11
+
+### Changed
+- Tolerate a prompt signal-death in the Ctrl-C long-poll test
+
 ## [0.1.149] - 2026-11-11
 
 ### Changed
