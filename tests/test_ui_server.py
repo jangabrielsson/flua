@@ -68,10 +68,67 @@ async def server(tmp_path):
     await engine.start()
     api_server = ApiServer(engine.api, port=0)
     await api_server.start()
+    engine.set_sim_api_port(api_server.port)  # offline loopback 11111 -> here
     base = f"http://127.0.0.1:{api_server.port}"
     yield engine, api_server, base
     await api_server.stop()
     await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_qa_installs_fqa_via_loopback_multipart(server, capsys, tmp_path) -> None:
+    # controller QA code installing an .fqa calls its own loopback API
+    # (127.0.0.1:11111, credential-free) with a hand-built multipart body.
+    # Offline, the engine rewrites the loopback to the sim's own API server,
+    # so the flow runs unchanged in the emulator.
+    engine, _api_server, _base = server
+    loader_path = tmp_path / "loader.lua"
+    loader_path.write_text(
+        "function QuickApp:onInit()\n"
+        "  local fqa = json.encode({\n"
+        "    type = 'QuickApp', name = 'loopback-import',\n"
+        "    files = {{ name = 'main', isMain = true, content = \"print('LOOPBACK QA')\\n\" }},\n"
+        "  })\n"
+        "  local boundary = '----qaDist' .. string.format('%08x', os.time())\n"
+        "  local body = '--' .. boundary .. '\\r\\n'\n"
+        "    .. 'Content-Disposition: form-data; name=\"file\"; filename=\"x.fqa\"\\r\\n'\n"
+        "    .. 'Content-Type: application/octet-stream\\r\\n'\n"
+        "    .. '\\r\\n'\n"
+        "    .. fqa .. '\\r\\n'\n"
+        "    .. '--' .. boundary .. '--\\r\\n'\n"
+        "  local url = 'http://127.0.0.1:11111/api/quickApp/import'\n"
+        "  net.HTTPClient({ timeout = 5000 }):request(url, {\n"
+        "    options = {\n"
+        "      method = 'POST',\n"
+        "      headers = {\n"
+        "        ['Accept'] = 'application/json',\n"
+        "        ['Content-Type'] = 'multipart/form-data; boundary=' .. boundary,\n"
+        "      },\n"
+        "      data = body,\n"
+        "    },\n"
+        "    success = function(response)\n"
+        "      print('IMPORTED', response.status)\n"
+        "    end,\n"
+        "    error = function(err) print('IMPORT-ERR', tostring(err)) end,\n"
+        "  })\n"
+        "end\n"
+    )
+    engine.load_qa_file(str(loader_path))
+    # wait for the import round trip (loader POST -> sim server -> new QA)
+    deadline = time.monotonic() + 5.0
+    out = ""
+    while "LOOPBACK QA" not in out:
+        if time.monotonic() > deadline:
+            raise AssertionError(f"loopback import never ran; output so far:\n{out}")
+        out += capsys.readouterr().out
+        await asyncio.sleep(0.02)
+    assert "IMPORTED 200" in out
+    assert "IMPORT-ERR" not in out
+    devices = {d["id"]: d for d in engine.api.state.devices.values()}
+    imported = next(
+        (d for d in devices.values() if d.get("name") == "loopback-import"), None
+    )
+    assert imported is not None
 
 
 @pytest.mark.asyncio

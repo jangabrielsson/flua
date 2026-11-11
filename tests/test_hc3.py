@@ -797,6 +797,24 @@ async def test_base_structs_merge_hc3_online(
 
 
 @pytest.mark.asyncio
+async def test_loopback_rewrite_offline_targets_the_sim_server() -> None:
+    # offline, the HC3 loopback (127.0.0.1:11111/11112) rewrites to the
+    # sim's own API server once one runs (--ui) — controller QA code that
+    # calls its own loopback API works unchanged in the emulator. Without a
+    # sim server the URL stands (connection refused, like any dead port).
+    engine = LuaEngine()
+    url, _ = engine._rewrite_loopback_api("http://127.0.0.1:11111/api/quickApp/import", {})
+    assert url == "http://127.0.0.1:11111/api/quickApp/import"
+    engine.set_sim_api_port(7777)
+    url, _ = engine._rewrite_loopback_api("http://127.0.0.1:11111/api/quickApp/import", {})
+    assert url == "http://127.0.0.1:7777/api/quickApp/import"
+    url, _ = engine._rewrite_loopback_api("http://localhost:11112/api/rooms", {})
+    assert url == "http://127.0.0.1:7777/api/rooms"
+    # a non-loopback port is untouched
+    url, _ = engine._rewrite_loopback_api("http://127.0.0.1:8080/api/rooms", {})
+    assert url == "http://127.0.0.1:8080/api/rooms"
+
+
 async def test_net_http_loopback_11111_rewritten_online(
     tmp_path, capsys, mock_hc3, monkeypatch
 ) -> None:

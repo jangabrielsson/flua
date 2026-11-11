@@ -688,6 +688,9 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             await ui_server.start()
         except (OSError, RuntimeError) as exc:
             parser.error(f"cannot serve the UI API on port {args.ui}: {exc}")
+        # offline QA loopback requests (127.0.0.1:11111/11112) rewrite here,
+        # so controller QA code calling its own loopback API works in the sim
+        engine.set_sim_api_port(ui_server.port)
         # logged after the greeting below, so the greeting always opens the
         # startup output (the pump prints messages in post order)
         ui_viewer_msg = (

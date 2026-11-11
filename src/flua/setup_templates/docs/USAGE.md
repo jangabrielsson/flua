@@ -1418,7 +1418,11 @@ run in your QA, timers keep running while requests are in flight):
   **Loopback API**: in online mode, requests to `127.0.0.1:11111`/`11112`
   (the HC3's loopback-only, credential-free API) are rewritten to the
   controller's standard API with the configured credentials — the same hack
-  QAs on the HC3 use to avoid embedding credentials.
+  QAs on the HC3 use to avoid embedding credentials. Offline, a running
+  `--ui` API server stands in: the loopback rewrites to the sim's own
+  server (still local, still credential-free), so controller QA code that
+  calls its own loopback API — e.g. installing an .fqa over multipart —
+  runs unchanged in the emulator.
 - `net.TCPSocket({timeout=ms})` → `connect/send/write/read/readUntil/close` — `examples/tcp.lua`
   (`write` is the HC3-documented alias of `send`)
 - `net.UDPSocket({broadcast, timeout})` → `sendTo/receive` — `examples/udp.lua`

@@ -392,6 +392,9 @@ class LuaEngine:
         # posts actions/UI events to, plus the in-flight CONNECT tasks.
         self._proxy_server: ApiServer | None = None
         self._proxy_tasks: set[asyncio.Task[None]] = set()
+        # The sim's own HTTP API server port (--ui), when one runs: offline
+        # loopback requests (127.0.0.1:11111/11112) rewrite here.
+        self._sim_api_port: int | None = None
         install_bindings(self)
         # .flua.lua (local > home > legacy ~/.plua/config.lua)
         self._load_lua_config()
@@ -2185,6 +2188,14 @@ class LuaEngine:
                 },
             )
 
+    def set_sim_api_port(self, port: int) -> None:
+        """The port of the sim's own HTTP API server (--ui). Offline QA
+        net.HTTPClient requests to the HC3's loopback ports 11111/11112 are
+        rewritten here, so controller QA code that calls its own loopback
+        API — e.g. installing an .fqa over multipart — runs unchanged in
+        the emulator."""
+        self._sim_api_port = port
+
     def _rewrite_loopback_api(
         self, url: str, headers: dict[str, str]
     ) -> tuple[str, dict[str, str]]:
@@ -2192,15 +2203,30 @@ class LuaEngine:
         the HC3 reach the loopback-only credential-free API without
         credentials. flua runs on the dev machine — rewrite the URL to the
         controller's standard API and add the configured credentials (an
-        explicit Authorization header or embedded userinfo wins)."""
-        if self.hc3 is None:
-            return url, headers
+        explicit Authorization header or embedded userinfo wins). Offline,
+        a running sim API server (--ui) stands in for the controller — the
+        loopback stays local and credential-free, like on the HC3."""
         parts = urllib.parse.urlsplit(url)
         if parts.hostname not in ("127.0.0.1", "localhost") or parts.port not in (
             11111,
             11112,
         ):
             return url, headers
+        if self.hc3 is None:
+            if self._sim_api_port is None:
+                return url, headers
+            hostport = f"127.0.0.1:{self._sim_api_port}"
+            netloc = parts.netloc
+            if "@" in netloc:
+                netloc = netloc.rsplit("@", 1)[0] + "@" + hostport
+            else:
+                netloc = hostport
+            return (
+                urllib.parse.urlunsplit(
+                    (parts.scheme, netloc, parts.path, parts.query, parts.fragment)
+                ),
+                headers,
+            )
         hc3_parts = urllib.parse.urlsplit(self.hc3.base_url)
         new_host = hc3_parts.hostname or parts.hostname
         hostport = f"[{new_host}]" if ":" in new_host else new_host
