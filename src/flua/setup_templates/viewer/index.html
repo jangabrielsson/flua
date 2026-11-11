@@ -738,10 +738,14 @@ function deviceHealth(device) {  const props = device.properties || {};
     health.appendChild(dot);
   }
   if (battery !== undefined && battery !== null && battery !== "") {
+    // battery levels arrive as floats (e.g. a charging simulation) — the
+    // indicator shows one decimal for fractions, integers stay whole
+    const n = Number(battery);
+    const text = Number.isFinite(n) && !Number.isInteger(n) ? n.toFixed(1) : battery;
     const cell = document.createElement("span");
     cell.className = "battery";
-    cell.textContent = "\uD83D\uDD0B" + battery + "%";
-    cell.title = "battery level " + battery + "%";
+    cell.textContent = "\uD83D\uDD0B" + text + "%";
+    cell.title = "battery level " + text + "%";
     health.appendChild(cell);
   }
   return health;
