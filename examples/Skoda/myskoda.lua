@@ -34,6 +34,8 @@
 --%%u:{label='l22',text='Set charging target'}
 --%%u:{slider='chargeLimit',text='Charge limit',min=50,max=100,onChanged='setChargingLimit'}
 
+--%%speed:60
+
 -- getVariable returns "" for unset variables (flua), and "" is truthy
 -- in Lua — so fallbacks need an explicit check, not `or`.
 local function first(v, fallback)
@@ -131,7 +133,8 @@ function QuickApp:refresh()
     local batteryColor = (soc and soc >= 50) and "green" or "red"
     local chargeColor = status.state == "CHARGING" and "green" or "grey"
     local climateColor = ac.state == "ON" and "coral" or "grey"
-    qa:updateView("battery", "text", "Battery: " .. colored(tostring(soc or "?") .. " %", batteryColor))
+    local socText = soc and string.format("%.1f", soc) or "?"
+    qa:updateView("battery", "text", "Battery: " .. colored(socText .. " %", batteryColor))
     qa:updateView("chargeState", "text", "Charging state: " .. colored(tostring(status.state or "?"), chargeColor))
     qa:updateView("climate", "text", "A/C Status: " .. colored(tostring(ac.state or "?"), climateColor))
     qa:updateView("target", "text", "Target charge: " .. tostring(settings.targetStateOfChargeInPercent or "?") .. " %")

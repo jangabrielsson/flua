@@ -68,7 +68,7 @@ end
 local qa
 local function updateMockUI()
   if qa then
-    qa:updateView("battery", "text", "Battery: " .. tostring(state.soc) .. " %")
+    qa:updateView("battery", "text", "Battery: " .. string.format("%.1f", state.soc) .. " %")
     qa:updateView("chargeState", "text", "Charging state: " .. state.charging)
     qa:updateView("climate", "text", "A/C Status: " .. state.climate)
     qa:updateView("target", "text", "Target charge: " .. tostring(state.target) .. " %")
