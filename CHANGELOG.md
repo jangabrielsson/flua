@@ -4,6 +4,13 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.148] - 2026-11-11
+
+### Changed
+- Serve the web-import endpoint in the release-test mock HC3
+- Upload QAs through the HC3's web-import endpoint
+- Match the HC3's own legacy export shape byte-for-byte
+
 ## [0.1.147] - 2026-11-11
 
 ### Changed
