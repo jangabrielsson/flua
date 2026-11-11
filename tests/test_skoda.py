@@ -151,3 +151,48 @@ async def test_skoda_embeds_the_mock_when_no_url_is_set(capsys) -> None:
         assert dev["properties"]["batteryLevel"] == 71
     finally:
         await engine.stop()
+
+
+def _probe_mock(port: int, count: int):
+    # blocking HTTP from a worker thread: the mock's handler runs on the
+    # pump (the test's own thread), so the requests must not block it
+    import http.client
+
+    results = []
+    for _ in range(count):
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        conn.request("GET", "/api/v1/vehicles/TMBMOCK123456789")
+        resp = conn.getresponse()
+        resp.read()
+        results.append(
+            (
+                resp.status,
+                resp.getheader("RateLimit-Remaining"),
+                resp.getheader("Retry-After"),
+            )
+        )
+        conn.close()
+    return results
+
+
+@pytest.mark.asyncio
+async def test_mock_enforces_the_real_rate_limit(capsys) -> None:
+    # the real API allows 20 requests/hour per VIN (the bundled docs); the
+    # mock emulates it, headers included: 20 requests pass, the 21st is a
+    # 429 with Retry-After
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        _mock_id, err = engine.load_qa_file(
+            str(EXAMPLES / "myskoda_mock.lua"), ["var:port=0"]
+        )
+        assert err is None, err
+        out = await wait_for(capsys, "SKODA_MOCK listening on ")
+        port = int(re.search(r"listening on (\d+)", out).group(1))
+        results = await asyncio.to_thread(_probe_mock, port, 21)
+        assert [r[0] for r in results[:20]] == [200] * 20
+        assert results[19][1] == "0"  # the last allowed request
+        assert results[20][0] == 429
+        assert results[20][2] is not None  # Retry-After
+    finally:
+        await engine.stop()

@@ -69,7 +69,10 @@ function QuickApp:onInit()
   self.key = first(self:getVariable("key"), "test-key")
   self:refresh()
   if self:getVariable("once") ~= "true" then
-    setInterval(function() self:refresh() end, 60 * 1000)
+    -- poll every 5 minutes: 12 requests/hour, well under the real API's
+    -- 20/hour/VIN quota (leaving headroom for the action round-trips,
+    -- two requests each)
+    setInterval(function() self:refresh() end, 5 * 60 * 1000)
   end
 end
 
@@ -84,6 +87,12 @@ function QuickApp:request(method, path, body, done)
     success = function(resp)
       if resp.status >= 200 and resp.status < 300 then
         if done then done(resp) end
+      elseif resp.status == 429 then
+        -- the real API allows 20 requests/hour per VIN; back off and say
+        -- how long the quota needs
+        local retry = resp.headers and resp.headers["Retry-After"]
+        self:warning(method .. " " .. path .. " -> 429 rate limited"
+          .. (retry and ("; retry after " .. retry .. " s") or ""))
       else
         self:warning(method .. " " .. path .. " -> " .. tostring(resp.status))
       end

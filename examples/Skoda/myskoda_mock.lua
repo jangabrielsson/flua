@@ -56,15 +56,41 @@ local function updateMockUI()
   end
 end
 
-local function reply(status, body)
-  return { status = status, body = body, headers = { ["Content-Type"] = "application/json" } }
+-- the real API rate-limits 20 requests/hour per VIN (see the bundled
+-- developer docs); the mock emulates it, headers included, so the pair
+-- teaches the real constraint offline
+local rate = { count = 0, window = os.time() }
+
+local function reply(status, body, extra)
+  extra = extra or {}
+  extra["Content-Type"] = "application/json"
+  return { status = status, body = body, headers = extra }
+end
+
+local function rateHeaders()
+  local now = os.time()
+  if now - rate.window >= 3600 then
+    rate.window = now
+    rate.count = 0
+  end
+  return {
+    ["RateLimit-Limit"] = "20",
+    ["RateLimit-Remaining"] = tostring(20 - rate.count),
+    ["RateLimit-Reset"] = tostring(3600 - (now - rate.window)),
+  }
 end
 
 local function handle(req)
   print("MOCK", req.method, req.url)
+  rate.count = rate.count + 1
+  if rate.count > 20 then
+    local extra = rateHeaders()
+    extra["Retry-After"] = tostring(extra["RateLimit-Reset"])
+    return reply(429, json.encode({ error = "rate limited" }), extra)
+  end
   local method, url = req.method, req.url
   if method == "GET" and url:match("^/api/v1/vehicles/[^/]+$") then
-    return reply(200, json.encode(vehicle()))
+    return reply(200, json.encode(vehicle()), rateHeaders())
   end
   local action = url:match("^/api/v1/vehicles/[^/]+/(charging/start)$")
     or url:match("^/api/v1/vehicles/[^/]+/(charging/stop)$")
@@ -72,7 +98,7 @@ local function handle(req)
     or url:match("^/api/v1/vehicles/[^/]+/(air%-conditioning/start)$")
     or url:match("^/api/v1/vehicles/[^/]+/(air%-conditioning/stop)$")
   if not action then
-    return reply(404, json.encode({ error = "not found" }))
+    return reply(404, json.encode({ error = "not found" }), rateHeaders())
   end
   if action == "charging/start" and method == "POST" then
     state.charging = "CHARGING"
@@ -88,10 +114,10 @@ local function handle(req)
   elseif action == "air-conditioning/stop" and method == "POST" then
     state.climate = "OFF"
   else
-    return reply(405, json.encode({ error = "method not allowed" }))
+    return reply(405, json.encode({ error = "method not allowed" }), rateHeaders())
   end
   updateMockUI()
-  return reply(202, "")
+  return reply(202, "", rateHeaders())
 end
 
 -- the mock serves a FIXED, deliberately unlikely port (the control QA
