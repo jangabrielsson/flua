@@ -838,13 +838,17 @@ class LuaEngine:
         code: str | None,
         qa_config: dict[str, Any],
         arg0: str,
+        *,
+        packing: bool = False,
     ) -> int:
         """Assign a QA id, resolve its name, register it in the sim directory.
 
         Proxy mode (--%%mode:proxy, online only) resolves the proxy device on
         the HC3 FIRST, before the id is assigned: the emulated QA runs under
         the proxy's HC3 id, so the two are treated as one device (caveat 2: same
-        deviceID).
+        deviceID). ``packing`` (build_fqa) never engages proxy mode or warns:
+        the package captures the QA's own files and properties, and packing is
+        credential-free by design.
         """
         qa_config = _apply_mode(dict(qa_config))  # mode/offline/proxy -> flags
         name = qa_config.get("name")
@@ -856,13 +860,15 @@ class LuaEngine:
             name = Path(arg0).stem if arg0.endswith(".lua") else "QA"
             qa_config["name"] = name
         # Proxy mode needs the real HC3; offline it degrades to a plain QA
-        # with a warning ("Offline mode, proxy disabled").
+        # with a warning ("Offline mode, proxy disabled") — except when
+        # packing, which is credential-free by design (no warning there).
         proxy_enabled = bool(qa_config.get("proxy"))
         if proxy_enabled and self.hc3 is None:
-            logger.warning(
-                "--%%mode:proxy needs online mode (HC3 credentials) — proxy disabled for %s",
-                name,
-            )
+            if not packing:
+                logger.warning(
+                    "--%%mode:proxy needs online mode (HC3 credentials) — proxy disabled for %s",
+                    name,
+                )
             proxy_enabled = False
         if proxy_enabled and self._db_persist:
             # proxy mode mirrors everything on the HC3 — the db file would

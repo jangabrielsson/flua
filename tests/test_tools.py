@@ -6,6 +6,7 @@ add_arguments() and run() — no other file changes.
 
 import argparse
 import json
+import logging
 import os
 import re
 import shutil
@@ -617,6 +618,30 @@ def test_upload_fqa_uses_the_web_import_endpoint(tmp_path, monkeypatch, capsys) 
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_pack_proxy_mode_qa_is_silent_and_keeps_the_directive(
+    tmp_path, capsys, monkeypatch, caplog
+) -> None:
+    # packing is credential-free by design, so --%%mode:proxy can never
+    # engage there — the pack must not emit the offline "proxy disabled"
+    # warning (that warning is for actually RUNNING the QA offline). The
+    # directive still travels in the packed main file (the author's run-mode
+    # intent for flua users of the package).
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "app.lua").write_text(
+        "--%%name:px\n--%%mode:proxy\nprint('x')\n"
+    )
+    pack = tools._TOOLS["pack"]
+    parser = argparse.ArgumentParser()
+    pack.add_arguments(parser)
+    with caplog.at_level(logging.WARNING):
+        assert pack.run(parser, parser.parse_args(["app.lua"])) == 0
+    assert "proxy disabled" not in caplog.text
+    assert "proxy disabled" not in capsys.readouterr().out
+    fqa = json.loads((tmp_path / "px.fqa").read_text())
+    main = next(f for f in fqa["files"] if f["isMain"])
+    assert "--%%mode:proxy" in main["content"]
 
 
 def test_download_restores_identity_properties(tmp_path, monkeypatch) -> None:

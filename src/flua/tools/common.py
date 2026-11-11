@@ -54,7 +54,9 @@ def build_fqa(script: str, *, dist: bool = False) -> tuple[dict[str, Any], None]
     annotations = expand_includes(parse_annotations(source), path.parent)
     _, local_params = split_annotations(annotations)
     engine = LuaEngine()
-    qa_id = engine._prepare_qa(str(path.resolve()), None, local_params, str(path.resolve()))
+    qa_id = engine._prepare_qa(
+        str(path.resolve()), None, local_params, str(path.resolve()), packing=True
+    )
     fqa = engine.qa_export(qa_id)
     if fqa is None:
         raise ValueError(f"cannot package {script}")
