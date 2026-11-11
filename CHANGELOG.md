@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.152] - 2026-11-11
+
+### Changed
+- Rewrite the HC3 loopback API to the sim's own server offline
+- Parse the web-import multipart format in the sim
+
 ## [0.1.151] - 2026-11-11
 
 ### Changed
