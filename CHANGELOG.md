@@ -4,6 +4,16 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.156] - 2026-11-12
+
+### Changed
+- --%%icons:path — preview a local icon set in the web view
+- park the QA self-installs-its-icon-set recipe
+- Custom icon sets: render state files (binary/multilevel/shutter)
+- Custom icons: fetch the real artwork from the userIcons tree
+- improve file name validation for HC3 editor compatibility
+- release.sh: retry the tag push on GitHub's object-store race
+
 ## [0.1.155] - 2026-11-12
 
 ### Changed
