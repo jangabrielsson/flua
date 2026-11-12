@@ -235,6 +235,26 @@ Parked 2026-11-12, from the custom-icon work (User<id> sets, uploadExternalIconS
   `type=device`, `deviceTemplate=<type>`, file fields per the provider
   (`icon`/`icon0`+`icon100`/`icon0..100`/`iconOpening...`), response
   `201 {"id":N,"iconSetName":"User<N>","fileExtension":"png"}`.
+- **The 11111/11112 split (probed from a QA on the controller)**: through
+  `api.get("/proxy?url=http://localhost:PORT/<path>")`, **11112** is the
+  full local API — JSON bodies that `api.get` decodes into Lua tables
+  (synchronous + credential-free recipe for GETs), plus the assets (a PNG
+  fetch crashed the JSON decoder — the bytes really arrive). **11111**
+  answers 200 with non-JSON bodies for such GETs (`nil, 200` after the
+  decode step); its one established use is Fibaro's own `uploadIconFiles`
+  (POST `http://127.0.0.1:11111/api/icons`). Open question: does
+  `net.HTTPClient` to `127.0.0.1:11112/assets/userIcons/...` return raw
+  bytes — if so it is the canonical icon-fetch recipe for the post.
+- **flua emulation divergences found along the way**: (1) `http_call`
+  decodes every body as UTF-8 with errors=replace, so binary responses
+  (`net.HTTPClient` and the `/proxy` fetcher) are corrupted — a 2442-byte
+  PNG comes back as 4829 bytes of mojibake, where the HC3 hands over raw
+  bytes (fix: latin-1 identity decode on the net/`/proxy` path, keep UTF-8
+  for api JSON paths; pin with a byte-identity test). (2) flua rewrites
+  11111 and 11112 identically to the standard API — faithful for 11112,
+  too lenient for 11111 GETs. (3) `api.get("/proxy?...")` of a binary body
+  returns the corrupted string instead of the HC3's `nil, 200` — mirror
+  the nil-on-non-JSON decode behavior once the bytes path is fixed.
 - **Flua angle**: recipe is online-only (needs `/api/icons` + the 11111
   loopback; the sim has the catalog route but no asset tree — degrade
   gracefully). Testable against the mock HC3. Related parked options from
