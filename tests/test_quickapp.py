@@ -270,8 +270,8 @@ def test_example_multifile_runs() -> None:
 
 
 def test_example_local_icons_runs() -> None:
-    # the --%%icons example: the QA flips value 0/100 a few times (the web
-    # view would switch the folder's icons) and exits cleanly
+    # the --%%icons example: the QA flips value false/true a few times (the
+    # web view would switch the folder's icons) and exits cleanly
     result = subprocess.run(
         [sys.executable, "-m", "flua", "--api", "local", "examples/local-icons.lua"],
         cwd=REPO_ROOT,
@@ -280,8 +280,9 @@ def test_example_local_icons_runs() -> None:
         timeout=60,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "value: 0" in result.stdout
-    assert "value: 100" in result.stdout
+    assert "value: false" in result.stdout
+    assert "value: true" in result.stdout
+    assert "silently ignores" not in result.stdout
 
 
 @pytest.mark.asyncio

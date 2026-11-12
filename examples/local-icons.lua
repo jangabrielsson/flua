@@ -7,14 +7,15 @@
 -- the icons per the value property — no HC3 upload needed.
 -- Run with:
 --   .venv/bin/flua examples/local-icons.lua --ui
--- The QA flips value 0/100 a few times (watch the icon switch), then exits.
+-- The QA flips value false/true a few times (watch the icon switch), then
+-- exits.
 -- --------------- EOH ---------------
 function QuickApp:onInit()
   local flips = 0
   local function flip()
     flips = flips + 1
     if flips > 4 then self:exit() return end
-    local value = flips % 2 == 1 and 0 or 100
+    local value = flips % 2 == 1
     self:updateProperty("value", value)
     print("value:", value)
     setTimeout(flip, 500)

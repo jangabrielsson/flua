@@ -1,0 +1,173 @@
+<h2>Custom QA icons — how the HC3 icon system actually works, and flua's take</h2>
+
+<p>Fibaro has never documented how custom icons work, and the forum
+answers are mostly guessing. So we did what everyone else does — poked
+around: fetched icon files from <code>&lt;hc3&gt;/assets</code>, uploaded test
+sets, compared bytes, and read people's attempts on the forum, then
+pieced the story together. Everything below about the controller was
+observed that way against a 5.22x controller — treat it as "how it
+works on 5.22x", not a contract. flua's own parts are documented and
+tested.</p>
+
+<h3>The icon library</h3>
+
+<p><code>GET /api/icons</code> lists every icon the controller knows:</p>
+
+<pre>
+{"device": [
+  {"id": 300, "deviceType": "com.fibaro.binarySwitch",
+   "iconSetName": "ButtonSwitchV2", "fileExtension": "svg"},
+  {"id": 1109, "deviceType": "com.fibaro.binarySwitch",
+   "iconSetName": "User1109", "fileExtension": "png"}
+]}
+</pre>
+
+<p>Two families: the built-in sets (named after their device family, like
+<code>ButtonSwitchV2</code>) and <b>custom sets</b> — <code>User&lt;id&gt;</code>,
+one per uploaded icon set, with the id assigned at upload time. The
+<code>deviceType</code> says which kind of device the set was built for.</p>
+
+<h3>What a set must contain — the four providers</h3>
+
+<p>Each device type belongs to one of four providers that decide how many
+files a set has:</p>
+
+<ul>
+<li><b>single</b> (sensors, genericDevice, deviceController, player) — one file: <code>icon</code></li>
+<li><b>binary</b> (binarySwitch, binarySensor, motionSensor, …) — <code>icon0</code> + <code>icon100</code></li>
+<li><b>multilevel</b> (multilevelSwitch, rollerShutter) — <code>icon0</code> … <code>icon100</code> in tens (11 files)</li>
+<li><b>baseShutter</b> — named states: <code>iconOpening</code>, <code>iconOpened</code>, <code>iconClosing</code>, <code>iconClosed</code>, <code>iconUnknown</code></li>
+</ul>
+
+<h3>Uploading a set</h3>
+
+<p><code>POST /api/icons</code>, multipart form: <code>type=device</code>,
+<code>deviceTemplate=com.fibaro.binarySwitch</code>, and one file part per
+provider file (<code>icon0</code>, <code>icon100</code>, …). The images must be
+reasonably large — 128×128 PNGs are accepted, a 32×32 was refused with
+<code>INVALID_ICON_SIZE</code>. On success:</p>
+
+<pre>
+201  {"id":1109,"iconSetName":"User1109","fileExtension":"png"}
+</pre>
+
+<p>The HC3 ships standard QuickApp functions for exactly this:
+<code>QuickApp:uploadExternalIconSet(urls, options, success, error)</code>
+downloads the files from a list of URLs (say, a GitHub repo) and uploads
+them, then sets <code>deviceIcon</code> to the new id itself —
+<code>QuickApp:externalIconsDownload</code> is the recursive downloader
+behind it.</p>
+
+<h3>Where the files actually live</h3>
+
+<p>This is the part nobody documents, and it explains most of the
+confusion:</p>
+
+<ul>
+<li><b><code>/assets/icon/fibaro/&lt;set&gt;/&lt;set&gt;&lt;state&gt;.&lt;ext&gt;</code></b> —
+the standard library tree. For custom <code>User&lt;id&gt;</code> sets this tree
+serves the generic placeholder (the grey box with a question mark) under
+<b>every name — including the declared <code>.png</code> slot, which returns
+an SVG body</b>. A naive download of "the icon files" for a custom set gets
+you grey boxes.</li>
+<li><b><code>/assets/userIcons/devices/User&lt;id&gt;/User&lt;id&gt;&lt;state&gt;.png</code></b> —
+the <b>real</b> uploaded artwork, served byte-identical to the upload. A
+binary set's files live here as <code>User11090.png</code> and
+<code>User1109100.png</code>. Names that don't exist — including the base
+file for binary/multilevel sets, which have no base — return an HTML
+error page.</li>
+</ul>
+
+<h3>Setting and switching</h3>
+
+<p>The device's <code>deviceIcon</code> property takes the icon <b>id</b>.
+The HC3 UI then switches the image per the device's state: binary types
+use <code>value</code> 0/100, multilevel types the nearest ladder step,
+shutters the named <code>state</code>. That is why a binary icon set needs
+two files.</p>
+
+<h3>Installing an icon set from a QA, idempotently</h3>
+
+<p>The manual flow (web UI upload + set <code>deviceIcon</code>) works, but a
+QA often wants to install its own set on first boot. The classic problem:
+"is my set already uploaded?" — quickVars/internalStorage go stale on
+reinstall and you end up with duplicate <code>User</code> sets.</p>
+
+<p>The controller's icon library is the state you need:</p>
+
+<ol>
+<li><code>api.get("/icons")</code> → entries where <code>deviceType == self.type</code>
+and <code>iconSetName</code> starts with <code>User</code>.</li>
+<li>For each candidate, download its state file(s) via
+<code>net.HTTPClient</code> from
+<code>http://127.0.0.1:11111/assets/userIcons/devices/…</code> (the 11111
+loopback — no credentials in QA code) and <b>byte-compare</b> with the icons
+you bundle.</li>
+<li>A match = already installed → just <code>updateProperty("deviceIcon", id)</code>.</li>
+<li>No match → <code>uploadExternalIconSet(urls, …)</code> → new id.</li>
+</ol>
+
+<p>Because the HC3 serves uploaded bytes verbatim, the comparison is
+exact — and reinstall-proof.</p>
+
+<h3>What flua does</h3>
+
+<p>flua ships the icon <b>catalog and file manifest</b> but not Fibaro's
+copyrighted artwork. <code>flua --tool icons download</code> fetches the
+images once into a machine-level cache (<code>~/.flua/icons</code>):</p>
+
+<ul>
+<li>standard sets from the fibaro tree,</li>
+<li>custom <code>User</code> sets from the userIcons tree — the <b>real</b>
+artwork, not placeholders, including state files for binary/multilevel
+sets,</li>
+<li>placeholder detection both ways: the grey box served under a wrong
+extension, and the HTML error pages for nonexistent names.</li>
+</ul>
+
+<p>The run is incremental (<code>--force</code> refetches) and
+<code>--dump &lt;www&gt;</code> copies from a local webroot dump with no network.
+The web view looks ids up in <code>/flua/iconMap</code> (the checked-in
+catalog, merged with your controller's <b>live</b> library when running
+online) and fetches images from <code>/flua/icons/…</code>, switching state
+files exactly like the HC3 UI.</p>
+
+<h3>--%%icons:path — previewing a set without uploading</h3>
+
+<p>To test an icon set before it exists on any controller, point a
+directive at a folder that uses the upload naming:</p>
+
+<pre>
+--%%name:myqa
+--%%type:com.fibaro.binarySwitch
+--%%icons:icons
+-- --------------- EOH ---------------
+
+function QuickApp:onInit()
+  self:updateProperty("value", false)
+  setTimeout(function() self:updateProperty("value", true) end, 1000)
+end
+</pre>
+
+<pre>
+icons/icon.png        -- base
+icons/icon0.png       -- off
+icons/icon100.png     -- on
+</pre>
+
+<p>flua then sets the QA's <code>deviceIcon</code> to <b>its own id</b> (a fake
+icon id; an explicit <code>--%%property:deviceIcon</code> wins), registers a
+synthetic <code>Local&lt;qaId&gt;</code> set listing whatever the folder holds,
+and serves the images from the folder. Run <code>flua myqa.lua --ui</code>,
+flip <code>value</code>, and watch the web view switch the icons — offline, no
+upload, no cache. (The folder may hold any subset; only present files are
+listed.) The directive never travels into packed <code>.fqa</code> files: it
+is a pure preview. A runnable example ships with flua
+(<code>examples/local-icons.lua</code>, red/green/blue folder).</p>
+
+<p>The whole flow: develop offline with <code>--%%icons:</code> → run
+online and download the cache once → upload the set (web UI or
+<code>uploadExternalIconSet</code>) → set the real <code>User&lt;id&gt;</code> id.</p>
+
+<p>If anything here misbehaves on your firmware — or you have learned more
+about how the icon system really works — corrections are most welcome.</p>
