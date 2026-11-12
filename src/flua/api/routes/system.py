@@ -530,6 +530,44 @@ def icons_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     return public(catalog), 200
 
 
+# the icon providers of quickapp.lua's deviceIconTypeMapping — a user set's
+# deviceType decides which state files it has (single: base only; binary:
+# 0/100; multilevel: 0..100 in tens; baseShutter: named states)
+_USER_ICON_FAMILY = {
+    "com.fibaro.humiditySensor": "single",
+    "com.fibaro.powerSensor": "single",
+    "com.fibaro.energyMeter": "single",
+    "com.fibaro.temperatureSensor": "single",
+    "com.fibaro.windSensor": "single",
+    "com.fibaro.multilevelSensor": "single",
+    "com.fibaro.deviceController": "single",
+    "com.fibaro.genericDevice": "single",
+    "com.fibaro.player": "single",
+    "com.fibaro.binarySwitch": "binary",
+    "com.fibaro.doorLock": "binary",
+    "com.fibaro.binarySensor": "binary",
+    "com.fibaro.doorSensor": "binary",
+    "com.fibaro.floodSensor": "binary",
+    "com.fibaro.smokeSensor": "binary",
+    "com.fibaro.windowSensor": "binary",
+    "com.fibaro.motionSensor": "binary",
+    "com.fibaro.rainDetector": "binary",
+    "com.fibaro.heatDetector": "binary",
+    "com.fibaro.gasDetector": "binary",
+    "com.fibaro.coDetector": "binary",
+    "com.fibaro.fireDetector": "binary",
+    "com.fibaro.multilevelSwitch": "multilevel",
+    "com.fibaro.rollerShutter": "multilevel",
+    "com.fibaro.baseShutter": "baseShutter",
+}
+_USER_FAMILY_STATES = {
+    "single": ("",),
+    "binary": ("0", "100"),
+    "multilevel": tuple(f"{step}" for step in range(0, 101, 10)),
+    "baseShutter": ("Opening", "Opened", "Closing", "Closed", "Unknown"),
+}
+
+
 def flua_icon_map(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     """GET /flua/iconMap — the viewer's icon lookup: ``deviceIcon`` id -> the
     icon set and its default state file (served by GET /flua/icons/{set}/
@@ -539,14 +577,17 @@ def flua_icon_map(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     unmapped ids (an icon the controller doesn't have, or a stale capture).
 
     Online the LIVE HC3's icon library is merged in: custom sets uploaded
-    with uploadExternalIconSet and newer-firmware ids map too (their file
-    lists derive from the uniform <set><state>.<ext> pattern), so a QA
+    with uploadExternalIconSet and newer-firmware ids map too, so a QA
     running online against its own controller renders its custom icon.
-    Captured ids keep their richer manifest file lists."""
+    Custom User<id> sets list only their provider family's state files
+    (single: base; binary: 0/100; multilevel: 0..100; shutter: named
+    states) — the fibaro tree serves placeholder art for their other
+    names. Captured ids keep their richer manifest file lists."""
     catalog = icon_catalog()
     manifest_files = (icon_manifest() or {}).get("files") or {}
     icons: dict[str, dict[str, str]] = {}
     sets: dict[str, list[str]] = {}
+    types: dict[str, str] = {}
     if catalog is not None:
         device = catalog.get("device") if isinstance(catalog, dict) else None
         for entry in device or []:
@@ -560,6 +601,7 @@ def flua_icon_map(state: SimState, req: ApiRequest) -> tuple[Any, int]:
                 continue
             icons[str(icon_id)] = {"set": str(set_name), "file": default}
             sets.setdefault(str(set_name), sorted(names))
+            types.setdefault(str(set_name), str(entry.get("deviceType") or ""))
     remote = remote_get(req, "/icons")
     if remote is not None:
         live_data = remote[0] if isinstance(remote, tuple) else remote
@@ -583,14 +625,33 @@ def flua_icon_map(state: SimState, req: ApiRequest) -> tuple[Any, int]:
                         continue
                     icons[str(icon_id)] = {"set": set_name, "file": default}
                     sets.setdefault(set_name, sorted(names))
-    # user-uploaded sets (User<id>) have no state files — only the base
-    # image exists (the fibaro tree serves placeholder art for states, and
-    # /assets/userIcons serves HTML error docs for state names). List just
-    # the base so the viewer never switches states for these sets.
+                    types.setdefault(set_name, str(entry.get("deviceType") or ""))
+    # user-uploaded sets (User<id>) serve only their provider's state files
+    # (the fibaro tree holds placeholder art for everything else, and
+    # /assets/userIcons serves HTML error docs for names that do not
+    # exist). List exactly the family's states and point the default at a
+    # file that exists: the base for single-icon sets, the off state for
+    # binary/multilevel, Closed for shutter sets.
     for set_name, _names in list(sets.items()):
-        if re.fullmatch(r"^User\d+$", set_name):
-            entry = next((v for v in icons.values() if v["set"] == set_name), None)
-            sets[set_name] = [entry["file"]] if entry else []
+        if not re.fullmatch(r"^User\d+$", set_name):
+            continue
+        entry = next((v for v in icons.values() if v["set"] == set_name), None)
+        if entry is None:
+            sets[set_name] = []
+            continue
+        ext = os.path.splitext(entry["file"])[1] or ".png"
+        family = _USER_ICON_FAMILY.get(types.get(set_name, ""), "single")
+        names = [f"{set_name}{state}{ext}" for state in _USER_FAMILY_STATES[family]]
+        sets[set_name] = names
+        if family == "baseShutter":
+            default = next((n for n in names if n.startswith(set_name + "Closed.")), names[0])
+        elif family in ("binary", "multilevel"):
+            default = next(n for n in names if n.startswith(set_name + "0."))
+        else:
+            default = names[0]
+        for mapped in icons.values():
+            if mapped["set"] == set_name:
+                mapped["file"] = default
     return {"icons": icons, "sets": sets}, 200
 
 

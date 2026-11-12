@@ -1514,21 +1514,23 @@ def test_icons_download_from_dump(tmp_path, capsys) -> None:
 
 
 def test_icons_download_user_sets_use_the_usericons_tree(tmp_path, capsys) -> None:
-    # User<id> sets have no state files — only the base image exists, under
-    # /assets/userIcons/devices. The dump's fibaro tree holds placeholder
-    # art for them; the download copies the real base and drops stale
-    # cached state names.
+    # User<id> sets live under /assets/userIcons/devices as <set><state>.png
+    # — the base plus the provider family's states. The dump's fibaro tree
+    # holds placeholder art for them and is never consulted; the download
+    # copies the real files and drops stale cached names outside the set's
+    # candidate list.
     fibaro = tmp_path / "www" / "assets" / "icon" / "fibaro" / "User1001"
     fibaro.mkdir(parents=True)
     (fibaro / "User1001.svg").write_bytes(b"<svg>placeholder</svg>")
     (fibaro / "User100110.svg").write_bytes(b"<svg>placeholder state</svg>")
     usericons = tmp_path / "www" / "assets" / "userIcons" / "devices" / "User1001"
     usericons.mkdir(parents=True)
-    (usericons / "User1001.png").write_bytes(b"\x89PNGreal")
+    (usericons / "User1001.png").write_bytes(b"\x89PNGbase")
+    (usericons / "User1001100.png").write_bytes(b"\x89PNGstate")
     cache = tmp_path / "cache"
     # a stale placeholder state file from an earlier download must be cleaned
     (cache / "User1001").mkdir(parents=True)
-    (cache / "User1001" / "User100110.svg").write_bytes(b"<svg>stale</svg>")
+    (cache / "User1001" / "User1001.svg").write_bytes(b"<svg>stale</svg>")
 
     assert (
         tools.run_tool(
@@ -1536,26 +1538,33 @@ def test_icons_download_user_sets_use_the_usericons_tree(tmp_path, capsys) -> No
         )
         == 0
     )
-    assert (cache / "User1001" / "User1001.png").read_bytes() == b"\x89PNGreal"
+    assert (cache / "User1001" / "User1001.png").read_bytes() == b"\x89PNGbase"
+    assert (cache / "User1001" / "User1001100.png").read_bytes() == b"\x89PNGstate"
     assert not (cache / "User1001" / "User1001.svg").exists()
-    assert not (cache / "User1001" / "User100110.svg").exists()
     out = capsys.readouterr().out
-    assert "copied 1 icon file(s)" in out
+    assert "copied 2 icon file(s)" in out
 
 
 def test_icons_hc3_download_user_sets_use_usericons(tmp_path, monkeypatch) -> None:
-    # the live path fetches a user set's base image from the userIcons tree
-    # — the fibaro tree serves placeholder art for those sets
+    # the live path fetches a user set's files from the userIcons tree —
+    # the base plus the provider family's states — and never touches the
+    # fibaro tree (placeholder art for these sets)
     requests: list[str] = []
+    real = {
+        "User999.png": b"\x89PNGbase",
+        "User9990.png": b"\x89PNGoff",
+        "User999100.png": b"\x89PNGon",
+    }
 
     class _IconsHandler(BaseHTTPRequestHandler):
         def do_GET(self):
             requests.append(self.path)
-            if self.path == "/assets/userIcons/devices/User999/User999.png":
+            prefix = "/assets/userIcons/devices/User999/"
+            if self.path.startswith(prefix) and self.path[len(prefix) :] in real:
                 self.send_response(200)
                 self.send_header("Content-Type", "image/png")
                 self.end_headers()
-                self.wfile.write(b"\x89PNGreal")
+                self.wfile.write(real[self.path[len(prefix) :]])
             else:
                 self.send_response(404)
                 self.end_headers()
@@ -1584,8 +1593,14 @@ def test_icons_hc3_download_user_sets_use_usericons(tmp_path, monkeypatch) -> No
             )
             == 0
         )
-        assert requests == ["/assets/userIcons/devices/User999/User999.png"]
-        assert (cache / "User999" / "User999.png").read_bytes() == b"\x89PNGreal"
+        assert "/assets/userIcons/devices/User999/User999.png" in requests
+        assert "/assets/userIcons/devices/User999/User9990.png" in requests
+        assert "/assets/userIcons/devices/User999/User999100.png" in requests
+        # the fibaro tree is never consulted for user sets
+        assert all(r.startswith("/assets/userIcons/devices/User999/") for r in requests)
+        assert (cache / "User999" / "User999.png").read_bytes() == b"\x89PNGbase"
+        assert (cache / "User999" / "User9990.png").read_bytes() == b"\x89PNGoff"
+        assert (cache / "User999" / "User999100.png").read_bytes() == b"\x89PNGon"
         assert not (cache / "User999" / "User99910.svg").exists()
     finally:
         server.shutdown()

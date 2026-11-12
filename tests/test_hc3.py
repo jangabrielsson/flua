@@ -138,6 +138,12 @@ class _MockHc3(BaseHTTPRequestHandler):
                             "iconSetName": "User999",
                             "fileExtension": "svg",
                         },
+                        {
+                            "id": 998,
+                            "deviceType": "com.fibaro.binarySwitch",
+                            "iconSetName": "User998",
+                            "fileExtension": "png",
+                        },
                     ]
                 }
             )
@@ -510,6 +516,10 @@ async def test_icon_map_merges_the_live_icon_library_online(
         assert status == 200
         assert icon_map["icons"]["999"] == {"set": "User999", "file": "User999.svg"}
         assert icon_map["sets"]["User999"] == ["User999.svg"]
+        # a binarySwitch user set lists its state files, default = the off
+        # state (no base file exists for it)
+        assert icon_map["icons"]["998"] == {"set": "User998", "file": "User9980.png"}
+        assert icon_map["sets"]["User998"] == ["User9980.png", "User998100.png"]
         # the captured catalog entry keeps its manifest file list
         assert icon_map["icons"]["300"] == {
             "set": "ButtonSwitchV2",

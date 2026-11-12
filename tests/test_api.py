@@ -2109,11 +2109,33 @@ def test_icon_map_serves_device_icon_lookup(api: Api) -> None:
         assert mapped, f"catalog id {entry['id']} not mapped"
         assert mapped["set"] == entry["iconSetName"]
         assert mapped["file"] in manifest_files[entry["iconSetName"]]
-        # user-uploaded sets (User<id>) have no state files — the map lists
-        # only the base image so the viewer never switches states for them
-        expected = (
-            [mapped["file"]]
-            if re.fullmatch(r"^User\d+$", entry["iconSetName"])
-            else sorted(manifest_files[entry["iconSetName"]])
-        )
-        assert data["sets"][entry["iconSetName"]] == expected
+        if re.fullmatch(r"^User\d+$", entry["iconSetName"]):
+            # user-uploaded sets list only their provider family's state
+            # files (single: base; binary: 0/100; multilevel: 0..100;
+            # shutter: named states) — pinned against the production map
+            from flua.api.routes.system import _USER_FAMILY_STATES, _USER_ICON_FAMILY
+
+            family = _USER_ICON_FAMILY.get(entry.get("deviceType", ""), "single")
+            ext = os.path.splitext(mapped["file"])[1]
+            expected = [f"{entry['iconSetName']}{s}{ext}" for s in _USER_FAMILY_STATES[family]]
+            if family in ("binary", "multilevel"):
+                default = next(
+                    n for n in expected if n.startswith(entry["iconSetName"] + "0.")
+                )
+            elif family == "baseShutter":
+                default = next(
+                    (
+                        n
+                        for n in expected
+                        if n.startswith(entry["iconSetName"] + "Closed.")
+                    ),
+                    expected[0],
+                )
+            else:
+                default = expected[0]
+            assert data["sets"][entry["iconSetName"]] == expected
+            assert mapped["file"] == default
+        else:
+            assert data["sets"][entry["iconSetName"]] == sorted(
+                manifest_files[entry["iconSetName"]]
+            )

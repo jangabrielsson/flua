@@ -1593,14 +1593,17 @@ by every project, never per repo. Against a live HC3 the tool also
 enumerates the controller's icon library and downloads the sets the
 manifest does not cover: newer-firmware additions (their files follow
 the same 14-suffix pattern) and custom icons uploaded with
-`uploadExternalIconSet`. A custom `User<id>` set has only its base
-image — the HC3 stores the uploaded artwork under
-`/assets/userIcons/devices/User<id>/User<id>.png`, while its
-`/assets/icon/fibaro/` slots hold placeholder art (the declared `.png`
-slot serves an SVG body). The downloader fetches the base from the
-userIcons tree and drops everything else for these sets (stale cached
-placeholder states included), and the icon map lists only the base for
-them, so the viewer never switches states for a custom icon.
+`uploadExternalIconSet`. A custom `User<id>` set lives in
+`/assets/userIcons/devices/` as `<set><state>.png` — the base for
+single-icon sets, ladder states (0..100) for binary/multilevel sets,
+named states for shutter sets — while its `/assets/icon/fibaro/` slots
+hold placeholder art (the declared `.png` slot serves an SVG body). The
+downloader fetches the set's candidate files from the userIcons tree
+(HTML error docs for nonexistent names are dropped as placeholders) and
+cleans stale cached names, and the icon map lists the provider family's
+state files (per the set's deviceType) with a default that exists — the
+base for single-icon sets, the off state for binary/multilevel — so the
+viewer switches states for a custom icon like any other set.
 Placeholder state files (the generic gray box the HC3 serves for states
 with no artwork, even under the requested extension) are dropped rather
 than cached, and the icon channel falls back to the cached sibling
