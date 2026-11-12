@@ -158,21 +158,21 @@ api.put("/quickApp/42/files/main", {
 })
 ```
 
-### Creating a QuickApp — use the IMPORT endpoint
+### Creating a QuickApp — the apiVersion marker decides, not the endpoint
 
-**`POST /api/quickApp/import` preserves an .fqa package verbatim — use it
-to create QAs.** The JSON `POST /api/quickApp` create RE-DERIVES the UI
+The JSON `POST /api/quickApp` create preserves the package verbatim —
+custom uiCallbacks included — **when it carries
+`initialProperties.apiVersion: "1.3"`** (flua's pack always writes the
+marker; hand-built structures must add it themselves). Without the
+marker the controller treats the package as legacy and RE-DERIVES the UI
 callbacks with generated default names (`ui<b2>OnReleased`) on recent
-firmware (live-verified 5.22x) **when the package lacks
-`initialProperties.apiVersion`** — the controller treats it as legacy
-format. WITH `initialProperties.apiVersion: "1.3"` the JSON create
-preserves the package too (the actual trigger, found by bisection), so a
-package carrying the marker installs fine through either endpoint.
-Symptom: buttons die with "Class does not have uib2OnReleased function
-defined - action ignored".
+firmware (live-verified 5.22x). Symptom: buttons die with "Class does
+not have uib2OnReleased function defined - action ignored".
 
-The import endpoint is what the HC3 web UI's Import button uses — the
-wire format is `multipart/form-data`:
+**`POST /api/quickApp/import` preserves an .fqa package verbatim
+regardless of the marker** and remains an equivalent alternative — it is
+the path the HC3 web UI's Import button uses. Its wire format is
+`multipart/form-data`:
 
 - part `file` — the .fqa JSON, **with a `filename`** (a filename-less
   part crashes the import handler with a bodyless HTTP 500);

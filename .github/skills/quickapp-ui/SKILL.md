@@ -97,13 +97,16 @@ end
 ```
 
 **Buttons call `uib2OnReleased` instead of your handler?** The QA was
-created through the HC3's JSON `POST /quickApp` API-create, which
-re-derives uiCallbacks with generated default names on recent firmware
-(live-verified 5.22x) — custom handlers get dropped and taps log "Class
-does not have uib2OnReleased function defined". Re-import the package via
-the HC3 web UI's Import button or flua's `--tool uploadFQA`/`uploadQA`
-(both use `POST /quickApp/import`, which preserves the package verbatim —
-see the hc3-rest-api skill).
+created from a package without `initialProperties.apiVersion` — on recent
+firmware (live-verified 5.22x) the HC3's JSON `POST /quickApp`
+API-create treats marker-less packages as legacy and re-derives
+uiCallbacks with generated default names, so custom handlers get dropped
+and taps log "Class does not have uib2OnReleased function defined". Fix
+it by adding the marker (`initialProperties.apiVersion = "1.3"` — flua's
+pack writes it) and re-creating through the JSON API — or re-import the
+package, which preserves it verbatim regardless: via the HC3 web UI's
+Import button or flua's `--tool uploadFQA`/`uploadQA` (both use
+`POST /quickApp/import` — see the hc3-rest-api skill).
 
 ## Asserting and driving UI state in tests
 

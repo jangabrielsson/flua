@@ -346,8 +346,18 @@ markArray(fqa.initialProperties.uiView)
 markArray(fqa.initialProperties.uiCallbacks)
 markArray(fqa.initialProperties.supportedDeviceRoles)
 
+fqa.initialProperties.apiVersion = "1.3"
 api.post("/quickApp/", json.encode(fqa))
 ```
+
+A hand-built package must also carry `initialProperties.apiVersion`
+("1.3"): the JSON create preserves a marked package verbatim — custom
+`uiCallbacks` included — while a marker-less package is treated as
+legacy and its UI callbacks are re-derived with generated default names
+(`ui<b2>OnReleased`, buttons die with "Class does not have uib2OnReleased
+function defined"). flua's own pack writes the marker automatically, and
+`POST /quickApp/import` preserves verbatim regardless of it — see the
+hc3-rest-api skill.
 
 The same care applies whenever you PUT an array-valued property back to
 `/api/devices/{id}` (e.g. `properties.quickAppVariables`,
