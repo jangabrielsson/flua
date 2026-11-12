@@ -4,6 +4,13 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.154] - 2026-11-12
+
+### Changed
+- Collapse CI bursts with concurrency groups + manual PyPI dispatch
+- Park the upload-wire-format simplification
+- The real trigger: initialProperties.apiVersion, not the endpoint
+
 ## [0.1.153] - 2026-11-11
 
 ### Changed
