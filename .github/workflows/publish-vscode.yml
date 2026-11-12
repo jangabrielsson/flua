@@ -5,6 +5,11 @@ on:
     types: [published]
   workflow_dispatch: # manual test run (publishes the current package.json version)
 
+# one publish per ref; a new release run supersedes a stuck one
+concurrency:
+  group: publish-vscode-${{ github.ref_name }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+# release storms stack runs (each push queues the full 7-job matrix);
+# a newer run on the same ref supersedes the older queued/in-progress one
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-24.04

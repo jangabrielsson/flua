@@ -3,6 +3,16 @@ name: Publish Python Package to PyPI
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "version to publish (e.g. 0.1.153) — for re-publishing after a stuck queue"
+        required: true
+
+# one publish per version; a new release run supersedes a stuck one
+concurrency:
+  group: publish-pypi-${{ github.event_name == 'release' && github.ref_name || inputs.version }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -27,9 +37,13 @@ jobs:
     - name: Extract version from tag
       id: get_version
       run: |
-        # Remove 'v' prefix if present (e.g., v1.0.54 -> 1.0.54)
-        VERSION=${GITHUB_REF#refs/tags/}
-        VERSION=${VERSION#v}
+        if [ "${{ github.event_name }}" = "release" ]; then
+          # Remove 'v' prefix if present (e.g., v1.0.54 -> 1.0.54)
+          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION=${VERSION#v}
+        else
+          VERSION="${{ inputs.version }}"
+        fi
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Extracted version: $VERSION"
     
