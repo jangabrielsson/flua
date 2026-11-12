@@ -54,6 +54,7 @@ from .config import (
     debug_flag,
     expand_includes,
     file_name_error,
+    file_name_warning,
     merge_annotations,
     parse_annotations,
     split_annotations,
@@ -1071,6 +1072,9 @@ class LuaEngine:
                     problem = file_name_error(declared)
                     if problem is not None:
                         raise ValueError(problem)
+                    warning = file_name_warning(declared)
+                    if warning is not None:
+                        logger.warning("%s", warning)
                 entries.append({"name": name, "path": path})
         config["files"] = entries
         return entries

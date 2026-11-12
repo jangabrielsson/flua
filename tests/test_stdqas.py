@@ -124,9 +124,12 @@ async def test_templates_boot_clean() -> None:
     assert booted == len(list(TEMPLATES.glob("*.lua")))
 
 
-def test_check_flags_short_file_names(tmp_path) -> None:
-    # a --%%file name the HC3 editor would refuse to open is a static error
+def test_check_warns_on_short_file_names(tmp_path) -> None:
+    # a --%%file name under 3 characters is only a warning: the HC3's
+    # upload accepts it, its file editor refuses to open it (odd names
+    # are still static errors — see test_file_name_validation)
     main = tmp_path / "main.lua"
+    (tmp_path / "extra.lua").write_text("x = 1\n")
     main.write_text(
         "--%%file:extra.lua,a\n"
         "-- --------------- EOH ---------------\n"
@@ -136,4 +139,6 @@ def test_check_flags_short_file_names(tmp_path) -> None:
     lua = engine.lua_runtime()
     findings = check_file(str(main), lua)
     errors = [f for f in findings if f["severity"] == "error"]
-    assert any("too short" in f["message"] for f in errors), errors
+    warnings = [f for f in findings if f["severity"] == "warning"]
+    assert not errors, errors
+    assert any("too short" in f["message"] for f in warnings), warnings

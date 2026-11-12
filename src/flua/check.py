@@ -22,7 +22,13 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .config import KNOWN_DIRECTIVES, expand_includes, file_name_error, parse_annotations
+from .config import (
+    KNOWN_DIRECTIVES,
+    expand_includes,
+    file_name_error,
+    file_name_warning,
+    parse_annotations,
+)
 from .devices import property_specs_for
 
 # (http method, path prefix, advice) — derived from the distilled API
@@ -277,6 +283,17 @@ def check_file(path: str, lua: Any) -> list[dict[str, Any]]:
                     )
                 )
                 continue
+            problem = file_name_warning(declared)
+            if problem is not None:
+                loc = re.search(rf"--%%file:\s*{re.escape(raw)}", source)
+                findings.append(
+                    finding(
+                        path,
+                        "warning",
+                        problem,
+                        *_line_col(source, loc.start()) if loc else (None, None),
+                    )
+                )
         if not raw:
             continue
         if raw.startswith("$"):

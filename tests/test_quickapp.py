@@ -949,10 +949,12 @@ async def test_remove_child_device_guards_foreign_children(capsys) -> None:
     assert "FOREIGN true true true" in out  # exists, no result, still there
 
 
-async def test_declared_file_names_must_pass_the_hc3_editor_rule(tmp_path) -> None:
+async def test_declared_file_names_warn_on_short_fail_on_odd(tmp_path) -> None:
     # the HC3's upload accepts any file name, but its editor refuses to
-    # open names under 3 characters or with odd characters — a declared
-    # --%%file name must obey the editor's rule or the load fails loudly
+    # open names with odd characters — a declared --%%file name must be
+    # identifier-like or the load fails loudly. Short names are different:
+    # the HC3 accepts them (only the editor refuses), so they load with a
+    # warning instead of failing.
     engine = LuaEngine()
     await engine.start()
     try:
@@ -964,7 +966,7 @@ async def test_declared_file_names_must_pass_the_hc3_editor_rule(tmp_path) -> No
             "function QuickApp:onInit() end\n"
         )
         qa_id, err = engine.load_qa_file(str(main))
-        assert qa_id is None and err and "too short" in err
+        assert qa_id is not None and err is None
         main.write_text(
             "--%%file:lib.lua,my-file\n"
             "-- --------------- EOH ---------------\n"

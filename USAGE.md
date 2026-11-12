@@ -999,11 +999,10 @@ offline too (`api.get('/quickApp/' .. _FLUA.qaId .. '/files')` etc.).
 `--%%file` files are the QA's *shipped* files — they travel into the `.fqa`
 (`--tool pack`, uploads). The declared file NAME is the name on the
 controller: the HC3's upload accepts anything, but its file editor
-refuses to open names under 3 characters or with odd characters — flua
-enforces the editor's rule for declared names (at least 3 characters,
-identifier-like), so a QA uploaded by flua stays editable on the HC3.
-The default name (derived from the path when no name is declared)
-keeps today's behavior. Test-only helpers (mock-server handlers, assertion
+refuses to open odd names (identifier-like is required — a hard error)
+and names under 3 characters (only a warning: the HC3 accepts them, the
+editor just will not open them). The default name (derived from the
+path when no name is declared) keeps today's behavior. Test-only helpers (mock-server handlers, assertion
 libraries) can stay out of the package: plain Lua `require("name")` finds
 `name.lua` next to the main file at runtime, and require'd files are never
 packaged.

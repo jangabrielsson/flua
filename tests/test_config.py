@@ -459,16 +459,22 @@ def test_plua_headers_directive_maps_to_include() -> None:
 
 def test_file_name_validation() -> None:
     # the HC3's file EDITOR refuses names under 3 characters or with odd
-    # characters — declared --%%file names must obey it (defaults derived
-    # from the path keep today's behavior)
-    from flua.config import file_name_error
+    # characters — odd names are hard errors for declared --%%file names;
+    # short names are only warnings (the HC3 upload API accepts them)
+    from flua.config import file_name_error, file_name_warning
 
     assert file_name_error("abc") is None
     assert file_name_error("aa1") is None
-    assert "too short" in file_name_error("a1")
+    assert file_name_error("a1") is None
     assert file_name_error("_ab") is None
-    assert "too short" in file_name_error("a")
-    assert "too short" in file_name_error("ab")
+    assert file_name_error("a") is None
+    assert file_name_error("ab") is None
     assert "not identifier-like" in file_name_error("my-file")
     assert "not identifier-like" in file_name_error("1ab")
     assert "not identifier-like" in file_name_error("a.b")
+    assert file_name_warning("abc") is None
+    assert file_name_warning("aa1") is None
+    assert file_name_warning("_ab") is None
+    assert "too short" in file_name_warning("a1")
+    assert "too short" in file_name_warning("a")
+    assert "too short" in file_name_warning("ab")
