@@ -6,6 +6,7 @@ import json
 import os
 import re
 import time
+from pathlib import Path
 from typing import Any
 
 from ... import messages
@@ -14,6 +15,7 @@ from ...devices import (
     icon_default_file,
     icon_manifest,
     icon_pattern_files,
+    local_icon_files,
     skeleton_for,
 )
 from ..request import ApiRequest, remote_get
@@ -334,9 +336,7 @@ def home_put(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     for key, value in req.body.items():
         if key == "timestamp":
             continue
-        if key in ("defaultSensors", "notificationClient") or not isinstance(
-            value, (dict, list)
-        ):
+        if key in ("defaultSensors", "notificationClient") or not isinstance(value, (dict, list)):
             state.home_overrides[key] = value
     return None, 200
 
@@ -652,6 +652,28 @@ def flua_icon_map(state: SimState, req: ApiRequest) -> tuple[Any, int]:
         for mapped in icons.values():
             if mapped["set"] == set_name:
                 mapped["file"] = default
+    # --%%icons:path — a QA's LOCAL icon set previews as a synthetic
+    # Local<qaId> set with the QA's own id as the deviceIcon; the file list
+    # is whatever the folder holds, the default follows the family like a
+    # user set (base else off state; Closed for shutter sets).
+    for qa_id, info in list((state.local_icons if state is not None else {}).items()):
+        set_name = f"Local{qa_id}"
+        names = local_icon_files(set_name, Path(str(info.get("dir") or "")))
+        if not names:
+            continue
+        by_suffix: dict[str, str] = {}
+        for name in names:
+            ext = os.path.splitext(name)[1]
+            by_suffix.setdefault(name[len(set_name) : -len(ext)], name)
+        family = _USER_ICON_FAMILY.get(str(info.get("type") or ""), "single")
+        if family == "baseShutter":
+            default = by_suffix.get("Closed") or names[0]
+        elif family in ("binary", "multilevel"):
+            default = by_suffix.get("0") or names[0]
+        else:
+            default = by_suffix.get("") or names[0]
+        icons[str(qa_id)] = {"set": set_name, "file": default}
+        sets[set_name] = sorted(names)
     return {"icons": icons, "sets": sets}, 200
 
 

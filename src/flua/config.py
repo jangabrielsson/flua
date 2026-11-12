@@ -660,6 +660,7 @@ KNOWN_DIRECTIVES = frozenset(
         "svar",  # --%%svar:name=expr — secret QuickApp variables (type='password')
         "clobber",  # --%%clobber:name=value — Plua-compatible package value
         "file",
+        "icons",  # --%%icons:path — a local icon set folder (icon*.png) previewed in the web view
         "fqafiles",  # internal: .fqa unpack headers mark their file lines so
         # the HC3-editor name rule (declared names) does not reject
         # package-carried names flua must be able to open

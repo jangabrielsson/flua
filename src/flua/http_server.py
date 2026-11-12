@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 from .api import Api
-from .devices import icon_file
+from .devices import icon_file, local_icon_file
 
 logger = logging.getLogger(__name__)
 
@@ -94,17 +94,12 @@ def _docs_file(subpath: str) -> tuple[bytes, str] | None:
     candidate = (root / subpath).resolve()
     if not candidate.is_relative_to(root) or not candidate.is_file():
         return None
-    content_type = _DOCS_MIME.get(
-        candidate.suffix.lower(), "application/octet-stream"
-    )
+    content_type = _DOCS_MIME.get(candidate.suffix.lower(), "application/octet-stream")
     body = candidate.read_bytes()
     if content_type.startswith("text/html") and b"<style" not in body[:4096]:
         # no page stylesheet: the injected theme block sets the base colors
         body = _DOCS_THEME + body
     return body, content_type
-
-
-
 
 
 class ApiServer:
@@ -188,10 +183,26 @@ class ApiServer:
             if method == "GET" and path.startswith("/flua/icons/"):
                 # the icon channel: raw image bytes from the shared cache
                 # (~/.flua/icons, populated by ``flua --tool icons download``) —
-                # the viewer's <img> tags fetch deviceIcon art from here
+                # the viewer's <img> tags fetch deviceIcon art from here. A
+                # QA's LOCAL set (--%%icons:path, Local<qaId>) serves from
+                # its folder first.
                 rest = path[len("/flua/icons/") :].split("/")
                 if len(rest) == 2:
-                    hit = icon_file(urllib.parse.unquote(rest[0]), urllib.parse.unquote(rest[1]))
+                    set_name = urllib.parse.unquote(rest[0])
+                    file_name = urllib.parse.unquote(rest[1])
+                    local_hit: tuple[bytes, str] | None = None
+                    for qa_id, info in self.api.state.local_icons.items():
+                        if f"Local{qa_id}" != set_name:
+                            continue
+                        local_hit = local_icon_file(
+                            set_name, Path(str(info.get("dir") or "")), file_name
+                        )
+                        break
+                    if local_hit is not None:
+                        body, content_type = local_hit
+                        _write(writer, 200, content_type, body, extra=_CORS)
+                        return
+                    hit = icon_file(set_name, file_name)
                     if hit is not None:
                         body, content_type = hit
                         _write(writer, 200, content_type, body, extra=_CORS)

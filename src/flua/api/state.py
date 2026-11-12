@@ -125,6 +125,9 @@ class SimState:
         self.rooms: dict[int, dict[str, Any]] = {}
         self.sections: dict[int, dict[str, Any]] = {}
         self.scenes: dict[int, dict[str, Any]] = {}
+        # --%%icons:path — per-QA local icon sets for the web view:
+        # qa_id -> {"dir": str, "type": deviceType}
+        self.local_icons: dict[int, dict[str, Any]] = {}
         self.climate_zones: dict[int, dict[str, Any]] = {}
         self.family_locations: list[dict[str, Any]] = []
         self.global_variables: dict[str, dict[str, Any]] = {}
@@ -607,9 +610,7 @@ class SimState:
         )
 
     def record_global_removed(self, name: str, now: float) -> dict[str, Any]:
-        return self.record_global_event(
-            "GlobalVariableRemovedEvent", {"variableName": name}, now
-        )
+        return self.record_global_event("GlobalVariableRemovedEvent", {"variableName": name}, now)
 
     def record_weather_changed(
         self, name: str, new_value: Any, old_value: Any, now: float
@@ -676,9 +677,7 @@ class SimState:
         device_id = self.new_id()
         dev = _device_skeleton(device_id, name, device_type)
         dev["isPlugin"] = False  # a base device, not a QA
-        dev["interfaces"] = [
-            i for i in (dev.get("interfaces") or []) if i != "quickApp"
-        ]
+        dev["interfaces"] = [i for i in (dev.get("interfaces") or []) if i != "quickApp"]
         if room_id is not None:
             dev["roomID"] = room_id
         if isinstance(properties, dict):

@@ -28,6 +28,13 @@ def test_keep_alive_directive() -> None:
     assert parse_annotations("--%%keep-alive:false\n")["keep-alive"] is False
 
 
+def test_icons_directive_is_a_plain_path() -> None:
+    # --%%icons:path — the QA's LOCAL icon set folder (a plain scalar path,
+    # resolved against the QA file like --%%file)
+    assert parse_annotations("--%%icons:icons\n")["icons"] == "icons"
+    assert parse_annotations("--%%icons:./assets/qa-icons\n")["icons"] == "./assets/qa-icons"
+
+
 def test_annotations() -> None:
     source = (
         '--%%speed:10\n--%%instant:false\n--%%time:instant=true,hours=48,speed=2\nprint("hi")\n'
@@ -81,8 +88,7 @@ def test_svar_parses_like_var_with_its_own_package_values() -> None:
     # --%%svar:name=expr[,"<placeholder>"] — same shape as --%%var, stored
     # separately so the runtime can type the entries 'password'.
     cfg = parse_annotations(
-        "--%%svar:user=config.user,'<set user>'\n"
-        "--%%svar:pwd=os.getenv('PW')\n--%%var:plain=42\n"
+        "--%%svar:user=config.user,'<set user>'\n--%%svar:pwd=os.getenv('PW')\n--%%var:plain=42\n"
     )
     assert cfg["svar"] == {"user": "config.user", "pwd": "os.getenv('PW')"}
     assert cfg["svarPkg"] == {"user": "<set user>"}
@@ -452,9 +458,7 @@ def test_legacy_equals_spelling_parses_like_colon() -> None:
 def test_plua_headers_directive_maps_to_include() -> None:
     # plua's --%%headers:FILE is accepted as --%%include:FILE, so plua QAs
     # run unchanged
-    assert parse_annotations("--%%headers:defaults.lua\n") == {
-        "include": "defaults.lua"
-    }
+    assert parse_annotations("--%%headers:defaults.lua\n") == {"include": "defaults.lua"}
 
 
 def test_file_name_validation() -> None:

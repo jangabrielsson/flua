@@ -145,6 +145,7 @@ def _parse_trace(trace: str) -> set[str]:
         return set(TRACE_CATEGORIES)
     return {c for c in categories if c in TRACE_CATEGORIES}
 
+
 # Seconds the client waits on the HC3's refreshStates long poll: the HC3
 # answers immediately with events and holds the request ~30s when idle.
 # The request runs on a dedicated daemon thread (see _poll_once), never the
@@ -527,9 +528,7 @@ class LuaEngine:
         """Record one QA console line in the sim's /debugMessages buffer
         (same sync/depth guarantees as log_line: pure state append, never
         Lua, so it is safe inside debugger-stepped code)."""
-        self.api.state.record_debug_message(
-            str(level).lower(), tag, text, self.clock.time
-        )
+        self.api.state.record_debug_message(str(level).lower(), tag, text, self.clock.time)
 
     def _system_event(self, event: str, qa: int | None, detail: str, code: int = 0) -> None:
         """Record one structured lifecycle/crash entry in /flua/systemLog
@@ -685,9 +684,7 @@ class LuaEngine:
             # embedding credentials. flua runs on the dev machine, not the
             # controller — substitute the standard API (scheme, host, port)
             # and use the configured credentials below.
-            port_11111 = (
-                loopback and parts.port in (11111, 11112) and self.hc3 is not None
-            )
+            port_11111 = loopback and parts.port in (11111, 11112) and self.hc3 is not None
             if loopback and self.hc3 is not None:
                 hc3_parts = urllib.parse.urlsplit(self.hc3.base_url)
                 new_host = hc3_parts.hostname or parts.hostname
@@ -928,6 +925,19 @@ class LuaEngine:
                     entry["path"] = str(bundled)
                 elif not Path(entry_path).is_absolute():
                     entry["path"] = str(base / entry_path)
+        # --%%icons:path — a LOCAL icon set folder for the web view: the QA
+        # previews its custom icons without uploading them (a synthetic
+        # Local<qaId> set serves the folder's icon*.png/svg files and the
+        # QA's own id becomes the deviceIcon). Resolves like --%%file.
+        icon_dir = None
+        if qa_config.get("icons"):
+            if path is None:
+                logger.warning("--%%icons needs a QA file to resolve against: %s", name)
+            else:
+                icon_dir = (Path(path).parent / str(qa_config["icons"])).resolve()
+                if not icon_dir.is_dir():
+                    logger.warning("--%%icons: %s is not a directory — no local icon set", icon_dir)
+                    icon_dir = None
         if proxy_enabled:
             # reuse or deploy the proxy FIRST: its HC3 id becomes the QA's id
             proxy_device = resolve_proxy(
@@ -945,6 +955,17 @@ class LuaEngine:
             while qa_id in self._qas or qa_id in self.api.state.devices:
                 qa_id = self._next_qa_id
                 self._next_qa_id += 1
+        if icon_dir is not None and not packing:
+            # the fake iconset id is the QA's own id: unique per QA, never a
+            # real icon id, and the iconMap/channel resolve it to the local
+            # folder. An explicit --%%property:deviceIcon wins (setdefault).
+            # Skipped when packing: a distributable package must not carry
+            # the local preview id.
+            device_properties.setdefault("deviceIcon", qa_id)
+            self.api.state.local_icons[qa_id] = {
+                "dir": str(icon_dir),
+                "type": str(qa_config.get("type") or ""),
+            }
         self._qas[qa_id] = {
             "name": name,
             "path": path,
@@ -1208,12 +1229,7 @@ class LuaEngine:
         header — e.g. rename it or preset its properties:
         {"name:Hall temp", "property:value=21.5", "property:unit=C"}.
         Returns (qa_id, None) or (None, error)."""
-        if (
-            not isinstance(name, str)
-            or not name
-            or Path(name).name != name
-            or name in (".", "..")
-        ):
+        if not isinstance(name, str) or not name or Path(name).name != name or name in (".", ".."):
             return None, f"bad sim device name: {name!r}"
         for suffix in (".lua", ".fqa"):
             path = SIM_DEVICES_DIR / f"{name}{suffix}"
@@ -1578,9 +1594,7 @@ class LuaEngine:
         device = self.api.state.devices.get(int(qa_id)) or {}
         # the export whitelist compares against the schema's DECLARED
         # defaults (authoritative), not the demoted capture
-        specs = property_specs_for(
-            device.get("type"), device.get("interfaces")
-        )
+        specs = property_specs_for(device.get("type"), device.get("interfaces"))
         properties: dict[str, Any] = {}
         for key, value in (device.get("properties") or {}).items():
             if key not in _EXPORT_PROPERTIES:
@@ -1936,7 +1950,7 @@ class LuaEngine:
         """Record one unhandled Lua callback error (called from the runtime's
         dispatch boundaries — timer coroutines, UI events, net callbacks).
         The record is sticky: nothing clears it. Bounded at 100 entries;
-        later failures are dropped with a ``truncated`` marker. """
+        later failures are dropped with a ``truncated`` marker."""
         if len(self._callback_failures) >= 100:
             self._callback_failures_truncated = True
             return
@@ -2026,9 +2040,11 @@ class LuaEngine:
                     continue
                 match = regex.match(path)
                 if match:
-                    return owner, route_id, {
-                        name: match.group(index) for name, index in params.items()
-                    }
+                    return (
+                        owner,
+                        route_id,
+                        {name: match.group(index) for name, index in params.items()},
+                    )
         return None
 
     def _handle_user_api_result(self, msg: dict[str, Any]) -> None:
@@ -2162,9 +2178,7 @@ class LuaEngine:
                 # the chain dies (cancel_qa can't see it yet — it is still
                 # a message, not a scheduled timer)
                 return
-        self._timers.set_timeout(
-            int(msg["id"]), int(msg["delay"]), qa, bool(msg.get("background"))
-        )
+        self._timers.set_timeout(int(msg["id"]), int(msg["delay"]), qa, bool(msg.get("background")))
         self.trace_event(
             "timer",
             int(qa) if qa is not None else None,
@@ -2552,8 +2566,12 @@ class LuaEngine:
             self.trace_event(
                 "net",
                 int(msg["qa"]) if msg.get("qa") is not None else None,
-                {"kind": "tcpSend", "ok": ok, "bytes": value if ok else None,
-                 "error": None if ok else value},
+                {
+                    "kind": "tcpSend",
+                    "ok": ok,
+                    "bytes": value if ok else None,
+                    "error": None if ok else value,
+                },
             )
         else:
             out = messages.tcp_result(
@@ -2562,8 +2580,12 @@ class LuaEngine:
             self.trace_event(
                 "net",
                 int(msg["qa"]) if msg.get("qa") is not None else None,
-                {"kind": "tcpRead", "ok": ok, "bytes": len(value) if ok else None,
-                 "error": None if ok else value},
+                {
+                    "kind": "tcpRead",
+                    "ok": ok,
+                    "bytes": len(value) if ok else None,
+                    "error": None if ok else value,
+                },
             )
         self.enqueue_outbound(out)
 
@@ -2607,9 +2629,12 @@ class LuaEngine:
         self.trace_event(
             "net",
             int(msg["qa"]) if msg.get("qa") is not None else None,
-            {"kind": "udp", "ok": ok,
-             "bytes": len(value) if isinstance(value, (str, bytes)) else value,
-             "error": None if ok else value},
+            {
+                "kind": "udp",
+                "ok": ok,
+                "bytes": len(value) if isinstance(value, (str, bytes)) else value,
+                "error": None if ok else value,
+            },
         )
         self.enqueue_outbound(out)
 
@@ -2817,8 +2842,11 @@ class LuaEngine:
         try:
             data = await asyncio.to_thread(response.read)
             result = messages.http_result(
-                msg["id"], msg.get("qa"), status,
-                data.decode("utf-8", errors="replace"), resp_headers,
+                msg["id"],
+                msg.get("qa"),
+                status,
+                data.decode("utf-8", errors="replace"),
+                resp_headers,
             )
         except Exception as exc:
             result = messages.http_result(msg["id"], msg.get("qa"), error=str(exc))

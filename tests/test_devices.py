@@ -185,8 +185,7 @@ def test_type_schemas_are_self_consistent() -> None:
             ptype = spec.get("type", "string")
             prior = iface_props.get(prop)
             assert prior is None or prior[0] == ptype, (
-                f"interface conflict: {prop} declared {prior[0]} ({prior[1]}) "
-                f"and {ptype} ({iname})"
+                f"interface conflict: {prop} declared {prior[0]} ({prior[1]}) and {ptype} ({iname})"
             )
             iface_props[prop] = (ptype, iname)
     for name, entry in types.items():
@@ -234,9 +233,7 @@ async def test_qa_interface_directive_applies_schema() -> None:
     with tempfile.TemporaryDirectory() as d:
         script = Path(d) / "qa.lua"
         script.write_text(
-            "--%%name:IfaceQA\n"
-            "--%%interface:autoTurnOff\n"
-            "function QuickApp:onInit() exit(0) end\n"
+            "--%%name:IfaceQA\n--%%interface:autoTurnOff\nfunction QuickApp:onInit() exit(0) end\n"
         )
         engine = LuaEngine()
         await engine.start()
@@ -437,6 +434,40 @@ def test_icon_file_resolves_only_inside_cache(tmp_path, monkeypatch) -> None:
     assert icon_file("ButtonSwitchV2", "../secret") is None
     assert icon_file("..", "secret.svg") is None
     assert icon_file("ButtonSwitchV2/other", "x.svg") is None
+
+
+def test_local_icon_files_and_serving(tmp_path) -> None:
+    # the --%%icons folder: upload-named files (icon<suffix>.<ext>) become a
+    # synthetic set's <set><suffix>.<ext> names; unknown files are skipped;
+    # serving translates back and refuses traversal/unknown shapes
+    from flua.devices import local_icon_file, local_icon_files
+
+    folder = tmp_path / "icons"
+    folder.mkdir()
+    (folder / "icon.png").write_bytes(b"\x89PNGbase")
+    (folder / "icon0.png").write_bytes(b"\x89PNGoff")
+    (folder / "icon100.svg").write_bytes(b"<svg>on</svg>")
+    (folder / "readme.txt").write_text("skip me")
+
+    assert local_icon_files("Local5000", folder) == [
+        "Local5000.png",
+        "Local50000.png",
+        "Local5000100.svg",
+    ]
+    assert local_icon_file("Local5000", folder, "Local50000.png") == (
+        b"\x89PNGoff",
+        "image/png",
+    )
+    assert local_icon_file("Local5000", folder, "Local5000100.svg") == (
+        b"<svg>on</svg>",
+        "image/svg+xml",
+    )
+    # unknown names and traversal are refused (the set -> folder binding is
+    # the caller's job; this helper is a pure name translation)
+    assert local_icon_file("Local5000", folder, "Local500050.png") is None
+    assert local_icon_file("Local5000", folder, "../secret") is None
+    assert local_icon_file("Local5000", folder, "Local5000../../secret.png") is None
+    assert local_icon_files("Local5000", tmp_path / "missing") == []
 
 
 def test_icon_default_file_prefers_base_then_off_state(monkeypatch) -> None:

@@ -269,6 +269,21 @@ def test_example_multifile_runs() -> None:
     assert "helper says: loaded in order" in result.stdout
 
 
+def test_example_local_icons_runs() -> None:
+    # the --%%icons example: the QA flips value 0/100 a few times (the web
+    # view would switch the folder's icons) and exits cleanly
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--api", "local", "examples/local-icons.lua"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "value: 0" in result.stdout
+    assert "value: 100" in result.stdout
+
+
 @pytest.mark.asyncio
 async def test_quickapp_import_runs_the_qa(tmp_path, capsys) -> None:
     engine = LuaEngine()

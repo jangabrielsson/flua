@@ -88,6 +88,7 @@ flua = [
     "*.lua",
     "*.json",
     "multifile/*.lua",
+    "local-icons/*",
     "Modbus Server/*",
     "Solar Edge Modbus Demo/*",
     "Skoda/*",

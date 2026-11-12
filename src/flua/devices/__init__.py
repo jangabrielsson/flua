@@ -318,10 +318,10 @@ def apply_interface(device: dict[str, Any], name: str, action: str) -> None:
         for action_name, spec in (schema.get("actions") or {}).items():
             actions.setdefault(action_name, int(spec.get("argc", 0)))
     else:
-        for prop in (schema.get("properties") or {}):
+        for prop in schema.get("properties") or {}:
             if prop not in type_properties:
                 properties.pop(prop, None)
-        for action_name in (schema.get("actions") or {}):
+        for action_name in schema.get("actions") or {}:
             actions.pop(action_name, None)
 
 
@@ -526,6 +526,48 @@ def _icon_candidates(file_name: str) -> list[str]:
     if lowered == "svg":
         return [file_name, f"{stem}.png"]
     return [file_name]
+
+
+# a QA's LOCAL icon set (--%%icons:path): the folder holds the icon files in
+# the upload naming (icon.png, icon0.png, icon100.png, iconOpening.png, ...);
+# the synthetic set (Local<qaId>) serves them under <set><state>.<ext> names.
+_LOCAL_FOLDER_NAME = re.compile(r"^icon([A-Za-z0-9_-]*)\.(png|svg|jpg|jpeg|gif|webp)$")
+
+
+def local_icon_files(set_name: str, folder: Path) -> list[str]:
+    """The synthetic set's file list: each ``icon<suffix>.<ext>`` in the
+    folder becomes ``<set><suffix>.<ext>`` (sorted; unknown names skipped)."""
+    names: list[str] = []
+    if not folder.is_dir():
+        return names
+    for entry in sorted(folder.iterdir()):
+        if not entry.is_file():
+            continue
+        match = _LOCAL_FOLDER_NAME.fullmatch(entry.name)
+        if not match:
+            continue
+        names.append(f"{set_name}{match.group(1)}.{match.group(2)}")
+    return names
+
+
+def local_icon_file(set_name: str, folder: Path, file_name: str) -> tuple[bytes, str] | None:
+    """Serve one synthetic-set file from the QA's icon folder: the name must
+    be ``<set><suffix>.<ext>`` and translates to the folder's
+    ``icon<suffix>.<ext>``. Traversal and unknown shapes are refused by
+    construction (strict name patterns + resolve check)."""
+    if not _ICON_NAME.fullmatch(set_name) or not _ICON_NAME.fullmatch(file_name):
+        return None
+    if not file_name.startswith(set_name):
+        return None
+    rest = file_name[len(set_name) :]
+    if not _LOCAL_FOLDER_NAME.fullmatch("icon" + rest):
+        return None
+    target = (folder / ("icon" + rest)).resolve()
+    root = folder.resolve()
+    if root not in target.parents or not target.is_file():
+        return None
+    content_type = _ICON_CONTENT_TYPES.get(target.suffix.lower(), "application/octet-stream")
+    return target.read_bytes(), content_type
 
 
 def icon_default_file(set_name: str, file_extension: str) -> str | None:

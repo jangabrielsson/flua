@@ -91,7 +91,7 @@ async def test_qa_installs_fqa_via_loopback_multipart(server, capsys, tmp_path) 
         "  })\n"
         "  local boundary = '----qaDist' .. string.format('%08x', os.time())\n"
         "  local body = '--' .. boundary .. '\\r\\n'\n"
-        "    .. 'Content-Disposition: form-data; name=\"file\"; filename=\"x.fqa\"\\r\\n'\n"
+        '    .. \'Content-Disposition: form-data; name="file"; filename="x.fqa"\\r\\n\'\n'
         "    .. 'Content-Type: application/octet-stream\\r\\n'\n"
         "    .. '\\r\\n'\n"
         "    .. fqa .. '\\r\\n'\n"
@@ -125,9 +125,7 @@ async def test_qa_installs_fqa_via_loopback_multipart(server, capsys, tmp_path) 
     assert "IMPORTED 200" in out
     assert "IMPORT-ERR" not in out
     devices = {d["id"]: d for d in engine.api.state.devices.values()}
-    imported = next(
-        (d for d in devices.values() if d.get("name") == "loopback-import"), None
-    )
+    imported = next((d for d in devices.values() if d.get("name") == "loopback-import"), None)
     assert imported is not None
 
 
@@ -142,9 +140,7 @@ async def test_import_accepts_multipart_body_over_http(server) -> None:
         {
             "type": "QuickApp",
             "name": "multipart-qa",
-            "files": [
-                {"name": "main", "isMain": True, "content": "print('MP QA')\n"}
-            ],
+            "files": [{"name": "main", "isMain": True, "content": "print('MP QA')\n"}],
         }
     )
     boundary = "----fluaTestBoundary"
@@ -157,12 +153,8 @@ async def test_import_accepts_multipart_body_over_http(server) -> None:
     ).encode()
 
     def post():
-        req = urllib.request.Request(
-            f"{base}/api/quickApp/import", data=body, method="POST"
-        )
-        req.add_header(
-            "Content-Type", f"multipart/form-data; boundary={boundary}"
-        )
+        req = urllib.request.Request(f"{base}/api/quickApp/import", data=body, method="POST")
+        req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
         with urllib.request.urlopen(req) as res:
             return res.status, json.loads(res.read())
 
@@ -190,7 +182,7 @@ async def test_viewer_page_served_at_root(server) -> None:
     # the QA's "log" property renders as a centered status line at the
     # panel bottom, and its changes feed the value key (live refresh)
     assert "qa-log" in page
-    assert "props.log || \"\"" in page
+    assert 'props.log || ""' in page
     # the condensed device-list mode: a toggle + one small status card per
     # device (value / bold name / log) for runs with many children
     assert 'id="viewtoggle"' in page
@@ -628,3 +620,88 @@ async def test_icon_channel_serves_the_cache(server, tmp_path, monkeypatch) -> N
             raise AssertionError(f"{path} should 404")
         except urllib.error.HTTPError as exc:
             assert exc.code == 404
+
+
+@pytest.mark.asyncio
+async def test_local_icon_set_directive(server, tmp_path, caplog) -> None:
+    # --%%icons:path — a QA's LOCAL icon set: the QA's own id becomes the
+    # deviceIcon, the iconMap serves a synthetic Local<qaId> set listing the
+    # folder's icon files (upload naming -> <set><state> naming), and the
+    # icon channel serves the bytes from the folder. State switching in the
+    # viewer works off the same protocol as cached sets.
+    engine, _api_server, base = server
+    icons = tmp_path / "icons"
+    icons.mkdir()
+    (icons / "icon0.png").write_bytes(b"\x89PNGoff")
+    (icons / "icon100.png").write_bytes(b"\x89PNGon")
+    (icons / "readme.txt").write_text("not an icon")  # skipped
+    qa = tmp_path / "iconqa.lua"
+    qa.write_text(
+        "--%%name:IconQA\n"
+        "--%%type:com.fibaro.binarySwitch\n"
+        "--%%icons:icons\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() end\n"
+    )
+    qa_id, err = engine.load_qa_file(str(qa))
+    assert qa_id is not None and err is None
+    set_name = f"Local{qa_id}"
+
+    # the fake iconset id: the QA's own id, injected as its deviceIcon
+    props = engine.api.state.devices[qa_id]["properties"]
+    assert props["deviceIcon"] == qa_id
+
+    icon_map = json.loads(
+        (await asyncio.to_thread(urllib.request.urlopen, f"{base}/flua/iconMap", timeout=10)).read()
+    )
+    assert icon_map["icons"][str(qa_id)] == {"set": set_name, "file": f"{set_name}0.png"}
+    assert icon_map["sets"][set_name] == [f"{set_name}0.png", f"{set_name}100.png"]
+
+    for name, want in ((f"{set_name}0.png", b"\x89PNGoff"), (f"{set_name}100.png", b"\x89PNGon")):
+        response = await asyncio.to_thread(
+            urllib.request.urlopen, f"{base}/flua/icons/{set_name}/{name}", timeout=10
+        )
+        assert response.read() == want
+    # unknown names and traversal 404
+    for path in (
+        f"/flua/icons/{set_name}/{set_name}50.png",  # not in the folder
+        f"/flua/icons/{set_name}/..%2F..%2Fsecret.svg",
+        "/flua/icons/OtherSet/x.png",
+    ):
+        try:
+            await asyncio.to_thread(urllib.request.urlopen, f"{base}{path}", timeout=10)
+            raise AssertionError(f"{path} should 404")
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 404
+
+    # an explicit --%%property:deviceIcon wins over the injected id
+    qa2 = tmp_path / "iconqa2.lua"
+    qa2.write_text(
+        "--%%name:IconQA2\n"
+        "--%%type:com.fibaro.binarySwitch\n"
+        "--%%icons:icons\n"
+        "--%%property:deviceIcon=999\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() end\n"
+    )
+    qa_id2, err = engine.load_qa_file(str(qa2))
+    assert qa_id2 is not None and err is None
+    assert engine.api.state.devices[qa_id2]["properties"]["deviceIcon"] == 999
+
+    # a missing folder: warning, no injected id, no synthetic mapping
+    qa3 = tmp_path / "iconqa3.lua"
+    qa3.write_text(
+        "--%%name:IconQA3\n"
+        "--%%type:com.fibaro.binarySwitch\n"
+        "--%%icons:missing\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() end\n"
+    )
+    qa_id3, err = engine.load_qa_file(str(qa3))
+    assert qa_id3 is not None and err is None
+    assert engine.api.state.devices[qa_id3]["properties"].get("deviceIcon") != qa_id3
+    icon_map = json.loads(
+        (await asyncio.to_thread(urllib.request.urlopen, f"{base}/flua/iconMap", timeout=10)).read()
+    )
+    assert str(qa_id3) not in icon_map["icons"]
+    assert "is not a directory" in caplog.text
