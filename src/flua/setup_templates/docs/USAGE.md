@@ -325,6 +325,7 @@ Parsing stops at the end-of-header marker:
 | `--%%build:7` | sets `buildNumber` (a number) |
 | `--%%manufacturer:...` | sets `manufacturer` |
 | `--%%file:lib.lua,lib` | extra QA file, loads before main (see below) |
+| `--%%icons:icons/` | LOCAL icon set folder previewed in the web view (see the icons section) |
 | `--%%speed:60` | virtual time speed (global) |
 | `--%%step:true` | step mode (global): deadline-ordered fast-forward, os.time()-coherent |
 | `--%%instant:true` | instant mode (global) |
@@ -1618,6 +1619,19 @@ step (binary 0/100, multilevel 0..100 in tens), and a `state` string
 matches named state files (`Opening`, `alarm`, …). Unmapped or uncached
 ids fall back to the set's default file or no icon. Later, user-uploaded
 QA icons land in the same store.
+
+A QA can preview a **local icon set** without touching the HC3:
+`--%%icons:path/to/folder` (resolved against the QA file, like
+`--%%file`) points at a folder holding the icons in the upload naming —
+`icon.png`, `icon0.png`+`icon100.png`, `icon0..100.png`,
+`iconOpening.png`, … The QA's own id becomes its `deviceIcon` (an
+explicit `--%%property:deviceIcon` wins), the icon map registers a
+synthetic `Local<qaId>` set listing whatever the folder holds, and the
+icon channel serves those files — the viewer switches them per
+`value`/`state` exactly like a cached set. Purely a preview: the folder
+never travels into `.fqa` packages, and the injected id does not render
+on a real HC3 (replace it with the uploaded set's `User<id>` id for
+production).
 
 Online (an HC3 backend), `GET /flua/iconMap` merges the **live** icon
 library into the checked-in catalog — custom `User<id>` sets and

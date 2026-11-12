@@ -213,3 +213,31 @@ assertion totals in `flua test --json`.
   `Hc3Remote.multipart` only if still needed, keep the sim's multipart
   parsing + the skill's multipart recipe as the marker-less-package
   fallback.
+
+Parked 2026-11-12, from the custom-icon work (User<id> sets, uploadExternalIconSet):
+
+## QA self-installs its own icon set (idempotent, no stored state)
+
+- **What**: an example QA + quickapp-patterns skill section for "ensure my
+  icon set exists": on init, `api.get("/icons")` -> filter `deviceType ==
+  self.type` and `iconSetName` starting with `User`; fetch each candidate's
+  state file via `net.HTTPClient` from
+  `http://127.0.0.1:11111/assets/userIcons/devices/<set>/<set><state>.png`
+  and byte-compare with the bundled icon; match -> already installed ->
+  `updateProperty("deviceIcon", id)`; no match -> `uploadExternalIconSet`
+  -> new id. Replaces the quickVar/internalStorage "already downloaded?"
+  bookkeeping that went stale on QA reinstall (duplicate sets, lost ids).
+- **Ground truth (live-verified 5.22x)**: the HC3 serves uploaded icon
+  files byte-identical (md5-equal) under `/assets/userIcons/devices/`; the
+  fibaro tree is placeholder art for User sets; binary/multilevel sets have
+  no base file, only state files; icons must be >= ~128x128
+  (`INVALID_ICON_SIZE` otherwise); POST `/api/icons` multipart contract:
+  `type=device`, `deviceTemplate=<type>`, file fields per the provider
+  (`icon`/`icon0`+`icon100`/`icon0..100`/`iconOpening...`), response
+  `201 {"id":N,"iconSetName":"User<N>","fileExtension":"png"}`.
+- **Flua angle**: recipe is online-only (needs `/api/icons` + the 11111
+  loopback; the sim has the catalog route but no asset tree — degrade
+  gracefully). Testable against the mock HC3. Related parked options from
+  the same session: a `_FLUA.saveIcon(set, file, bytes)` bridge call and
+  lazy fetch+cache in the icon channel (online/proxy) so the viewer warms
+  the cache on demand — both "wait for now".
