@@ -29,6 +29,11 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 
+That clone is for developing flua itself (its own AGENTS.md governs work
+there). When you hit a flua bug while working in a **different** project,
+never patch the flua repo to fix it — file an issue on the flua repo
+instead (see the flua-troubleshooting skill).
+
 ## HC3 credentials (.env)
 
 flua reads HC3 credentials through an environment chain: the local `.env`
