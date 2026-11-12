@@ -609,6 +609,15 @@ async def test_icon_channel_serves_the_cache(server, tmp_path, monkeypatch) -> N
     assert "image/svg+xml" in headers["Content-Type"]
     assert "<svg>off</svg>" in body
 
+    # a miss serves the sibling extension (png <-> svg): sets whose .png
+    # slot is an SVG body cache only the .svg, and still render
+    status, headers, body = await asyncio.to_thread(
+        _http_page, f"{base}/flua/icons/ButtonSwitchV2/ButtonSwitchV20.png"
+    )
+    assert status == 200
+    assert "image/svg+xml" in headers["Content-Type"]
+    assert "<svg>off</svg>" in body
+
     for path in (
         "/flua/icons/ButtonSwitchV2/missing.svg",  # not cached
         "/flua/icons/ButtonSwitchV2/..%2F..%2Fsecret.svg",  # traversal

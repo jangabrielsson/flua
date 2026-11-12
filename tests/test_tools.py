@@ -1513,6 +1513,102 @@ def test_icons_download_from_dump(tmp_path, capsys) -> None:
     assert (cache / "ButtonSwitchV2" / "ButtonSwitchV20.svg").read_bytes() == b"<svg>new</svg>"
 
 
+def test_icons_download_user_sets_use_the_usericons_tree(tmp_path, capsys) -> None:
+    # User<id> sets have no state files — only the base image exists, under
+    # /assets/userIcons/devices. The dump's fibaro tree holds placeholder
+    # art for them; the download copies the real base and drops stale
+    # cached state names.
+    fibaro = tmp_path / "www" / "assets" / "icon" / "fibaro" / "User1001"
+    fibaro.mkdir(parents=True)
+    (fibaro / "User1001.svg").write_bytes(b"<svg>placeholder</svg>")
+    (fibaro / "User100110.svg").write_bytes(b"<svg>placeholder state</svg>")
+    usericons = tmp_path / "www" / "assets" / "userIcons" / "devices" / "User1001"
+    usericons.mkdir(parents=True)
+    (usericons / "User1001.png").write_bytes(b"\x89PNGreal")
+    cache = tmp_path / "cache"
+    # a stale placeholder state file from an earlier download must be cleaned
+    (cache / "User1001").mkdir(parents=True)
+    (cache / "User1001" / "User100110.svg").write_bytes(b"<svg>stale</svg>")
+
+    assert (
+        tools.run_tool(
+            "icons", ["download", "--dump", str(tmp_path / "www"), "--dir", str(cache)]
+        )
+        == 0
+    )
+    assert (cache / "User1001" / "User1001.png").read_bytes() == b"\x89PNGreal"
+    assert not (cache / "User1001" / "User1001.svg").exists()
+    assert not (cache / "User1001" / "User100110.svg").exists()
+    out = capsys.readouterr().out
+    assert "copied 1 icon file(s)" in out
+
+
+def test_icons_hc3_download_user_sets_use_usericons(tmp_path, monkeypatch) -> None:
+    # the live path fetches a user set's base image from the userIcons tree
+    # — the fibaro tree serves placeholder art for those sets
+    requests: list[str] = []
+
+    class _IconsHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            requests.append(self.path)
+            if self.path == "/assets/userIcons/devices/User999/User999.png":
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.end_headers()
+                self.wfile.write(b"\x89PNGreal")
+            else:
+                self.send_response(404)
+                self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _IconsHandler)
+    threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
+    try:
+        monkeypatch.setenv("HC3_URL", f"http://127.0.0.1:{server.server_port}")
+        monkeypatch.setenv("HC3_USER", "admin")
+        monkeypatch.setenv("HC3_PASSWORD", "secret")
+        from flua.tools.icons import _from_hc3
+
+        cache = tmp_path / "cache"
+        (cache / "User999").mkdir(parents=True)
+        (cache / "User999" / "User99910.svg").write_bytes(b"<svg>stale</svg>")
+        assert (
+            _from_hc3(
+                [("User999", "User999.png"), ("User999", "User99910.png")],
+                cache,
+                force=False,
+            )
+            == 0
+        )
+        assert requests == ["/assets/userIcons/devices/User999/User999.png"]
+        assert (cache / "User999" / "User999.png").read_bytes() == b"\x89PNGreal"
+        assert not (cache / "User999" / "User99910.svg").exists()
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_icon_placeholder_detects_html_error_docs(tmp_path) -> None:
+    # the userIcons tree serves HTML error docs for missing files — those
+    # are placeholders too, not artwork
+    from flua.tools.icons import _is_placeholder
+
+    png = tmp_path / "x.png"
+    png.write_bytes(b"\x89PNG")
+    assert not _is_placeholder(png)
+    svg = tmp_path / "z.svg"
+    svg.write_bytes(b"<svg></svg>")
+    assert not _is_placeholder(svg)
+    for name in ("y.png", "w.svg"):
+        doc = tmp_path / name
+        doc.write_bytes(b"<!doctype html><html></html>")
+        assert _is_placeholder(doc), name
+
+
 def test_migrate_tool_scans_a_project(tmp_path, capsys) -> None:
     # one-pass plua-migration scan: directive spellings, plua-only
     # directives, script invocations, stale packages, baked IPs

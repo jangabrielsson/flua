@@ -418,12 +418,20 @@ def test_icon_file_resolves_only_inside_cache(tmp_path, monkeypatch) -> None:
     folder = tmp_path / "icons" / "ButtonSwitchV2"
     folder.mkdir(parents=True)
     (folder / "ButtonSwitchV20.svg").write_bytes(b"<svg>off</svg>")
-    (folder / "ButtonSwitchV20.png").write_bytes(b"\x89PNG")
     assert icon_file("ButtonSwitchV2", "ButtonSwitchV20.svg") == (
         b"<svg>off</svg>",
         "image/svg+xml",
     )
-    assert icon_file("ButtonSwitchV2", "ButtonSwitchV20.png") == (b"\x89PNG", "image/png")
+    # a miss falls back to the sibling extension (png <-> svg): sets whose
+    # declared .png slot is an SVG body (dropped as a placeholder) render
+    # from the cached .svg, and vice versa
+    assert icon_file("ButtonSwitchV2", "ButtonSwitchV20.png") == (
+        b"<svg>off</svg>",
+        "image/svg+xml",
+    )
+    (folder / "ButtonSwitchV20.svg").unlink()
+    (folder / "ButtonSwitchV20.png").write_bytes(b"\x89PNG")
+    assert icon_file("ButtonSwitchV2", "ButtonSwitchV20.svg") == (b"\x89PNG", "image/png")
     assert icon_file("ButtonSwitchV2", "missing.svg") is None
     # traversal and separators are refused by the name pattern / resolution
     assert icon_file("ButtonSwitchV2", "../secret") is None

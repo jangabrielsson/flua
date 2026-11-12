@@ -1591,12 +1591,22 @@ from the HC3: every set serves 14 state suffixes in both png and svg).
 (`~/.flua/icons`, `FLUA_ICON_DIR` overrides) — one cache per user, shared
 by every project, never per repo. Against a live HC3 the tool also
 enumerates the controller's icon library and downloads the sets the
-manifest does not cover — custom icons uploaded with
-`uploadExternalIconSet` and newer-firmware additions (their files follow
-the same 14-suffix pattern). Placeholder state files (the generic gray
-box the HC3 serves for states with no artwork, even under the requested
-extension) are dropped rather than cached — the viewer falls back to the
-set's default art for those states. The sim serves the cache to the viewer
+manifest does not cover: newer-firmware additions (their files follow
+the same 14-suffix pattern) and custom icons uploaded with
+`uploadExternalIconSet`. A custom `User<id>` set has only its base
+image — the HC3 stores the uploaded artwork under
+`/assets/userIcons/devices/User<id>/User<id>.png`, while its
+`/assets/icon/fibaro/` slots hold placeholder art (the declared `.png`
+slot serves an SVG body). The downloader fetches the base from the
+userIcons tree and drops everything else for these sets (stale cached
+placeholder states included), and the icon map lists only the base for
+them, so the viewer never switches states for a custom icon.
+Placeholder state files (the generic gray box the HC3 serves for states
+with no artwork, even under the requested extension) are dropped rather
+than cached, and the icon channel falls back to the cached sibling
+extension (png ↔ svg) on a miss; the viewer falls back to the set's
+default art for states with no artwork at all. The sim serves the cache
+to the viewer
 at `GET /flua/icons/<set>/<file>`; uncached icons 404 until the tool runs
 once. The viewer renders each QA's `deviceIcon` (both in the panel and on
 the condensed card, via the `GET /flua/iconMap` id→set lookup) and

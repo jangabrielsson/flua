@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import re
 import shutil
 import sys
 import urllib.error
@@ -123,17 +124,22 @@ def _with_live_custom_sets(wanted: list[tuple[str, str]]) -> list[tuple[str, str
 def _is_placeholder(path: Path) -> bool:
     """The HC3 serves a generic gray box for states with no artwork, even
     under the requested extension (an SVG body named .png). Detect the
-    mismatch: png bodies must be PNG, svg bodies must start with '<'."""
+    mismatch: png bodies must be PNG, svg bodies must start with '<' and
+    must not be HTML error documents (the userIcons tree serves ``<!doctype
+    html>`` pages for missing files)."""
     try:
         with open(path, "rb") as handle:
-            head = handle.read(8)
+            head = handle.read(32)
     except OSError:
         return False
     suffix = path.suffix.lower()
     if suffix == ".png":
         return not head.startswith(b"\x89PNG")
     if suffix == ".svg":
-        return not head.lstrip().startswith(b"<")
+        lowered = head.lstrip().lower()
+        if lowered.startswith(b"<!doctype") or lowered.startswith(b"<html"):
+            return True
+        return not lowered.startswith(b"<")
     return False
 
 
@@ -150,14 +156,48 @@ def _store(source: Path, target: Path, placeholder_count: list[int]) -> bool:
     return True
 
 
+_USER_SET_RE = re.compile(r"^User\d+$")
+
+
+def _with_user_sets(wanted: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """User-uploaded icon sets (User<id>, uploadExternalIconSet) have no
+    state files — only the base image exists, under
+    ``/assets/userIcons/devices/``. Collapse each user set to its base
+    ``.png`` (the HC3 stores the uploaded artwork as png there; the
+    fibaro tree's slots for these sets are placeholder art)."""
+    result: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for set_name, file_name in wanted:
+        if not _USER_SET_RE.fullmatch(set_name):
+            result.append((set_name, file_name))
+            continue
+        if set_name in seen:
+            continue
+        seen.add(set_name)
+        result.append((set_name, f"{set_name}.png"))
+    return result
+
+
 def _from_dump(wanted: list[tuple[str, str]], dump: Path, cache: Path, force: bool) -> int:
     root = dump / "assets" / "icon" / "fibaro"
     if not root.is_dir():
         raise SystemExit(f"{dump} is not an HC3 webroot dump (missing assets/icon/fibaro)")
     copied = skipped = missing = 0
     placeholders = [0]
-    for set_name, file_name in wanted:
+    for set_name, file_name in _with_user_sets(wanted):
         target = cache / set_name / file_name
+        is_user_set = bool(_USER_SET_RE.fullmatch(set_name))
+        source = (
+            dump / "assets" / "userIcons" / "devices" / set_name / file_name
+            if is_user_set
+            else root / set_name / file_name
+        )
+        if is_user_set:
+            # no state files exist for user sets — drop stale cached names
+            # so placeholder art never lingers
+            for stale in target.parent.glob(f"{set_name}*"):
+                if stale.name != file_name and stale.is_file():
+                    stale.unlink()
         if target.is_file() and not force:
             # a cached placeholder is dropped; the HC3 keeps serving the
             # same placeholder, so there is nothing to re-fetch
@@ -166,7 +206,6 @@ def _from_dump(wanted: list[tuple[str, str]], dump: Path, cache: Path, force: bo
                 placeholders[0] += 1
             skipped += 1
             continue
-        source = root / set_name / file_name
         if not source.is_file():
             missing += 1
             continue
@@ -199,9 +238,22 @@ def _from_hc3(wanted: list[tuple[str, str]], cache: Path, force: bool) -> int:
     ).decode()
     fetched = skipped = failed = 0
     placeholders = [0]
+    wanted = _with_user_sets(wanted)
     total = len(wanted)
     for index, (set_name, file_name) in enumerate(wanted, start=1):
         target = cache / set_name / file_name
+        is_user_set = bool(_USER_SET_RE.fullmatch(set_name))
+        url = (
+            f"{base}/assets/userIcons/devices/{set_name}/{file_name}"
+            if is_user_set
+            else f"{base}/assets/icon/fibaro/{set_name}/{file_name}"
+        )
+        if is_user_set:
+            # no state files exist for user sets — drop stale cached names
+            # so placeholder art never lingers
+            for stale in target.parent.glob(f"{set_name}*"):
+                if stale.name != file_name and stale.is_file():
+                    stale.unlink()
         if target.is_file() and not force:
             # a cached placeholder is dropped; the HC3 keeps serving the
             # same placeholder, so there is nothing to re-fetch
@@ -211,7 +263,7 @@ def _from_hc3(wanted: list[tuple[str, str]], cache: Path, force: bool) -> int:
             skipped += 1
             continue
         request = urllib.request.Request(
-            f"{base}/assets/icon/fibaro/{set_name}/{file_name}",
+            url,
             headers={"Authorization": "Basic " + auth},
         )
         try:

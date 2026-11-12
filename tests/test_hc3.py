@@ -495,9 +495,10 @@ async def test_icon_map_merges_the_live_icon_library_online(
     tmp_path, capsys, mock_hc3, monkeypatch
 ) -> None:
     # online: /flua/iconMap merges the LIVE HC3 icon library — custom sets
-    # uploaded with uploadExternalIconSet (User999 here) map too, with file
-    # lists derived from the uniform <set><state>.<ext> pattern; captured
-    # ids keep their richer manifest lists
+    # uploaded with uploadExternalIconSet (User999 here) map too. User sets
+    # have no state files (only the base image exists, served from the
+    # userIcons tree), so their file list is the base alone; captured ids
+    # keep their richer manifest lists
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.setenv("HC3_URL", mock_hc3)
     monkeypatch.setenv("HC3_USER", "admin")
@@ -508,8 +509,7 @@ async def test_icon_map_merges_the_live_icon_library_online(
         icon_map, status = engine.api.dispatch("GET", "/flua/iconMap")
         assert status == 200
         assert icon_map["icons"]["999"] == {"set": "User999", "file": "User999.svg"}
-        assert "User9990.svg" in icon_map["sets"]["User999"]
-        assert "User999Unknown.svg" in icon_map["sets"]["User999"]
+        assert icon_map["sets"]["User999"] == ["User999.svg"]
         # the captured catalog entry keeps its manifest file list
         assert icon_map["icons"]["300"] == {
             "set": "ButtonSwitchV2",

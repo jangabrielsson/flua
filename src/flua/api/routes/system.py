@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from typing import Any
 
@@ -582,6 +583,14 @@ def flua_icon_map(state: SimState, req: ApiRequest) -> tuple[Any, int]:
                         continue
                     icons[str(icon_id)] = {"set": set_name, "file": default}
                     sets.setdefault(set_name, sorted(names))
+    # user-uploaded sets (User<id>) have no state files — only the base
+    # image exists (the fibaro tree serves placeholder art for states, and
+    # /assets/userIcons serves HTML error docs for state names). List just
+    # the base so the viewer never switches states for these sets.
+    for set_name, _names in list(sets.items()):
+        if re.fullmatch(r"^User\d+$", set_name):
+            entry = next((v for v in icons.values() if v["set"] == set_name), None)
+            sets[set_name] = [entry["file"]] if entry else []
     return {"icons": icons, "sets": sets}, 200
 
 

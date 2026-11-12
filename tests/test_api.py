@@ -8,6 +8,7 @@ tests run QAs against the API through the engine, and a CLI test covers
 import asyncio
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -2108,6 +2109,11 @@ def test_icon_map_serves_device_icon_lookup(api: Api) -> None:
         assert mapped, f"catalog id {entry['id']} not mapped"
         assert mapped["set"] == entry["iconSetName"]
         assert mapped["file"] in manifest_files[entry["iconSetName"]]
-        assert data["sets"][entry["iconSetName"]] == sorted(
-            manifest_files[entry["iconSetName"]]
+        # user-uploaded sets (User<id>) have no state files — the map lists
+        # only the base image so the viewer never switches states for them
+        expected = (
+            [mapped["file"]]
+            if re.fullmatch(r"^User\d+$", entry["iconSetName"])
+            else sorted(manifest_files[entry["iconSetName"]])
         )
+        assert data["sets"][entry["iconSetName"]] == expected

@@ -495,15 +495,37 @@ def icon_file(set_name: str, file_name: str) -> tuple[bytes, str] | None:
     """One cached icon file as ``(bytes, content_type)``, or None when the
     name is invalid or the file is not cached. Names are strictly
     ``[A-Za-z0-9._-]`` and resolved inside the cache — path traversal and
-    arbitrary reads are refused by construction."""
+    arbitrary reads are refused by construction.
+
+    Some sets cache only their sibling extension — the HC3 declares a
+    ``.png`` but serves an SVG body in that slot (user-icon sets), which
+    the downloader drops as a placeholder while the ``.svg`` caches. A
+    miss therefore falls back to the sibling extension (png <-> svg) so
+    the set still renders."""
     if not _ICON_NAME.fullmatch(set_name) or not _ICON_NAME.fullmatch(file_name):
         return None
     cache = icon_cache_dir().resolve()
-    path = (cache / set_name / file_name).resolve()
-    if cache not in path.parents or not path.is_file():
-        return None
-    content_type = _ICON_CONTENT_TYPES.get(path.suffix.lower(), "application/octet-stream")
-    return path.read_bytes(), content_type
+    for candidate in _icon_candidates(file_name):
+        path = (cache / set_name / candidate).resolve()
+        if cache not in path.parents or not path.is_file():
+            continue
+        content_type = _ICON_CONTENT_TYPES.get(path.suffix.lower(), "application/octet-stream")
+        return path.read_bytes(), content_type
+    return None
+
+
+def _icon_candidates(file_name: str) -> list[str]:
+    """The requested name first, then the sibling-extension name — the two
+    extensions the HC3 swaps between for icon bodies."""
+    stem, dot, suffix = file_name.rpartition(".")
+    if not dot:
+        return [file_name]
+    lowered = suffix.lower()
+    if lowered == "png":
+        return [file_name, f"{stem}.svg"]
+    if lowered == "svg":
+        return [file_name, f"{stem}.png"]
+    return [file_name]
 
 
 def icon_default_file(set_name: str, file_extension: str) -> str | None:
