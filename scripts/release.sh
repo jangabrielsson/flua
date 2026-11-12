@@ -134,7 +134,25 @@ git tag "v$NEW"
 
 # 6. push — the tag alone triggers nothing; the RELEASE does
 git push origin HEAD
-git push origin "v$NEW"
+# The tag push can race GitHub's object store right behind the main push:
+# "remote rejected ... (missing necessary objects)" even though the objects
+# just landed with main. Retry a few times with a pause — any other error
+# is real and fails the script.
+ERR=$(mktemp) || exit 1
+trap 'rm -f "$ERR"' EXIT
+for attempt in 1 2 3 4 5; do
+  if git push origin "v$NEW" 2>"$ERR"; then
+    cat "$ERR"
+    break
+  fi
+  if [ "$attempt" -eq 5 ] || ! grep -q "missing necessary objects" "$ERR"; then
+    cat "$ERR" >&2
+    exit 1
+  fi
+  cat "$ERR" >&2
+  echo "tag push raced the object store (attempt $attempt); retrying..."
+  sleep 3
+done
 
 # 7. publish the GitHub Release -> fires the PyPI workflow
 if command -v gh >/dev/null 2>&1; then
