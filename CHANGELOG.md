@@ -4,6 +4,15 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.164] - 2026-11-13
+
+### Changed
+- Skill: document the WebSocket mock server's push surface
+- net.WebSocketServer: server-initiated push, lifecycle events, disconnect
+
+### Fixed
+- add missing interface declaration for RemoteController
+
 ## [0.1.163] - 2026-11-13
 
 ### Changed
