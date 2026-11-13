@@ -259,7 +259,7 @@ def test_variables_hc3_ids_route_through_helper_bridge(api: Api) -> None:
     class FakeRemote:
         base_url = "http://hc3/"
 
-        def request(self, method: str, path: str, query=None, body=None):
+        def request(self, method: str, path: str, query=None, body=None, version=None):
             rest_calls.append((method, path))
             return None, 500  # the real HC3 refuses these externally
 
@@ -299,7 +299,7 @@ def test_variables_proxy_devices_route_to_the_helper_bridge(api: Api) -> None:
     class FakeRemote:
         base_url = "http://hc3/"
 
-        def request(self, method: str, path: str, query=None, body=None):
+        def request(self, method: str, path: str, query=None, body=None, version=None):
             rest_calls.append((method, path))
             return None, 500
 
@@ -1079,7 +1079,7 @@ def test_weather_online_serves_the_real_hc3_with_local_overrides(api: Api) -> No
     class FakeRemote:
         base_url = "http://hc3/"
 
-        def request(self, method: str, path: str, query=None, body=None):
+        def request(self, method: str, path: str, query=None, body=None, version=None):
             remote_calls.append((method, path))
             if method == "GET" and path == "/weather":
                 return {

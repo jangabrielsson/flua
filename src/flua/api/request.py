@@ -74,18 +74,20 @@ def forward_to_proxy(req: ApiRequest, is_proxy: bool) -> None:
         req.remote(req.method, req.path, req.body)
 
 
-def remote_get(req: ApiRequest, path: str) -> tuple[Any, int] | None:
+def remote_get(req: ApiRequest, path: str, version: str | None = None) -> tuple[Any, int] | None:
     """Serve a resource GET from the real HC3 when the run is online.
 
     The HC3 is authoritative for its resources; the sim only fills in the
     ones the emu created locally (those handlers merge instead). Returns
     None offline or when the controller can't answer, so callers fall back
-    to the sim."""
+    to the sim. ``version`` overrides the X-Fibaro-Version header (default
+    2, the web UI's shape — pass "1" for resources like /api/icons whose
+    library listing lives under version 1)."""
     if req.remote is None:
         return None
     if req.query:
         path = f"{path}?{urlencode(req.query)}"
-    data, status = req.remote("GET", path, None)
+    data, status = req.remote("GET", path, None, version)
     if status == 200:
         return copy.deepcopy(data), status
     return None

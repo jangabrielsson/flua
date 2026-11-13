@@ -115,9 +115,18 @@ class Hc3Remote:
         query: dict[str, str] | None = None,
         body: Any = None,
         timeout: float | None = None,
+        version: str | None = "2",
     ) -> tuple[Any, int]:
         """One REST call -> (data, status). A 401/403 invokes the auth guard
-        and aborts flua — never retried (the HC3 locks after 4 attempts)."""
+        and aborts flua — never retried (the HC3 locks after 4 attempts).
+
+        ``version`` rides as ``X-Fibaro-Version`` like the web UI's
+        interceptor (default 2 — the shape the HC3 serves its own UI and
+        QA context; some resources answer a different shape per version —
+        GET /api/icons returns the type-definition table under 2 and the
+        library dict under 1 — so callers needing the library shape pass
+        version="1"). NEVER combine query params with X-Fibaro-Version 2
+        on /api/icons — the controller hangs."""
         url = self._base + "/api" + path
         if query:
             # spaces as %20, not '+' (quote_via=quote): the HC3 decodes
@@ -125,6 +134,8 @@ class Hc3Remote:
             # %20 — names with spaces must match on the wire)
             url += "?" + urllib.parse.urlencode(query, quote_via=urllib.parse.quote)
         headers = {"Accept": "application/json"}
+        if version is not None:
+            headers["X-Fibaro-Version"] = version
         auth = self._auth_header()
         if auth:
             headers["Authorization"] = auth

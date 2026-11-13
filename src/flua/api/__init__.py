@@ -265,14 +265,16 @@ class Api:
         now = self._engine.clock.time if self._engine is not None else time.time()
         return self.state.register_qa(qa_id, name, device_type, properties, proxy=proxy, now=now)
 
-    def _remote_hook(self, method: str, path: str, body: Any) -> tuple[Any, int]:
+    def _remote_hook(
+        self, method: str, path: str, body: Any, version: str | None = None
+    ) -> tuple[Any, int]:
         """Forward a sim-handled call to the real HC3 (proxy mode): handlers
         use this so the controller stays in sync with the shadow device."""
         if self._remote is None:
             return None, 404
         segments, query = parse_url(path)
         remote_path = "/" + "/".join(segments)
-        return self._remote.request(method, remote_path, query, body)
+        return self._remote.request(method, remote_path, query, body, version=version)
 
     def _remote_cached(self, path: str) -> tuple[Any, int] | None:
         """One lazy GET against the real HC3, cached for the run: base

@@ -231,7 +231,7 @@ async def test_helper_wake_advertises_the_bound_port() -> None:
         class FakeRemote:
             base_url = "http://192.168.50.57/"
 
-            def request(self, method: str, path: str, query=None, body=None):
+            def request(self, method: str, path: str, query=None, body=None, version=None):
                 if path == "/devices":
                     return [
                         {"id": 9, "properties": {"quickAppUuid": uuid, "model": "1.1.0"}}
@@ -330,7 +330,7 @@ async def test_api_helper_connects_on_demand(capsys) -> None:
         class FakeRemote:
             base_url = "http://192.168.50.57/"
 
-            def request(self, method: str, path: str, query=None, body=None):
+            def request(self, method: str, path: str, query=None, body=None, version=None):
                 calls.append((method, path, query))
                 if path == "/devices":
                     return [

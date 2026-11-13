@@ -513,7 +513,7 @@ def profile_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def icons_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    remote = remote_get(req, "/icons")
+    remote = remote_get(req, "/icons", version="1")  # v1 = the library dict; v2 is the type table
     if remote is not None:
         return remote
     catalog = icon_catalog()
@@ -566,7 +566,7 @@ def flua_icon_map(state: SimState, req: ApiRequest) -> tuple[Any, int]:
             icons[str(icon_id)] = {"set": str(set_name), "file": default}
             sets.setdefault(str(set_name), sorted(names))
             types.setdefault(str(set_name), str(entry.get("deviceType") or ""))
-    remote = remote_get(req, "/icons")
+    remote = remote_get(req, "/icons", version="1")  # v1 = the library dict; v2 is the type table
     if remote is not None:
         live_data = remote[0] if isinstance(remote, tuple) else remote
         if isinstance(live_data, dict):

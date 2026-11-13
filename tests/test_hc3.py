@@ -2057,3 +2057,38 @@ async def test_example_icon_install_stale_flag_reinstalls(
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_hc3_remote_sends_fibaro_version_header() -> None:
+    # the engine's remote REST rides X-Fibaro-Version: 2 like the web UI's
+    # interceptor (the QA-context shape); version="1" opts out for resources
+    # whose library listing lives there (GET /api/icons)
+    seen: list = []
+
+    class _Hc3(BaseHTTPRequestHandler):
+        def do_GET(self):
+            seen.append(self.headers.get("X-Fibaro-Version"))
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b"{}")
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _Hc3)
+    threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
+    try:
+        from flua.hc3 import Hc3Remote
+
+        remote = Hc3Remote(f"http://127.0.0.1:{server.server_port}/api", "admin", "secret")
+        data, status = remote.request("GET", "/icons")
+        assert status == 200 and data == {}
+        data, status = remote.request("GET", "/icons", version="1")
+        assert status == 200
+        assert seen == ["2", "1"]
+    finally:
+        server.shutdown()
+        server.server_close()
