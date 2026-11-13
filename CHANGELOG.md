@@ -4,6 +4,24 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.157] - 2026-11-13
+
+### Added
+- add displayIcons example for browsing and displaying user icons
+- add _FLUA.hostIP for accessing the dev machine's LAN address and update documentation
+
+### Changed
+- flua --tool icons ui — the HC3 icon manager
+- park the /proxy username/password emulation gap
+- add project review for flua with detailed assessments and recommendations
+- the asset tree is public on port 80 — fix the icon recipe
+- net.HTTPClient responses are byte-faithful (raw bytes, like the HC3)
+- extend the icon note with the 11111/11112 split and flua divergences
+- icon tutorial post (forum series + web docs)
+
+### Fixed
+- update icon URL to use port 11111 and improve documentation clarity
+
 ## [0.1.156] - 2026-11-12
 
 ### Changed
