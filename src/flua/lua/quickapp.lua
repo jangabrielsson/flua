@@ -745,7 +745,7 @@ function QuickAppBase:uploadExternalIconSet(urls, options, successCallback, erro
 
     local deviceType = self.type
     local provider = QuickApp.deviceIconTypeMapping[deviceType]
-    
+
     if provider == nil then
         error("Unsupported type " .. tostring(deviceType), 2)
     end
@@ -772,4 +772,4 @@ function QuickAppBase:uploadExternalIconSet(urls, options, successCallback, erro
             end
         end, 
         errorCallback)
-end 
+end
