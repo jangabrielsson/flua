@@ -142,15 +142,18 @@ def http_result(
     request_id: int,
     qa: int | None,
     status: int | None = None,
-    data: str | None = None,
+    data: str | bytes | None = None,
     headers: dict[str, str] | None = None,
     error: str | None = None,
     more: bool = False,
 ) -> dict[str, Any]:
     """Response for a net.HTTPClient request: status/data/headers or error.
 
-    ``more=True`` marks an SSE stream event: the Lua side keeps the request
-    entry alive and calls success again on the next event."""
+    ``data`` is the raw response body — bytes for binary (byte-faithful,
+    like the HC3's response.data; lupa carries Python bytes into the Lua
+    string unchanged). ``more=True`` marks an SSE stream event: the Lua
+    side keeps the request entry alive and calls success again on the
+    next event."""
     msg: dict[str, Any] = {"type": HTTP_RESULT, "id": int(request_id)}
     if qa is not None:
         msg["qa"] = qa

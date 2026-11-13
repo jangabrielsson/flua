@@ -805,7 +805,8 @@ def diagnostics_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 def proxy_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     # GET /proxy?url=... — the HC3's UI helper fetches a URL server-side.
     # JSON bodies are decoded (like the HC3's api.get), anything else comes
-    # back as the raw string.
+    # back as the RAW bytes — byte-faithful for images (flua extension: the
+    # HC3's api.get returns nil here, but the bytes are what recipes need).
     url = req.query.get("url")
     if not url:
         return None, 400
@@ -814,11 +815,11 @@ def proxy_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     status, body, _headers = req.fetch(url)
     if status is None:
         return None, 502
-    if isinstance(body, str) and body:
+    if isinstance(body, (str, bytes)) and body:
         try:
             body = json.loads(body)
         except ValueError:
-            pass  # not JSON — the raw string is the answer
+            pass  # not JSON — the raw body is the answer
     return body, status
 
 

@@ -67,6 +67,14 @@ class _Handler(BaseHTTPRequestHandler):
                 self.wfile.flush()
                 time.sleep(0.05)
             return
+        if self.path.startswith("/blob"):
+            # raw binary: byte-faithful response.data (a PNG-ish blob with
+            # high bytes — a utf-8 decode would inflate/corrupt it)
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.end_headers()
+            self.wfile.write(b"\x89PNG\r\n\x1a\n\xff\xfe")
+            return
         if self.path.startswith("/slow"):
             time.sleep(1.0)  # slow enough that the 0.2s timeout test times out
         payload = json.dumps(
@@ -188,6 +196,42 @@ async def test_http_check_certificate_option(tmp_path, capsys) -> None:
 
 
 # -- engine wiring: Lua request -> pump -> callback ------------------------------
+
+
+@pytest.mark.asyncio
+async def test_http_client_binary_body_is_byte_faithful(tmp_path, capsys, http_server: str) -> None:
+    # response.data must be the RAW bytes like on the HC3 (Lua strings are
+    # byte arrays): a utf-8 decode would inflate the length and break
+    # byte-compare recipes (icons)
+    script = tmp_path / "netblob.lua"
+    script.write_text(
+        "local client = net.HTTPClient()\n"
+        "setTimeout(function()\n"
+        "  client:request('" + http_server + "/blob', {\n"
+        "    success = function(resp)\n"
+        "      print('BLOB', #resp.data, string.byte(resp.data, 1), string.byte(resp.data, 9))\n"
+        "    end,\n"
+        "  })\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {}, str(script))
+        out = await _wait_for_all(capsys, ["BLOB 10 137 255"])
+    finally:
+        await engine.stop()
+    assert "BLOB 10 137 255" in out
+
+
+def test_http_call_binary_flag_returns_raw_bytes(http_server: str) -> None:
+    status, body, headers = http_call("GET", http_server + "/blob", binary=True)
+    assert status == 200 and isinstance(body, bytes)
+    assert body == b"\x89PNG\r\n\x1a\n\xff\xfe"
+    assert headers["Content-Type"] == "image/png"
+    # the default stays text-oriented (utf-8 decode with replacement)
+    status, body, _ = http_call("GET", http_server + "/blob")
+    assert isinstance(body, str)
 
 
 @pytest.mark.asyncio

@@ -660,10 +660,12 @@ class LuaEngine:
         like log_line. ``plain`` strips the tags without colors (JSON logs)."""
         return render_html_tags(str(text), False if plain else self.color_enabled())
 
-    def fetch_url(self, url: str) -> tuple[int | None, str, dict[str, str]]:
+    def fetch_url(self, url: str) -> tuple[int | None, str | bytes, dict[str, str]]:
         """Server-side fetch for GET /proxy?url=... (the HC3's UI helper):
         one blocking HTTP GET through the engine's HTTP client. Transport
-        failures return status None (the route answers 502).
+        failures return status None (the route answers 502). The body comes
+        back as RAW bytes (byte-faithful for images; the route JSON-decodes
+        when it can).
 
         Embedded credentials work like the HC3's proxy: urllib does not
         consume userinfo URLs itself, so the userinfo is stripped and sent
@@ -718,12 +720,12 @@ class LuaEngine:
                     (parts.scheme, host, parts.path, parts.query, parts.fragment)
                 )
                 token = base64.b64encode(f"{user}:{password}".encode()).decode()
-                return http_call("GET", url, {"Authorization": f"Basic {token}"})
+                return http_call("GET", url, {"Authorization": f"Basic {token}"}, binary=True)
             if port_11111:
                 auth = self.hc3.auth_header
                 if auth is not None:
-                    return http_call("GET", url, {"Authorization": auth})
-            return http_call("GET", url)
+                    return http_call("GET", url, {"Authorization": auth}, binary=True)
+            return http_call("GET", url, binary=True)
         except OSError:
             return None, "", {}
 
@@ -2845,7 +2847,11 @@ class LuaEngine:
                 msg["id"],
                 msg.get("qa"),
                 status,
-                data.decode("utf-8", errors="replace"),
+                data,  # RAW bytes — the HC3 hands the QA the raw body; a
+                # text decode here would corrupt binary (utf-8 replace
+                # inflates a 2442B PNG to 4829B) and break byte-compare
+                # recipes. lupa carries Python bytes into the Lua string
+                # unchanged.
                 resp_headers,
             )
         except Exception as exc:

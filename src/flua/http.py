@@ -28,7 +28,8 @@ def http_call(
     data: str | bytes | None = None,
     timeout: float = 30.0,
     check_certificate: bool = True,
-) -> tuple[int, str, dict[str, str]]:
+    binary: bool = False,
+) -> tuple[int, str | bytes, dict[str, str]]:
     """One blocking HTTP exchange -> (status, body, headers).
 
     Any HTTP response — including 4xx/5xx — is returned with its status;
@@ -37,13 +38,19 @@ def http_call(
     ``response.status``; ``error`` fires for failures to reach the server.
     ``check_certificate=False`` skips HTTPS certificate verification (the
     HC3's checkCertificate option; Python verifies by default, like the
-    HC3's default true).
+    HC3's default true). ``binary=True`` returns the RAW body bytes
+    (byte-faithful — the HC3 hands QAs raw bytes; a text decode would
+    corrupt binary and inflate its length); the default decodes UTF-8 with
+    replacement for the text/JSON paths.
     """
     status, response_headers, response = open_http(
         method, url, headers, data, timeout, check_certificate
     )
     try:
-        return status, response.read().decode("utf-8", errors="replace"), response_headers
+        body = response.read()
+        if not binary:
+            body = body.decode("utf-8", errors="replace")
+        return status, body, response_headers
     finally:
         with contextlib.suppress(Exception):
             response.close()

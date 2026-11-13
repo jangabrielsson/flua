@@ -1242,6 +1242,13 @@ class _ProxyHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(payload)
             return
+        if self.path.endswith("/blob"):
+            payload = b"\x89PNG\r\n\x1a\n\xff\xfe"
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.end_headers()
+            self.wfile.write(payload)
+            return
         payload = b"hello-from-proxy"
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
@@ -1262,7 +1269,13 @@ def test_proxy_fetch() -> None:
         engine = LuaEngine()
         url = f"http://127.0.0.1:{server.server_port}/anything"
         body, status = engine.api.dispatch("GET", f"/proxy?url={url}")
-        assert status == 200 and body == "hello-from-proxy"
+        assert status == 200 and body == b"hello-from-proxy"
+        # a binary body comes back byte-faithful (the HC3's api.get would
+        # nil it — flua returns the raw bytes so QAs can fetch icons)
+        body, status = engine.api.dispatch(
+            "GET", f"/proxy?url=http://127.0.0.1:{server.server_port}/blob"
+        )
+        assert status == 200 and body == b"\x89PNG\r\n\x1a\n\xff\xfe"
         assert engine.api.dispatch("GET", "/proxy") == (None, 400)  # url required
         # embedded credentials: urllib does not consume userinfo URLs, so the
         # proxy strips them and injects Basic auth (percent-decoded) — the
@@ -1286,7 +1299,7 @@ def test_proxy_fetch() -> None:
         body, status = engine.api.dispatch(
             "GET", "/proxy?url=http://admin:pass@127.0.0.1/api/zigbee/devices"
         )
-        assert status == 200 and body == "hello-from-proxy"  # reached the stub HC3
+        assert status == 200 and body == b"hello-from-proxy"  # reached the stub HC3
         # ... and the credentials survived the host rewrite (the 401 bug)
         assert _ProxyHandler.seen_auth == [
             "Basic " + base64.b64encode(b"admin:pass").decode()
@@ -1307,7 +1320,7 @@ def test_proxy_fetch() -> None:
         body, status = engine.api.dispatch(
             "GET", "/proxy?url=http://127.0.0.1:11112/api/settings/network"
         )
-        assert status == 200 and body == "hello-from-proxy"
+        assert status == 200 and body == b"hello-from-proxy"
         assert _ProxyHandler.seen_auth == [
             "Basic " + base64.b64encode(b"admin:secret").decode()
         ]

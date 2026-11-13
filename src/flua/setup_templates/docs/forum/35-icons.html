@@ -100,9 +100,9 @@ reinstall and you end up with duplicate <code>User</code> sets.</p>
 and <code>iconSetName</code> starts with <code>User</code>.</li>
 <li>For each candidate, download its state file(s) via
 <code>net.HTTPClient</code> from
-<code>http://127.0.0.1:11111/assets/userIcons/devices/…</code> (the 11111
-loopback — no credentials in QA code) and <b>byte-compare</b> with the icons
-you bundle.</li>
+<code>http://127.0.0.1/assets/userIcons/devices/…</code> — the plain
+web server (port 80) serves the asset tree credential-free — and
+<b>byte-compare</b> with the icons you bundle.</li>
 <li>A match = already installed → just <code>updateProperty("deviceIcon", id)</code>.</li>
 <li>No match → <code>uploadExternalIconSet(urls, …)</code> → new id.</li>
 </ol>
