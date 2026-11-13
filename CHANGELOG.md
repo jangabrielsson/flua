@@ -4,6 +4,18 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.159] - 2026-11-13
+
+### Added
+- add support for .fqa files in flua.examples package data
+- update icon installation logic and add demo configuration
+
+### Changed
+- example: provider-generic icon files (all four families)
+- example: guard _FLUA.mode — nil on a real HC3
+- example: fix the icon URL overrides — getVariable returns "", never nil
+- Self-installing icon set example + full loopback rewrite policy
+
 ## [0.1.158] - 2026-11-13
 
 ### Changed
