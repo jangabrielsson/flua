@@ -4,6 +4,13 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.160] - 2026-11-13
+
+### Changed
+- Icon manager: probe the asset tree instead of trusting deviceType
+- Icon manager: bump the port instead of crashing when it is taken
+- /devices?isTypeOf= — the HC3's inheritance filter, emulated
+
 ## [0.1.159] - 2026-11-13
 
 ### Added
