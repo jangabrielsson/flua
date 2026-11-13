@@ -2229,19 +2229,20 @@ class LuaEngine:
     ) -> tuple[str, dict[str, str]]:
         """net.HTTPClient parity with the /proxy 11111/11112 hack: QAs on
         the HC3 reach the loopback-only credential-free API without
-        credentials. flua runs on the dev machine — rewrite the URL to the
-        controller's standard API and add the configured credentials (an
-        explicit Authorization header or embedded userinfo wins). Offline,
-        a running sim API server (--ui) stands in for the controller — the
-        loopback stays local and credential-free, like on the HC3."""
+        credentials. On the HC3, ``127.0.0.1``/``localhost`` IS the
+        controller — every port, the public web server included (the
+        /assets icon tree lives there). Online, flua rewrites ALL loopback
+        URLs to the configured controller and adds the credentials (an
+        explicit Authorization header or embedded userinfo wins); QAs that
+        want the dev laptop use ``_FLUA.hostIP`` — a real LAN address,
+        never loopback, never rewritten. Offline, only the controller's
+        11111/11112 surface stands in at the sim API server (--ui); any
+        other loopback URL stays local (mock servers on the laptop)."""
         parts = urllib.parse.urlsplit(url)
-        if parts.hostname not in ("127.0.0.1", "localhost") or parts.port not in (
-            11111,
-            11112,
-        ):
+        if parts.hostname not in ("127.0.0.1", "localhost"):
             return url, headers
         if self.hc3 is None:
-            if self._sim_api_port is None:
+            if parts.port not in (11111, 11112) or self._sim_api_port is None:
                 return url, headers
             hostport = f"127.0.0.1:{self._sim_api_port}"
             netloc = parts.netloc

@@ -1415,14 +1415,19 @@ run in your QA, timers keep running while requests are in flight):
   just inside typical read timeouts (Hue ≈ every 58s), so treat mid-stream
   timeouts as transient: catch and reconnect, don't fail the QA. `exit()`
   cancels the QA's in-flight requests — an open stream dies with its QA.
-  **Loopback API**: in online mode, requests to `127.0.0.1:11111`/`11112`
-  (the HC3's loopback-only, credential-free API) are rewritten to the
-  controller's standard API with the configured credentials — the same hack
-  QAs on the HC3 use to avoid embedding credentials. Offline, a running
-  `--ui` API server stands in: the loopback rewrites to the sim's own
-  server (still local, still credential-free), so controller QA code that
-  calls its own loopback API — e.g. installing an .fqa over multipart —
-  runs unchanged in the emulator.
+  **Loopback**: on the HC3, `127.0.0.1`/`localhost` **is** the controller —
+  every port, the public web server included (the `/assets` icon tree
+  lives there). Online, flua rewrites ALL loopback URLs to the configured
+  controller with the configured credentials — the same hack QAs on the
+  HC3 use to avoid embedding credentials (an explicit `Authorization`
+  header or embedded userinfo wins). A QA that wants the **dev laptop**
+  instead uses `_FLUA.hostIP` — a real LAN address, never loopback, never
+  rewritten (guard with `_FLUA and _FLUA.hostIP or "192.168.1.99"` for
+  HC3 portability). Offline, only the controller's `11111`/`11112`
+  surface stands in at a running `--ui` API server; every other loopback
+  URL stays local (mock servers on the laptop), so controller QA code
+  that calls its own loopback API — e.g. installing an .fqa over
+  multipart — runs unchanged in the emulator.
 - `net.TCPSocket({timeout=ms})` → `connect/send/write/read/readUntil/close` — `examples/tcp.lua`
   (`write` is the HC3-documented alias of `send`)
 - `net.UDPSocket({broadcast, timeout})` → `sendTo/receive` — `examples/udp.lua`

@@ -287,7 +287,12 @@ multipart**: a JSON body dies with HTTP 500 "Field name too long", so
 hand-build the multipart body and send it with net.HTTPClient to the
 loopback API (port 11111 — the HC3's own, credential-free; flua rewrites
 it to the controller online and to the sim's `--ui` server offline, so
-the same code runs in the emulator):
+the same code runs in the emulator). More generally: online, ALL
+loopback URLs (`127.0.0.1`/`localhost`, any port — the controller's
+public web server and the `/assets` icon tree included) rewrite to the
+controller; to reach a service on the dev laptop use `_FLUA.hostIP`
+(flua-only — guard with `_FLUA and _FLUA.hostIP or "192.168.1.99"` for
+HC3 portability).
 
 ```lua
 function QuickApp:installFqaMultipart(fqa, filename, cb)

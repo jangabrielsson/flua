@@ -1821,3 +1821,239 @@ def test_api_remote_overrides_main_qa_offline_pin(
     assert result.returncode == 0, result.stdout + result.stderr
     assert "MODE online" in result.stdout  # the pin no longer applies
     assert "SERIAL HC3-00000001" in result.stdout  # the MOCK HC3's serial, not the sim's
+
+
+# -- the self-installing icon set example (examples/iconInstall.lua) ----------
+
+
+def _icon_png(rgb: tuple[int, int, int]) -> bytes:
+    import struct
+    import zlib
+
+    def chunk(typ: bytes, data: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(data))
+            + typ
+            + data
+            + struct.pack(">I", zlib.crc32(typ + data) & 0xFFFFFFFF)
+        )
+
+    sig = b"\x89PNG\r\n\x1a\n"
+    ihdr = struct.pack(">IIBBBBB", 128, 128, 8, 2, 0, 0, 0)
+    raw = b"".join(b"\x00" + bytes(rgb) * 128 for _ in range(128))
+    return sig + chunk(b"IHDR", ihdr) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
+
+
+RED = _icon_png((255, 0, 0))
+GREEN = _icon_png((0, 255, 0))
+BLUE = _icon_png((0, 0, 255))
+
+
+class _IconHc3(BaseHTTPRequestHandler):
+    # a stateful icon library: sets listed here are served byte-identical on
+    # the asset tree; POST /api/icons installs a new set with id 9000.
+    # User777 serves BLUE art (never matches the example's red/green icons);
+    # add_matching() adds User888 serving the matching art.
+    uploads = 0
+    matching = False
+
+    def do_GET(self):
+        if self.path == "/api/icons":
+            entries = [
+                {"id": 777, "deviceType": "com.fibaro.binarySwitch",
+                 "iconSetName": "User777", "fileExtension": "png"},
+            ]
+            if _IconHc3.matching:
+                entries.append(
+                    {"id": 888, "deviceType": "com.fibaro.binarySwitch",
+                     "iconSetName": "User888", "fileExtension": "png"}
+                )
+            self._json({"device": entries})
+            return
+        if self.path.startswith("/assets/userIcons/devices/User777/User7770.png"):
+            self._blob(BLUE)
+            return
+        if self.path.startswith("/assets/userIcons/devices/User777/User777100.png"):
+            self._blob(BLUE)
+            return
+        if self.path.startswith("/assets/userIcons/devices/User888/User8880.png"):
+            self._blob(RED)
+            return
+        if self.path.startswith("/assets/userIcons/devices/User888/User888100.png"):
+            self._blob(GREEN)
+            return
+        if self.path.startswith("/assets/userIcons/devices/User9000/User90000.png"):
+            self._blob(RED)
+            return
+        if self.path.startswith("/assets/userIcons/devices/User9000/User9000100.png"):
+            self._blob(GREEN)
+            return
+        if self.path == "/icons-src/icon0.png":
+            self._blob(RED)
+            return
+        if self.path == "/icons-src/icon100.png":
+            self._blob(GREEN)
+            return
+        self.send_response(404)
+        self.end_headers()
+
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length") or 0)
+        body = self.rfile.read(length)
+        assert self.path == "/api/icons"
+        assert b'name="type"' in body and b"\r\n\r\ndevice\r\n" in body
+        assert b'name="deviceTemplate"' in body and b"com.fibaro.binarySwitch" in body
+        assert b'name="icon0"' in body and b'name="icon100"' in body
+        assert body.count(b"\x89PNG") == 2
+        _IconHc3.uploads += 1
+        self._json({"id": 9000, "iconSetName": "User9000", "fileExtension": "png"}, status=201)
+
+    def _json(self, payload, status=200):
+        body = json.dumps(payload).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _blob(self, data):
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def log_message(self, *args):
+        pass
+
+
+async def _icon_install_wait(capsys, needle: str, timeout: float = 8.0) -> str:
+    out = ""
+    deadline = time.monotonic() + timeout
+    while needle not in out:
+        if time.monotonic() > deadline:
+            raise AssertionError(f"not seen: {needle!r}; output so far:\n{out}")
+        await asyncio.sleep(0.02)
+        out += capsys.readouterr().out
+    return out
+
+
+def _start_icon_hc3(monkeypatch) -> ThreadingHTTPServer:
+    _IconHc3.uploads = 0
+    _IconHc3.matching = False
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _IconHc3)
+    threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
+    monkeypatch.setenv("HC3_URL", f"http://127.0.0.1:{server.server_port}")
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    return server
+
+
+@pytest.mark.asyncio
+async def test_example_icon_install_uploads_on_fresh_install(
+    tmp_path, capsys, monkeypatch
+) -> None:
+    # first start, no flag: the QA downloads its icons and scans the
+    # library — the mock's User888 serves the identical art, so the scan
+    # FINDS it (no upload; the deviceIcon and the flag get the found id)
+    server = _start_icon_hc3(monkeypatch)
+    try:
+        _IconHc3.matching = True
+        engine = LuaEngine(api_mode="remote")
+        await engine.start()
+        try:
+            example = Path(__file__).resolve().parent.parent / "examples" / "iconInstall.lua"
+            qa_id, err = engine.load_qa_file(
+                str(example),
+                directives=[
+                    f'var:iconURL0="http://127.0.0.1:{server.server_port}/icons-src/icon0.png"',
+                    f'var:iconURL100="http://127.0.0.1:{server.server_port}/icons-src/icon100.png"',
+                ],
+            )
+            assert qa_id is not None and err is None
+            await _icon_install_wait(capsys, "found existing icon set 888")
+            assert _IconHc3.uploads == 0  # byte match — nothing to upload
+            device = engine.api.state.devices[qa_id]
+            assert device["properties"]["deviceIcon"] == 888
+            assert (
+                engine.api.state.plugin_variables[qa_id]["installedIconSet"]["value"]
+                == "888"
+            )
+        finally:
+            await engine.stop()
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+@pytest.mark.asyncio
+async def test_example_icon_install_restart_with_flag_skips(
+    tmp_path, capsys, monkeypatch
+) -> None:
+    # the stored id is still listed: one cheap liveness check, no scan, no
+    # upload, and the user's deviceIcon is left alone
+    server = _start_icon_hc3(monkeypatch)
+    try:
+        engine = LuaEngine(api_mode="remote")
+        await engine.start()
+        try:
+            engine.api.state.plugin_variables[5000] = {
+                "installedIconSet": {
+                    "name": "installedIconSet", "value": "777", "isHidden": True,
+                }
+            }
+            example = Path(__file__).resolve().parent.parent / "examples" / "iconInstall.lua"
+            qa_id, err = engine.load_qa_file(str(example))
+            assert qa_id is not None and err is None
+            await _icon_install_wait(capsys, "already installed — leaving deviceIcon alone")
+            assert _IconHc3.uploads == 0
+            # the user's deviceIcon is respected: the QA must not set it
+            assert engine.api.state.devices[qa_id]["properties"].get("deviceIcon") != 777
+        finally:
+            await engine.stop()
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+@pytest.mark.asyncio
+async def test_example_icon_install_stale_flag_reinstalls(
+    tmp_path, capsys, monkeypatch
+) -> None:
+    # the stored id is gone from the library (deleted via the icon manager):
+    # the QA treats it as missing and uploads a fresh set
+    server = _start_icon_hc3(monkeypatch)
+    try:
+        engine = LuaEngine(api_mode="remote")
+        await engine.start()
+        try:
+            # a stored id the mock's library does not list
+            engine.api.state.plugin_variables[5000] = {
+                "installedIconSet": {
+                    "name": "installedIconSet", "value": "9999", "isHidden": True,
+                }
+            }
+            example = Path(__file__).resolve().parent.parent / "examples" / "iconInstall.lua"
+            qa_id, err = engine.load_qa_file(
+                str(example),
+                directives=[
+                    f'var:iconURL0="http://127.0.0.1:{server.server_port}/icons-src/icon0.png"',
+                    f'var:iconURL100="http://127.0.0.1:{server.server_port}/icons-src/icon100.png"',
+                ],
+            )
+            assert qa_id is not None and err is None
+            await _icon_install_wait(capsys, "uploaded new icon set 9000")
+            assert _IconHc3.uploads == 1
+            device = engine.api.state.devices[qa_id]
+            assert device["properties"]["deviceIcon"] == 9000
+            assert (
+                engine.api.state.plugin_variables[qa_id]["installedIconSet"]["value"]
+                == "9000"
+            )
+        finally:
+            await engine.stop()
+    finally:
+        server.shutdown()
+        server.server_close()
