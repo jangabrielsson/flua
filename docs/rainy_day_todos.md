@@ -189,7 +189,26 @@ assertion totals in `flua test --json`.
   a valid example.
 - **Virtual time vs real I/O recipe** — how `--step` advances while socket
   I/O is pending; an `eventually(predicate, timeout)` helper and an
-  awaitable request helper for test QAs.
+  awaitable request helper for test QAs. Reconfirmed by the Sonos offline
+  suite report (docs/feedback/sonos_flua_26_11_13.md): the #1 friction —
+  at `--speed 50` a 300 ms virtual delay is ~6 ms wall, shorter than a
+  localhost round-trip, so fixed-delay waits fail everywhere; wall-paced
+  messages spread out in virtual time, so poll timeouts must scale with
+  `--speed`. Ask shape: a `t:waitFor(cond, timeout, cb)` in flua-test plus
+  the (now added) skill warning. The pipe-buffering false-hang note is
+  documented in the test skill.
+- **ws mock deferred replies** — the ws handler's reply is synchronous-only;
+  a sentinel + `ws:reply(conn, data)` would enable reply-latency/
+  reordering/timeout tests against the client's request queue (SonosLib's
+  30 s command timeout is untestable without it). Event latency already
+  mocks via `setTimeout` + `ws:send`.
+- **flua-test verdict visibility** — PASS/FAIL lines emit at DEBUG level
+  with the standard prefix; a mode where verdicts stand out (level/tag) in
+  plain text would make `grep FAIL` pipelines cleaner (CI use).
+- **Pack verification flag** — `--tool pack --verify`: print name/type/
+  vars and scan for values that look like the evaluated secrets/real IPs
+  the pack just replaced (turns the documented post-pack checklist into a
+  flag).
 - **Package inspection** — `--tool inspectFQA FILE --json` (metadata,
   inventory, interfaces, validation) and `verifyPackage SOURCE PACKAGE`
   (source-aware comparison; pack rewrites `--%%var` expressions as baked
