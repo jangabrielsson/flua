@@ -19,6 +19,10 @@
   main { max-width: 860px; margin: 24px auto; padding: 0 24px; display: grid; gap: 20px; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
   .card h2 { font-size: 15px; margin: 0 0 12px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+  .tabs button { font: inherit; padding: 7px 16px; border-radius: 6px; border: 1px solid var(--line);
+    background: #fff; cursor: pointer; color: var(--muted); }
+  .tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
   label { color: var(--muted); font-size: 13px; min-width: 110px; }
   select, button { font: inherit; padding: 6px 10px; border-radius: 6px;
@@ -47,8 +51,8 @@
   #popup .state { display: flex; flex-direction: column; align-items: center; gap: 3px; }
   #popup .state img { width: 64px; height: 64px; object-fit: contain; }
   #popup .state span { font-size: 11px; color: var(--muted); font-family: ui-monospace, monospace; }
-  #popup .state.missing { color: #c4cad4; }
   td.preview { cursor: default; }
+  .hidden { display: none; }
 </style>
 </head>
 <body>
@@ -58,8 +62,14 @@
   <button class="primary" id="refresh" style="margin-left:auto">Refresh</button>
 </header>
 <main>
-  <section class="card">
-    <h2>Upload an icon set</h2>
+  <div class="tabs">
+    <button data-cat="device" class="active">Devices</button>
+    <button data-cat="room">Rooms</button>
+    <button data-cat="scene">Scenes</button>
+  </div>
+
+  <section class="card" id="deviceUpload">
+    <h2>Upload a device icon set</h2>
     <div class="row">
       <label for="deviceType">Device type</label>
       <select id="deviceType"></select>
@@ -71,11 +81,27 @@
     </div>
   </section>
 
+  <section class="card hidden" id="singleUpload">
+    <h2 id="singleUploadTitle">Upload an icon</h2>
+    <div class="row">
+      <label for="singleFile">Icon PNG</label>
+      <input type="file" id="singleFile" accept="image/png">
+    </div>
+    <div class="row">
+      <label for="singleExt">Extension</label>
+      <input type="text" id="singleExt" value="png" size="6" class="mono">
+    </div>
+    <div class="row">
+      <button class="primary" id="uploadSingle">Upload</button>
+      <span class="hint">PNG, at least 128×128.</span>
+    </div>
+  </section>
+
   <section class="card">
-    <h2>User icon sets</h2>
+    <h2 id="listTitle">User icon sets</h2>
     <p class="hint" id="summary"></p>
     <table>
-      <thead><tr><th></th><th>id</th><th>set</th><th>kind</th><th>extension</th><th></th></tr></thead>
+      <thead id="thead"></thead>
       <tbody id="icons"></tbody>
     </table>
   </section>
@@ -86,7 +112,7 @@
 <script>
 "use strict";
 const $ = (sel) => document.querySelector(sel);
-let FAMILIES = {}, STATES = {};
+let FAMILIES = {}, STATES = {}, LISTS = {}, currentCat = "device";
 
 function status(msg, kind) {
   const el = $("#status");
@@ -101,8 +127,12 @@ async function api(path, options) {
   return data;
 }
 
+function previewUrl(cat, name, file) {
+  return `/api/preview?cat=${encodeURIComponent(cat)}&set=${encodeURIComponent(name)}&file=${encodeURIComponent(file)}`;
+}
+
 function previewFile(setName, ext, family) {
-  const base = (suffix) => `/api/preview?set=${encodeURIComponent(setName)}&file=${encodeURIComponent(setName + suffix + "." + ext)}`;
+  const base = (suffix) => previewUrl("device", setName, setName + suffix + "." + ext);
   return family === "binary" || family === "multilevel" ? base("0")
     : family === "baseShutter" ? base("Closed") : base("");
 }
@@ -111,11 +141,18 @@ function makeImg(setName, ext, family) {
   const img = document.createElement("img");
   img.alt = setName;
   img.src = previewFile(setName, ext, family);
-  img.onerror = () => { img.onerror = null; img.src = `/api/preview?set=${encodeURIComponent(setName)}&file=${encodeURIComponent(setName + "." + ext)}`; };
+  img.onerror = () => { img.onerror = null; img.src = previewUrl("device", setName, setName + "." + ext); };
   return img;
 }
 
-// hover popup: the whole set's state files, lazily fetched per family
+function makeSingleImg(cat, name, ext) {
+  const img = document.createElement("img");
+  img.alt = name;
+  img.src = previewUrl(cat, name, name + "." + ext);
+  return img;
+}
+
+// hover popup (devices only): the whole set's state files
 const popup = document.createElement("div");
 popup.id = "popup";
 document.body.appendChild(popup);
@@ -130,16 +167,15 @@ function attachPopup(cell, setName, ext, family) {
       state.className = "state";
       const img = document.createElement("img");
       img.alt = suffix;
-      img.src = `/api/preview?set=${encodeURIComponent(setName)}&file=${encodeURIComponent(setName + suffix + "." + ext)}`;
+      img.src = previewUrl("device", setName, setName + suffix + "." + ext);
       img.onerror = () => {
         state.classList.add("missing");
         img.remove();
         state.textContent = suffix || "base";
-        state.style.width = "64px"; state.style.height = "64px";
-        state.style.display = "flex"; state.style.alignItems = "center";
-        state.style.justifyContent = "center";
-        state.style.border = "1px dashed var(--line)";
-        state.style.borderRadius = "6px";
+        Object.assign(state.style, {
+          width: "64px", height: "64px", display: "flex", alignItems: "center",
+          justifyContent: "center", border: "1px dashed var(--line)", borderRadius: "6px",
+        });
       };
       const label = document.createElement("span");
       label.textContent = suffix || "base";
@@ -170,47 +206,99 @@ async function refresh() {
   status("loading…");
   const data = await api("/api/list");
   $("#hc3").textContent = data.hc3;
-  const devices = (data.icons && data.icons.device) || [];
-  const users = devices.filter((e) => /^User\d+$/.test(e.iconSetName || ""));
-  $("#summary").textContent = users.length + " user set(s) on this controller";
+  LISTS = data.icons || {};
+  renderTab();
+  status("listed", "ok");
+}
+
+function userEntries(cat) {
+  const entries = LISTS[cat] || [];
+  return entries.filter((e) => /^User\d+$/.test(e.iconSetName || e.iconName || ""));
+}
+
+function renderTab() {
+  const cat = currentCat;
+  $("#deviceUpload").classList.toggle("hidden", cat !== "device");
+  $("#singleUpload").classList.toggle("hidden", cat === "device");
+  $("#singleUploadTitle").textContent = cat === "room" ? "Upload a room icon" : "Upload a scene icon";
+  $("#listTitle").textContent =
+    cat === "device" ? "User device icon sets" : cat === "room" ? "User room icons" : "User scene icons";
+
+  const users = userEntries(cat);
+  $("#summary").textContent = users.length + " user icon(s) on this controller";
+
+  const thead = $("#thead");
+  thead.textContent = "";
+  const trHead = document.createElement("tr");
+  const heads = cat === "device"
+    ? ["", "id", "set", "kind", "extension", ""]
+    : ["", "id", "name", "extension", ""];
+  for (const h of heads) {
+    const th = document.createElement("th"); th.textContent = h; trHead.appendChild(th);
+  }
+  thead.appendChild(trHead);
+
   const tbody = $("#icons");
   tbody.textContent = "";
   for (const icon of users) {
-    const family = FAMILIES[icon.deviceType] || "single";
     const tr = document.createElement("tr");
-    const tdImg = document.createElement("td");
-    tdImg.className = "preview";
-    tdImg.appendChild(makeImg(icon.iconSetName, icon.fileExtension, family));
-    attachPopup(tdImg, icon.iconSetName, icon.fileExtension, family);
-    const tdId = document.createElement("td"); tdId.className = "mono"; tdId.textContent = icon.id;
-    const tdSet = document.createElement("td"); tdSet.className = "mono"; tdSet.textContent = icon.iconSetName;
-    const tdKind = document.createElement("td");
-    const badge = document.createElement("span");
-    badge.className = "badge " + (family === "single" ? "" : family);
-    badge.textContent = family;
-    tdKind.appendChild(badge);
-    const tdExt = document.createElement("td"); tdExt.className = "mono"; tdExt.textContent = icon.fileExtension;
-    const tdDel = document.createElement("td");
-    const del = document.createElement("button");
-    del.className = "danger"; del.textContent = "Delete";
-    del.onclick = async () => {
-      if (!confirm("Delete icon set " + icon.iconSetName + " (id " + icon.id + ")?")) return;
-      del.disabled = true;
-      try {
-        await api("/api/delete", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: icon.id, name: icon.iconSetName, fileExtension: icon.fileExtension }),
-        });
-        status("deleted " + icon.iconSetName, "ok");
-        await refresh();
-      } catch (err) { status("delete failed: " + err.message, "error"); del.disabled = false; }
-    };
-    tdDel.appendChild(del);
-    tr.append(tdImg, tdId, tdSet, tdKind, tdExt, tdDel);
+    if (cat === "device") {
+      const family = FAMILIES[icon.deviceType] || "single";
+      const tdImg = document.createElement("td");
+      tdImg.className = "preview";
+      tdImg.appendChild(makeImg(icon.iconSetName, icon.fileExtension, family));
+      attachPopup(tdImg, icon.iconSetName, icon.fileExtension, family);
+      const tdId = cell("td", String(icon.id), "mono");
+      const tdSet = cell("td", icon.iconSetName, "mono");
+      const tdKind = document.createElement("td");
+      const badge = document.createElement("span");
+      badge.className = "badge " + (family === "single" ? "" : family);
+      badge.textContent = family;
+      tdKind.appendChild(badge);
+      const tdExt = cell("td", icon.fileExtension, "mono");
+      const tdDel = document.createElement("td");
+      tdDel.appendChild(deleteButton(icon.iconSetName, icon.id, icon.fileExtension));
+      tr.append(tdImg, tdId, tdSet, tdKind, tdExt, tdDel);
+    } else {
+      const name = icon.iconName;
+      const tdImg = document.createElement("td");
+      tdImg.appendChild(makeSingleImg(cat, name, icon.fileExtension));
+      const tdId = cell("td", String(icon.id), "mono");
+      const tdName = cell("td", name, "mono");
+      const tdExt = cell("td", icon.fileExtension, "mono");
+      const tdDel = document.createElement("td");
+      tdDel.appendChild(deleteButton(name, icon.id, icon.fileExtension));
+      tr.append(tdImg, tdId, tdName, tdExt, tdDel);
+    }
     tbody.appendChild(tr);
   }
-  status(users.length ? users.length + " icon set(s) listed" : "no user icon sets on this controller", "ok");
+}
+
+function cell(tag, text, cls) {
+  const el = document.createElement(tag);
+  el.textContent = text;
+  if (cls) el.className = cls;
+  return el;
+}
+
+function deleteButton(name, id, ext) {
+  const del = document.createElement("button");
+  del.className = "danger";
+  del.textContent = "Delete";
+  del.onclick = async () => {
+    if (!confirm("Delete " + currentCat + " icon " + name + " (id " + id + ")?")) return;
+    del.disabled = true;
+    try {
+      await api("/api/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: currentCat, id, name, fileExtension: ext }),
+      });
+      status("deleted " + name, "ok");
+      await refresh();
+    } catch (err) { status("delete failed: " + err.message, "error"); del.disabled = false; }
+  };
+  return del;
 }
 
 function buildUploadForm() {
@@ -249,7 +337,7 @@ function fileToBase64(file) {
   });
 }
 
-async function upload() {
+async function uploadDevice() {
   const deviceTemplate = $("#deviceType").value;
   const files = {};
   for (const input of document.querySelectorAll("#fileFields input[type=file]")) {
@@ -263,7 +351,7 @@ async function upload() {
     const data = await api("/api/upload", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ deviceTemplate, files }),
+      body: JSON.stringify({ category: "device", deviceTemplate, files }),
     });
     status("uploaded: " + data.result, "ok");
     await refresh();
@@ -271,15 +359,44 @@ async function upload() {
   btn.disabled = false;
 }
 
-(async function init() {
+async function uploadSingle() {
+  const input = $("#singleFile");
+  if (!input.files || !input.files[0]) { status("pick an icon file", "error"); return; }
+  const extension = $("#singleExt").value.trim() || "png";
+  const btn = $("#uploadSingle");
+  btn.disabled = true;
   try {
-    const meta = await api("/api/families");
+    const files = { icon: await fileToBase64(input.files[0]) };
+    const data = await api("/api/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category: currentCat, files, fileExtension: extension }),
+    });
+    status("uploaded: " + data.result, "ok");
+    input.value = "";
+    await refresh();
+  } catch (err) { status("upload failed: " + err.message, "error"); }
+  btn.disabled = false;
+}
+
+(function init() {
+  for (const tab of document.querySelectorAll(".tabs button")) {
+    tab.onclick = () => {
+      currentCat = tab.dataset.cat;
+      for (const other of document.querySelectorAll(".tabs button")) {
+        other.classList.toggle("active", other === tab);
+      }
+      renderTab();
+    };
+  }
+  $("#refresh").onclick = () => refresh().catch((err) => status(err.message, "error"));
+  $("#upload").onclick = uploadDevice;
+  $("#uploadSingle").onclick = uploadSingle;
+  api("/api/families").then((meta) => {
     FAMILIES = meta.families; STATES = meta.states;
     buildUploadForm();
-    await refresh();
-  } catch (err) { status("cannot reach flua: " + err.message, "error"); }
-  $("#refresh").onclick = () => refresh().catch((err) => status(err.message, "error"));
-  $("#upload").onclick = upload;
+    return refresh();
+  }).catch((err) => status("cannot reach flua: " + err.message, "error"));
 })();
 </script>
 </body>

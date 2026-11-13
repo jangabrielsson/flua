@@ -371,6 +371,26 @@ def _ui_hc3() -> tuple[str, str]:
     return base, f"Basic {auth}"
 
 
+def _build_single_icon_multipart(category: str, data: bytes, extension: str) -> tuple[bytes, str]:
+    """The single-icon upload contract for room/scene (mined from the web
+    UI's generated client uploadIcon): type=<category>, one file part named
+    icon, fileExtension."""
+    boundary = "----fluaIconsUi" + secrets.token_hex(8)
+    head = (
+        f'--{boundary}\r\nContent-Disposition: form-data; name="type"\r\n\r\n'
+        f"{category}\r\n"
+    ).encode()
+    icon = (
+        f'--{boundary}\r\nContent-Disposition: form-data; name="icon"; filename="icon"\r\n'
+        f"Content-Type: image/png\r\n\r\n".encode() + data + b"\r\n"
+    )
+    ext = (
+        f'--{boundary}\r\nContent-Disposition: form-data; name="fileExtension"\r\n\r\n'
+        f"{extension}\r\n".encode()
+    )
+    return head + icon + ext + f"--{boundary}--\r\n".encode(), boundary
+
+
 def _build_icon_multipart(device_template: str, files: dict[str, bytes]) -> tuple[bytes, str]:
     """The HC3 upload format (live-verified 5.22x): type=device,
     deviceTemplate=<type>, one part per provider file, image/png."""
@@ -445,17 +465,36 @@ class _IconsUiHandler(http.server.BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/preview":
             query = urllib.parse.parse_qs(parsed.query)
+            category = (query.get("cat") or ["device"])[0]
             set_name = (query.get("set") or [""])[0]
             file_name = (query.get("file") or [""])[0]
-            if not _UI_NAME_RE.fullmatch(set_name) or not _UI_NAME_RE.fullmatch(file_name):
-                self._json(400, {"error": "bad set/file name"})
+            if (
+                category not in ("device", "room", "scene")
+                or not _UI_NAME_RE.fullmatch(set_name)
+                or not _UI_NAME_RE.fullmatch(file_name)
+            ):
+                self._json(400, {"error": "bad category/set/file name"})
                 return
-            tree = "user" if _USER_SET_RE.fullmatch(set_name) else "fibaro"
-            url = (
-                f"{self.server.hc3_base}/assets/userIcons/devices/{set_name}/{file_name}"
-                if tree == "user"
-                else f"{self.server.hc3_base}/assets/icon/fibaro/{set_name}/{file_name}"
-            )
+            user_set = _USER_SET_RE.fullmatch(set_name) is not None
+            if category == "device":
+                tree = (
+                    f"assets/userIcons/devices/{set_name}/{file_name}"
+                    if user_set
+                    else f"assets/icon/fibaro/{set_name}/{file_name}"
+                )
+            elif category == "room":
+                tree = (
+                    f"assets/userIcons/rooms/{set_name}/{file_name}"
+                    if user_set
+                    else f"assets/icon/fibaro/rooms/{set_name}/{file_name}"
+                )
+            else:
+                tree = (
+                    f"assets/userIcons/scenes/{set_name}/{file_name}"
+                    if user_set
+                    else f"assets/icon/fibaro/scena/{set_name}/{file_name}"
+                )
+            url = f"{self.server.hc3_base}/{tree}"
             try:
                 # the asset tree is public — no auth needed
                 status, body, headers = http_call("GET", url, binary=True)
@@ -482,10 +521,13 @@ class _IconsUiHandler(http.server.BaseHTTPRequestHandler):
             self._json(400, {"error": "bad JSON"})
             return
         if parsed.path == "/api/upload":
-            device_template = str(request.get("deviceTemplate") or "")
+            category = str(request.get("category") or "device")
+            if category not in ("device", "room", "scene"):
+                self._json(400, {"error": "category must be device, room or scene"})
+                return
             files_raw = request.get("files")
-            if not device_template or not isinstance(files_raw, dict) or not files_raw:
-                self._json(400, {"error": "deviceTemplate and files are required"})
+            if not isinstance(files_raw, dict) or not files_raw:
+                self._json(400, {"error": "files are required"})
                 return
             files: dict[str, bytes] = {}
             for name, encoded in files_raw.items():
@@ -510,7 +552,21 @@ class _IconsUiHandler(http.server.BaseHTTPRequestHandler):
                         },
                     )
                     return
-            body, boundary = _build_icon_multipart(device_template, files)
+            if category == "device":
+                device_template = str(request.get("deviceTemplate") or "")
+                if not device_template:
+                    self._json(400, {"error": "deviceTemplate is required for device icons"})
+                    return
+                body, boundary = _build_icon_multipart(device_template, files)
+            else:
+                if set(files) != {"icon"}:
+                    self._json(400, {"error": "room/scene uploads take exactly one file: icon"})
+                    return
+                extension = str(request.get("fileExtension") or "png")
+                if not re.fullmatch(r"[A-Za-z0-9]+", extension):
+                    self._json(400, {"error": f"bad fileExtension {extension!r}"})
+                    return
+                body, boundary = _build_single_icon_multipart(category, files["icon"], extension)
             try:
                 status, response, _headers = http_call(
                     "POST",
@@ -531,9 +587,13 @@ class _IconsUiHandler(http.server.BaseHTTPRequestHandler):
             self._json(201, {"result": response.decode(errors="replace")})
             return
         if parsed.path == "/api/delete":
+            category = str(request.get("category") or "device")
+            if category not in ("device", "room", "scene"):
+                self._json(400, {"error": "category must be device, room or scene"})
+                return
             query = urllib.parse.urlencode(
                 {
-                    "type": "device",
+                    "type": category,
                     "id": request.get("id"),
                     "name": request.get("name"),
                     "fileExtension": request.get("fileExtension"),

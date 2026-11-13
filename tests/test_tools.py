@@ -1770,7 +1770,13 @@ def test_icons_ui_manager_proxies_the_hc3(tmp_path, monkeypatch) -> None:
                                 "iconSetName": "User998",
                                 "fileExtension": "png",
                             },
-                        ]
+                        ],
+                        "room": [
+                            {"id": 44, "iconName": "User44", "fileExtension": "png"}
+                        ],
+                        "scene": [
+                            {"id": 55, "iconName": "User55", "fileExtension": "png"}
+                        ],
                     }
                 ).encode()
                 self.send_response(200)
@@ -1783,6 +1789,12 @@ def test_icons_ui_manager_proxies_the_hc3(tmp_path, monkeypatch) -> None:
                 self.send_header("Content-Type", "image/png")
                 self.end_headers()
                 self.wfile.write(b"\x89PNGpreview")
+                return
+            if self.path.startswith("/assets/userIcons/rooms/User44/"):
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.end_headers()
+                self.wfile.write(b"\x89PNGroom")
                 return
             self.send_response(404)
             self.end_headers()
@@ -1835,6 +1847,13 @@ def test_icons_ui_manager_proxies_the_hc3(tmp_path, monkeypatch) -> None:
                 "User1001",
                 "User998",
             ]
+            assert [e["iconName"] for e in data["icons"]["room"]] == ["User44"]
+            assert [e["iconName"] for e in data["icons"]["scene"]] == ["User55"]
+
+            body = urllib.request.urlopen(
+                f"{base}/api/preview?cat=room&set=User44&file=User44.png", timeout=10
+            ).read()
+            assert body == b"\x89PNGroom"
 
             body = urllib.request.urlopen(
                 f"{base}/api/preview?set=User1001&file=User1001.png", timeout=10
@@ -1898,6 +1917,41 @@ def test_icons_ui_manager_proxies_the_hc3(tmp_path, monkeypatch) -> None:
             assert any(
                 "type=device" in path and "id=998" in path and "name=User998" in path
                 for _, path, _ in deletes
+            )
+
+            # a room upload uses the single-icon contract (type=room + icon)
+            request = urllib.request.Request(
+                f"{base}/api/upload",
+                data=json.dumps(
+                    {
+                        "category": "room",
+                        "files": {"icon": base64.b64encode(png).decode()},
+                        "fileExtension": "png",
+                    }
+                ).encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            assert urllib.request.urlopen(request, timeout=10).status == 201
+            room_post = [x for x in seen if x[0] == "POST"][-1]
+            room_body = room_post[3]
+            assert b'name="type"' in room_body and b"\r\n\r\nroom\r\n" in room_body
+            assert b'name="icon"' in room_body and b"\x89PNG" in room_body
+            assert b'name="fileExtension"' in room_body and b"png" in room_body
+
+            # a scene delete sends type=scene
+            request = urllib.request.Request(
+                f"{base}/api/delete",
+                data=json.dumps(
+                    {"category": "scene", "id": 55, "name": "User55", "fileExtension": "png"}
+                ).encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            assert urllib.request.urlopen(request, timeout=10).status == 200
+            assert any(
+                "type=scene" in path and "id=55" in path
+                for _, path, _ in [x for x in seen if x[0] == "DELETE"]
             )
         finally:
             server.shutdown()

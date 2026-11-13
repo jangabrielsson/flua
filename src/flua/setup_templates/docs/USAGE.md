@@ -1635,11 +1635,12 @@ on a real HC3 (replace it with the uploaded set's `User<id>` id for
 production).
 
 A browser-based **icon manager** (`flua --tool icons ui`) lists the
-controller's user icon sets with live previews, uploads new sets (pick
-the device type, give it the provider's PNG files — 128×128 or larger),
-and deletes sets. The local server proxies every HC3 call with the
-`.env` chain credentials, so the browser only ever talks to localhost —
-no CORS, no credentials in the page.
+controller's user icon sets — devices, rooms and scenes, each on its own
+tab — with live previews, uploads new sets (device icons per the chosen
+type's provider files; room/scene icons as a single PNG — 128×128 or
+larger), and deletes sets. The local server proxies every HC3 call with
+the `.env` chain credentials, so the browser only ever talks to
+localhost — no CORS, no credentials in the page.
 
 Online (an HC3 backend), `GET /flua/iconMap` merges the **live** icon
 library into the checked-in catalog — custom `User<id>` sets and
