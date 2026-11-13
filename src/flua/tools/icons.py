@@ -628,15 +628,30 @@ class IconsUiServer(http.server.ThreadingHTTPServer):
         super().__init__(("127.0.0.1", port), _IconsUiHandler)
 
 
-def serve_icons_ui(port: int) -> IconsUiServer:
+def serve_icons_ui(port: int, retries: int = 10) -> IconsUiServer:
+    """Bind the manager's server. When the port is taken, try the next one
+    (the CLI prints the URL, so a bumped port stays discoverable); raises
+    when all candidates are busy."""
     base, auth = _ui_hc3()
-    return IconsUiServer(port, base, auth)
+    last_error: OSError | None = None
+    for attempt in range(max(1, retries)):
+        candidate = port if port == 0 else port + attempt
+        try:
+            return IconsUiServer(candidate, base, auth)
+        except OSError as exc:
+            last_error = exc
+    raise last_error if last_error is not None else OSError("cannot bind the icon manager server")
 
 
 def _run_icons_ui(args: argparse.Namespace) -> int:
-    server = serve_icons_ui(args.port)
+    try:
+        server = serve_icons_ui(args.port)
+    except OSError as exc:
+        print(f"icon manager: cannot bind a port near {args.port}: {exc}", file=sys.stderr)
+        return 1
     _host, port = server.server_address[:2]
-    print(f"HC3 icon manager: http://127.0.0.1:{port}/  (Ctrl-C to stop)")
+    note = "" if args.port in (0, port) else f" (port {args.port} was in use)"
+    print(f"HC3 icon manager: http://127.0.0.1:{port}/{note}  (Ctrl-C to stop)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

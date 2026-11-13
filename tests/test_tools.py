@@ -1959,3 +1959,30 @@ def test_icons_ui_manager_proxies_the_hc3(tmp_path, monkeypatch) -> None:
     finally:
         hc3.shutdown()
         hc3.server_close()
+
+
+def test_icons_ui_bumps_a_taken_port(tmp_path, monkeypatch) -> None:
+    # the manager never crashes on an occupied port: it binds the next free
+    # one (the CLI prints the URL, so the bump stays discoverable)
+    import socket
+
+    from flua.tools.icons import serve_icons_ui
+
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        taken = sock.getsockname()[1]
+        monkeypatch.setenv("HC3_URL", "http://127.0.0.1:1")
+        monkeypatch.setenv("HC3_USER", "admin")
+        monkeypatch.setenv("HC3_PASSWORD", "secret")
+        server = serve_icons_ui(taken)
+        threading.Thread(
+            target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+        ).start()
+        try:
+            port = server.server_address[1]
+            assert port != taken
+            page = urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=10).read()
+            assert b"HC3 Icon Manager" in page
+        finally:
+            server.shutdown()
+            server.server_close()
