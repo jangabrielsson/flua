@@ -1949,6 +1949,9 @@ live on `_FLUA` so your code stays portable:
   separator: `io.open(_FLUA.mainPath .. "data.json", "r")` reads files
   shipped next to the QA regardless of the cwd (absolute when loaded via
   the CLI; the unpack directory for `.fqa` packages)
+- `_FLUA.hostIP` — the dev machine's LAN address (the laptop running
+  flua) — for QAs that call back to services on the host (mock servers,
+  tooling); `127.0.0.1` when no interface is reachable
 - `_FLUA.exit(code)` — stop the engine (vs `exit(code)` / `os.exit()` in a QA, which stop only that QA — `os.exit()` is the name real HC3 QAs use)
 - `_FLUA.keepAlive()` — keep this QA (and with it the run) alive past idle,
   like `--%%keep-alive:true` but at runtime and in every mode; the QA's

@@ -19,6 +19,7 @@ _FLUA = {}
 -- on the HC3 the process dies at the call, so code after it never runs
 _FLUA.restartAbort = {}
 _FLUA.version = _PY.version()
+_FLUA.hostIP = _PY.hostIP()
 
 -- ----------------------------------------------------------------- registry
 -- One-shot callback registry. The id doubles as the timer id on the Python

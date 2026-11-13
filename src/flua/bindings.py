@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any
 from . import __version__
 from .config import debug_flag, warn_enabled
 from .devices import icon_catalog, property_specs_for, property_type_mismatch, schema_for
+from .proxy import local_ip
 
 logger = logging.getLogger(__name__)
 
@@ -241,6 +242,7 @@ def install_bindings(engine: "LuaEngine") -> None:
     py["api_remote_mode"] = lambda: engine.hc3 is not None
     py["qa_mode"] = lambda qa_id: engine.qa_mode(int(qa_id))
     py["version"] = lambda: __version__
+    py["hostIP"] = local_ip
     py["color_enabled"] = engine.color_enabled
     py["render_html"] = engine.render_html
 

@@ -1741,6 +1741,24 @@ def test_flua_table_is_per_qa(tmp_path) -> None:
     assert "B 5001 qa-b" in result.stdout
 
 
+def test_flua_host_ip_is_the_dev_machine(tmp_path) -> None:
+    # _FLUA.hostIP: the LAN address of the machine running flua — QAs call
+    # back to host services with it (127.0.0.1 when no interface reachable)
+    from flua.proxy import local_ip
+
+    script = tmp_path / "hostip.lua"
+    script.write_text("print('HOSTIP', _FLUA.hostIP)\nexit(0)\n")
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--api", "local", str(script)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert f"HOSTIP {local_ip()}" in result.stdout
+
+
 def test_run_for_expiry_exits_nonzero(tmp_path) -> None:
     # a QA that never drains: --run-for's wall deadline cuts the run short
     # — that is a failure, not a green pass (the CI false-pass guard)
