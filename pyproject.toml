@@ -87,6 +87,7 @@ flua = [
 "flua.examples" = [
     "*.lua",
     "*.json",
+    "*.fqa",
     "multifile/*.lua",
     "local-icons/*",
     "iconInstall/*",
