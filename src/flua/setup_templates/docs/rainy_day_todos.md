@@ -235,6 +235,12 @@ Parked 2026-11-12, from the custom-icon work (User<id> sets, uploadExternalIconS
   `type=device`, `deviceTemplate=<type>`, file fields per the provider
   (`icon`/`icon0`+`icon100`/`icon0..100`/`iconOpening...`), response
   `201 {"id":N,"iconSetName":"User<N>","fileExtension":"png"}`.
+  DELETE contract (mined from the web UI's Angular bundle + live-verified):
+  `DELETE /api/icons?type=<device|room|scene>&id=N&name=<set>&fileExtension=<ext>`
+  — `type` is the icon CATEGORY (not deviceType; WRONG_TYPE otherwise),
+  `id` is required (MISSING_PARAMETER); 200 + empty body on success. POSTs
+  to unknown /api/icons/* paths HANG the connection — never guess there.
+  (`flua --tool icons ui` — the icon manager — builds on all of this.)
 - **The 11111/11112 split (probed from a QA on the controller, settled)**:
   through `api.get("/proxy?url=http://localhost:PORT/<path>")`, **11112**
   is the full local API — JSON bodies that `api.get` decodes into Lua

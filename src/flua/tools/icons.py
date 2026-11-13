@@ -21,15 +21,25 @@ from __future__ import annotations
 
 import argparse
 import base64
+import http.server
 import json
 import re
+import secrets
 import shutil
+import struct
 import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
 
-from ..devices import icon_cache_dir, icon_manifest, icon_pattern_files
+from ..devices import (
+    USER_FAMILY_STATES,
+    USER_ICON_FAMILY,
+    icon_cache_dir,
+    icon_manifest,
+    icon_pattern_files,
+)
+from ..http import http_call
 
 NAME = "icons"
 HELP = "populate the icon cache (icons download)"
@@ -55,6 +65,16 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         "--force",
         action="store_true",
         help="re-fetch files that are already cached",
+    )
+    ui = sub.add_parser(
+        "ui",
+        help="icon manager: a browser page to list, upload and delete user icon sets",
+    )
+    ui.add_argument(
+        "--port",
+        type=int,
+        default=8095,
+        help="local port (default 8095; 0 = pick a free one)",
     )
 
 
@@ -309,6 +329,8 @@ def _from_hc3(wanted: list[tuple[str, str]], cache: Path, force: bool) -> int:
 
 
 def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
+    if args.command == "ui":
+        return _run_icons_ui(args)
     if args.command != "download":
         parser.error(f"unknown icons command: {args.command}")
     cache = Path(args.dir) if args.dir else icon_cache_dir()
@@ -318,3 +340,248 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         return _from_dump(wanted, Path(args.dump), cache, args.force)
     wanted = _with_live_custom_sets(wanted)
     return _from_hc3(wanted, cache, args.force)
+
+
+# -- icons ui: the icon manager ------------------------------------------------
+
+_ICONS_UI_PAGE = (
+    Path(__file__).resolve().parent.parent / "setup_templates" / "icons_manager.html"
+)
+_UI_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def _ui_hc3() -> tuple[str, str]:
+    """(base_url, auth_header) from the .env chain — the manager's server
+    talks to the controller; the browser only ever talks to localhost (no
+    CORS, no credentials in the page)."""
+    from ..environment import EnvChain
+
+    chain = EnvChain(Path(__file__).resolve().parent.parent.parent)
+    url = chain.get("HC3_URL")
+    if not url:
+        raise SystemExit(
+            "HC3_URL is not set (the .env chain) — configure it to run the icon manager"
+        )
+    base = url.rstrip("/")
+    if base.endswith("/api"):
+        base = base[: -len("/api")]
+    auth = base64.b64encode(
+        f"{chain.get('HC3_USER')}:{chain.get('HC3_PASSWORD')}".encode()
+    ).decode()
+    return base, f"Basic {auth}"
+
+
+def _build_icon_multipart(device_template: str, files: dict[str, bytes]) -> tuple[bytes, str]:
+    """The HC3 upload format (live-verified 5.22x): type=device,
+    deviceTemplate=<type>, one part per provider file, image/png."""
+    boundary = "----fluaIconsUi" + secrets.token_hex(8)
+    parts: list[bytes] = []
+
+    def field(name: str, value: str) -> None:
+        parts.append(
+            f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n'
+            f"{value}\r\n".encode()
+        )
+
+    def file(name: str, data: bytes) -> None:
+        parts.append(
+            f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"; '
+            f'filename="{name}"\r\nContent-Type: image/png\r\n\r\n'.encode() + data + b"\r\n"
+        )
+
+    field("type", "device")
+    field("deviceTemplate", device_template)
+    for name, data in files.items():
+        file(name, data)
+    return b"".join(parts) + f"--{boundary}--\r\n".encode(), boundary
+
+
+class _IconsUiHandler(http.server.BaseHTTPRequestHandler):
+    server: IconsUiServer  # type annotation only — set on the server class
+
+    def _json(self, status: int, payload: object) -> None:
+        body = json.dumps(payload).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self) -> None:
+        parsed = urllib.parse.urlsplit(self.path)
+        if parsed.path == "/":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(self.server.page)))
+            self.end_headers()
+            self.wfile.write(self.server.page)
+            return
+        if parsed.path == "/api/families":
+            self._json(
+                200,
+                {
+                    "families": {
+                    device_type: family
+                    for device_type, family in USER_ICON_FAMILY.items()
+                },
+                    "states": USER_FAMILY_STATES,
+                },
+            )
+            return
+        if parsed.path == "/api/list":
+            try:
+                status, body, _headers = http_call(
+                    "GET",
+                    f"{self.server.hc3_base}/api/icons",
+                    {"Authorization": self.server.hc3_auth},
+                )
+            except OSError as exc:
+                self._json(502, {"error": f"cannot reach the HC3: {exc}"})
+                return
+            if status != 200 or not isinstance(body, str):
+                self._json(502, {"error": f"HC3 answered {status}"})
+                return
+            self._json(200, {"hc3": self.server.hc3_base, "icons": json.loads(body)})
+            return
+        if parsed.path == "/api/preview":
+            query = urllib.parse.parse_qs(parsed.query)
+            set_name = (query.get("set") or [""])[0]
+            file_name = (query.get("file") or [""])[0]
+            if not _UI_NAME_RE.fullmatch(set_name) or not _UI_NAME_RE.fullmatch(file_name):
+                self._json(400, {"error": "bad set/file name"})
+                return
+            tree = "user" if _USER_SET_RE.fullmatch(set_name) else "fibaro"
+            url = (
+                f"{self.server.hc3_base}/assets/userIcons/devices/{set_name}/{file_name}"
+                if tree == "user"
+                else f"{self.server.hc3_base}/assets/icon/fibaro/{set_name}/{file_name}"
+            )
+            try:
+                # the asset tree is public — no auth needed
+                status, body, headers = http_call("GET", url, binary=True)
+            except OSError as exc:
+                self._json(502, {"error": f"cannot reach the HC3: {exc}"})
+                return
+            if status != 200 or not isinstance(body, bytes):
+                self._json(404, {"error": "not found"})
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", headers.get("Content-Type") or "image/png")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        self._json(404, {"error": "not found"})
+
+    def do_POST(self) -> None:
+        parsed = urllib.parse.urlsplit(self.path)
+        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            request = json.loads(self.rfile.read(length) or b"{}")
+        except ValueError:
+            self._json(400, {"error": "bad JSON"})
+            return
+        if parsed.path == "/api/upload":
+            device_template = str(request.get("deviceTemplate") or "")
+            files_raw = request.get("files")
+            if not device_template or not isinstance(files_raw, dict) or not files_raw:
+                self._json(400, {"error": "deviceTemplate and files are required"})
+                return
+            files: dict[str, bytes] = {}
+            for name, encoded in files_raw.items():
+                if not _UI_NAME_RE.fullmatch(name) or not isinstance(encoded, str):
+                    self._json(400, {"error": f"bad file name {name!r}"})
+                    return
+                try:
+                    files[name] = base64.b64decode(encoded)
+                except ValueError:
+                    self._json(400, {"error": f"file {name!r} is not valid base64"})
+                    return
+            for name, data in files.items():
+                width = height = None
+                if data.startswith(b"\x89PNG") and len(data) >= 24:
+                    width, height = struct.unpack(">II", data[16:24])
+                if width is None or width < 128 or height < 128:
+                    self._json(
+                        400,
+                        {
+                            "error": f"file {name!r} must be a PNG of at least 128x128 "
+                            f"(got {width}x{height})"
+                        },
+                    )
+                    return
+            body, boundary = _build_icon_multipart(device_template, files)
+            try:
+                status, response, _headers = http_call(
+                    "POST",
+                    f"{self.server.hc3_base}/api/icons",
+                    {
+                        "Authorization": self.server.hc3_auth,
+                        "Content-Type": f"multipart/form-data; boundary={boundary}",
+                    },
+                    body,
+                    binary=True,
+                )
+            except OSError as exc:
+                self._json(502, {"error": f"cannot reach the HC3: {exc}"})
+                return
+            if status not in (200, 201):
+                self._json(status, {"error": response.decode(errors="replace")})
+                return
+            self._json(201, {"result": response.decode(errors="replace")})
+            return
+        if parsed.path == "/api/delete":
+            query = urllib.parse.urlencode(
+                {
+                    "type": "device",
+                    "id": request.get("id"),
+                    "name": request.get("name"),
+                    "fileExtension": request.get("fileExtension"),
+                }
+            )
+            try:
+                status, response, _headers = http_call(
+                    "DELETE",
+                    f"{self.server.hc3_base}/api/icons?{query}",
+                    {"Authorization": self.server.hc3_auth},
+                    binary=True,
+                )
+            except OSError as exc:
+                self._json(502, {"error": f"cannot reach the HC3: {exc}"})
+                return
+            if status != 200:
+                self._json(status, {"error": response.decode(errors="replace")})
+                return
+            self._json(200, {"deleted": True})
+            return
+        self._json(404, {"error": "not found"})
+
+    def log_message(self, *args: object) -> None:
+        pass  # quiet — the tool's own output is enough
+
+
+class IconsUiServer(http.server.ThreadingHTTPServer):
+    def __init__(self, port: int, hc3_base: str, hc3_auth: str):
+        self.hc3_base = hc3_base
+        self.hc3_auth = hc3_auth
+        self.page = _ICONS_UI_PAGE.read_bytes()
+        super().__init__(("127.0.0.1", port), _IconsUiHandler)
+
+
+def serve_icons_ui(port: int) -> IconsUiServer:
+    base, auth = _ui_hc3()
+    return IconsUiServer(port, base, auth)
+
+
+def _run_icons_ui(args: argparse.Namespace) -> int:
+    server = serve_icons_ui(args.port)
+    _host, port = server.server_address[:2]
+    print(f"HC3 icon manager: http://127.0.0.1:{port}/  (Ctrl-C to stop)")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.shutdown()
+        server.server_close()
+    return 0

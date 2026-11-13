@@ -2126,11 +2126,11 @@ def test_icon_map_serves_device_icon_lookup(api: Api) -> None:
             # user-uploaded sets list only their provider family's state
             # files (single: base; binary: 0/100; multilevel: 0..100;
             # shutter: named states) — pinned against the production map
-            from flua.api.routes.system import _USER_FAMILY_STATES, _USER_ICON_FAMILY
+            from flua.devices import USER_FAMILY_STATES, USER_ICON_FAMILY
 
-            family = _USER_ICON_FAMILY.get(entry.get("deviceType", ""), "single")
+            family = USER_ICON_FAMILY.get(entry.get("deviceType", ""), "single")
             ext = os.path.splitext(mapped["file"])[1]
-            expected = [f"{entry['iconSetName']}{s}{ext}" for s in _USER_FAMILY_STATES[family]]
+            expected = [f"{entry['iconSetName']}{s}{ext}" for s in USER_FAMILY_STATES[family]]
             if family in ("binary", "multilevel"):
                 default = next(
                     n for n in expected if n.startswith(entry["iconSetName"] + "0.")

@@ -1576,6 +1576,7 @@ format (individual `.lua` files) and only the HC3 sees `.fqa`:
 # populate the shared icon cache (~/.flua/icons) from the HC3 or a local webroot dump
 .venv/bin/flua --tool icons download              # from the HC3 (.env chain)
 .venv/bin/flua --tool icons download --dump www   # from a var/www copy — no network (partial: the dump ships a subset)
+.venv/bin/flua --tool icons ui                    # icon manager: browser page to list/upload/delete user icon sets
 
 # scan a project for plua leftovers (one-pass migration gate)
 .venv/bin/flua --tool migrate .                   # exit 1 on findings; --json for agents
@@ -1632,6 +1633,13 @@ icon channel serves those files — the viewer switches them per
 never travels into `.fqa` packages, and the injected id does not render
 on a real HC3 (replace it with the uploaded set's `User<id>` id for
 production).
+
+A browser-based **icon manager** (`flua --tool icons ui`) lists the
+controller's user icon sets with live previews, uploads new sets (pick
+the device type, give it the provider's PNG files — 128×128 or larger),
+and deletes sets. The local server proxies every HC3 call with the
+`.env` chain credentials, so the browser only ever talks to localhost —
+no CORS, no credentials in the page.
 
 Online (an HC3 backend), `GET /flua/iconMap` merges the **live** icon
 library into the checked-in catalog — custom `User<id>` sets and

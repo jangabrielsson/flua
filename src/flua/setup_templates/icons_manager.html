@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HC3 Icon Manager</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --ink: #1c2430; --muted: #6a7482;
+    --line: #dde2e8; --accent: #2563eb; --danger: #b91c1c; --ok: #15803d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { background: var(--card); border-bottom: 1px solid var(--line);
+    padding: 14px 24px; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; }
+  header .hc3 { color: var(--muted); font-family: ui-monospace, monospace; font-size: 13px; }
+  main { max-width: 860px; margin: 24px auto; padding: 0 24px; display: grid; gap: 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
+  .card h2 { font-size: 15px; margin: 0 0 12px; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  label { color: var(--muted); font-size: 13px; min-width: 110px; }
+  select, button { font: inherit; padding: 6px 10px; border-radius: 6px;
+    border: 1px solid var(--line); background: #fff; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); cursor: pointer; }
+  button.danger { color: var(--danger); border-color: var(--danger); cursor: pointer; background: #fff; }
+  button:disabled { opacity: .55; cursor: default; }
+  input[type=file] { font: inherit; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  td img { width: 40px; height: 40px; object-fit: contain; display: block; background: #fff; }
+  .badge { font-size: 12px; padding: 2px 8px; border-radius: 10px; background: #eef2f7; color: var(--muted); }
+  .badge.binary { background: #e0edff; color: #1d4ed8; }
+  .badge.multilevel { background: #e6f7ec; color: var(--ok); }
+  .badge.shutter { background: #fdf0e4; color: #9a4d0d; }
+  .mono { font-family: ui-monospace, monospace; font-size: 13px; }
+  #status { color: var(--muted); font-size: 13px; min-height: 1.2em; }
+  #status.error { color: var(--danger); }
+  #status.ok { color: var(--ok); }
+  .hint { color: var(--muted); font-size: 13px; }
+  #popup { position: fixed; z-index: 50; background: var(--card);
+    border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+    box-shadow: 0 6px 22px rgba(16, 24, 40, .18); display: none; max-width: 480px; }
+  #popup .states { display: flex; gap: 10px; flex-wrap: wrap; }
+  #popup .state { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  #popup .state img { width: 64px; height: 64px; object-fit: contain; }
+  #popup .state span { font-size: 11px; color: var(--muted); font-family: ui-monospace, monospace; }
+  #popup .state.missing { color: #c4cad4; }
+  td.preview { cursor: default; }
+</style>
+</head>
+<body>
+<header>
+  <h1>HC3 Icon Manager</h1>
+  <span class="hc3" id="hc3"></span>
+  <button class="primary" id="refresh" style="margin-left:auto">Refresh</button>
+</header>
+<main>
+  <section class="card">
+    <h2>Upload an icon set</h2>
+    <div class="row">
+      <label for="deviceType">Device type</label>
+      <select id="deviceType"></select>
+    </div>
+    <div id="fileFields" class="row"></div>
+    <div class="row">
+      <button class="primary" id="upload">Upload</button>
+      <span class="hint">PNG files, at least 128×128. One file per state below.</span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>User icon sets</h2>
+    <p class="hint" id="summary"></p>
+    <table>
+      <thead><tr><th></th><th>id</th><th>set</th><th>kind</th><th>extension</th><th></th></tr></thead>
+      <tbody id="icons"></tbody>
+    </table>
+  </section>
+
+  <div id="status"></div>
+</main>
+
+<script>
+"use strict";
+const $ = (sel) => document.querySelector(sel);
+let FAMILIES = {}, STATES = {};
+
+function status(msg, kind) {
+  const el = $("#status");
+  el.textContent = msg;
+  el.className = kind || "";
+}
+
+async function api(path, options) {
+  const res = await fetch(path, options);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.status + " " + res.statusText);
+  return data;
+}
+
+function previewFile(setName, ext, family) {
+  const base = (suffix) => `/api/preview?set=${encodeURIComponent(setName)}&file=${encodeURIComponent(setName + suffix + "." + ext)}`;
+  return family === "binary" || family === "multilevel" ? base("0")
+    : family === "baseShutter" ? base("Closed") : base("");
+}
+
+function makeImg(setName, ext, family) {
+  const img = document.createElement("img");
+  img.alt = setName;
+  img.src = previewFile(setName, ext, family);
+  img.onerror = () => { img.onerror = null; img.src = `/api/preview?set=${encodeURIComponent(setName)}&file=${encodeURIComponent(setName + "." + ext)}`; };
+  return img;
+}
+
+// hover popup: the whole set's state files, lazily fetched per family
+const popup = document.createElement("div");
+popup.id = "popup";
+document.body.appendChild(popup);
+
+function attachPopup(cell, setName, ext, family) {
+  const states = STATES[family] || [""];
+  cell.addEventListener("mouseenter", (event) => {
+    const wrap = document.createElement("div");
+    wrap.className = "states";
+    for (const suffix of states) {
+      const state = document.createElement("div");
+      state.className = "state";
+      const img = document.createElement("img");
+      img.alt = suffix;
+      img.src = `/api/preview?set=${encodeURIComponent(setName)}&file=${encodeURIComponent(setName + suffix + "." + ext)}`;
+      img.onerror = () => {
+        state.classList.add("missing");
+        img.remove();
+        state.textContent = suffix || "base";
+        state.style.width = "64px"; state.style.height = "64px";
+        state.style.display = "flex"; state.style.alignItems = "center";
+        state.style.justifyContent = "center";
+        state.style.border = "1px dashed var(--line)";
+        state.style.borderRadius = "6px";
+      };
+      const label = document.createElement("span");
+      label.textContent = suffix || "base";
+      state.append(img, label);
+      wrap.appendChild(state);
+    }
+    popup.textContent = "";
+    popup.appendChild(wrap);
+    popup.style.display = "block";
+    movePopup(event);
+  });
+  cell.addEventListener("mousemove", movePopup);
+  cell.addEventListener("mouseleave", () => { popup.style.display = "none"; });
+}
+
+function movePopup(event) {
+  const margin = 16;
+  const rect = popup.getBoundingClientRect();
+  let left = event.clientX + margin;
+  let top = event.clientY + margin;
+  if (left + rect.width > window.innerWidth) left = event.clientX - rect.width - margin;
+  if (top + rect.height > window.innerHeight) top = event.clientY - rect.height - margin;
+  popup.style.left = Math.max(4, left) + "px";
+  popup.style.top = Math.max(4, top) + "px";
+}
+
+async function refresh() {
+  status("loading…");
+  const data = await api("/api/list");
+  $("#hc3").textContent = data.hc3;
+  const devices = (data.icons && data.icons.device) || [];
+  const users = devices.filter((e) => /^User\d+$/.test(e.iconSetName || ""));
+  $("#summary").textContent = users.length + " user set(s) on this controller";
+  const tbody = $("#icons");
+  tbody.textContent = "";
+  for (const icon of users) {
+    const family = FAMILIES[icon.deviceType] || "single";
+    const tr = document.createElement("tr");
+    const tdImg = document.createElement("td");
+    tdImg.className = "preview";
+    tdImg.appendChild(makeImg(icon.iconSetName, icon.fileExtension, family));
+    attachPopup(tdImg, icon.iconSetName, icon.fileExtension, family);
+    const tdId = document.createElement("td"); tdId.className = "mono"; tdId.textContent = icon.id;
+    const tdSet = document.createElement("td"); tdSet.className = "mono"; tdSet.textContent = icon.iconSetName;
+    const tdKind = document.createElement("td");
+    const badge = document.createElement("span");
+    badge.className = "badge " + (family === "single" ? "" : family);
+    badge.textContent = family;
+    tdKind.appendChild(badge);
+    const tdExt = document.createElement("td"); tdExt.className = "mono"; tdExt.textContent = icon.fileExtension;
+    const tdDel = document.createElement("td");
+    const del = document.createElement("button");
+    del.className = "danger"; del.textContent = "Delete";
+    del.onclick = async () => {
+      if (!confirm("Delete icon set " + icon.iconSetName + " (id " + icon.id + ")?")) return;
+      del.disabled = true;
+      try {
+        await api("/api/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: icon.id, name: icon.iconSetName, fileExtension: icon.fileExtension }),
+        });
+        status("deleted " + icon.iconSetName, "ok");
+        await refresh();
+      } catch (err) { status("delete failed: " + err.message, "error"); del.disabled = false; }
+    };
+    tdDel.appendChild(del);
+    tr.append(tdImg, tdId, tdSet, tdKind, tdExt, tdDel);
+    tbody.appendChild(tr);
+  }
+  status(users.length ? users.length + " icon set(s) listed" : "no user icon sets on this controller", "ok");
+}
+
+function buildUploadForm() {
+  const select = $("#deviceType");
+  const types = Object.keys(FAMILIES).sort();
+  for (const t of types) {
+    const opt = document.createElement("option");
+    opt.value = t; opt.textContent = t;
+    select.appendChild(opt);
+  }
+  const renderFields = () => {
+    const family = FAMILIES[select.value] || "single";
+    const states = STATES[family] || [""];
+    const wrap = $("#fileFields");
+    wrap.textContent = "";
+    for (const suffix of states) {
+      const name = "icon" + suffix;
+      const label = document.createElement("label");
+      label.textContent = name + ".png";
+      label.htmlFor = "file-" + name;
+      const input = document.createElement("input");
+      input.type = "file"; input.accept = "image/png"; input.id = "file-" + name; input.dataset.name = name;
+      wrap.append(label, input);
+    }
+  };
+  select.onchange = renderFields;
+  renderFields();
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1]);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function upload() {
+  const deviceTemplate = $("#deviceType").value;
+  const files = {};
+  for (const input of document.querySelectorAll("#fileFields input[type=file]")) {
+    if (!input.files || !input.files[0]) continue;
+    files[input.dataset.name] = await fileToBase64(input.files[0]);
+  }
+  if (!Object.keys(files).length) { status("pick at least one icon file", "error"); return; }
+  const btn = $("#upload");
+  btn.disabled = true;
+  try {
+    const data = await api("/api/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceTemplate, files }),
+    });
+    status("uploaded: " + data.result, "ok");
+    await refresh();
+  } catch (err) { status("upload failed: " + err.message, "error"); }
+  btn.disabled = false;
+}
+
+(async function init() {
+  try {
+    const meta = await api("/api/families");
+    FAMILIES = meta.families; STATES = meta.states;
+    buildUploadForm();
+    await refresh();
+  } catch (err) { status("cannot reach flua: " + err.message, "error"); }
+  $("#refresh").onclick = () => refresh().catch((err) => status(err.message, "error"));
+  $("#upload").onclick = upload;
+})();
+</script>
+</body>
+</html>

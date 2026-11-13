@@ -5,14 +5,18 @@ add_arguments() and run() — no other file changes.
 """
 
 import argparse
+import base64
 import json
 import logging
 import os
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import threading
+import urllib.request
+import zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -1723,3 +1727,181 @@ def test_typeinfo_reports_the_qa_contract(tmp_path) -> None:
         timeout=60,
     )
     assert result.returncode == 2
+
+
+def _test_png(w: int = 128, h: int = 128, rgb: tuple[int, int, int] = (255, 0, 0)) -> bytes:
+    def chunk(typ: bytes, data: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(data))
+            + typ
+            + data
+            + struct.pack(">I", zlib.crc32(typ + data) & 0xFFFFFFFF)
+        )
+
+    sig = b"\x89PNG\r\n\x1a\n"
+    ihdr = struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)
+    raw = b"".join(b"\x00" + bytes(rgb) * w for _ in range(h))
+    return sig + chunk(b"IHDR", ihdr) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
+
+
+def test_icons_ui_manager_proxies_the_hc3(tmp_path, monkeypatch) -> None:
+    # the manager's server talks to the HC3 (auth server-side, never in the
+    # page) while the browser only talks to localhost: list + preview relay,
+    # upload builds the live-verified HC3 multipart, delete sends the
+    # four-param DELETE
+    seen: list[tuple] = []
+
+    class _Hc3(BaseHTTPRequestHandler):
+        def do_GET(self):
+            seen.append(("GET", self.path, self.headers.get("Authorization")))
+            if self.path == "/api/icons":
+                payload = json.dumps(
+                    {
+                        "device": [
+                            {
+                                "id": 1001,
+                                "deviceType": "com.fibaro.genericDevice",
+                                "iconSetName": "User1001",
+                                "fileExtension": "png",
+                            },
+                            {
+                                "id": 998,
+                                "deviceType": "com.fibaro.binarySwitch",
+                                "iconSetName": "User998",
+                                "fileExtension": "png",
+                            },
+                        ]
+                    }
+                ).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(payload)
+                return
+            if self.path.startswith("/assets/userIcons/devices/User1001/"):
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.end_headers()
+                self.wfile.write(b"\x89PNGpreview")
+                return
+            self.send_response(404)
+            self.end_headers()
+
+        def do_POST(self):
+            length = int(self.headers.get("Content-Length") or 0)
+            seen.append(
+                ("POST", self.path, self.headers.get("Content-Type"), self.rfile.read(length))
+            )
+            if self.path == "/api/icons":
+                self.send_response(201)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(b'{"id":1234,"iconSetName":"User1234","fileExtension":"png"}')
+                return
+            self.send_response(404)
+            self.end_headers()
+
+        def do_DELETE(self):
+            seen.append(("DELETE", self.path, self.headers.get("Authorization")))
+            if self.path.startswith("/api/icons?"):
+                self.send_response(200)
+                self.end_headers()
+                return
+            self.send_response(404)
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    hc3 = ThreadingHTTPServer(("127.0.0.1", 0), _Hc3)
+    threading.Thread(target=hc3.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True).start()
+    try:
+        monkeypatch.setenv("HC3_URL", f"http://127.0.0.1:{hc3.server_port}")
+        monkeypatch.setenv("HC3_USER", "admin")
+        monkeypatch.setenv("HC3_PASSWORD", "secret")
+        from flua.tools.icons import serve_icons_ui
+
+        server = serve_icons_ui(0)
+        threading.Thread(
+            target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+        ).start()
+        base = f"http://127.0.0.1:{server.server_address[1]}"
+        try:
+            page = urllib.request.urlopen(f"{base}/", timeout=10).read()
+            assert b"HC3 Icon Manager" in page
+
+            data = json.loads(urllib.request.urlopen(f"{base}/api/list", timeout=10).read())
+            assert [e["iconSetName"] for e in data["icons"]["device"]] == [
+                "User1001",
+                "User998",
+            ]
+
+            body = urllib.request.urlopen(
+                f"{base}/api/preview?set=User1001&file=User1001.png", timeout=10
+            ).read()
+            assert body == b"\x89PNGpreview"
+
+            png = _test_png()
+            request = urllib.request.Request(
+                f"{base}/api/upload",
+                data=json.dumps(
+                    {
+                        "deviceTemplate": "com.fibaro.binarySwitch",
+                        "files": {
+                            "icon0": base64.b64encode(png).decode(),
+                            "icon100": base64.b64encode(png).decode(),
+                        },
+                    }
+                ).encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            response = urllib.request.urlopen(request, timeout=10)
+            assert response.status == 201
+            post = next(x for x in seen if x[0] == "POST")
+            multipart = post[3]
+            assert b'name="type"' in multipart and b"\r\n\r\ndevice\r\n" in multipart
+            assert b'name="deviceTemplate"' in multipart and b"com.fibaro.binarySwitch" in multipart
+            assert b'name="icon0"' in multipart and b'name="icon100"' in multipart
+            assert multipart.count(b"\x89PNG") == 2
+
+            # a too-small icon is refused before the HC3 sees it
+            small = _test_png(32, 32)
+            request = urllib.request.Request(
+                f"{base}/api/upload",
+                data=json.dumps(
+                    {
+                        "deviceTemplate": "com.fibaro.binarySwitch",
+                        "files": {"icon0": base64.b64encode(small).decode()},
+                    }
+                ).encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            try:
+                urllib.request.urlopen(request, timeout=10)
+                raise AssertionError("small icon should be refused")
+            except urllib.error.HTTPError as exc:
+                assert exc.code == 400
+                assert "128" in exc.read().decode()
+
+            request = urllib.request.Request(
+                f"{base}/api/delete",
+                data=json.dumps(
+                    {"id": 998, "name": "User998", "fileExtension": "png"}
+                ).encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            assert urllib.request.urlopen(request, timeout=10).status == 200
+            deletes = [x for x in seen if x[0] == "DELETE"]
+            assert any(
+                "type=device" in path and "id=998" in path and "name=User998" in path
+                for _, path, _ in deletes
+            )
+        finally:
+            server.shutdown()
+            server.server_close()
+    finally:
+        hc3.shutdown()
+        hc3.server_close()

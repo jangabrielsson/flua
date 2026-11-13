@@ -11,6 +11,8 @@ from typing import Any
 
 from ... import messages
 from ...devices import (
+    USER_FAMILY_STATES,
+    USER_ICON_FAMILY,
     icon_catalog,
     icon_default_file,
     icon_manifest,
@@ -530,44 +532,6 @@ def icons_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     return public(catalog), 200
 
 
-# the icon providers of quickapp.lua's deviceIconTypeMapping — a user set's
-# deviceType decides which state files it has (single: base only; binary:
-# 0/100; multilevel: 0..100 in tens; baseShutter: named states)
-_USER_ICON_FAMILY = {
-    "com.fibaro.humiditySensor": "single",
-    "com.fibaro.powerSensor": "single",
-    "com.fibaro.energyMeter": "single",
-    "com.fibaro.temperatureSensor": "single",
-    "com.fibaro.windSensor": "single",
-    "com.fibaro.multilevelSensor": "single",
-    "com.fibaro.deviceController": "single",
-    "com.fibaro.genericDevice": "single",
-    "com.fibaro.player": "single",
-    "com.fibaro.binarySwitch": "binary",
-    "com.fibaro.doorLock": "binary",
-    "com.fibaro.binarySensor": "binary",
-    "com.fibaro.doorSensor": "binary",
-    "com.fibaro.floodSensor": "binary",
-    "com.fibaro.smokeSensor": "binary",
-    "com.fibaro.windowSensor": "binary",
-    "com.fibaro.motionSensor": "binary",
-    "com.fibaro.rainDetector": "binary",
-    "com.fibaro.heatDetector": "binary",
-    "com.fibaro.gasDetector": "binary",
-    "com.fibaro.coDetector": "binary",
-    "com.fibaro.fireDetector": "binary",
-    "com.fibaro.multilevelSwitch": "multilevel",
-    "com.fibaro.rollerShutter": "multilevel",
-    "com.fibaro.baseShutter": "baseShutter",
-}
-_USER_FAMILY_STATES = {
-    "single": ("",),
-    "binary": ("0", "100"),
-    "multilevel": tuple(f"{step}" for step in range(0, 101, 10)),
-    "baseShutter": ("Opening", "Opened", "Closing", "Closed", "Unknown"),
-}
-
-
 def flua_icon_map(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     """GET /flua/iconMap — the viewer's icon lookup: ``deviceIcon`` id -> the
     icon set and its default state file (served by GET /flua/icons/{set}/
@@ -640,8 +604,8 @@ def flua_icon_map(state: SimState, req: ApiRequest) -> tuple[Any, int]:
             sets[set_name] = []
             continue
         ext = os.path.splitext(entry["file"])[1] or ".png"
-        family = _USER_ICON_FAMILY.get(types.get(set_name, ""), "single")
-        names = [f"{set_name}{state}{ext}" for state in _USER_FAMILY_STATES[family]]
+        family = USER_ICON_FAMILY.get(types.get(set_name, ""), "single")
+        names = [f"{set_name}{state}{ext}" for state in USER_FAMILY_STATES[family]]
         sets[set_name] = names
         if family == "baseShutter":
             default = next((n for n in names if n.startswith(set_name + "Closed.")), names[0])
@@ -665,7 +629,7 @@ def flua_icon_map(state: SimState, req: ApiRequest) -> tuple[Any, int]:
         for name in names:
             ext = os.path.splitext(name)[1]
             by_suffix.setdefault(name[len(set_name) : -len(ext)], name)
-        family = _USER_ICON_FAMILY.get(str(info.get("type") or ""), "single")
+        family = USER_ICON_FAMILY.get(str(info.get("type") or ""), "single")
         if family == "baseShutter":
             default = by_suffix.get("Closed") or names[0]
         elif family in ("binary", "multilevel"):

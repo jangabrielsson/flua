@@ -570,6 +570,45 @@ def local_icon_file(set_name: str, folder: Path, file_name: str) -> tuple[bytes,
     return target.read_bytes(), content_type
 
 
+# the icon providers of quickapp.lua's deviceIconTypeMapping — a user set's
+# deviceType decides which state files it has (single: base only; binary:
+# 0/100; multilevel: 0..100 in tens; baseShutter: named states). Shared by
+# the icon map route and the icon manager tool.
+USER_ICON_FAMILY = {
+    "com.fibaro.humiditySensor": "single",
+    "com.fibaro.powerSensor": "single",
+    "com.fibaro.energyMeter": "single",
+    "com.fibaro.temperatureSensor": "single",
+    "com.fibaro.windSensor": "single",
+    "com.fibaro.multilevelSensor": "single",
+    "com.fibaro.deviceController": "single",
+    "com.fibaro.genericDevice": "single",
+    "com.fibaro.player": "single",
+    "com.fibaro.binarySwitch": "binary",
+    "com.fibaro.doorLock": "binary",
+    "com.fibaro.binarySensor": "binary",
+    "com.fibaro.doorSensor": "binary",
+    "com.fibaro.floodSensor": "binary",
+    "com.fibaro.smokeSensor": "binary",
+    "com.fibaro.windowSensor": "binary",
+    "com.fibaro.motionSensor": "binary",
+    "com.fibaro.rainDetector": "binary",
+    "com.fibaro.heatDetector": "binary",
+    "com.fibaro.gasDetector": "binary",
+    "com.fibaro.coDetector": "binary",
+    "com.fibaro.fireDetector": "binary",
+    "com.fibaro.multilevelSwitch": "multilevel",
+    "com.fibaro.rollerShutter": "multilevel",
+    "com.fibaro.baseShutter": "baseShutter",
+}
+USER_FAMILY_STATES = {
+    "single": ("",),
+    "binary": ("0", "100"),
+    "multilevel": tuple(f"{step}" for step in range(0, 101, 10)),
+    "baseShutter": ("Opening", "Opened", "Closing", "Closed", "Unknown"),
+}
+
+
 def icon_default_file(set_name: str, file_extension: str) -> str | None:
     """The icon set's representative state file (the viewer's static
     default): the base file, else the off state, else the multilevel
