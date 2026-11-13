@@ -259,7 +259,12 @@ Parked 2026-11-12, from the custom-icon work (User<id> sets, uploadExternalIconS
   too lenient for 11111 GETs (the controller answers non-JSON there).
   (3) `api.get("/proxy?...")` of a binary body returns the raw bytes
   where the HC3 nils it — kept as a deliberate flua extension (the bytes
-  are what recipes need); document it.
+  are what recipes need); document it. (4) flua's `/proxy` route ignores
+  the HC3's `username`/`password` query parameters (Fibaro's own
+  `getProxyUri(uri, login, password)` helper — the undocumented
+  target-auth surface; no user code seen using it yet). Fix when needed:
+  prepend them as userinfo in `proxy_get` so `fetch_url`'s existing
+  userinfo→Basic path applies; pin with a mock-server test.
 - **Flua angle**: recipe is online-only (needs `/api/icons` + the 11111
   loopback; the sim has the catalog route but no asset tree — degrade
   gracefully). Testable against the mock HC3. Related parked options from
