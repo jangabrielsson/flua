@@ -205,15 +205,13 @@ assertion totals in `flua test --json`.
 - **flua-test verdict visibility** — PASS/FAIL lines emit at DEBUG level
   with the standard prefix; a mode where verdicts stand out (level/tag) in
   plain text would make `grep FAIL` pipelines cleaner (CI use).
-- **Pack verification flag** — `--tool pack --verify`: print name/type/
-  vars and scan for values that look like the evaluated secrets/real IPs
-  the pack just replaced (turns the documented post-pack checklist into a
-  flag).
-- **Package inspection** — `--tool inspectFQA FILE --json` (metadata,
-  inventory, interfaces, validation) and `verifyPackage SOURCE PACKAGE`
-  (source-aware comparison; pack rewrites `--%%var` expressions as baked
-  literals, so byte-compare is wrong). The Skoda .fqa drift pin covers the
-  checked-in artifact, not user packages.
+- **Pack verification** — SHIPPED (the two repeated asks merged):
+  `--tool inspectFQA FILE [--json]` (metadata, file inventory, the
+  apiVersion marker, placeholder-vs-baked variables, UI surface, IP leak
+  scan) and `--tool pack --verify` (the same inspection right after
+  packing plus the declared-placeholder check). The remaining sliver, if
+  ever wanted: a full source-aware diff of the packed main against the
+  source (byte-compare is wrong — the bake rewrites --%%var lines).
 - **Skill installation vs invocation** — workspace skill files and the
   editor's skill loader can disagree; a setup/doctor check should report
   which skills are local docs vs registered, and how to load each.

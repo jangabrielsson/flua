@@ -1589,6 +1589,8 @@ format (individual `.lua` files) and only the HC3 sees `.fqa`:
 .venv/bin/flua --tool icons download              # from the HC3 (.env chain)
 .venv/bin/flua --tool icons download --dump www   # from a var/www copy — no network (partial: the dump ships a subset)
 .venv/bin/flua --tool icons ui                    # icon manager: browser page to list/upload/delete user icon sets
+.venv/bin/flua --tool inspectFQA my.fqa [--json]  # what a packed .fqa contains: inventory, vars, leak scan
+.venv/bin/flua --tool pack qa.lua --verify        # pack, then inspect the artifact (placeholder/leak checks)
 
 # scan a project for plua leftovers (one-pass migration gate)
 .venv/bin/flua --tool migrate .                   # exit 1 on findings; --json for agents

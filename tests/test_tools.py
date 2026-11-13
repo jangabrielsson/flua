@@ -37,6 +37,7 @@ def test_registry_discovers_all_tools() -> None:
         "hub",
         "hubList",
         "icons",
+        "inspectFQA",
         "installHelper",
         "migrate",
         "newQA",
@@ -1997,3 +1998,66 @@ def test_icons_ui_bumps_a_taken_port(tmp_path, monkeypatch) -> None:
         finally:
             server.shutdown()
             server.server_close()
+
+
+def test_inspect_fqa_reports_pack_contents(tmp_path, capsys) -> None:
+    # the "did my pack come out right" check: inventory, the apiVersion
+    # marker, placeholder vs baked variables, and the IP leak scan
+    qa = tmp_path / "qa.lua"
+    qa.write_text(
+        "--%%name:Inspected\n"
+        "--%%type:com.fibaro.binarySwitch\n"
+        "--%%var:ip=os.getenv('IP'),\"<player ip>\"\n"
+        "--%%var:host='192.168.50.5'\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() end\n"
+    )
+    assert tools.run_tool("pack", [str(qa), "-o", str(tmp_path / "qa.fqa")]) == 0
+    capsys.readouterr()
+    assert tools.run_tool("inspectFQA", [str(tmp_path / "qa.fqa"), "--json"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["name"] == "Inspected"
+    assert report["type"] == "com.fibaro.binarySwitch"
+    assert report["apiVersion"]
+    assert [f["name"] for f in report["files"]] == ["main"]
+    by_name = {v["name"]: v for v in report["variables"]}
+    assert by_name["ip"]["placeholder"] is True
+    assert by_name["ip"]["value"] == "<player ip>"
+    assert by_name["host"]["value"] == "192.168.50.5"
+    assert any("real IP" in w for w in report["warnings"])
+    assert report["errors"] == []
+
+
+def test_inspect_fqa_fails_on_broken_packages(tmp_path, capsys) -> None:
+    broken = tmp_path / "broken.fqa"
+    broken.write_text(json.dumps({"name": "Broken", "files": []}))
+    assert tools.run_tool("inspectFQA", [str(broken)]) == 1
+    assert "error: no files" in capsys.readouterr().out
+
+
+def test_pack_verify_reports_and_checks(tmp_path, capsys) -> None:
+    # pack --verify: the inspection runs right after packing, the declared
+    # placeholder must have replaced its expression, and the leak scan warns
+    qa = tmp_path / "v.lua"
+    qa.write_text(
+        "--%%name:Verified\n"
+        "--%%var:ip=os.getenv('IP'),\"<player ip>\"\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() end\n"
+    )
+    assert tools.run_tool("pack", [str(qa), "-o", str(tmp_path / "v.fqa"), "--verify"]) == 0
+    out = capsys.readouterr().out
+    assert "verify: ok" in out
+    assert "'<player ip>' (placeholder)" in out
+
+    qa2 = tmp_path / "v2.lua"
+    qa2.write_text(
+        "--%%name:Verified2\n"
+        "--%%var:host='192.168.50.5'\n"
+        "-- --------------- EOH ---------------\n"
+        "function QuickApp:onInit() end\n"
+    )
+    assert tools.run_tool("pack", [str(qa2), "-o", str(tmp_path / "v2.fqa"), "--verify"]) == 0
+    out2 = capsys.readouterr().out
+    assert "verify: ok" in out2
+    assert "real IP" in out2  # the leak scan warns — intentional literals are fine
