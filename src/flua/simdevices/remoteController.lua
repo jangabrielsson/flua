@@ -1,7 +1,7 @@
 --%%name:RemoteController
 --%%type:com.fibaro.remoteController
 --%%description:"Simulated device bundled with flua"
-
+--%%interface:zwaveCentralScene
 -- A simulated device: change its state from another QA (or the
 -- debugger) and watch scenes/reacting QAs fire, exactly like a real
 -- device would behave.
