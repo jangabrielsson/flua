@@ -62,7 +62,7 @@ function QuickApp:onInit()
 end
 
 function QuickApp:ensureIconSet()
-  local mode = _FLUA.mode
+  local mode = _FLUA and _FLUA.mode or "online"
   if mode ~= "online" and mode ~= "proxy" then
     self:debug("iconInstall: needs an HC3 (online/proxy) — skipping in " .. tostring(mode))
     return
