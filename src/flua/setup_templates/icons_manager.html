@@ -131,61 +131,103 @@ function previewUrl(cat, name, file) {
   return `/api/preview?cat=${encodeURIComponent(cat)}&set=${encodeURIComponent(name)}&file=${encodeURIComponent(file)}`;
 }
 
-function previewFile(setName, ext, family) {
-  const base = (suffix) => previewUrl("device", setName, setName + suffix + "." + ext);
-  return family === "binary" || family === "multilevel" ? base("0")
-    : family === "baseShutter" ? base("Closed") : base("");
+// candidate state suffixes, in probe order — the superset of every
+// provider family's states plus the extras the tree might serve
+const CANDIDATE_STATES = [
+  "0", "100", "", "10", "20", "30", "40", "50", "60", "70", "80", "90",
+  "255", "Unknown", "Opening", "Opened", "Closing", "Closed", "PartialOpen",
+];
+
+function stateURL(setName, ext, suffix) {
+  return previewUrl("device", setName, setName + suffix + "." + ext);
 }
 
 function makeImg(setName, ext, family) {
+  // the table thumbnail: the family's own states first, then every other
+  // candidate — the HC3 entry's deviceType is not always trustworthy
+  // (older web uploads), so the tree itself is the truth. Never leaks alt
+  // text: a total failure removes the image silently.
+  const preferred = STATES[family] || [""];
+  const order = preferred.concat(CANDIDATE_STATES.filter((s) => !preferred.includes(s)));
   const img = document.createElement("img");
-  img.alt = setName;
-  img.src = previewFile(setName, ext, family);
-  img.onerror = () => { img.onerror = null; img.src = previewUrl("device", setName, setName + "." + ext); };
+  img.alt = "";
+  let i = 0;
+  img.onerror = () => {
+    i += 1;
+    if (i < order.length) {
+      img.src = stateURL(setName, ext, order[i]);
+    } else {
+      img.remove();
+    }
+  };
+  img.src = stateURL(setName, ext, order[0]);
   return img;
 }
 
 function makeSingleImg(cat, name, ext) {
   const img = document.createElement("img");
-  img.alt = name;
+  img.alt = "";
+  img.onerror = () => img.remove();
   img.src = previewUrl(cat, name, name + "." + ext);
   return img;
 }
 
-// hover popup (devices only): the whole set's state files
+function classifyFamily(found) {
+  // infer the provider family from the states that actually serve
+  const has = (s) => found.includes(s);
+  const named = has("Opening") || has("Opened") || has("Closing") || has("Closed");
+  const tens = CANDIDATE_STATES.filter((s) => /^\d0$/.test(s) && s !== "0" && s !== "100")
+    .filter(has).length;
+  if (named) return "baseShutter";
+  if (tens >= 3) return "multilevel";
+  if (has("0") || has("100")) return "binary";
+  if (has("")) return "single";
+  return "unknown";
+}
+
+// hover popup (devices only): probe ALL candidate states and show the ones
+// the tree actually serves — misclassified sets still show their real icons
 const popup = document.createElement("div");
 popup.id = "popup";
 document.body.appendChild(popup);
 
-function attachPopup(cell, setName, ext, family) {
-  const states = STATES[family] || [""];
+function attachPopup(cell, setName, ext, badge) {
   cell.addEventListener("mouseenter", (event) => {
     const wrap = document.createElement("div");
     wrap.className = "states";
-    for (const suffix of states) {
-      const state = document.createElement("div");
-      state.className = "state";
-      const img = document.createElement("img");
-      img.alt = suffix;
-      img.src = previewUrl("device", setName, setName + suffix + "." + ext);
-      img.onerror = () => {
-        state.classList.add("missing");
-        img.remove();
-        state.textContent = suffix || "base";
-        Object.assign(state.style, {
-          width: "64px", height: "64px", display: "flex", alignItems: "center",
-          justifyContent: "center", border: "1px dashed var(--line)", borderRadius: "6px",
-        });
+    const found = [];
+    let pending = CANDIDATE_STATES.length;
+    const finish = () => {
+      popup.textContent = "";
+      popup.appendChild(wrap);
+      popup.style.display = "block";
+      movePopup(event);
+      const family = classifyFamily(found);
+      if (family !== "unknown") {
+        badge.textContent = family;
+        badge.className = "badge " + (family === "single" ? "" : family);
+      }
+    };
+    for (const suffix of CANDIDATE_STATES) {
+      const img = new Image();
+      img.onload = () => {
+        found.push(suffix);
+        const state = document.createElement("div");
+        state.className = "state";
+        img.alt = "";
+        const label = document.createElement("span");
+        label.textContent = suffix || "base";
+        state.append(img, label);
+        wrap.appendChild(state);
+        pending -= 1;
+        if (pending === 0) finish();
       };
-      const label = document.createElement("span");
-      label.textContent = suffix || "base";
-      state.append(img, label);
-      wrap.appendChild(state);
+      img.onerror = () => {
+        pending -= 1;
+        if (pending === 0) finish();
+      };
+      img.src = stateURL(setName, ext, suffix);
     }
-    popup.textContent = "";
-    popup.appendChild(wrap);
-    popup.style.display = "block";
-    movePopup(event);
   });
   cell.addEventListener("mousemove", movePopup);
   cell.addEventListener("mouseleave", () => { popup.style.display = "none"; });
@@ -247,7 +289,6 @@ function renderTab() {
       const tdImg = document.createElement("td");
       tdImg.className = "preview";
       tdImg.appendChild(makeImg(icon.iconSetName, icon.fileExtension, family));
-      attachPopup(tdImg, icon.iconSetName, icon.fileExtension, family);
       const tdId = cell("td", String(icon.id), "mono");
       const tdSet = cell("td", icon.iconSetName, "mono");
       const tdKind = document.createElement("td");
@@ -255,6 +296,9 @@ function renderTab() {
       badge.className = "badge " + (family === "single" ? "" : family);
       badge.textContent = family;
       tdKind.appendChild(badge);
+      // the popup probes the tree and corrects the badge when the HC3's
+      // deviceType misleads (older web uploads classify as single)
+      attachPopup(tdImg, icon.iconSetName, icon.fileExtension, badge);
       const tdExt = cell("td", icon.fileExtension, "mono");
       const tdDel = document.createElement("td");
       tdDel.appendChild(deleteButton(icon.iconSetName, icon.id, icon.fileExtension));

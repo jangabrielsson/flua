@@ -52,6 +52,21 @@ def _catalog() -> dict[str, dict[str, Any]]:
 
 
 @functools.lru_cache(maxsize=1)
+def type_is_a(device_type: str | None, target: str) -> bool:
+    """The HC3's ``?isTypeOf=`` semantics: true when the type IS the
+    target or inherits from it (the whole parent chain, per the distilled
+    hierarchy) — unlike ``?type=``, which matches exactly."""
+    if not device_type or not target:
+        return False
+    current: str | None = device_type
+    parents = _hierarchy()
+    while current:
+        if current == target:
+            return True
+        current = parents.get(current)
+    return False
+
+
 def _hierarchy() -> dict[str, str]:
     """The offline type hierarchy (child -> parent), distilled from the
     HC3's /api/devices/hierarchy by scripts/extract_hierarchy.py."""

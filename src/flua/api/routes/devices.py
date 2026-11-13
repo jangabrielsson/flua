@@ -7,7 +7,7 @@ import urllib.parse
 from typing import Any
 
 from ... import messages
-from ...devices import skeleton_for
+from ...devices import skeleton_for, type_is_a
 from ..request import ApiRequest, forward_to_proxy
 from ..state import SimState, public
 
@@ -31,6 +31,9 @@ def _stringify(value: Any) -> str | None:
 
 def _matches(dev: dict[str, Any], query: dict[str, str]) -> bool:
     if "type" in query and dev.get("type") != query["type"]:
+        return False
+    if "isTypeOf" in query and not type_is_a(dev.get("type"), query["isTypeOf"]):
+        # the HC3's inheritance filter: the whole parent chain, vs type='s exact match
         return False
     if "name" in query and str(dev.get("name") or "").lower() != query["name"].lower():
         # the HC3 matches case-insensitively (observed: "Wake on LAN" hit "Wake on Lan")

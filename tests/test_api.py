@@ -67,6 +67,20 @@ def test_devices_query_filters(api: Api) -> None:
     data, status = api.dispatch("GET", "/devices?type=com.fibaro.binarySensor")
     assert status == 200 and [d["id"] for d in data] == [20]
 
+    # isTypeOf follows the inheritance chain (live-verified HC3 finding):
+    # binarySwitch IS-A actor IS-A device, binarySensor IS-A sensor IS-A
+    # device — ancestor filters match along the chain, type= stays exact
+    data, _ = api.dispatch("GET", "/devices?isTypeOf=com.fibaro.sensor")
+    assert [d["id"] for d in data] == [20]
+    data, _ = api.dispatch("GET", "/devices?isTypeOf=com.fibaro.actor")
+    assert [d["id"] for d in data] == [10]
+    data, _ = api.dispatch("GET", "/devices?isTypeOf=com.fibaro.device")
+    assert [d["id"] for d in data] == [10, 20]  # every chain ends at device
+    data, _ = api.dispatch("GET", "/devices?isTypeOf=com.fibaro.motionSensor")
+    assert data == []  # motionSensor is BELOW both — no ancestor match
+    data, _ = api.dispatch("GET", "/devices?type=com.fibaro.sensor")
+    assert data == []  # type= stays exact
+
     data, _ = api.dispatch("GET", "/devices?parentId=10")
     assert [d["id"] for d in data] == [20]
 

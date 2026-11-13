@@ -230,7 +230,9 @@ Parked 2026-11-12, from the custom-icon work (User<id> sets, uploadExternalIconS
 - **Ground truth (live-verified 5.22x)**: the HC3 serves uploaded icon
   files byte-identical (md5-equal) under `/assets/userIcons/devices/`; the
   fibaro tree is placeholder art for User sets; binary/multilevel sets have
-  no base file, only state files; icons must be >= ~128x128
+  no base file, only state files; the named shutter states serve under the
+  same `<set><state>.png` naming (live-verified with a baseShutter set,
+  id 1111); icons must be >= ~128x128
   (`INVALID_ICON_SIZE` otherwise); POST `/api/icons` multipart contract:
   `type=device`, `deviceTemplate=<type>`, file fields per the provider
   (`icon`/`icon0`+`icon100`/`icon0..100`/`iconOpening...`), response
