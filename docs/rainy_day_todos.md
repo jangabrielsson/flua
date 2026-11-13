@@ -222,7 +222,7 @@ Parked 2026-11-12, from the custom-icon work (User<id> sets, uploadExternalIconS
   icon set exists": on init, `api.get("/icons")` -> filter `deviceType ==
   self.type` and `iconSetName` starting with `User`; fetch each candidate's
   state file via `net.HTTPClient` from
-  `http://127.0.0.1:11111/assets/userIcons/devices/<set>/<set><state>.png`
+  `http://127.0.0.1/assets/userIcons/devices/<set>/<set><state>.png`
   and byte-compare with the bundled icon; match -> already installed ->
   `updateProperty("deviceIcon", id)`; no match -> `uploadExternalIconSet`
   -> new id. Replaces the quickVar/internalStorage "already downloaded?"
@@ -235,26 +235,31 @@ Parked 2026-11-12, from the custom-icon work (User<id> sets, uploadExternalIconS
   `type=device`, `deviceTemplate=<type>`, file fields per the provider
   (`icon`/`icon0`+`icon100`/`icon0..100`/`iconOpening...`), response
   `201 {"id":N,"iconSetName":"User<N>","fileExtension":"png"}`.
-- **The 11111/11112 split (probed from a QA on the controller)**: through
-  `api.get("/proxy?url=http://localhost:PORT/<path>")`, **11112** is the
-  full local API — JSON bodies that `api.get` decodes into Lua tables
-  (synchronous + credential-free recipe for GETs), plus the assets (a PNG
-  fetch crashed the JSON decoder — the bytes really arrive). **11111**
+- **The 11111/11112 split (probed from a QA on the controller, settled)**:
+  through `api.get("/proxy?url=http://localhost:PORT/<path>")`, **11112**
+  is the full local API — JSON bodies that `api.get` decodes into Lua
+  tables (synchronous + credential-free recipe for GETs). **11111**
   answers 200 with non-JSON bodies for such GETs (`nil, 200` after the
   decode step); its one established use is Fibaro's own `uploadIconFiles`
-  (POST `http://127.0.0.1:11111/api/icons`). Open question: does
-  `net.HTTPClient` to `127.0.0.1:11112/assets/userIcons/...` return raw
-  bytes — if so it is the canonical icon-fetch recipe for the post.
-- **flua emulation divergences found along the way**: (1) `http_call`
-  decodes every body as UTF-8 with errors=replace, so binary responses
-  (`net.HTTPClient` and the `/proxy` fetcher) are corrupted — a 2442-byte
-  PNG comes back as 4829 bytes of mojibake, where the HC3 hands over raw
-  bytes (fix: latin-1 identity decode on the net/`/proxy` path, keep UTF-8
-  for api JSON paths; pin with a byte-identity test). (2) flua rewrites
+  (POST `http://127.0.0.1:11111/api/icons`). **Neither port serves the
+  asset tree** — `net.HTTPClient` to `127.0.0.1:11112/assets/...` 404s
+  ("The requested method does not exist"), 11111 501s. The real icon
+  source is the plain web server: `http://<hc3>/assets/userIcons/devices/...`
+  on port 80, served by nginx **credential-free** (verified both from a QA
+  on the controller and externally) — that is the canonical icon-fetch
+  recipe, and flua online rewrites `127.0.0.1` to the controller keeping
+  port 80 with no auth.
+- **flua emulation divergences found along the way**: (1) FIXED —
+  `net.HTTPClient` and the `/proxy` fetcher corrupted binary bodies (the
+  utf-8-replace decode inflated a 2442B PNG to 4829B of mojibake):
+  responses now travel as raw `bytes` (lupa carries them into Lua strings
+  unchanged; a str channel cannot be byte-faithful — even latin-1 doubles
+  up at the bridge). Pinned by binary `/blob` tests. (2) flua rewrites
   11111 and 11112 identically to the standard API — faithful for 11112,
-  too lenient for 11111 GETs. (3) `api.get("/proxy?...")` of a binary body
-  returns the corrupted string instead of the HC3's `nil, 200` — mirror
-  the nil-on-non-JSON decode behavior once the bytes path is fixed.
+  too lenient for 11111 GETs (the controller answers non-JSON there).
+  (3) `api.get("/proxy?...")` of a binary body returns the raw bytes
+  where the HC3 nils it — kept as a deliberate flua extension (the bytes
+  are what recipes need); document it.
 - **Flua angle**: recipe is online-only (needs `/api/icons` + the 11111
   loopback; the sim has the catalog route but no asset tree — degrade
   gracefully). Testable against the mock HC3. Related parked options from
