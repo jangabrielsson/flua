@@ -1,6 +1,6 @@
 ---
 name: quickapp-patterns
-description: Common QuickApp implementation patterns: timer polling loops, cancellable timers, retry on failure, async HTTP requests (net.HTTPClient), refreshStates event polling (listening for HC3 device changes), RefreshStateSubscriber class, child device patterns, global variable access, state persistence (QA variables, internalStorage), UI update patterns, calling other devices, time-based schedulers, sending notifications. USE FOR: implementing recurring tasks, reacting to HC3 events, making HTTP calls, managing child devices, keeping state across restarts.
+description: Common QuickApp implementation patterns: timer polling loops, cancellable timers, retry on failure, async HTTP requests (net.HTTPClient), refreshStates event polling (listening for HC3 device changes), RefreshStateSubscriber class, child device patterns, global variable access, state persistence (QA variables, internalStorage), UI update patterns, calling other devices, time-based schedulers, sending notifications, mocking services (net.HTTPServer, net.WebSocketServer with server-initiated push). USE FOR: implementing recurring tasks, reacting to HC3 events, making HTTP calls, managing child devices, keeping state across restarts, building offline mocks of HTTP and event-driven WebSocket services.
 ---
 
 # QuickApp Common Patterns
@@ -489,6 +489,38 @@ end
   values apply ONLY on the mock path — a configured url is the real
   service, and missing credentials should warn, not silently call it
   with mock values.
+
+### Mocking an event-driven WebSocket service (server-initiated push)
+
+`net.WebSocketServer` (flua-only — there is no server hosting on a real
+HC3) is the mock for protocols where the SERVICE talks first: the client
+subscribes, then events arrive at the server's initiative (Sonos,
+Dirigera, HASS). The handler gets the stable per-connection id, and the
+server can push, broadcast, disconnect, and watch connection lifecycle:
+
+```lua
+local ws = net.WebSocketServer()
+ws:listen(0, function(message, isBinary, conn)
+  if message == "subscribe" then
+    ws:send(conn, "status:ok")            -- an unsolicited reply-style push
+    return "subscribed"                    -- the direct reply (optional)
+  end
+end)
+
+-- push on your own schedule (timers, api events):
+--   ws:send(conn, data) / ws:sendBinary(conn, data)  one connection
+--   ws:broadcast(data)                               every open connection
+--   ws:disconnect(conn)                              server-side close —
+--                                                    test client reconnect
+ws:addEventListener("connected",    function(conn) end)
+ws:addEventListener("disconnected", function(conn) end)
+```
+
+Pattern notes: store the `conn` ids on subscribe and drop them on
+`disconnected` (per-connection subscription state, like a real server);
+after `ws:disconnect(conn)` assert the client reconnects AND resubscribes;
+text pushes are UTF-8 frames, binary pushes byte-safe via `sendBinary`.
+The client side is plain `net.WebSocketClient` — nothing beyond the HC3.
 
 ## Child Device Patterns
 
