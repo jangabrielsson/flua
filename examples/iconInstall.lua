@@ -21,11 +21,20 @@
 --   .venv/bin/flua examples/iconInstall.lua
 -- --------------- EOH ---------------
 
-local ICON_FILES = { "icon0", "icon100" }   -- the binary provider's files, in order
 local ICON_SET_KEY = "installedIconSet"     -- internalStorage key
 local LOOPBACK_JSON = "http://127.0.0.1:11111"  -- the controller's local API (JSON; flua online rewrites it to the configured controller)
 local ASSET_TREE = "http://127.0.0.1/assets"    -- the public icon assets (port 80)
 local GIT_REPO = "https://raw.githubusercontent.com/jangabrielsson/flua/main/examples/iconInstall/icons/"
+
+-- the icon files the QA's type needs, per the provider (single: icon;
+-- binary: icon0/icon100; multilevel: icon0..icon100; baseShutter:
+-- iconOpening/iconOpened/iconClosing/iconClosed/iconUnknown). Everything
+-- below is generic over this list — the state suffix is the file name
+-- minus "icon", which is exactly how the asset tree serves the states.
+function QuickApp:providerFiles()
+  local provider = QuickApp.deviceIconTypeMapping[self.type]
+  return provider and provider.fileNames or { "icon" }
+end
 
 function QuickApp:iconURLs()
   -- each file's download URL. The quickAppVariable iconURL0/iconURL100 is an
@@ -36,7 +45,7 @@ function QuickApp:iconURLs()
   -- default file in that folder.
   local base = GIT_REPO
   local urls = {}
-  for _, file in ipairs(ICON_FILES) do
+  for _, file in ipairs(self:providerFiles()) do
     local override = self:getVariable("iconURL" .. file:sub(5)) or ""
     if override == "" then
       urls[file] = base .. file .. ".png"
@@ -115,9 +124,10 @@ function QuickApp:ensureIconSet()
 end
 
 function QuickApp:downloadIcons(cb)
+  local files = self:providerFiles()
   local urls = self:iconURLs()
-  local icons, pending = {}, #ICON_FILES
-  for _, file in ipairs(ICON_FILES) do
+  local icons, pending = {}, #files
+  for _, file in ipairs(files) do
     net.HTTPClient():request(urls[file], {
       success = function(response)
         icons[file] = response.data
@@ -139,8 +149,9 @@ function QuickApp:findMatchingSet(candidates, icons, cb)
     if not entry then cb(nil) return end
     local set = entry.iconSetName
     local ext = entry.fileExtension or "png"
-    local fetched, pending = {}, #ICON_FILES
-    for _, file in ipairs(ICON_FILES) do
+    local files = self:providerFiles()
+    local fetched, pending = {}, #files
+    for _, file in ipairs(files) do
       -- the asset tree serves the set's states as <set><state>.<ext>;
       -- icon0 -> state 0, icon100 -> state 100
       local url = ASSET_TREE .. "/userIcons/devices/" .. set .. "/"
@@ -150,11 +161,11 @@ function QuickApp:findMatchingSet(candidates, icons, cb)
           fetched[file] = response.data
           pending = pending - 1
           if pending == 0 then
-            if fetched.icon0 == icons.icon0 and fetched.icon100 == icons.icon100 then
-              cb(entry.id)
-            else
-              nextCandidate()
+            local matched = true
+            for _, name in ipairs(files) do
+              if fetched[name] ~= icons[name] then matched = false break end
             end
+            if matched then cb(entry.id) else nextCandidate() end
           end
         end,
         error = function()
@@ -174,7 +185,7 @@ function QuickApp:uploadIcons(icons)
     return
   end
   local files = {}
-  for i, file in ipairs(ICON_FILES) do
+  for i, file in ipairs(self:providerFiles()) do
     files[i] = icons[file]
   end
   -- the HC3's standard upload (POST 127.0.0.1:11111/api/icons multipart);
