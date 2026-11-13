@@ -382,6 +382,38 @@ function ServerBase:close()
   end
 end
 
+-- WebSocket servers only: unsolicited server frames (ws:send/broadcast),
+-- server-side disconnect, and connection lifecycle events — the pieces a
+-- mock needs to replay event-driven protocols (subscribe -> push).
+function ServerBase:send(conn, data)
+  assert(self._kind == "ws", "net.*Server:send is for WebSocket servers")
+  _PY.net_server_push(self._id, conn, _FLUA.escapeBytes(data), false)
+end
+
+function ServerBase:sendBinary(conn, data)
+  assert(self._kind == "ws", "net.*Server:sendBinary is for WebSocket servers")
+  _PY.net_server_push(self._id, conn, _FLUA.escapeBytes(data), true)
+end
+
+function ServerBase:broadcast(data)
+  assert(self._kind == "ws", "net.*Server:broadcast is for WebSocket servers")
+  for conn in pairs(self._conns or {}) do
+    self:send(conn, data)
+  end
+end
+
+function ServerBase:disconnect(conn)
+  assert(self._kind == "ws", "net.*Server:disconnect is for WebSocket servers")
+  _PY.net_server_disconnect(self._id, conn)
+end
+
+function ServerBase:addEventListener(event, fn)
+  assert(self._kind == "ws", "net.*Server:addEventListener is for WebSocket servers")
+  assert(event == "connected" or event == "disconnected", "ws server events: connected|disconnected")
+  self._listeners = self._listeners or {}
+  self._listeners[event] = fn
+end
+
 local function serverClass(kind)
   local cls = {}
   setmetatable(cls, cls)
@@ -394,6 +426,21 @@ end
 
 local function handleServerRequest(msg)
   local srv = servers[msg.server]
+  if msg.event then
+    -- a connection lifecycle event (ws servers): route to the listener;
+    -- no handler call, no reply expected
+    local listeners = srv and srv._listeners
+    local listener = listeners and listeners[msg.event]
+    if msg.event == "disconnected" and srv and srv._conns then
+      srv._conns[msg.conn] = nil -- prune broadcast targets
+    end
+    if listener then
+      xpcall(function() listener(msg.conn) end, function(err)
+        print("[net] server event error: " .. tostring(err))
+      end)
+    end
+    return
+  end
   local handler = srv and srv._handler
   if not handler then
     _PY.net_server_reply(msg.server, msg.conn, nil)
@@ -407,7 +454,11 @@ local function handleServerRequest(msg)
     elseif msg.kind == "udp" then
       return handler(_FLUA.unescapeBytes(msg.data or ""), msg.addr, msg.port)
     elseif msg.kind == "ws" then
-      return handler(msg.message or "", msg.binary == true)
+      if srv and msg.conn and srv._kind == "ws" then
+        srv._conns = srv._conns or {}
+        srv._conns[msg.conn] = true  -- broadcast targets
+      end
+      return handler(msg.message or "", msg.binary == true, msg.conn)
     end
   end, function(err)
     print("[net] server handler error: " .. tostring(err))

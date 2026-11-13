@@ -242,7 +242,10 @@ def server_request(
     every incoming request; the QA handler's return value flows back via
     the net_server_reply bridge call. ``kind`` is http/tcp/udp/ws; the
     remaining fields are kind-specific (http: method/url/headers/body;
-    tcp: data; udp: data/addr/port; ws: message/binary).
+    tcp: data; udp: data/addr/port; ws: message/binary). A lifecycle
+    ``event`` field ("connected"/"disconnected", ws servers only) carries
+    the connection notice instead of a request — the QA routes it to the
+    server's addEventListener listener and sends no reply.
     """
     msg: dict[str, Any] = {
         "type": SERVER_REQUEST,

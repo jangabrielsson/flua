@@ -1460,15 +1460,22 @@ tcp:listen(0, function(data, conn) return data:upper() end)
 local udp = net.UDPServer()
 udp:listen(0, function(data, ip, port) return "got:" .. data end)  -- nil = no reply
 local ws = net.WebSocketServer()
-ws:listen(0, function(message, isBinary) return "echo:" .. message end)
+ws:listen(0, function(message, isBinary, conn) return "echo:" .. message end)
+  -- ws handlers get the stable per-connection id too — and the server can
+  -- push UNSOLICITED frames (event-driven protocols, Sonos-style):
+  --   ws:send(conn, data) / ws:sendBinary(conn, data)  one connection
+  --   ws:broadcast(data)                               every open connection
+  --   ws:disconnect(conn)                              server-side close
+  --   ws:addEventListener("connected"/"disconnected", function(conn) ... end)
 ...
 http:close()
 ```
 
-Semantics: HTTP and WS are one-shot (request/response); TCP keeps the
+Semantics: HTTP is one-shot (request/response); TCP keeps the
 connection open across requests until the client closes, UDP is one datagram
-in, optional reply out. WS binary messages echo back as binary frames,
-byte-safe, and TCP/UDP payloads cross the engine bridge byte-safe. A handler
+in, optional reply out, and WS is message-based with optional replies plus
+server-initiated pushes. WS binary messages echo back as binary frames,
+byte-safe, and TCP/UDP/WS payloads cross the engine bridge byte-safe. A handler
 that raises replies `500` (HTTP) or nothing; a handler that never returns
 answers `504` after 10 s. Mock scaffolding can live in a sibling file loaded
 with `require` — it runs in the QA's own environment (so it can use

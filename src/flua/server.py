@@ -175,6 +175,7 @@ class _Server:
         self.sid = server_id
         self.kind = kind
         self.qa = qa
+        self._ws_writers: dict[int, asyncio.StreamWriter] = {}
         self.sock = socket.socket(
             socket.AF_INET, socket.SOCK_DGRAM if kind == "udp" else socket.SOCK_STREAM
         )
@@ -301,6 +302,7 @@ class _Server:
 
     async def _ws_conn(self, sock: socket.socket) -> None:
         reader, writer = await self._streams(sock)
+        conn: int | None = None
         try:
             request = await _read_http_request(reader)  # the upgrade request
             if request is None:
@@ -320,6 +322,13 @@ class _Server:
                 ).encode("latin-1")
             )
             await writer.drain()
+            # one STABLE id per connection (the handler and ws:send address
+            # it); the writer is registered for unsolicited pushes
+            conn = self._new_conn()
+            self._ws_writers[conn] = writer
+            self.host._engine.enqueue_outbound(
+                messages.server_request(self.sid, conn, self.kind, self.qa, event="connected")
+            )
             while True:
                 frame = await _read_ws_frame(reader)
                 if frame is None:
@@ -343,7 +352,6 @@ class _Server:
                         if not binary
                         else payload.decode("latin-1")
                     )
-                    conn = self._new_conn()
                     fut = self._post(conn, message=message, binary=binary)
                     response = await self._await(fut)
                     if response is not _TIMEOUT and response:
@@ -355,8 +363,35 @@ class _Server:
         except (asyncio.IncompleteReadError, ConnectionError, OSError, ValueError):
             pass
         finally:
+            if conn is not None and self._ws_writers.pop(conn, None) is not None:
+                self.host._engine.enqueue_outbound(
+                    messages.server_request(
+                        self.sid, conn, self.kind, self.qa, event="disconnected"
+                    )
+                )
             with contextlib.suppress(Exception):
                 writer.close()
+
+    async def _ws_push(self, conn: int, data: bytes, binary: bool) -> None:
+        """An unsolicited server frame (ws:send/broadcast): the payload is
+        the raw bytes (latin-1 for binary, the QA's UTF-8 for text)."""
+        writer = self._ws_writers.get(conn)
+        if writer is None or writer.is_closing():
+            return
+        with contextlib.suppress(ConnectionError, OSError):
+            writer.write(_ws_frame(0x2 if binary else 0x1, data))
+            await writer.drain()
+
+    async def _ws_disconnect(self, conn: int) -> None:
+        """Server-side close (ws:disconnect): a clean close frame, then the
+        socket goes away — the client sees a normal close and can reconnect."""
+        writer = self._ws_writers.get(conn)
+        if writer is None or writer.is_closing():
+            return
+        with contextlib.suppress(ConnectionError, OSError):
+            writer.write(_ws_frame(0x8, b""))
+            await writer.drain()
+            writer.close()
 
 
 class _UdpProtocol(asyncio.DatagramProtocol):
@@ -412,6 +447,25 @@ class ServerHost:
         fut = self._pending.pop((server_id, conn_id), None)
         if fut is not None and not fut.done():
             fut.set_result(response)
+
+    def push(self, server_id: int, conn_id: int, data: str, binary: bool) -> None:
+        """An unsolicited server frame (ws:send/broadcast) — the QA called
+        from the pump; the write runs as a loop task so it serializes with
+        the connection coroutine's own writes."""
+        server = self._servers.get(server_id)
+        if server is None:
+            return
+        asyncio.get_running_loop().create_task(
+            server._ws_push(int(conn_id), _to_bytes(_unescape_data(data)), bool(binary))
+        )
+
+    def disconnect(self, server_id: int, conn_id: int) -> None:
+        """Server-side close (ws:disconnect) — a clean close frame so the
+        client sees a normal close and can reconnect."""
+        server = self._servers.get(server_id)
+        if server is None:
+            return
+        asyncio.get_running_loop().create_task(server._ws_disconnect(int(conn_id)))
 
     def close_server(self, server_id: int) -> None:
         server = self._servers.pop(server_id, None)

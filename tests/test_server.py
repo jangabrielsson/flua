@@ -425,3 +425,60 @@ def test_handler_error_is_http_500(tmp_path) -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "GOT 500" in result.stdout
+
+
+def test_ws_server_push_disconnect_and_events(tmp_path) -> None:
+    # the server can push UNSOLICITED frames (event-driven protocols), sees
+    # per-connection lifecycle events, and can close a connection server-side
+    result = run_qa(
+        tmp_path,
+        "--%%name:wspush\n"
+        "function QuickApp:onInit()\n"
+        "  local failures = 0\n"
+        "  local function eq(a, b, msg)\n"
+        "    if tostring(a) ~= tostring(b) then\n"
+        "      failures = failures + 1\n"
+        "      print('FAIL: ' .. msg .. ' ' .. tostring(a) .. '!=' .. tostring(b))\n"
+        "    else print('PASS: ' .. msg) end\n"
+        "  end\n"
+        "  local ws = net.WebSocketServer()\n"
+        "  local events = {}\n"
+        "  ws:addEventListener('connected', function(conn) events.c = (events.c or 0) + 1 end)\n"
+        "  ws:addEventListener('disconnected', function(conn) events.d = (events.d or 0) + 1 end)\n"
+        "  ws:listen(0, function(message, isBinary, conn)\n"
+        "    if message == 'subscribe' then\n"
+        "      setTimeout(function() ws:send(conn, 'event:on') end, 50)\n"
+        "      return 'subscribed'\n"
+        "    end\n"
+        "    if message == 'bye' then ws:disconnect(conn) end\n"
+        "  end)\n"
+        "  local w = net.WebSocketClient({timeout=5000})\n"
+        "  w:addEventListener('connected', function()\n"
+        "    eq(events.c or 0, 1, 'connected event')\n"
+        "    w:send('subscribe')\n"
+        "  end)\n"
+        "  w:addEventListener('dataReceived', function(d, bin)\n"
+        "    if d == 'subscribed' then\n"
+        "      eq(bin, false, 'reply frame')\n"
+        "    elseif d == 'event:on' then\n"
+        "      eq(bin, false, 'pushed frame')\n"
+        "      w:send('bye')  -- the server closes us\n"
+        "    else\n"
+        "      failures = failures + 1\n"
+        "      print('FAIL: unexpected ' .. tostring(d))\n"
+        "    end\n"
+        "  end)\n"
+        "  w:addEventListener('disconnected', function()\n"
+        "    eq(events.d or 0, 1, 'disconnected event')\n"
+        "    print('failures:', failures)\n"
+        "    exit(failures > 0 and 1 or 0)\n"
+        "  end)\n"
+        "  w:addEventListener('error', function(e)\n"
+        "    failures = failures + 1\n"
+        "    print('FAIL: ws ' .. tostring(e))\n"
+        "  end)\n"
+        "  w:connect('ws://127.0.0.1:' .. ws.port)\n"
+        "end\n",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "failures: 0" in result.stdout

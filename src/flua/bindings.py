@@ -270,9 +270,19 @@ def install_bindings(engine: "LuaEngine") -> None:
     def net_server_close(server_id: object) -> None:
         engine.server_host.close_server(int(server_id))
 
+    def net_server_push(server_id: object, conn_id: object, data: object, binary: object) -> None:
+        engine.server_host.push(
+            int(server_id), int(conn_id), str(data or ""), bool(binary)
+        )
+
+    def net_server_disconnect(server_id: object, conn_id: object) -> None:
+        engine.server_host.disconnect(int(server_id), int(conn_id))
+
     py["net_server_start"] = net_server_start
     py["net_server_reply"] = net_server_reply
     py["net_server_close"] = net_server_close
+    py["net_server_push"] = net_server_push
+    py["net_server_disconnect"] = net_server_disconnect
 
     # JSON for QA code and mobdebug's VSCODE protocol (json.lua delegates
     # here). Both converters honor json.util.InitArray's __isArray marker, so
