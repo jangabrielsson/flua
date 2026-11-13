@@ -274,6 +274,8 @@ class Api:
             return None, 404
         segments, query = parse_url(path)
         remote_path = "/" + "/".join(segments)
+        if version is None:
+            return self._remote.request(method, remote_path, query, body)
         return self._remote.request(method, remote_path, query, body, version=version)
 
     def _remote_cached(self, path: str) -> tuple[Any, int] | None:

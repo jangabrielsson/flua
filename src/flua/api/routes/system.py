@@ -513,7 +513,11 @@ def profile_get(state: SimState, req: ApiRequest) -> tuple[Any, int]:
 
 
 def icons_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
-    remote = remote_get(req, "/icons", version="1")  # v1 = the library dict; v2 is the type table
+    # online: the QA-context shape — X-Fibaro-Version 2, the type-definition
+    # table (what api.get("/icons") answers on the controller). flua's own
+    # library consumers (the iconMap merge) fetch v1 explicitly; offline the
+    # sim serves its checked-in catalog.
+    remote = remote_get(req, "/icons")
     if remote is not None:
         return remote
     catalog = icon_catalog()
