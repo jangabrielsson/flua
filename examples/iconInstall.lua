@@ -25,6 +25,7 @@ local ICON_FILES = { "icon0", "icon100" }   -- the binary provider's files, in o
 local ICON_SET_KEY = "installedIconSet"     -- internalStorage key
 local LOOPBACK_JSON = "http://127.0.0.1:11111"  -- the controller's local API (JSON; flua online rewrites it to the configured controller)
 local ASSET_TREE = "http://127.0.0.1/assets"    -- the public icon assets (port 80)
+local GIT_REPO = "https://raw.githubusercontent.com/jangabrielsson/flua/main/examples/iconInstall/icons/"
 
 function QuickApp:iconURLs()
   -- each file's download URL. The quickAppVariable iconURL0/iconURL100 is an
@@ -33,7 +34,7 @@ function QuickApp:iconURLs()
   -- repo's icon folder, and unset (getVariable returns "", never nil —
   -- "" is truthy, so `x or default` would never fall through) means the
   -- default file in that folder.
-  local base = "https://raw.githubusercontent.com/jangabrielsson/flua/main/examples/iconInstall/icons/"
+  local base = GIT_REPO
   local urls = {}
   for _, file in ipairs(ICON_FILES) do
     local override = self:getVariable("iconURL" .. file:sub(5)) or ""
