@@ -285,7 +285,7 @@ function renderTab() {
   for (const icon of users) {
     const tr = document.createElement("tr");
     if (cat === "device") {
-      const family = FAMILIES[icon.deviceType] || "single";
+      const family = icon.family || FAMILIES[icon.deviceType] || "single";
       const tdImg = document.createElement("td");
       tdImg.className = "preview";
       tdImg.appendChild(makeImg(icon.iconSetName, icon.fileExtension, family));

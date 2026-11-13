@@ -624,6 +624,22 @@ USER_FAMILY_STATES = {
 }
 
 
+def type_icon_family(device_type: str | None) -> str:
+    """The icon provider family for a device type: the type's own mapping,
+    else the nearest ANCESTOR's — the HC3 registers custom icon sets under
+    the concrete product type (e.g. com.fibaro.FGWDS221, a child of
+    com.fibaro.binarySwitch), and the family must inherit through the
+    hierarchy chain."""
+    current = device_type
+    parents = _hierarchy()
+    while current:
+        family = USER_ICON_FAMILY.get(current)
+        if family is not None:
+            return family
+        current = parents.get(current)
+    return "single"
+
+
 def icon_default_file(set_name: str, file_extension: str) -> str | None:
     """The icon set's representative state file (the viewer's static
     default): the base file, else the off state, else the multilevel

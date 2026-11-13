@@ -12,13 +12,13 @@ from typing import Any
 from ... import messages
 from ...devices import (
     USER_FAMILY_STATES,
-    USER_ICON_FAMILY,
     icon_catalog,
     icon_default_file,
     icon_manifest,
     icon_pattern_files,
     local_icon_files,
     skeleton_for,
+    type_icon_family,
 )
 from ..request import ApiRequest, remote_get
 from ..state import SimState, public
@@ -608,7 +608,7 @@ def flua_icon_map(state: SimState, req: ApiRequest) -> tuple[Any, int]:
             sets[set_name] = []
             continue
         ext = os.path.splitext(entry["file"])[1] or ".png"
-        family = USER_ICON_FAMILY.get(types.get(set_name, ""), "single")
+        family = type_icon_family(types.get(set_name))
         names = [f"{set_name}{state}{ext}" for state in USER_FAMILY_STATES[family]]
         sets[set_name] = names
         if family == "baseShutter":
@@ -633,7 +633,7 @@ def flua_icon_map(state: SimState, req: ApiRequest) -> tuple[Any, int]:
         for name in names:
             ext = os.path.splitext(name)[1]
             by_suffix.setdefault(name[len(set_name) : -len(ext)], name)
-        family = USER_ICON_FAMILY.get(str(info.get("type") or ""), "single")
+        family = type_icon_family(str(info.get("type") or ""))
         if family == "baseShutter":
             default = by_suffix.get("Closed") or names[0]
         elif family in ("binary", "multilevel"):

@@ -1770,6 +1770,14 @@ def test_icons_ui_manager_proxies_the_hc3(tmp_path, monkeypatch) -> None:
                                 "iconSetName": "User998",
                                 "fileExtension": "png",
                             },
+                            {
+                                # a concrete product type: the family must
+                                # resolve through the hierarchy chain
+                                "id": 997,
+                                "deviceType": "com.fibaro.FGWDS221",
+                                "iconSetName": "User997",
+                                "fileExtension": "png",
+                            },
                         ],
                         "room": [
                             {"id": 44, "iconName": "User44", "fileExtension": "png"}
@@ -1846,7 +1854,10 @@ def test_icons_ui_manager_proxies_the_hc3(tmp_path, monkeypatch) -> None:
             assert [e["iconSetName"] for e in data["icons"]["device"]] == [
                 "User1001",
                 "User998",
+                "User997",
             ]
+            families = {e["iconSetName"]: e["family"] for e in data["icons"]["device"]}
+            assert families == {"User1001": "single", "User998": "binary", "User997": "binary"}
             assert [e["iconName"] for e in data["icons"]["room"]] == ["User44"]
             assert [e["iconName"] for e in data["icons"]["scene"]] == ["User55"]
 

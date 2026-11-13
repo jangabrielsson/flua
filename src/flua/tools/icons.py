@@ -38,6 +38,7 @@ from ..devices import (
     icon_cache_dir,
     icon_manifest,
     icon_pattern_files,
+    type_icon_family,
 )
 from ..http import http_call
 
@@ -461,7 +462,14 @@ class _IconsUiHandler(http.server.BaseHTTPRequestHandler):
             if status != 200 or not isinstance(body, str):
                 self._json(502, {"error": f"HC3 answered {status}"})
                 return
-            self._json(200, {"hc3": self.server.hc3_base, "icons": json.loads(body)})
+            icons = json.loads(body)
+            # resolve each device entry's provider family through the type
+            # hierarchy — the HC3 registers user sets under concrete product
+            # types (com.fibaro.FGWDS221 is a binarySwitch child)
+            for entry in (icons.get("device") or []) if isinstance(icons, dict) else []:
+                if isinstance(entry, dict):
+                    entry["family"] = type_icon_family(entry.get("deviceType"))
+            self._json(200, {"hc3": self.server.hc3_base, "icons": icons})
             return
         if parsed.path == "/api/preview":
             query = urllib.parse.parse_qs(parsed.query)

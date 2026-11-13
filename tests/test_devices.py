@@ -436,6 +436,20 @@ def test_icon_file_resolves_only_inside_cache(tmp_path, monkeypatch) -> None:
     assert icon_file("ButtonSwitchV2/other", "x.svg") is None
 
 
+def test_type_icon_family_resolves_through_the_hierarchy() -> None:
+    # product types inherit their family from the nearest known ancestor —
+    # the HC3 registers user icon sets under the concrete type
+    from flua.devices import type_icon_family
+
+    assert type_icon_family("com.fibaro.binarySwitch") == "binary"
+    assert type_icon_family("com.fibaro.FGWDS221") == "binary"  # child of binarySwitch
+    assert type_icon_family("com.fibaro.motionSensor") == "binary"
+    assert type_icon_family("com.fibaro.baseShutter") == "baseShutter"
+    assert type_icon_family("com.fibaro.genericDevice") == "single"
+    assert type_icon_family("com.fibaro.noSuchType") == "single"
+    assert type_icon_family(None) == "single"
+
+
 def test_local_icon_files_and_serving(tmp_path) -> None:
     # the --%%icons folder: upload-named files (icon<suffix>.<ext>) become a
     # synthetic set's <set><suffix>.<ext> names; unknown files are skipped;
