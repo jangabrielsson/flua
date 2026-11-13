@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.162] - 2026-11-13
+
+### Changed
+- QA-facing GET /icons serves the v2 type table, like on the controller
+
 ## [0.1.161] - 2026-11-13
 
 ### Changed
