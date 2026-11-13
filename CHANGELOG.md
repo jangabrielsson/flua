@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.165] - 2026-11-14
+
+### Changed
+- inspectFQA + pack --verify: prove a packed artifact came out right
+- Triage the Sonos offline-suite report (skills + parked items)
+
 ## [0.1.164] - 2026-11-13
 
 ### Changed
