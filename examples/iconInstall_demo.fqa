@@ -1,0 +1,41 @@
+{
+  "name": "iconInstall-demo",
+  "type": "com.fibaro.binarySwitch",
+  "apiVersion": "1.3",
+  "initialProperties": {
+    "viewLayout": {
+      "$jason": {
+        "body": {
+          "header": {
+            "style": {
+              "height": "0"
+            },
+            "title": "quickApp_device_57"
+          },
+          "sections": {
+            "items": []
+          }
+        },
+        "head": {
+          "title": "quickApp_device_57"
+        }
+      }
+    },
+    "uiCallbacks": [],
+    "quickAppVariables": [],
+    "typeTemplateInitialized": true,
+    "apiVersion": "1.3"
+  },
+  "files": [
+    {
+      "name": "main",
+      "isMain": true,
+      "isOpen": false,
+      "content": "--%%name:iconInstall-demo\n--%%type:com.fibaro.binarySwitch\n-- Example: a self-installing icon set. On the FIRST start after a fresh\n-- install the QA makes sure its custom icon set exists in the controller's\n-- icon library: it downloads its two icons (icon0/icon100 — the binary\n-- provider), scans the library's User sets of its own device type for a\n-- byte-identical match (the HC3 serves uploaded art byte-identical), and\n-- only uploads a new set when nothing matches. The installed set's id is\n-- remembered in internalStorage (plugins/<id>/variables — NOT saved when a\n-- QA is re-downloaded, so a fresh download re-runs the check; the id must\n-- NOT live in a quickAppVariable, which WOULD be saved). On later starts a\n-- single cheap liveness check (the stored id still listed in /api/icons)\n-- keeps the QA from re-uploading — and if the set was deleted (e.g. via\n-- flua --tool icons ui), the QA reinstalls it cleanly. The user's own\n-- deviceIcon choice is respected: restarts never touch deviceIcon.\n-- Icons: iconInstall/icons/icon0.png (red = off) and icon100.png (green =\n-- on). The download URLs default to this repo and can be overridden with\n-- the quickAppVariables iconURL0/iconURL100 (the test suite points them at\n-- a mock server).\n-- Run online:\n--   .venv/bin/flua examples/iconInstall.lua\n-- --------------- EOH ---------------\n\nlocal ICON_FILES = { \"icon0\", \"icon100\" }   -- the binary provider's files, in order\nlocal ICON_SET_KEY = \"installedIconSet\"     -- internalStorage key\nlocal LOOPBACK_JSON = \"http://127.0.0.1:11112\"  -- the controller's local API (JSON)\nlocal ASSET_TREE = \"http://127.0.0.1/assets\"    -- the public icon assets (port 80)\n\nfunction QuickApp:iconURLs()\n  local urls = {}\n  for _, file in ipairs(ICON_FILES) do\n    local base = \"https://raw.githubusercontent.com/jangabrielsson/flua/main/examples/iconInstall/icons/\"\n    urls[file] = self:getVariable(\"iconURL\" .. file:sub(5)) or (base .. file .. \".png\")\n  end\n  return urls\nend\n\nfunction QuickApp:storedIconId()\n  return tonumber(self:internalStorageGet(ICON_SET_KEY))\nend\n\nfunction QuickApp:saveIconId(id)\n  self:internalStorageSet(ICON_SET_KEY, tostring(id), true)\nend\n\nfunction QuickApp:onInit()\n  self:ensureIconSet()\nend\n\nfunction QuickApp:ensureIconSet()\n  local mode = _FLUA.mode\n  if mode ~= \"online\" and mode ~= \"proxy\" then\n    self:debug(\"iconInstall: needs an HC3 (online/proxy) — skipping in \" .. tostring(mode))\n    return\n  end\n  local stored = self:storedIconId()\n  -- the LIVE icon library (JSON via the controller's local API; flua online\n  -- rewrites the loopback to the configured HC3) — api.get would answer from\n  -- the sim catalog in the emulator, so the loopback keeps one behavior.\n  net.HTTPClient():request(LOOPBACK_JSON .. \"/api/icons\", {\n    success = function(response)\n      local ok, lib = pcall(json.decode, response.data)\n      if not ok or type(lib) ~= \"table\" then\n        self:error(\"iconInstall: cannot read the icon library\")\n        return\n      end\n      local devices = type(lib.device) == \"table\" and lib.device or {}\n      if stored then\n        for _, entry in ipairs(devices) do\n          if entry.id == stored then\n            self:debug(\"iconInstall: icon set \" .. stored .. \" already installed — leaving deviceIcon alone\")\n            return\n          end\n        end\n        self:debug(\"iconInstall: stored icon set \" .. stored .. \" is gone — reinstalling\")\n        self:internalStorageRemove(ICON_SET_KEY)\n      end\n      local candidates = {}\n      for _, entry in ipairs(devices) do\n        if entry.deviceType == self.type\n          and tostring(entry.iconSetName or \"\"):match(\"^User%d+$\") then\n          candidates[#candidates + 1] = entry\n        end\n      end\n      self:downloadIcons(function(icons)\n        self:findMatchingSet(candidates, icons, function(foundId)\n          if foundId then\n            self:saveIconId(foundId)\n            self:updateProperty(\"deviceIcon\", foundId)\n            self:debug(\"iconInstall: found existing icon set \" .. foundId)\n          else\n            self:uploadIcons(icons)\n          end\n        end)\n      end)\n    end,\n    error = function(err)\n      self:error(\"iconInstall: cannot reach the icon library: \" .. tostring(err))\n    end,\n  })\nend\n\nfunction QuickApp:downloadIcons(cb)\n  local urls = self:iconURLs()\n  local icons, pending = {}, #ICON_FILES\n  for _, file in ipairs(ICON_FILES) do\n    net.HTTPClient():request(urls[file], {\n      success = function(response)\n        icons[file] = response.data\n        pending = pending - 1\n        if pending == 0 then cb(icons) end\n      end,\n      error = function(err)\n        self:error(\"iconInstall: cannot download \" .. urls[file] .. \": \" .. tostring(err))\n      end,\n    })\n  end\nend\n\nfunction QuickApp:findMatchingSet(candidates, icons, cb)\n  local index = 0\n  local function nextCandidate()\n    index = index + 1\n    local entry = candidates[index]\n    if not entry then cb(nil) return end\n    local set = entry.iconSetName\n    local ext = entry.fileExtension or \"png\"\n    local fetched, pending = {}, #ICON_FILES\n    for _, file in ipairs(ICON_FILES) do\n      -- the asset tree serves the set's states as <set><state>.<ext>;\n      -- icon0 -> state 0, icon100 -> state 100\n      local url = ASSET_TREE .. \"/userIcons/devices/\" .. set .. \"/\"\n        .. set .. file:sub(5) .. \".\" .. ext\n      net.HTTPClient():request(url, {\n        success = function(response)\n          fetched[file] = response.data\n          pending = pending - 1\n          if pending == 0 then\n            if fetched.icon0 == icons.icon0 and fetched.icon100 == icons.icon100 then\n              cb(entry.id)\n            else\n              nextCandidate()\n            end\n          end\n        end,\n        error = function()\n          pending = pending - 1\n          if pending == 0 then nextCandidate() end\n        end,\n      })\n    end\n  end\n  nextCandidate()\nend\n\nfunction QuickApp:uploadIcons(icons)\n  local provider = QuickApp.deviceIconTypeMapping[self.type]\n  if not provider then\n    self:error(\"iconInstall: no icon provider for \" .. tostring(self.type))\n    return\n  end\n  local files = {}\n  for i, file in ipairs(ICON_FILES) do\n    files[i] = icons[file]\n  end\n  -- the HC3's standard upload (POST 127.0.0.1:11111/api/icons multipart);\n  -- flua online rewrites the loopback to the configured controller\n  self:uploadIconFiles({\n    fileNames = provider.fileNames,\n    files = files,\n    deviceType = self.type,\n  }, {}, function(iconId)\n    self:saveIconId(iconId)\n    self:updateProperty(\"deviceIcon\", iconId)\n    self:debug(\"iconInstall: uploaded new icon set \" .. iconId)\n  end, function(err)\n    self:error(\"iconInstall: icon upload failed: \" .. tostring(err))\n  end)\nend\n"
+    }
+  ],
+  "initialInterfaces": [
+    "light",
+    "autoTurnOff"
+  ]
+}

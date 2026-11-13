@@ -23,14 +23,27 @@
 
 local ICON_FILES = { "icon0", "icon100" }   -- the binary provider's files, in order
 local ICON_SET_KEY = "installedIconSet"     -- internalStorage key
-local LOOPBACK_JSON = "http://127.0.0.1:11112"  -- the controller's local API (JSON)
+local LOOPBACK_JSON = "http://127.0.0.1:11111"  -- the controller's local API (JSON; flua online rewrites it to the configured controller)
 local ASSET_TREE = "http://127.0.0.1/assets"    -- the public icon assets (port 80)
 
 function QuickApp:iconURLs()
+  -- each file's download URL. The quickAppVariable iconURL0/iconURL100 is an
+  -- optional override: a full http(s) URL wins verbatim (the test suite
+  -- points them at a mock server), a bare file name resolves against the
+  -- repo's icon folder, and unset (getVariable returns "", never nil —
+  -- "" is truthy, so `x or default` would never fall through) means the
+  -- default file in that folder.
+  local base = "https://raw.githubusercontent.com/jangabrielsson/flua/main/examples/iconInstall/icons/"
   local urls = {}
   for _, file in ipairs(ICON_FILES) do
-    local base = "https://raw.githubusercontent.com/jangabrielsson/flua/main/examples/iconInstall/icons/"
-    urls[file] = self:getVariable("iconURL" .. file:sub(5)) or (base .. file .. ".png")
+    local override = self:getVariable("iconURL" .. file:sub(5)) or ""
+    if override == "" then
+      urls[file] = base .. file .. ".png"
+    elseif override:match("^https?://") then
+      urls[file] = override
+    else
+      urls[file] = base .. override
+    end
   end
   return urls
 end
