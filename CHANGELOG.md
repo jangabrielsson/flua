@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.161] - 2026-11-13
+
+### Changed
+- Send X-Fibaro-Version: 2 on the remote REST, like the web UI interceptor
+
 ## [0.1.160] - 2026-11-13
 
 ### Changed
