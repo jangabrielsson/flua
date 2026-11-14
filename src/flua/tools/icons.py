@@ -491,14 +491,16 @@ class _IconsUiHandler(http.server.BaseHTTPRequestHandler):
                     else f"assets/icon/fibaro/{set_name}/{file_name}"
                 )
             elif category == "room":
+                # custom room icons serve FLAT (no <set>/ directory —
+                # live-verified), standard ones keep the fibaro tree layout
                 tree = (
-                    f"assets/userIcons/rooms/{set_name}/{file_name}"
+                    f"assets/userIcons/rooms/{file_name}"
                     if user_set
                     else f"assets/icon/fibaro/rooms/{set_name}/{file_name}"
                 )
             else:
                 tree = (
-                    f"assets/userIcons/scenes/{set_name}/{file_name}"
+                    f"assets/userIcons/scenes/{file_name}"
                     if user_set
                     else f"assets/icon/fibaro/scena/{set_name}/{file_name}"
                 )

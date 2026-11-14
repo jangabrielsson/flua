@@ -249,7 +249,11 @@ Parked 2026-11-12, from the custom-icon work (User<id> sets, uploadExternalIconS
   fibaro tree is placeholder art for User sets; binary/multilevel sets have
   no base file, only state files; the named shutter states serve under the
   same `<set><state>.png` naming (live-verified with a baseShutter set,
-  id 1111); icons must be >= ~128x128
+  id 1111); custom ROOM/SCENE icons serve FLAT —
+  `/assets/userIcons/rooms/<iconName>.<ext>` and
+  `/assets/userIcons/scenes/<iconName>.<ext>`, no `<set>/` directory
+  (live-verified: room id 1001, scene id 1001 — each category has its
+  own id sequence); icons must be >= ~128x128
   (`INVALID_ICON_SIZE` otherwise); POST `/api/icons` multipart contract:
   `type=device`, `deviceTemplate=<type>`, file fields per the provider
   (`icon`/`icon0`+`icon100`/`icon0..100`/`iconOpening...`), response

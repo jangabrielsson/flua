@@ -1172,6 +1172,8 @@ def test_wheel_ships_every_example_file() -> None:
     for path in examples.rglob("*"):
         if not path.is_file() or "__pycache__" in path.parts:
             continue
+        if path.name.startswith("."):
+            continue  # Finder/editor metadata — never shipped, never covered
         if path.name == "__init__.py":
             continue  # ships as the package itself, not package-data
         relative = path.relative_to(examples).as_posix()
@@ -1799,7 +1801,7 @@ def test_icons_ui_manager_proxies_the_hc3(tmp_path, monkeypatch) -> None:
                 self.end_headers()
                 self.wfile.write(b"\x89PNGpreview")
                 return
-            if self.path.startswith("/assets/userIcons/rooms/User44/"):
+            if self.path.startswith("/assets/userIcons/rooms/User44.png"):
                 self.send_response(200)
                 self.send_header("Content-Type", "image/png")
                 self.end_headers()
