@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.166] - 2026-11-14
+
+### Changed
+- Icon manager: custom room/scene icons serve flat, not in a directory
+
 ## [0.1.165] - 2026-11-14
 
 ### Changed
