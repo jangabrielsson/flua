@@ -136,3 +136,43 @@ async def test_heat_when_cold_reacts_to_weather() -> None:
         assert engine.api.state.devices[heater]["properties"]["value"] is False
     finally:
         await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_recipe_sliders_update_quickapp_variables() -> None:
+    # a threshold slider in a recipe's UI: boot syncs it from the
+    # quickAppVariable, a drag writes the variable back and the running
+    # logic uses the new value on the very next poll
+    engine = LuaEngine(speed=60.0)
+    await engine.start()
+    try:
+        sensor, _ = engine.load_sim_device("humiditySensor", ["property:value=90"])
+        fan, _ = engine.load_sim_device("binarySwitch")
+        main = REPO / "recipes" / "humidity-fan" / "main.lua"
+        qa_id, err = engine.load_qa_file(
+            str(main), [f"var:humidityId={sensor}", f"var:fanId={fan}", "var:threshold=65"]
+        )
+        assert qa_id is not None and err is None, err
+        await asyncio.sleep(0.7)  # the first 30s poll: 90 > 65 -> fan on
+        assert engine.api.state.devices[fan]["properties"]["value"] is True
+        # the slider shows the current threshold at boot
+        layout, status = engine.api.dispatch("GET", f"/plugins/getView?id={qa_id}")
+        assert status == 200
+        assert "65" in json.dumps(layout)
+        # drag the slider the way the viewer does
+        engine.api.dispatch(
+            "GET",
+            f"/plugins/callUIEvent?deviceID={qa_id}&elementName=thresholdSlider"
+            "&eventType=onChanged&value=95",
+        )
+        await asyncio.sleep(0.7)  # next poll: 90 <= 95 - 5 -> fan off
+        assert engine.api.state.devices[fan]["properties"]["value"] is False
+        # the variable persisted and the slider reflects it
+        dev = engine.api.state.devices[qa_id]
+        variables = {v["name"]: v["value"] for v in dev["properties"]["quickAppVariables"]}
+        assert variables["threshold"] == 95
+        layout, status = engine.api.dispatch("GET", f"/plugins/getView?id={qa_id}")
+        assert status == 200
+        assert "95" in json.dumps(layout)
+    finally:
+        await engine.stop()

@@ -5,6 +5,7 @@
 --%%var:humidityId=0      -- the humidity sensor's id (com.fibaro.humiditySensor)
 --%%var:fanId=0           -- the fan/switch's id (com.fibaro.binarySwitch)
 --%%var:threshold=65      -- humidity % that starts the fan
+--%%u:{slider='thresholdSlider',text='Start fan above (%)',min=20,max=100,unit='%',onChanged='_setThreshold'}
 -- =====================================================================
 -- --------------- EOH ---------------
 local HUMIDITY
@@ -15,6 +16,7 @@ function QuickApp:onInit()
   HUMIDITY = tonumber(self:getVariable("humidityId")) or 0
   FAN = tonumber(self:getVariable("fanId")) or 0
   THRESHOLD = tonumber(self:getVariable("threshold")) or 65
+  self:updateView("thresholdSlider", "value", tostring(THRESHOLD))
   if HUMIDITY == 0 or FAN == 0 then
     self:debug("set humidityId and fanId, then restart")
     return
@@ -33,4 +35,13 @@ function QuickApp:checkHumidity()
   elseif humidity <= THRESHOLD - 5 and on then  -- 5% hysteresis
     fibaro.call(FAN, "turnOff")
   end
+end
+
+-- UI: the slider changes the threshold the QA uses right away
+function QuickApp:_setThreshold(event)
+  local v = tonumber(event.values and event.values[1])
+  if not v then return end
+  THRESHOLD = v
+  self:setVariable("threshold", v)
+  self:updateView("thresholdSlider", "value", tostring(v))
 end

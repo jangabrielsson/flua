@@ -5,6 +5,7 @@
 --%%var:motionId=0        -- the motion sensor's id (com.fibaro.motionSensor)
 --%%var:lightId=0         -- the light's id (com.fibaro.binarySwitch)
 --%%var:minutes=5         -- how long the light stays on after motion
+--%%u:{slider='minutesSlider',text='On for (minutes)',min=1,max=120,unit='min',onChanged='_setMinutes'}
 -- =====================================================================
 -- --------------- EOH ---------------
 local MOTION
@@ -15,6 +16,7 @@ function QuickApp:onInit()
   MOTION = tonumber(self:getVariable("motionId")) or 0
   LIGHT = tonumber(self:getVariable("lightId")) or 0
   MINUTES = tonumber(self:getVariable("minutes")) or 5
+  self:updateView("minutesSlider", "value", tostring(MINUTES))
   if MOTION == 0 or LIGHT == 0 then
     self:debug("set motionId and lightId, then restart")
     return
@@ -32,4 +34,14 @@ function QuickApp:checkMotion()
       fibaro.call(LIGHT, "turnOff")
     end, MINUTES * 60 * 1000)
   end
+end
+
+-- UI: the slider changes how long the light stays on — it applies from
+-- the next motion (a pending off-timer keeps its old duration)
+function QuickApp:_setMinutes(event)
+  local v = tonumber(event.values and event.values[1])
+  if not v then return end
+  MINUTES = v
+  self:setVariable("minutes", v)
+  self:updateView("minutesSlider", "value", tostring(v))
 end
