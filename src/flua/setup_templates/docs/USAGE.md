@@ -1609,6 +1609,15 @@ format (individual `.lua` files) and only the HC3 sees `.fqa`:
 .venv/bin/flua --tool
 ```
 
+Recipes are `recipes/<id>/{main.lua,manifest.json}` in the flua repo, fetched
+live by the builder (one merge, no release). The manifest declares the
+title/description/categories/params — a device param's `filter` is an
+`isTypeOf` base type for its picker — and optionally `simDevices`: bundled
+sim devices loaded into the sim run alongside the picked devices, so the
+user can drive the recipe's world from the web view (the weather manager
+and its sliders for heat-when-cold). `scripts/gen-recipes-index.py`
+regenerates the index and validates every field.
+
 The HC3's standard icon library (~13,000 state files, ~65 MB) is Fibaro
 copyrighted artwork, so flua ships only the manifest (`devices/
 icon_manifest.json`, built by `scripts/extract_icon_files.py` — live-probed
