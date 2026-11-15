@@ -26,5 +26,43 @@
   ],
   "categories": [
     "Climate"
-  ]
+  ],
+  "verify": {
+    "params": {
+      "humidityId": 1,
+      "fanId": 1,
+      "threshold": 65
+    },
+    "steps": [
+      {
+        "check": {
+          "device": "fanId",
+          "value": false
+        }
+      },
+      {
+        "device": "humidityId",
+        "call": "setValue",
+        "args": [
+          90
+        ]
+      },
+      {
+        "check": {
+          "device": "fanId",
+          "value": true
+        }
+      },
+      {
+        "slider": "thresholdSlider",
+        "value": 95
+      },
+      {
+        "check": {
+          "device": "fanId",
+          "value": false
+        }
+      }
+    ]
+  }
 }

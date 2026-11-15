@@ -20,5 +20,49 @@
   ],
   "categories": [
     "Alerts & alarms"
-  ]
+  ],
+  "verify": {
+    "params": {
+      "floodId": 1,
+      "sirenId": 1
+    },
+    "steps": [
+      {
+        "check": {
+          "device": "sirenId",
+          "value": false
+        }
+      },
+      {
+        "device": "floodId",
+        "call": "breach"
+      },
+      {
+        "check": {
+          "device": "sirenId",
+          "value": true
+        }
+      },
+      {
+        "check": {
+          "log": "water detected"
+        }
+      },
+      {
+        "device": "floodId",
+        "call": "clearBreach"
+      },
+      {
+        "check": {
+          "device": "sirenId",
+          "value": false
+        }
+      },
+      {
+        "check": {
+          "log": "water cleared"
+        }
+      }
+    ]
+  }
 }

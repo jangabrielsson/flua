@@ -27,5 +27,43 @@
   "categories": [
     "Lights",
     "Presence"
-  ]
+  ],
+  "verify": {
+    "params": {
+      "motionId": 1,
+      "lightId": 1,
+      "minutes": 1
+    },
+    "steps": [
+      {
+        "check": {
+          "device": "lightId",
+          "value": false
+        }
+      },
+      {
+        "device": "motionId",
+        "call": "breach"
+      },
+      {
+        "check": {
+          "device": "lightId",
+          "value": true
+        }
+      },
+      {
+        "device": "motionId",
+        "call": "clearBreach"
+      },
+      {
+        "wait": "2m"
+      },
+      {
+        "check": {
+          "device": "lightId",
+          "value": false
+        }
+      }
+    ]
+  }
 }

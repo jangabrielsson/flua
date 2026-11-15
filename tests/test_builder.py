@@ -3,6 +3,7 @@ the HC3 pickers, and the page."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 import subprocess
 import sys
@@ -433,3 +434,54 @@ def test_builder_simulate_loads_declared_world_devices(monkeypatch) -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_builder_verify_runs_a_recipe_scenario(monkeypatch) -> None:
+    # the manifest's verify block drives the sim: seed, breach, check — the
+    # whole scenario passes step by step
+    from flua.tools import build
+
+    monkeypatch.setattr(build, "_CACHE_ROOT", Path(tempfile.mkdtemp()))
+    manifest = build._manifest_for("leak-alert")
+    assert manifest is not None
+    result = asyncio.run(build._run_verification(manifest))
+    assert result["ok"], result
+    assert len(result["steps"]) == 7
+    assert all(step["passed"] for step in result["steps"])
+
+
+def test_builder_cli_lists_and_verifies_for_agents(monkeypatch, tmp_path) -> None:
+    # --list/--verify with --json are the agent channel; HOME isolation keeps
+    # the user's ~/.flua recipe cache out of the verdict
+    monkeypatch.setenv("HOME", str(tmp_path))
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--tool", "build", "--list", "--json"],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    ids = [recipe["id"] for recipe in json.loads(result.stdout)["recipes"]]
+    assert len(ids) == 6
+    assert "leak-alert" in ids
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--tool", "build", "--verify", "leak-alert", "--json"],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
+    assert payload["steps"]
+    # an unknown id fails loudly for scripts
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--tool", "build", "--verify", "no-such-recipe"],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 1

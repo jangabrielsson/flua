@@ -68,6 +68,25 @@ def load_manifests(root: Path) -> tuple[list[dict], list[str]]:
         for name in sim_devices or []:
             if not (simdevices / f"{name}.lua").is_file():
                 problems.append(f"{folder.name}: unknown sim device {name!r}")
+        # verify: the declarative scenario flua --tool build --verify runs
+        verify = manifest.get("verify")
+        if verify is not None:
+            steps = verify.get("steps") if isinstance(verify, dict) else None
+            if not isinstance(steps, list) or not steps:
+                problems.append(f"{folder.name}: verify needs a non-empty steps list")
+            else:
+                kinds = ("device", "slider", "weather", "wait", "check")
+                for step in steps:
+                    used = [k for k in kinds if k in step]
+                    if len(used) != 1:
+                        problems.append(
+                            f"{folder.name}: a verify step needs exactly one of "
+                            "device/slider/weather/wait/check"
+                        )
+                    elif used[0] == "device" and not isinstance(step.get("call"), str):
+                        problems.append(f"{folder.name}: a device step needs a call")
+                    elif used[0] == "check" and not isinstance(step.get("check"), dict):
+                        problems.append(f"{folder.name}: a check step needs device/log")
         recipes.append(manifest)
     return recipes, problems
 

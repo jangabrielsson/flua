@@ -24,7 +24,43 @@
           "kind": "number",
           "default": 10
         }
-      ]
+      ],
+      "verify": {
+        "params": {
+          "heaterId": 1,
+          "threshold": 10
+        },
+        "steps": [
+          {
+            "check": {
+              "device": "heaterId",
+              "value": false
+            }
+          },
+          {
+            "weather": {
+              "Temperature": 5
+            }
+          },
+          {
+            "check": {
+              "device": "heaterId",
+              "value": true
+            }
+          },
+          {
+            "weather": {
+              "Temperature": 15
+            }
+          },
+          {
+            "check": {
+              "device": "heaterId",
+              "value": false
+            }
+          }
+        ]
+      }
     },
     {
       "id": "humidity-fan",
@@ -54,7 +90,45 @@
       ],
       "categories": [
         "Climate"
-      ]
+      ],
+      "verify": {
+        "params": {
+          "humidityId": 1,
+          "fanId": 1,
+          "threshold": 65
+        },
+        "steps": [
+          {
+            "check": {
+              "device": "fanId",
+              "value": false
+            }
+          },
+          {
+            "device": "humidityId",
+            "call": "setValue",
+            "args": [
+              90
+            ]
+          },
+          {
+            "check": {
+              "device": "fanId",
+              "value": true
+            }
+          },
+          {
+            "slider": "thresholdSlider",
+            "value": 95
+          },
+          {
+            "check": {
+              "device": "fanId",
+              "value": false
+            }
+          }
+        ]
+      }
     },
     {
       "id": "leak-alert",
@@ -78,7 +152,51 @@
       ],
       "categories": [
         "Alerts & alarms"
-      ]
+      ],
+      "verify": {
+        "params": {
+          "floodId": 1,
+          "sirenId": 1
+        },
+        "steps": [
+          {
+            "check": {
+              "device": "sirenId",
+              "value": false
+            }
+          },
+          {
+            "device": "floodId",
+            "call": "breach"
+          },
+          {
+            "check": {
+              "device": "sirenId",
+              "value": true
+            }
+          },
+          {
+            "check": {
+              "log": "water detected"
+            }
+          },
+          {
+            "device": "floodId",
+            "call": "clearBreach"
+          },
+          {
+            "check": {
+              "device": "sirenId",
+              "value": false
+            }
+          },
+          {
+            "check": {
+              "log": "water cleared"
+            }
+          }
+        ]
+      }
     },
     {
       "id": "light-at-sunset",
@@ -132,7 +250,45 @@
       "categories": [
         "Lights",
         "Presence"
-      ]
+      ],
+      "verify": {
+        "params": {
+          "motionId": 1,
+          "lightId": 1,
+          "minutes": 1
+        },
+        "steps": [
+          {
+            "check": {
+              "device": "lightId",
+              "value": false
+            }
+          },
+          {
+            "device": "motionId",
+            "call": "breach"
+          },
+          {
+            "check": {
+              "device": "lightId",
+              "value": true
+            }
+          },
+          {
+            "device": "motionId",
+            "call": "clearBreach"
+          },
+          {
+            "wait": "2m"
+          },
+          {
+            "check": {
+              "device": "lightId",
+              "value": false
+            }
+          }
+        ]
+      }
     },
     {
       "id": "notify-when-door-opens",
@@ -156,7 +312,37 @@
       "categories": [
         "Doors & windows",
         "Alerts & alarms"
-      ]
+      ],
+      "verify": {
+        "params": {
+          "doorId": 1
+        },
+        "steps": [
+          {
+            "device": "doorId",
+            "call": "breach"
+          },
+          {
+            "check": {
+              "log": "push: The door opened"
+            }
+          },
+          {
+            "device": "doorId",
+            "call": "clearBreach"
+          },
+          {
+            "device": "doorId",
+            "call": "breach"
+          },
+          {
+            "check": {
+              "log": "push: The door opened",
+              "count": 2
+            }
+          }
+        ]
+      }
     }
   ]
 }

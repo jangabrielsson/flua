@@ -20,5 +20,35 @@
   "categories": [
     "Doors & windows",
     "Alerts & alarms"
-  ]
+  ],
+  "verify": {
+    "params": {
+      "doorId": 1
+    },
+    "steps": [
+      {
+        "device": "doorId",
+        "call": "breach"
+      },
+      {
+        "check": {
+          "log": "push: The door opened"
+        }
+      },
+      {
+        "device": "doorId",
+        "call": "clearBreach"
+      },
+      {
+        "device": "doorId",
+        "call": "breach"
+      },
+      {
+        "check": {
+          "log": "push: The door opened",
+          "count": 2
+        }
+      }
+    ]
+  }
 }

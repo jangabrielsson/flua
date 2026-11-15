@@ -15,10 +15,12 @@ import asyncio
 import contextlib
 import http.server
 import json
+import os
 import re
 import sys
 import tempfile
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -35,6 +37,7 @@ INDEX_URL = "https://raw.githubusercontent.com/jangabrielsson/flua/main/recipes/
 RECIPE_URL = "https://raw.githubusercontent.com/jangabrielsson/flua/main/recipes/{id}/main.lua"
 _CACHE_ROOT = Path.home() / ".flua" / "recipes"
 _SIM_SPEED = 600.0  # 1 wall second = 10 virtual minutes in the sim
+_DEVNULL = open(os.devnull, "w", encoding="utf-8")  # QA logs go to files only
 
 _PAGE_PATH = Path(__file__).resolve().parent.parent / "setup_templates" / "qa_builder.html"
 
@@ -132,6 +135,145 @@ def _manifest_for(rid: str) -> dict[str, object] | None:
     return None
 
 
+def _parse_wait(value: object) -> float:
+    """A verify wait: a bare number (seconds) or '30s' / '2m' / '1h'."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    match = re.fullmatch(r"(\d+(?:\.\d+)?)\s*(s|m|h)?", str(value or "").strip())
+    if not match:
+        raise ValueError(f"bad wait {value!r} (use seconds, 30s, 2m, 1h)")
+    return float(match.group(1)) * {"s": 1, "m": 60, "h": 3600}[match.group(2) or "s"]
+
+
+async def _settle(engine: object, virtual_seconds: float) -> None:
+    """Advance the virtual clock by at least ``virtual_seconds`` (wall-bound):
+    the pump ticks the clock, so this waits real time until the virtual clock
+    has covered the span — deterministic under any pump cadence, unlike a
+    fixed wall sleep scaled by _SIM_SPEED. A wall cap keeps a drained pump
+    from hanging the verify run."""
+    start = engine.virtual_now()  # type: ignore[attr-defined]
+    deadline = time.monotonic() + 5.0
+    while engine.virtual_now() - start < virtual_seconds:  # type: ignore[attr-defined]
+        if time.monotonic() > deadline:
+            return
+        await asyncio.sleep(0.01)
+    await asyncio.sleep(0.02)  # one extra pump pass: timers at the boundary fire
+
+
+async def _run_verification(manifest: dict[str, object]) -> dict[str, object]:
+    """Run a recipe's declared verify scenario in the sim: seed the params,
+    drive the steps (device actions, weather, UI sliders, virtual waits),
+    check the outcomes, and report step-by-step. The clock runs at _SIM_SPEED;
+    every action settles ~30 virtual seconds, which also fires the recipes'
+    30s polls — scenarios complete in a couple of wall seconds."""
+    from ..engine import LuaEngine
+
+    rid = str(manifest.get("id") or "?")
+    scenario = manifest.get("verify")
+    if not isinstance(scenario, dict) or not isinstance(scenario.get("steps"), list):
+        return {"id": rid, "ok": False, "error": "no verify scenario in the manifest"}
+    code = _recipe_code(rid)
+    if code is None:
+        return {"id": rid, "ok": False, "error": "recipe not found"}
+    steps: list[dict[str, object]] = []
+    with tempfile.NamedTemporaryFile(
+        "w", prefix="flua-verify-", suffix=".log", delete=False, encoding="utf-8"
+    ) as handle:
+        log_path = Path(handle.name)
+    try:
+        engine = LuaEngine(speed=_SIM_SPEED, api_mode="local", log_stream=_DEVNULL)
+        engine.set_log_mode("text", str(log_path))
+        await engine.start()
+        try:
+            verify_params = scenario.get("params")
+            run_code = bake_params(code, verify_params if isinstance(verify_params, dict) else {})
+            params, seeded, _extra, seed_err = _seed_sim_devices(engine, run_code, manifest)
+            if seed_err is not None:
+                return {"id": rid, "ok": False, "error": seed_err}
+            run_code = bake_params(run_code, params)
+            qa_id, qa_err = engine.load_qa_file(engine.qa_temp_file(run_code))
+            if qa_id is None:
+                return {"id": rid, "ok": False, "error": qa_err or "cannot load the QA"}
+            device_ids = {entry["name"]: entry["simId"] for entry in seeded}
+            await _settle(engine, 30)  # the QA boots; the first 30s poll fires
+            ok = True
+            for step in scenario["steps"]:
+                if not isinstance(step, dict):
+                    steps.append({"passed": False, "detail": "bad step"})
+                    ok = False
+                    continue
+                passed, detail = await _verify_step(engine, step, device_ids, qa_id, log_path)
+                steps.append({"passed": passed, "detail": detail})
+                if not passed:
+                    ok = False
+            log = log_path.read_text(encoding="utf-8")
+            return {"id": rid, "ok": ok, "qa": qa_id, "steps": steps, "log": log}
+        finally:
+            await engine.stop()
+    finally:
+        log_path.unlink(missing_ok=True)
+
+
+async def _verify_step(
+    engine: object,
+    step: dict[str, object],
+    device_ids: dict[str, object],
+    qa_id: int,
+    log_path: Path,
+) -> tuple[bool, str]:
+    """One scenario step; device/slider/weather steps settle afterwards
+    (~30 virtual seconds — the recipes' poll interval) so the reaction
+    lands before the next check."""
+    if "device" in step:
+        name = str(step["device"])
+        device_id = device_ids.get(name)
+        if device_id is None:
+            return False, f"{name}: not seeded (device param unset)"
+        args = step.get("args")
+        _data, status = engine.api.dispatch(  # type: ignore[attr-defined]
+            "POST", f"/devices/{device_id}/action/{step['call']}", {"args": args or []}
+        )
+        await _settle(engine, 30)
+        return status in (200, 201, 202, 204), f"{name}:{step['call']} -> {status}"
+    if "slider" in step:
+        engine.api.dispatch(  # type: ignore[attr-defined]
+            "GET",
+            f"/plugins/callUIEvent?deviceID={qa_id}&elementName={step['slider']}"
+            f"&eventType=onChanged&value={step['value']}",
+        )
+        await _settle(engine, 30)
+        return True, f"slider {step['slider']} -> {step['value']}"
+    if "weather" in step:
+        changes = step["weather"]
+        engine.api.state.weather_overrides.update(changes)  # type: ignore[attr-defined]
+        await _settle(engine, 30)
+        return True, f"weather {changes}"
+    if "wait" in step:
+        try:
+            seconds = _parse_wait(step["wait"])
+        except ValueError as exc:
+            return False, str(exc)
+        await _settle(engine, seconds)
+        return True, f"waited {seconds:g}s (virtual)"
+    if "check" in step:
+        check = step["check"]
+        if isinstance(check, dict) and "device" in check:
+            device_id = device_ids.get(str(check["device"]))
+            dev = engine.api.state.devices.get(device_id) if device_id is not None else None  # type: ignore[attr-defined]
+            actual = (dev or {}).get("properties", {}).get("value")
+            expected = check["value"]
+            passed = actual == expected
+            return passed, f"{check['device']}.value == {expected!r} (got {actual!r})"
+        if isinstance(check, dict) and "log" in check:
+            text = log_path.read_text(encoding="utf-8")
+            count = text.count(str(check["log"]))
+            want = check.get("count", 1)
+            passed = count == want if isinstance(want, int) else count >= 1
+            return passed, f"log contains {check['log']!r} x{count} (want {want})"
+        return False, "check needs device+value or log"
+    return False, "step needs one of device/slider/weather/wait/check"
+
+
 def _seed_sim_devices(
     engine: object, code: str, manifest: dict[str, object] | None
 ) -> tuple[dict[str, object], list[dict[str, object]], list[dict[str, object]], str | None]:
@@ -184,7 +326,7 @@ async def _run_simulation(
     from ..engine import LuaEngine
 
     minutes = max(1, min(int(minutes or 5), 30))
-    engine = LuaEngine(speed=_SIM_SPEED, api_mode="local")
+    engine = LuaEngine(speed=_SIM_SPEED, api_mode="local", log_stream=_DEVNULL)
     engine.set_log_mode("text", str(log_path))
     qa_info: dict[str, object] | None = None
     extra: list[dict[str, object]] = []
@@ -267,7 +409,7 @@ def _start_ui_session(
 
     async def _start(
     ) -> tuple[object, object, int, list[dict[str, object]], list[dict[str, object]]]:
-        engine = LuaEngine(api_mode="local")
+        engine = LuaEngine(api_mode="local", log_stream=_DEVNULL)
         await engine.start()
         try:
             params, seeded, extra, seed_err = _seed_sim_devices(engine, code, manifest)
@@ -541,9 +683,50 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         default=8096,
         help="local port (default 8096; 0 = pick a free one)",
     )
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="list the installed recipe templates",
+    )
+    parser.add_argument(
+        "--verify",
+        metavar="ID",
+        help="run a recipe's verify scenario in the sim (see --list)",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="machine-readable output for --list and --verify (agents)",
+    )
 
 
 def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
+    if args.list:
+        index = cached_index()
+        if args.json:
+            print(json.dumps(index, indent=2, ensure_ascii=False))
+            return 0
+        for recipe in index.get("recipes", []):
+            categories = ", ".join(recipe.get("categories") or [])
+            suffix = f"  [{categories}]" if categories else ""
+            print(f"{recipe.get('id')}  {recipe.get('title')}{suffix}")
+        return 0
+    if args.verify:
+        manifest = _manifest_for(str(args.verify))
+        if manifest is None:
+            print(f"builder: unknown recipe {args.verify!r} (try --list)", file=sys.stderr)
+            return 1
+        result = asyncio.run(_run_verification(manifest))
+        if args.json:
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+        else:
+            print(f"verify {result['id']}")
+            for step in result.get("steps", []):
+                print(f"  [{'ok' if step['passed'] else 'FAIL'}] {step['detail']}")
+            if result.get("error"):
+                print(f"  [FAIL] {result['error']}")
+            print(f"{result['id']}: {'OK' if result['ok'] else 'FAILED'}")
+        return 0 if result["ok"] else 1
     try:
         server = serve_builder(args.port)
     except OSError as exc:

@@ -1599,6 +1599,8 @@ format (individual `.lua` files) and only the HC3 sees `.fqa`:
 .venv/bin/flua --tool icons download --dump www   # from a var/www copy — no network (partial: the dump ships a subset)
 .venv/bin/flua --tool icons ui                    # icon manager: browser page to list/upload/delete user icon sets
 .venv/bin/flua --tool build                        # QA builder: pick a recipe, pick your devices, generate, simulate, view UI, upload
+.venv/bin/flua --tool build --list                 # the installed recipe templates
+.venv/bin/flua --tool build --verify leak-alert    # run the recipe's verify scenario in the sim (--json for agents)
 .venv/bin/flua --tool inspectFQA my.fqa [--json]  # what a packed .fqa contains: inventory, vars, leak scan
 .venv/bin/flua --tool pack qa.lua --verify        # pack, then inspect the artifact (placeholder/leak checks)
 
@@ -1615,8 +1617,11 @@ title/description/categories/params — a device param's `filter` is an
 `isTypeOf` base type for its picker — and optionally `simDevices`: bundled
 sim devices loaded into the sim run alongside the picked devices, so the
 user can drive the recipe's world from the web view (the weather manager
-and its sliders for heat-when-cold). `scripts/gen-recipes-index.py`
-regenerates the index and validates every field.
+and its sliders for heat-when-cold). An optional `verify` block declares
+the scenario `--verify` runs: the params to seed, the steps (device calls,
+weather changes, UI slider drags, virtual waits), and the expected
+outcomes. `scripts/gen-recipes-index.py` regenerates the index and
+validates every field.
 
 The HC3's standard icon library (~13,000 state files, ~65 MB) is Fibaro
 copyrighted artwork, so flua ships only the manifest (`devices/
