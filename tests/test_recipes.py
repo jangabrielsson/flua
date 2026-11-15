@@ -2,6 +2,7 @@
 the flua repo at build time); the wheel ships an offline snapshot under
 setup_templates/recipes. These tests pin the index against the manifests
 and prove every recipe's main.lua checks and boots."""
+
 from __future__ import annotations
 
 import json
@@ -81,3 +82,12 @@ def test_recipes_have_no_module_level_self() -> None:
     for main in sorted((REPO / "recipes").glob("*/main.lua")):
         head = main.read_text(encoding="utf-8").split("function ", 1)[0]
         assert "self" not in head, f"{main}: module scope uses self"
+
+
+def test_recipes_use_fibaro_call_for_device_actions() -> None:
+    # device actions go through fibaro.call(id, "turnOn") — the
+    # HC3-idiomatic form that stays readable for the builder audience;
+    # raw api.post to the action endpoint is banned in the recipe library
+    for main in sorted((REPO / "recipes").glob("*/main.lua")):
+        text = main.read_text(encoding="utf-8")
+        assert 'api.post("/devices/' not in text, f"{main}: raw device post"

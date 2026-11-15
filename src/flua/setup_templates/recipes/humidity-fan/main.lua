@@ -29,8 +29,8 @@ function QuickApp:checkHumidity()
   local fan = api.get("/devices/" .. FAN)
   local on = fan and fan.properties and fan.properties.value == true
   if humidity > THRESHOLD and not on then
-    api.post("/devices/" .. FAN .. "/action/turnOn")
+    fibaro.call(FAN, "turnOn")
   elseif humidity <= THRESHOLD - 5 and on then  -- 5% hysteresis
-    api.post("/devices/" .. FAN .. "/action/turnOff")
+    fibaro.call(FAN, "turnOff")
   end
 end

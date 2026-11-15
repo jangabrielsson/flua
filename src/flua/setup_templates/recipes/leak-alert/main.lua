@@ -23,7 +23,7 @@ function QuickApp:checkFlood()
   local flood = api.get("/devices/" .. FLOOD)
   if flood and flood.properties and flood.properties.value == true then
     fibaro.call(2, "sendPush", "Water detected!")
-    if SIREN > 0 then api.post("/devices/" .. SIREN .. "/action/turnOn") end
+    if SIREN > 0 then fibaro.call(SIREN, "turnOn") end
     self:debug("water detected")
   end
 end

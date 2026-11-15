@@ -26,10 +26,10 @@ end
 function QuickApp:checkMotion()
   local motion = api.get("/devices/" .. MOTION)
   if motion and motion.properties and motion.properties.value == true then
-    api.post("/devices/" .. LIGHT .. "/action/turnOn")
+    fibaro.call(LIGHT, "turnOn")
     if self._offTimer then clearTimeout(self._offTimer) end
     self._offTimer = setTimeout(function()
-      api.post("/devices/" .. LIGHT .. "/action/turnOff")
+      fibaro.call(LIGHT, "turnOff")
     end, MINUTES * 60 * 1000)
   end
 end

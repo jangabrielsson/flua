@@ -37,6 +37,6 @@ function QuickApp:scheduleNext()
 end
 
 function QuickApp:turnOn()
-  api.post("/devices/" .. LIGHT .. "/action/turnOn")
+  fibaro.call(LIGHT, "turnOn")
   self:debug("light on")
 end
