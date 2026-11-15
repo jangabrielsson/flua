@@ -4,6 +4,14 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.169] - 2026-11-15
+
+### Changed
+- tests: the plain-readonly gate fake gets the readonly+call hook
+- readonly+call: device actions pass, everything else stays blocked
+- readonly mode: online reads, no HC3 writes
+- ADR 0015 — the recipe builder is a parked tool, not a wizard
+
 ## [0.1.168] - 2026-11-15
 
 ### Changed
