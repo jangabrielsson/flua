@@ -6,10 +6,12 @@
 --%%var:message=The door opened
 -- =====================================================================
 -- --------------- EOH ---------------
-local DOOR = tonumber(self:getVariable("doorId")) or 0
-local MESSAGE = self:getVariable("message") or "The door opened"
+local DOOR
+local MESSAGE
 
 function QuickApp:onInit()
+  DOOR = tonumber(self:getVariable("doorId")) or 0
+  MESSAGE = self:getVariable("message") or 'The door opened'
   if DOOR == 0 then
     self:debug("set doorId (the door sensor's id) and restart")
     return

@@ -72,3 +72,12 @@ async def test_every_recipe_boots(tmp_path, capsys) -> None:
             assert qa_id is not None and err is None, f"{main}: {err}"
     finally:
         await engine.stop()
+
+
+def test_recipes_have_no_module_level_self() -> None:
+    # on the real HC3 there is no `self` outside method bodies — module
+    # scope must only declare locals (the sim tolerates self there; the
+    # HC3 does not, and recipes are controller code first)
+    for main in sorted((REPO / "recipes").glob("*/main.lua")):
+        head = main.read_text(encoding="utf-8").split("function ", 1)[0]
+        assert "self" not in head, f"{main}: module scope uses self"

@@ -7,11 +7,14 @@
 --%%var:threshold=65      -- humidity % that starts the fan
 -- =====================================================================
 -- --------------- EOH ---------------
-local HUMIDITY = tonumber(self:getVariable("humidityId")) or 0
-local FAN = tonumber(self:getVariable("fanId")) or 0
-local THRESHOLD = tonumber(self:getVariable("threshold")) or 65
+local HUMIDITY
+local FAN
+local THRESHOLD
 
 function QuickApp:onInit()
+  HUMIDITY = tonumber(self:getVariable("humidityId")) or 0
+  FAN = tonumber(self:getVariable("fanId")) or 0
+  THRESHOLD = tonumber(self:getVariable("threshold")) or 65
   if HUMIDITY == 0 or FAN == 0 then
     self:debug("set humidityId and fanId, then restart")
     return

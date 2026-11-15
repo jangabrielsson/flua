@@ -6,10 +6,12 @@
 --%%var:offset=-30        -- minutes before (-) / after (+) sunset
 -- =====================================================================
 -- --------------- EOH ---------------
-local LIGHT = tonumber(self:getVariable("deviceId")) or 0
-local OFFSET = tonumber(self:getVariable("offset")) or -30
+local LIGHT
+local OFFSET
 
 function QuickApp:onInit()
+  LIGHT = tonumber(self:getVariable("deviceId")) or 0
+  OFFSET = tonumber(self:getVariable("offset")) or -30
   if LIGHT == 0 then
     self:debug("set deviceId (the light's id) and restart")
     return

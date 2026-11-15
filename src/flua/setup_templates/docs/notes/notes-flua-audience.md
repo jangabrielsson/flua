@@ -92,4 +92,9 @@ that already serves `examples/iconInstall.lua`'s icons
 1. Posting discipline + the first 5 recipes as forum downloads (no code).
 2. `recipes/` layout + `index.json` + the builder page (fetch → pick →
    generate → simulate → upload), starting with the 5 recipes.
+   **Shipped as the MVP**: `flua --tool build` serves the builder page —
+   recipe list from the index (GitHub refresh + shipped fallback), HC3-fed
+   pickers with typed-id fallback, param baking into the marked --%%var
+   lines, and a `.lua` download. Simulate-in-place and upload are the next
+   slice.
 3. One-click installers (macOS/Windows) once the builder is worth opening.

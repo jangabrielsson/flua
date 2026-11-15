@@ -6,10 +6,12 @@
 --%%var:sirenId=0         -- optional siren/switch to turn on (0 = none)
 -- =====================================================================
 -- --------------- EOH ---------------
-local FLOOD = tonumber(self:getVariable("floodId")) or 0
-local SIREN = tonumber(self:getVariable("sirenId")) or 0
+local FLOOD
+local SIREN
 
 function QuickApp:onInit()
+  FLOOD = tonumber(self:getVariable("floodId")) or 0
+  SIREN = tonumber(self:getVariable("sirenId")) or 0
   if FLOOD == 0 then
     self:debug("set floodId (the flood sensor's id) and restart")
     return

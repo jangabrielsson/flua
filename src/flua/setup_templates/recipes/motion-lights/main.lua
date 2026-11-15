@@ -7,11 +7,14 @@
 --%%var:minutes=5         -- how long the light stays on after motion
 -- =====================================================================
 -- --------------- EOH ---------------
-local MOTION = tonumber(self:getVariable("motionId")) or 0
-local LIGHT = tonumber(self:getVariable("lightId")) or 0
-local MINUTES = tonumber(self:getVariable("minutes")) or 5
+local MOTION
+local LIGHT
+local MINUTES
 
 function QuickApp:onInit()
+  MOTION = tonumber(self:getVariable("motionId")) or 0
+  LIGHT = tonumber(self:getVariable("lightId")) or 0
+  MINUTES = tonumber(self:getVariable("minutes")) or 5
   if MOTION == 0 or LIGHT == 0 then
     self:debug("set motionId and lightId, then restart")
     return
