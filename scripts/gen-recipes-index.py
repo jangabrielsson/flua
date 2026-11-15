@@ -75,7 +75,7 @@ def load_manifests(root: Path) -> tuple[list[dict], list[str]]:
             if not isinstance(steps, list) or not steps:
                 problems.append(f"{folder.name}: verify needs a non-empty steps list")
             else:
-                kinds = ("device", "slider", "weather", "wait", "check")
+                kinds = ("device", "slider", "weather", "wait", "waitUntil", "check")
                 for step in steps:
                     used = [k for k in kinds if k in step]
                     if len(used) != 1:
@@ -87,12 +87,19 @@ def load_manifests(root: Path) -> tuple[list[dict], list[str]]:
                         problems.append(f"{folder.name}: a device step needs a call")
                     elif used[0] == "check" and not isinstance(step.get("check"), dict):
                         problems.append(f"{folder.name}: a check step needs device/log")
+                    elif used[0] == "waitUntil" and not isinstance(step.get("waitUntil"), dict):
+                        problems.append(f"{folder.name}: a waitUntil step needs device/value")
                 start = verify.get("start")
-                if start is not None and (
-                    not isinstance(start, dict) or start.get("before") != "sunset"
+                if start is not None and not (
+                    isinstance(start, str)
+                    or (
+                        isinstance(start, dict)
+                        and (start.get("before") == "sunset" or start.get("time"))
+                    )
                 ):
                     problems.append(
-                        f"{folder.name}: verify start must be {{before='sunset', by='2m'}}"
+                        f"{folder.name}: verify start must be a time/date string, "
+                        "{before='sunset', by='2m'}, or {time='12:00'}"
                     )
         recipes.append(manifest)
     return recipes, problems

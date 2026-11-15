@@ -22,8 +22,7 @@
   ],
   "verify": {
     "start": {
-      "before": "sunset",
-      "by": "2m"
+      "time": "12:00"
     },
     "params": {
       "deviceId": 1,
@@ -37,7 +36,11 @@
         }
       },
       {
-        "wait": "5m"
+        "waitUntil": {
+          "device": "deviceId",
+          "value": true,
+          "timeout": "12h"
+        }
       },
       {
         "check": {

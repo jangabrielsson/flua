@@ -37,6 +37,7 @@ INDEX_URL = "https://raw.githubusercontent.com/jangabrielsson/flua/main/recipes/
 RECIPE_URL = "https://raw.githubusercontent.com/jangabrielsson/flua/main/recipes/{id}/main.lua"
 _CACHE_ROOT = Path.home() / ".flua" / "recipes"
 _SIM_SPEED = 600.0  # 1 wall second = 10 virtual minutes in the sim
+_VERIFY_SPEED = 6000.0  # verification: 1 wall second = 100 virtual minutes
 _DEVNULL = open(os.devnull, "w", encoding="utf-8")  # QA logs go to files only
 
 _PAGE_PATH = Path(__file__).resolve().parent.parent / "setup_templates" / "qa_builder.html"
@@ -157,7 +158,10 @@ async def _settle(engine: object, virtual_seconds: float) -> None:
         if time.monotonic() > deadline:
             return
         await asyncio.sleep(0.01)
-    await asyncio.sleep(0.02)  # one extra pump pass: timers at the boundary fire
+    # a wall-clock grace, not a virtual one: reaction chains (action ->
+    # property update -> refresh event -> subscriber) span several pump
+    # passes, and at high speeds a virtual grace shrinks to nothing
+    await asyncio.sleep(0.08)
 
 
 async def _run_verification(manifest: dict[str, object]) -> dict[str, object]:
@@ -181,7 +185,7 @@ async def _run_verification(manifest: dict[str, object]) -> dict[str, object]:
     ) as handle:
         log_path = Path(handle.name)
     try:
-        engine = LuaEngine(speed=_SIM_SPEED, api_mode="local", log_stream=_DEVNULL)
+        engine = LuaEngine(speed=_VERIFY_SPEED, api_mode="local", log_stream=_DEVNULL)
         engine.set_log_mode("text", str(log_path))
         await engine.start()
         try:
@@ -201,6 +205,22 @@ async def _run_verification(manifest: dict[str, object]) -> dict[str, object]:
                     now.year, now.month, now.day, int(match.group(1)), int(match.group(2))
                 ).timestamp()
                 engine.clock.set_start(epoch - by)  # type: ignore[attr-defined]
+            elif isinstance(start, dict) and start.get("time"):
+                # today at the given time ("12:00") — a fixed anchor that
+                # is safely before sunset for any configured location
+                match = re.fullmatch(r"(\d{1,2}):(\d{2})", str(start["time"]))
+                if not match:
+                    return {"id": rid, "ok": False, "error": f"bad start time {start['time']!r}"}
+                now = datetime.fromtimestamp(engine.virtual_now())  # type: ignore[attr-defined]
+                epoch = datetime(
+                    now.year, now.month, now.day, int(match.group(1)), int(match.group(2))
+                ).timestamp()
+                engine.clock.set_start(epoch)  # type: ignore[attr-defined]
+            elif isinstance(start, str):
+                # a full date ("2027/10/6 12:00:20") for fixed-date scenarios
+                from ..clock import parse_start_time
+
+                engine.clock.set_start(parse_start_time(start))  # type: ignore[attr-defined]
             verify_params = scenario.get("params")
             run_code = bake_params(code, verify_params if isinstance(verify_params, dict) else {})
             params, seeded, _extra, seed_err = _seed_sim_devices(engine, run_code, manifest)
@@ -271,23 +291,47 @@ async def _verify_step(
             return False, str(exc)
         await _settle(engine, seconds)
         return True, f"waited {seconds:g}s (virtual)"
+    if "waitUntil" in step:
+        spec = step["waitUntil"]
+        device_id = device_ids.get(str(spec["device"]))
+        expected = spec["value"]
+        timeout = _parse_wait(spec.get("timeout", "1h"))
+        deadline = time.monotonic() + timeout / _VERIFY_SPEED + 5.0
+        while True:
+            dev = engine.api.state.devices.get(device_id)  # type: ignore[attr-defined]
+            actual = (dev or {}).get("properties", {}).get("value")
+            if actual == expected:
+                return True, f"{spec['device']}.value became {expected!r}"
+            if time.monotonic() > deadline:
+                return False, f"{spec['device']}.value still {actual!r} (timeout {timeout:g}s)"
+            await _settle(engine, 300)
     if "check" in step:
         check = step["check"]
+        deadline = time.monotonic() + 0.5  # the reaction may be mid-chain
         if isinstance(check, dict) and "device" in check:
             device_id = device_ids.get(str(check["device"]))
-            dev = engine.api.state.devices.get(device_id) if device_id is not None else None  # type: ignore[attr-defined]
-            actual = (dev or {}).get("properties", {}).get("value")
-            expected = check["value"]
-            passed = actual == expected
-            return passed, f"{check['device']}.value == {expected!r} (got {actual!r})"
+            while True:
+                dev = engine.api.state.devices.get(device_id) if device_id is not None else None  # type: ignore[attr-defined]
+                actual = (dev or {}).get("properties", {}).get("value")
+                expected = check["value"]
+                if actual == expected:
+                    return True, f"{check['device']}.value == {expected!r} (got {actual!r})"
+                if time.monotonic() > deadline:
+                    return False, f"{check['device']}.value == {expected!r} (got {actual!r})"
+                await asyncio.sleep(0.02)
         if isinstance(check, dict) and "log" in check:
-            text = log_path.read_text(encoding="utf-8")
-            count = text.count(str(check["log"]))
             want = check.get("count", 1)
-            passed = count == want if isinstance(want, int) else count >= 1
-            return passed, f"log contains {check['log']!r} x{count} (want {want})"
+            while True:
+                text = log_path.read_text(encoding="utf-8")
+                count = text.count(str(check["log"]))
+                passed = count == want if isinstance(want, int) else count >= 1
+                if passed:
+                    return True, f"log contains {check['log']!r} x{count} (want {want})"
+                if time.monotonic() > deadline:
+                    return False, f"log contains {check['log']!r} x{count} (want {want})"
+                await asyncio.sleep(0.02)
         return False, "check needs device+value or log"
-    return False, "step needs one of device/slider/weather/wait/check"
+    return False, "step needs one of device/slider/weather/wait/waitUntil/check"
 
 
 def _seed_sim_devices(

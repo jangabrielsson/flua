@@ -1621,10 +1621,12 @@ user can drive the recipe's world from the web view (the weather manager
 and its sliders for heat-when-cold). An optional `verify` block declares
 the scenario `--verify` runs: the params to seed, the steps (device calls,
 weather changes, UI slider drags, virtual waits), and the expected
-outcomes; a `start` of `{before="sunset", by="2m"}` rewinds the virtual
-clock to just before the sim's actual sunset for time-of-day recipes.
-`scripts/gen-recipes-index.py` regenerates the index and validates every
-field.
+outcomes; a `start` anchors the virtual clock — `{time="12:00"}` (today at
+noon, safely before sunset), a full date-time string, or
+`{before="sunset", by="2m"}` for short sunset timers — and a `waitUntil`
+step advances virtual time until a device reaches a value (with a
+timeout). `scripts/gen-recipes-index.py` regenerates the index and
+validates every field.
 
 The HC3's standard icon library (~13,000 state files, ~65 MB) is Fibaro
 copyrighted artwork, so flua ships only the manifest (`devices/
