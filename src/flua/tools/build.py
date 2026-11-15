@@ -694,10 +694,33 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         help="run a recipe's verify scenario in the sim (see --list)",
     )
     parser.add_argument(
+        "--verify-all",
+        action="store_true",
+        help="run the verify scenarios of every recipe that declares one",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="machine-readable output for --list and --verify (agents)",
     )
+
+
+def _verify_all() -> dict[str, object]:
+    """Run every declared verify scenario; returns the aggregate verdict
+    (recipes without a scenario are listed as skipped, not failures)."""
+    results: list[dict[str, object]] = []
+    skipped: list[str] = []
+    for recipe in cached_index().get("recipes", []):
+        rid = str(recipe.get("id") or "")
+        if isinstance(recipe.get("verify"), dict):
+            results.append(asyncio.run(_run_verification(recipe)))
+        else:
+            skipped.append(rid)
+    return {
+        "ok": all(result["ok"] for result in results),
+        "results": results,
+        "skipped": skipped,
+    }
 
 
 def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
@@ -711,6 +734,23 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
             suffix = f"  [{categories}]" if categories else ""
             print(f"{recipe.get('id')}  {recipe.get('title')}{suffix}")
         return 0
+    if args.verify_all:
+        verdict = _verify_all()
+        if args.json:
+            print(json.dumps(verdict, indent=2, ensure_ascii=False))
+        else:
+            for result in verdict["results"]:
+                print(f"{result['id']}: {'OK' if result['ok'] else 'FAILED'}")
+                if not result["ok"]:
+                    for step in result.get("steps", []):
+                        if not step["passed"]:
+                            print(f"  [FAIL] {step['detail']}")
+                    if result.get("error"):
+                        print(f"  [FAIL] {result['error']}")
+            if verdict["skipped"]:
+                print("no scenario: " + ", ".join(verdict["skipped"]))
+            print("all templates OK" if verdict["ok"] else "TEMPLATE VERIFICATION FAILED")
+        return 0 if verdict["ok"] else 1
     if args.verify:
         manifest = _manifest_for(str(args.verify))
         if manifest is None:

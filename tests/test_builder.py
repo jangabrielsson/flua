@@ -485,3 +485,15 @@ def test_builder_cli_lists_and_verifies_for_agents(monkeypatch, tmp_path) -> Non
         timeout=60,
     )
     assert result.returncode == 1
+
+
+def test_builder_verify_all_runs_every_scenario(monkeypatch) -> None:
+    # the aggregate gate CI runs when templates change: every declared
+    # scenario passes, and only light-at-sunset (sun-dependent) is skipped
+    from flua.tools import build
+
+    monkeypatch.setattr(build, "_CACHE_ROOT", Path(tempfile.mkdtemp()))
+    verdict = build._verify_all()
+    assert verdict["ok"], verdict
+    assert len(verdict["results"]) == 5
+    assert verdict["skipped"] == ["light-at-sunset"]

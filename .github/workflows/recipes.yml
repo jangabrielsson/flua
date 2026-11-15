@@ -1,0 +1,39 @@
+name: recipes
+
+# The template scenarios run only when the templates (or the machinery
+# that verifies them) change — a push that only touches engine code does
+# not pay for five simulated-houses verification runs. The plain suite
+# (tests.yml) still boots every recipe on every push; this gate runs the
+# full scenarios, so a faulty template cannot ship in a release.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "recipes/**"
+      - "src/flua/setup_templates/recipes/**"
+      - "src/flua/simdevices/**"
+      - "src/flua/tools/build.py"
+      - "scripts/gen-recipes-index.py"
+  pull_request:
+    paths:
+      - "recipes/**"
+      - "src/flua/setup_templates/recipes/**"
+      - "src/flua/simdevices/**"
+      - "src/flua/tools/build.py"
+      - "scripts/gen-recipes-index.py"
+
+concurrency:
+  group: recipes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - run: python -m flua --tool build --verify-all --json
