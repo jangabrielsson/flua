@@ -16,6 +16,7 @@ import http.server
 import json
 import re
 import sys
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -318,13 +319,21 @@ class _BuilderHandler(http.server.BaseHTTPRequestHandler):
             except (TypeError, ValueError):
                 minutes = 5
             manifest = _manifest_for(rid) if re.fullmatch(r"[a-z0-9-]+", rid) else None
-            log_path = _CACHE_ROOT.parent / "sim.log"
-            log_path.parent.mkdir(parents=True, exist_ok=True)
-            result = asyncio.run(_run_simulation(code, manifest, minutes, log_path))
+            # a fresh log file per run: set_log_mode appends, so a shared
+            # path would leak stale lines from earlier runs (and concurrent
+            # simulations would interleave)
+            with tempfile.NamedTemporaryFile(
+                "w", prefix="flua-sim-", suffix=".log", delete=False, encoding="utf-8"
+            ) as handle:
+                log_path = Path(handle.name)
             try:
-                result["log"] = log_path.read_text(encoding="utf-8")
-            except OSError:
-                result["log"] = ""
+                result = asyncio.run(_run_simulation(code, manifest, minutes, log_path))
+                try:
+                    result["log"] = log_path.read_text(encoding="utf-8")
+                except OSError:
+                    result["log"] = ""
+            finally:
+                log_path.unlink(missing_ok=True)
             self._json(200, result)
             return
         self._json(404, {"error": "not found"})
