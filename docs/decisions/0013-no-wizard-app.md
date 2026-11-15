@@ -1,6 +1,6 @@
 # 0013 — no wizard app; the agent loop is the product surface
 
-- **Status:** active
+- **Status:** active, **amended by ADR 0015** (a parked recipe-builder tool)
 - **Date:** 2026-11-09
 
 ## Context

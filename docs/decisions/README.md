@@ -18,5 +18,6 @@ decision changes.
 | [0010](0010-mcp-ships-in-the-wheel.md) | the MCP server ships in the fibaro-flua wheel as a second entry point | active |
 | [0011](0011-streamable-http-transport.md) | flua-mcp serves Streamable HTTP in stateless mode, opt-in, loopback + token-guarded | active |
 | [0012](0012-interfaces-stored-not-emulated.md) | device interfaces are stored, not emulated — no properties, actions, or UI effects | active |
-| [0013](0013-no-wizard-app.md) | no wizard app; the agent loop is the product surface — elicitation and verification instead | active |
+| [0013](0013-no-wizard-app.md) | no wizard app; the agent loop is the product surface — elicitation and verification instead | active, amended by 0015 |
 | [0014](0014-device-schemas.md) | device structures and interface semantics derive from the distilled type/interface schema | active |
+| [0015](0015-recipe-builder-tool.md) | the recipe builder is a tool on top of flua (engine-first, CLI/JSON), parked as a PoC | active |

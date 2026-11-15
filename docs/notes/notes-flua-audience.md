@@ -98,4 +98,6 @@ that already serves `examples/iconInstall.lua`'s icons
    lines, a `.lua` download, direct upload to the HC3 (import endpoint),
    and simulate-in-place: the generated QA runs on the laptop with a
    virtual clock, picked devices re-pointed at bundled sim devices.
+   **Parked as a PoC (2026-11-15)** — waiting for forum feedback before
+   more investment; ADR 0015 delimits it against the no-wizard decision.
 3. One-click installers (macOS/Windows) once the builder is worth opening.
