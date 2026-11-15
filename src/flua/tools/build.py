@@ -134,16 +134,19 @@ def _manifest_for(rid: str) -> dict[str, object] | None:
 
 def _seed_sim_devices(
     engine: object, code: str, manifest: dict[str, object] | None
-) -> tuple[dict[str, object], list[dict[str, object]], str | None]:
-    """Load a bundled sim device for every picked (nonzero) device param and
-    return (bake-params, seeded, error) — the bake params re-point the code
-    at the sim ids, so the QA polls a real sim world instead of empty air."""
+) -> tuple[dict[str, object], list[dict[str, object]], list[dict[str, object]], str | None]:
+    """Load a bundled sim device for every picked (nonzero) device param —
+    the bake params re-point the code at the sim ids, so the QA polls a real
+    sim world instead of empty air — plus the recipe's declared simDevices
+    (world devices the user drives from the view, like the weatherMgr).
+    Returns (bake-params, seeded, extra, error)."""
     from ..engine import SIM_DEVICES_DIR
 
     params: dict[str, object] = {}
     seeded: list[dict[str, object]] = []
+    extra: list[dict[str, object]] = []
     if not manifest:
-        return params, seeded, None
+        return params, seeded, extra, None
     for param in manifest.get("params", []):
         if param.get("kind") != "device" or not param.get("filter"):
             continue
@@ -156,10 +159,17 @@ def _seed_sim_devices(
             continue
         sim_id, sim_err = engine.load_sim_device(kind)
         if sim_id is None:
-            return params, seeded, f"sim device {kind}: {sim_err}"
+            return params, seeded, extra, f"sim device {kind}: {sim_err}"
         params[name] = sim_id
         seeded.append({"name": name, "kind": kind, "simId": sim_id})
-    return params, seeded, None
+    for name in manifest.get("simDevices") or []:
+        if not isinstance(name, str) or not (SIM_DEVICES_DIR / f"{name}.lua").is_file():
+            continue
+        sim_id, sim_err = engine.load_sim_device(name)
+        if sim_id is None:
+            return params, seeded, extra, f"sim device {name}: {sim_err}"
+        extra.append({"name": name, "kind": name, "simId": sim_id})
+    return params, seeded, extra, None
 
 
 async def _run_simulation(
@@ -177,10 +187,11 @@ async def _run_simulation(
     engine = LuaEngine(speed=_SIM_SPEED, api_mode="local")
     engine.set_log_mode("text", str(log_path))
     qa_info: dict[str, object] | None = None
+    extra: list[dict[str, object]] = []
     error: str | None = None
     await engine.start()
     try:
-        params, seeded, seed_err = _seed_sim_devices(engine, code, manifest)
+        params, seeded, extra, seed_err = _seed_sim_devices(engine, code, manifest)
         error = seed_err
         if error is None:
             run_code = bake_params(code, params) if params else code
@@ -201,6 +212,7 @@ async def _run_simulation(
     return {
         "error": error,
         "devices": seeded,
+        "simDevices": extra,
         "virtualMinutes": minutes,
         "qa": qa_info,
         "clock": clock,
@@ -243,21 +255,22 @@ def _stop_ui_session() -> None:
 
 def _start_ui_session(
     code: str, manifest: dict[str, object] | None
-) -> tuple[str, dict[str, object], list[dict[str, object]]]:
+) -> tuple[str, dict[str, object], list[dict[str, object]], list[dict[str, object]]]:
     """Boot the generated QA on a persistent engine and serve its web view.
-    Returns (url, qa, seeded); the last code wins — a new click replaces
-    the previous session."""
+    Returns (url, qa, seeded, extra); the last code wins — a new click
+    replaces the previous session."""
     from ..engine import LuaEngine
     from ..http_server import ApiServer
 
     _stop_ui_session()
     loop = asyncio.new_event_loop()
 
-    async def _start() -> tuple[object, object, int, list[dict[str, object]]]:
+    async def _start(
+    ) -> tuple[object, object, int, list[dict[str, object]], list[dict[str, object]]]:
         engine = LuaEngine(api_mode="local")
         await engine.start()
         try:
-            params, seeded, seed_err = _seed_sim_devices(engine, code, manifest)
+            params, seeded, extra, seed_err = _seed_sim_devices(engine, code, manifest)
             if seed_err is not None:
                 raise RuntimeError(seed_err)
             run_code = bake_params(code, params) if params else code
@@ -272,11 +285,11 @@ def _start_ui_session(
         except BaseException:
             await engine.stop()
             raise
-        return engine, server, qa_id, seeded
+        return engine, server, qa_id, seeded, extra
 
     threading.Thread(target=loop.run_forever, name="flua-builder-ui", daemon=True).start()
     try:
-        engine, server, qa_id, seeded = asyncio.run_coroutine_threadsafe(
+        engine, server, qa_id, seeded, extra = asyncio.run_coroutine_threadsafe(
             _start(), loop
         ).result(timeout=30)
     except BaseException:
@@ -285,7 +298,7 @@ def _start_ui_session(
     with _UI_LOCK:
         _UI_SESSION.update(engine=engine, server=server, loop=loop)
     qa = {"id": qa_id, "name": (manifest or {}).get("title") or "QuickApp"}
-    return f"http://127.0.0.1:{server.port}/", qa, seeded
+    return f"http://127.0.0.1:{server.port}/", qa, seeded, extra
 
 
 class _BuilderHandler(http.server.BaseHTTPRequestHandler):
@@ -412,11 +425,11 @@ class _BuilderHandler(http.server.BaseHTTPRequestHandler):
                 return
             manifest = _manifest_for(rid) if re.fullmatch(r"[a-z0-9-]+", rid) else None
             try:
-                url, qa, seeded = _start_ui_session(code, manifest)
+                url, qa, seeded, extra = _start_ui_session(code, manifest)
             except Exception as exc:
                 self._json(502, {"error": str(exc)})
                 return
-            self._json(200, {"url": url, "qa": qa, "devices": seeded})
+            self._json(200, {"url": url, "qa": qa, "devices": seeded, "simDevices": extra})
             return
         if parsed.path == "/api/simulate":
             rid = str(request.get("id") or "")

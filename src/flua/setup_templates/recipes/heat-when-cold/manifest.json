@@ -1,0 +1,11 @@
+{
+  "id": "heat-when-cold",
+  "title": "Heater on cold weather",
+  "description": "Turns a heater on when the outside temperature drops below a threshold, off 1°C above it.",
+  "categories": ["Climate"],
+  "simDevices": ["weatherMgr"],
+  "params": [
+    {"name": "heaterId", "label": "Heater", "kind": "device", "filter": "com.fibaro.binarySwitch", "default": 0},
+    {"name": "threshold", "label": "Start below (°C)", "kind": "number", "default": 10}
+  ]
+}

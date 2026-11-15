@@ -79,7 +79,8 @@
       <button class="primary" id="simulate" style="background:#7c3aed">Simulate</button>
       <input type="number" id="simMinutes" value="5" min="1" max="30">
       <span class="hint">virtual minutes on your laptop (no HC3 needed — the picked
-        devices become simulated devices)</span>
+        devices become simulated devices, plus any world devices the recipe
+        declares, like the weather manager)</span>
     </div>
     <div class="row">
       <button class="primary" id="viewui" style="background:#b45309">View UI</button>
@@ -354,9 +355,14 @@ async function simulate() {
     const devices = (data.devices || [])
       .map((d) => d.name + " \u2192 sim device " + d.simId + " (" + d.kind + ")")
       .join(", ");
+    const world = (data.simDevices || [])
+      .map((d) => d.name + " \u2192 sim device " + d.simId)
+      .join(", ");
     const head = "simulated " + (data.qa ? data.qa.name + " (id " + data.qa.id + ")" : "the QA")
       + " — " + (data.virtualMinutes || 0) + " virtual minutes, clock " + (data.clock || "");
-    log.textContent = (devices ? "sim devices: " + devices + "\n" : "") + head + "\n\n"
+    log.textContent = (devices ? "sim devices: " + devices + "\n" : "")
+      + (world ? "world devices: " + world + "\n" : "")
+      + head + "\n\n"
       + (data.log || "") + "\n"
       + (data.error ? "ERROR: " + data.error : "no errors");
   } catch (err) { log.textContent = "simulation failed: " + err.message; }
@@ -381,7 +387,12 @@ async function viewUI() {
     const devices = (data.devices || [])
       .map((d) => d.name + " \u2192 sim device " + d.simId)
       .join(", ");
-    status("UI viewer: " + data.url + (devices ? " — " + devices : ""), "ok");
+    const world = (data.simDevices || [])
+      .map((d) => d.name + " \u2192 sim device " + d.simId)
+      .join(", ");
+    status("UI viewer: " + data.url
+      + (devices ? " — " + devices : "")
+      + (world ? " — world: " + world : ""), "ok");
   } catch (err) { status("view UI failed: " + err.message, "error"); }
   btn.disabled = false;
 }

@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import tempfile
 import threading
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -19,10 +20,13 @@ REPO = Path(__file__).resolve().parent.parent
 
 
 def _serve(monkeypatch, port: int = 0):
-    from flua.tools.build import serve_builder
+    from flua.tools import build
 
     monkeypatch.delenv("HC3_URL", raising=False)  # offline: typed-id pickers
-    server = serve_builder(port)
+    # the builder's cache must never be the user's ~/.flua state — a stale
+    # index there (an old refresh) would silently change what the tests see
+    monkeypatch.setattr(build, "_CACHE_ROOT", Path(tempfile.mkdtemp()))
+    server = build.serve_builder(port)
     threading.Thread(
         target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
     ).start()
@@ -49,8 +53,9 @@ def test_builder_serves_the_page_and_index(monkeypatch) -> None:
         assert b'id="cats"' in page  # the category selector above the templates
         index = json.loads(urllib.request.urlopen(f"{base}/api/index", timeout=10).read())
         ids = [recipe["id"] for recipe in index["recipes"]]
-        assert len(ids) == 5
+        assert len(ids) == 6
         assert "light-at-sunset" in ids
+        assert "heat-when-cold" in ids
     finally:
         server.shutdown()
         server.server_close()
@@ -400,3 +405,31 @@ def test_builder_serves_the_qa_web_view(monkeypatch) -> None:
     finally:
         server.shutdown()
         server.server_close()  # also stops the UI session
+
+
+def test_builder_simulate_loads_declared_world_devices(monkeypatch) -> None:
+    # a recipe can declare extra sim devices its world needs (the weatherMgr
+    # for a weather recipe); simulate loads them alongside the picked devices
+    server, base = _serve(monkeypatch)
+    try:
+        generated = json.loads(
+            _post(
+                base,
+                "/api/generate",
+                {"id": "heat-when-cold", "params": {"heaterId": 999, "threshold": 10}},
+            )[1]
+        )["code"]
+        status, body = _post(
+            base,
+            "/api/simulate",
+            {"id": "heat-when-cold", "code": generated, "minutes": 1},
+        )
+        assert status == 200
+        result = json.loads(body)
+        assert result["error"] is None
+        assert result["devices"] == [{"name": "heaterId", "kind": "binarySwitch", "simId": 5000}]
+        assert result["simDevices"] == [{"name": "weatherMgr", "kind": "weatherMgr", "simId": 5001}]
+        assert "WeatherSimulator ready" in result["log"]
+    finally:
+        server.shutdown()
+        server.server_close()

@@ -5,6 +5,7 @@ and prove every recipe's main.lua checks and boots."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 import subprocess
 import sys
@@ -111,3 +112,27 @@ def test_recipes_declare_known_categories() -> None:
     assert used == set(CATEGORY_ORDER), (
         f"recipe categories drift from the taxonomy: {sorted(used)} vs {CATEGORY_ORDER}"
     )
+
+
+@pytest.mark.asyncio
+async def test_heat_when_cold_reacts_to_weather() -> None:
+    # the demo loop the builder's View UI tab offers: the outside
+    # temperature drops below the threshold and the recipe turns the heater
+    # on; above threshold + 1°C it turns it off again (the 1°C hysteresis)
+    engine = LuaEngine(speed=60.0)  # 1 wall second = 60 virtual seconds
+    await engine.start()
+    try:
+        heater, _ = engine.load_sim_device("binarySwitch")
+        main = REPO / "recipes" / "heat-when-cold" / "main.lua"
+        qa_id, err = engine.load_qa_file(
+            str(main), [f"var:heaterId={heater}", "var:threshold=10"]
+        )
+        assert qa_id is not None and err is None, err
+        engine.api.state.weather_overrides["Temperature"] = 5.0
+        await asyncio.sleep(0.7)  # the 30s virtual poll at 60x fires in ~0.5s
+        assert engine.api.state.devices[heater]["properties"]["value"] is True
+        engine.api.state.weather_overrides["Temperature"] = 15.0
+        await asyncio.sleep(0.7)
+        assert engine.api.state.devices[heater]["properties"]["value"] is False
+    finally:
+        await engine.stop()

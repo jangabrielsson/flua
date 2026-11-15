@@ -21,6 +21,7 @@ def load_manifests(root: Path) -> tuple[list[dict], list[str]]:
     recipes: list[dict] = []
     problems: list[str] = []
     seen: set[str] = set()
+    simdevices = root.parent / "src" / "flua" / "simdevices"
     for folder in sorted(p for p in root.iterdir() if p.is_dir()):
         manifest_path = folder / "manifest.json"
         main_path = folder / "main.lua"
@@ -55,6 +56,18 @@ def load_manifests(root: Path) -> tuple[list[dict], list[str]]:
                     f"{folder.name}: param {param.get('name')!r} has unknown kind "
                     f"{param.get('kind')!r} (one of {sorted(KINDS)})"
                 )
+        # simDevices: extra bundled sim devices the sim run loads so the
+        # user can drive the recipe's world (the weatherMgr for a weather
+        # recipe) — every name must exist in src/flua/simdevices
+        sim_devices = manifest.get("simDevices")
+        if sim_devices is not None and (
+            not isinstance(sim_devices, list)
+            or not all(isinstance(name, str) and name for name in sim_devices)
+        ):
+            problems.append(f"{folder.name}: simDevices must be a list of names")
+        for name in sim_devices or []:
+            if not (simdevices / f"{name}.lua").is_file():
+                problems.append(f"{folder.name}: unknown sim device {name!r}")
         recipes.append(manifest)
     return recipes, problems
 
