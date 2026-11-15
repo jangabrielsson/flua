@@ -565,10 +565,10 @@ def parse_annotations(source: str, warn_unknown: bool = True) -> dict[str, Any]:
                 "persist": db_path.startswith("+"),
             }
         elif name == "mode":
-            # --%%mode:online|offline|proxy[,noUI] — the mode directive; the
-            # optional "noUI" (proxy mode only) connects to the existing
-            # proxy WITHOUT clobbering its UI (developers who edit the
-            # proxy's UI in the HC3's UI editor)
+            # --%%mode:online|offline|proxy|readonly[,noUI] — the mode
+            # directive; the optional "noUI" (proxy mode only) connects to
+            # the existing proxy WITHOUT clobbering its UI (developers who
+            # edit the proxy's UI in the HC3's UI editor)
             parts = [part.strip() for part in value.split(",")]
             config["mode"] = parts[0] if parts and parts[0] else None
             if "noUI" in parts:
@@ -592,17 +592,20 @@ def parse_annotations(source: str, warn_unknown: bool = True) -> dict[str, Any]:
     return _apply_mode(config)
 
 
-_MODE_VALUES = ("online", "offline", "proxy")
+_MODE_VALUES = ("online", "offline", "proxy", "readonly")
 
 
 def _apply_mode(config: dict[str, Any]) -> dict[str, Any]:
-    """Resolve --%%mode:online|offline|proxy into the engine's flags.
+    """Resolve --%%mode:online|offline|proxy|readonly into the engine's flags.
 
     The single mode directive; the legacy --%%offline:true / --%%proxy:true
     map onto it (an explicit --%%mode wins over both). "offline" pins the
-    QA's api.* calls to the sim, "proxy" arms proxy mode (online only), and
-    "online" is the plain online behavior. Idempotent — engine callers also
-    apply it, so raw config dicts behave like parsed annotations.
+    QA's api.* calls to the sim, "proxy" arms proxy mode (online only),
+    "online" is the plain online behavior, and "readonly" is online for
+    reads — a mutating call that would reach the HC3 is refused with 403
+    (sim-owned writes still work; they never touch the controller).
+    Idempotent — engine callers also apply it, so raw config dicts behave
+    like parsed annotations.
     """
     mode = config.get("mode")
     if mode not in _MODE_VALUES:
@@ -617,6 +620,8 @@ def _apply_mode(config: dict[str, Any]) -> dict[str, Any]:
         config["mode"] = mode
         config["offline"] = mode == "offline"
         config["proxy"] = mode == "proxy"
+        if mode == "readonly":
+            config["readonly"] = True
     return config
 
 

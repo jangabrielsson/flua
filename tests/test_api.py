@@ -2166,3 +2166,43 @@ def test_icon_map_serves_device_icon_lookup(api: Api) -> None:
             assert data["sets"][entry["iconSetName"]] == sorted(
                 manifest_files[entry["iconSetName"]]
             )
+
+
+def test_readonly_mode_refuses_remote_writes_at_the_gate() -> None:
+    # --%%mode:readonly: GETs fall through to the remote HC3, mutating
+    # verbs are refused with 403 before they ever reach the controller;
+    # a non-readonly QA's writes pass unchanged
+    calls: list[str] = []
+
+    class _Remote:
+        def request(self, method, path, query, body, version=None):
+            calls.append(f"{method} {path}")
+            return {}, 200
+
+    class _Engine:
+        clock = None
+
+        def qa_is_offline(self, qa_id):
+            return False
+
+        def qa_is_readonly(self, qa_id):
+            return qa_id == 5000
+
+        def mark_db_dirty(self):
+            pass
+
+        def trace_event(self, category, qa_id, data):
+            pass
+
+    api = Api()
+    api._engine = _Engine()
+    api._remote = _Remote()
+    data, status = api.dispatch("GET", "/devices/45", qa_id=5000)
+    assert status == 200
+    assert calls == ["GET /devices/45"]
+    data, status = api.dispatch("PUT", "/devices/45", {"name": "x"}, qa_id=5000)
+    assert status == 403
+    assert calls == ["GET /devices/45"]  # the write never reached the HC3
+    data, status = api.dispatch("PUT", "/devices/45", {"name": "x"}, qa_id=5001)
+    assert status == 200
+    assert calls == ["GET /devices/45", "PUT /devices/45"]

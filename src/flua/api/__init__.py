@@ -20,7 +20,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from . import routes
-from .request import ApiRequest, parse_url
+from .request import ApiRequest, _readonly_block, parse_url
 from .state import SimState, public
 
 if TYPE_CHECKING:
@@ -364,7 +364,27 @@ class Api:
         # remote hook is None, so handlers (list unions, proxy forwarding)
         # and the 404 fallback all stay in the sim.
         offline = self._engine is not None and self._engine.qa_is_offline(qa_id)
+        readonly = self._engine is not None and self._engine.qa_is_readonly(qa_id)
         remote_hook = self._remote_hook if (self._remote is not None and not offline) else None
+        if readonly and remote_hook is not None:
+            # --%%mode:readonly: reads pass through, mutating remote verbs
+            # are refused before they reach the controller
+            def _guard(hook: Callable[..., tuple[Any, int]]) -> Callable[..., tuple[Any, int]]:
+                def wrapped(method: str, path: str, body: Any = None, version: str | None = None):
+                    blocked = _readonly_block(method, True)
+                    if blocked is not None:
+                        logger.warning(
+                            "readonly QA %s: %s %s refused (no HC3 writes)",
+                            qa_id, method, path,
+                        )
+                        return blocked
+                    if version is None:
+                        return hook(method, path, body)
+                    return hook(method, path, body, version)
+
+                return wrapped
+
+            remote_hook = _guard(remote_hook)
         for route_method, regex, params, handler in _COMPILED:
             if route_method != method:
                 continue
@@ -402,6 +422,13 @@ class Api:
                 # variables endpoints it refuses to external REST callers
                 # go through the FluaHelper QA (the controller's local
                 # context) instead of the plain REST transport.
+                blocked = _readonly_block(method, readonly)
+                if blocked is not None:
+                    logger.warning(
+                        "readonly QA %s: %s %s refused (no HC3 writes)",
+                        qa_id, method, path,
+                    )
+                    return blocked
                 if _variables_via_helper(method, path):
                     if self._helper_bridge is not None:
                         return self._helper_bridge(method, path, body)
@@ -416,6 +443,13 @@ class Api:
         )
         if remote_hook is not None and not flua_id:
             # online mode: anything the sim doesn't own goes to the real HC3
+            blocked = _readonly_block(method, readonly)
+            if blocked is not None:
+                logger.warning(
+                    "readonly QA %s: %s %s refused (no HC3 writes)",
+                    qa_id, method, path,
+                )
+                return blocked
             return self._remote.request(method, path, query, body)
         return None, 404
 

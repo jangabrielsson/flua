@@ -338,6 +338,7 @@ Parsing stops at the end-of-header marker:
 | `--%%mode:online` | force this QA online against the real HC3 |
 | `--%%mode:proxy` | proxy mode: mirror this QA onto the HC3 (online only, see below) |
 | `--%%mode:proxy,noUI` | proxy mode, but leave the proxy's UI untouched (you edit it in the HC3's UI editor) |
+| `--%%mode:readonly` | online for reads, never for writes: a mutating `api.*` call that would reach the HC3 is refused with 403 (sim-owned writes still work — they never touch the controller) |
 | `--%%debug:refreshState=true,api=true,http=true` | debug logging: refreshStates events / `api.*` calls / `net.HTTPClient` requests (global) |
 | `--%%debug:ws=true` | debug logging: byte-level `net.WebSocketClient` traffic — handshake leftovers, per-frame rx/tx with masked previews, close codes (global) |
 | `--%%debug:true` | shorthand for all three debug channels (`:false` disables them) |
@@ -353,7 +354,11 @@ Parsing stops at the end-of-header marker:
 
 The legacy `--%%offline:true` and `--%%proxy:true` still work as aliases for
 `--%%mode:offline` and `--%%mode:proxy` (an explicit `--%%mode` wins when
-both appear).
+both appear). `--%%mode:readonly` is the safety posture for exploring the
+live HC3: reads behave exactly like online mode, and any mutating verb
+(POST/PUT/DELETE) that would reach the controller is refused with 403 —
+writes the sim owns stay local. Without a configured HC3 it degrades to
+plain offline.
 
 ### The emulator database (`--%%db`)
 

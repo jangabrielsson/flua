@@ -74,6 +74,15 @@ def forward_to_proxy(req: ApiRequest, is_proxy: bool) -> None:
         req.remote(req.method, req.path, req.body)
 
 
+def _readonly_block(method: str, readonly: bool) -> tuple[Any, int] | None:
+    """--%%mode:readonly: a mutating verb that would reach the HC3 is
+    refused with 403 (GET/HEAD pass; sim-side writes are unaffected —
+    they never touch the controller)."""
+    if readonly and method.upper() not in ("GET", "HEAD"):
+        return None, 403
+    return None
+
+
 def remote_get(req: ApiRequest, path: str, version: str | None = None) -> tuple[Any, int] | None:
     """Serve a resource GET from the real HC3 when the run is online.
 

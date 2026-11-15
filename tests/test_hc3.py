@@ -2092,3 +2092,34 @@ def test_hc3_remote_sends_fibaro_version_header() -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+
+@pytest.mark.asyncio
+async def test_readonly_mode_reads_online_but_never_writes(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # --%%mode:readonly: the QA reads the live HC3 (device 45) but its
+    # writes are refused with 403 before reaching the controller
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    script = tmp_path / "readonly.lua"
+    script.write_text(
+        "--%%mode:readonly\n"
+        "setTimeout(function()\n"
+        "  local dev, status = api.get('/devices/45')\n"
+        "  print('READ', status, dev and dev.name)\n"
+        "  local data, put = api.put('/devices/45', {properties={userDescription='x'}})\n"
+        "  print('WRITE', put)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {"mode": "readonly"}, str(script))
+        out = await _wait_for_output(capsys, "WRITE")
+    finally:
+        await engine.stop()
+    assert "READ 200 hc3-device" in out  # reads pass through
+    assert "WRITE 403" in out  # writes are refused

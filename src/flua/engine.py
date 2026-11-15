@@ -425,6 +425,15 @@ class LuaEngine:
         info = self._qas.get(int(qa_id))
         return bool(info and info.get("config", {}).get("offline"))
 
+    def qa_is_readonly(self, qa_id: int | None) -> bool:
+        """--%%mode:readonly on a QA: its api.* calls may read the HC3 but
+        never mutate it — remote writes are refused with 403 (sim-owned
+        writes still work; they never reach the controller)."""
+        if qa_id is None:
+            return False
+        info = self._qas.get(int(qa_id))
+        return bool(info and info.get("config", {}).get("readonly"))
+
     def qa_mode(self, qa_id: int) -> str:
         """The QA's effective runtime mode ("proxy" | "online" | "offline"):
         a proxy QA in a remote run is proxy; otherwise remote, unless the QA

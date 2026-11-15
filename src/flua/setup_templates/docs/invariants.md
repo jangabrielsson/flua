@@ -40,8 +40,14 @@ model) and ARCHITECTURE.md (components).
   *Pinned by:* `tests/test_hc3.py::test_devices_list_is_union_of_sim_and_hc3`,
   `tests/test_proxy.py::test_devices_list_has_no_proxy_doublets`
 - **`api.hc3.*` bypasses the hybrid dispatch** (always the real HC3 online;
-  stands in for the sim offline).
+  the sim stands in offline).
   *Pinned by:* `tests/test_hc3.py::test_api_hc3_bypasses_the_hybrid_dispatch`
+- **A `--%%mode:readonly` QA reads the HC3 but never mutates it** — any
+  POST/PUT/DELETE that would reach the controller is refused with 403
+  before dispatch; sim-owned writes still work (they never touch the
+  controller).
+  *Pinned by:* `tests/test_api.py::test_readonly_mode_refuses_remote_writes_at_the_gate`,
+  `tests/test_hc3.py::test_readonly_mode_reads_online_but_never_writes`
 
 ## refreshStates feed & events
 

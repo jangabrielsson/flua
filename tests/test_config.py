@@ -482,3 +482,16 @@ def test_file_name_validation() -> None:
     assert "too short" in file_name_warning("a1")
     assert "too short" in file_name_warning("a")
     assert "too short" in file_name_warning("ab")
+
+
+def test_mode_directive_readonly_normalizes_flags() -> None:
+    # --%%mode:readonly: online reads, no HC3 writes — the flag rides the
+    # config; the other modes keep their exact shape (no readonly key)
+    assert _apply_mode({"mode": "readonly"}) == {
+        "mode": "readonly",
+        "offline": False,
+        "proxy": False,
+        "readonly": True,
+    }
+    assert "readonly" not in _apply_mode({"mode": "online"})
+    assert "readonly" not in _apply_mode({"mode": "offline"})
