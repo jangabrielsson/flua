@@ -2188,6 +2188,9 @@ def test_readonly_mode_refuses_remote_writes_at_the_gate() -> None:
         def qa_is_readonly(self, qa_id):
             return qa_id == 5000
 
+        def qa_readonly_call(self, qa_id):
+            return False
+
         def mark_db_dirty(self):
             pass
 
