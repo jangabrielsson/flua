@@ -29,6 +29,7 @@ from flua import tools  # noqa: E402
 
 def test_registry_discovers_all_tools() -> None:
     assert tools.tool_names() == [
+        "build",
         "catalog",
         "createDB",
         "downloadFQA",
