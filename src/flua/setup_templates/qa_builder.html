@@ -81,6 +81,11 @@
       <span class="hint">virtual minutes on your laptop (no HC3 needed — the picked
         devices become simulated devices)</span>
     </div>
+    <div class="row">
+      <button class="primary" id="viewui" style="background:#b45309">View UI</button>
+      <span class="hint">opens the HC3-style web view of the running QA in a new tab
+        (click devices to inspect them; add UI code to the box and view it here)</span>
+    </div>
     <pre id="simlog" class="hidden"></pre>
     <textarea id="code" class="code hidden" spellcheck="false"></textarea>
   </section>
@@ -358,11 +363,35 @@ async function simulate() {
   btn.disabled = false;
 }
 
+async function viewUI() {
+  const code = $("#code");
+  if (!code.value.trim()) {
+    await generate(false);
+    if (!$("#code").value.trim()) return;
+  }
+  const btn = $("#viewui");
+  btn.disabled = true;
+  try {
+    const data = await api("/api/viewui", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: current.id, code: code.value }),
+    });
+    window.open(data.url, "_blank");
+    const devices = (data.devices || [])
+      .map((d) => d.name + " \u2192 sim device " + d.simId)
+      .join(", ");
+    status("UI viewer: " + data.url + (devices ? " — " + devices : ""), "ok");
+  } catch (err) { status("view UI failed: " + err.message, "error"); }
+  btn.disabled = false;
+}
+
 $("#refresh").onclick = () => loadIndex(true).catch((err) => status(err.message, "error"));
 $("#generate").onclick = () => generate(false);
 $("#download").onclick = () => generate(true);
 $("#upload").onclick = upload;
 $("#simulate").onclick = simulate;
+$("#viewui").onclick = viewUI;
 (async function init() {
   try {
     await loadIndex(true);  // live index; falls back to the cache/snapshot offline

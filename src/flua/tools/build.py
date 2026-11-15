@@ -12,11 +12,13 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import http.server
 import json
 import re
 import sys
 import tempfile
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -130,6 +132,36 @@ def _manifest_for(rid: str) -> dict[str, object] | None:
     return None
 
 
+def _seed_sim_devices(
+    engine: object, code: str, manifest: dict[str, object] | None
+) -> tuple[dict[str, object], list[dict[str, object]], str | None]:
+    """Load a bundled sim device for every picked (nonzero) device param and
+    return (bake-params, seeded, error) — the bake params re-point the code
+    at the sim ids, so the QA polls a real sim world instead of empty air."""
+    from ..engine import SIM_DEVICES_DIR
+
+    params: dict[str, object] = {}
+    seeded: list[dict[str, object]] = []
+    if not manifest:
+        return params, seeded, None
+    for param in manifest.get("params", []):
+        if param.get("kind") != "device" or not param.get("filter"):
+            continue
+        name = str(param["name"])
+        baked = re.search(rf"^--%%var:{re.escape(name)}=(\d+)", code, re.M)
+        if not baked or int(baked.group(1)) == 0:
+            continue  # unset — the recipe prints its hint instead
+        kind = str(param["filter"]).split(".")[-1]
+        if not (SIM_DEVICES_DIR / f"{kind}.lua").is_file():
+            continue
+        sim_id, sim_err = engine.load_sim_device(kind)
+        if sim_id is None:
+            return params, seeded, f"sim device {kind}: {sim_err}"
+        params[name] = sim_id
+        seeded.append({"name": name, "kind": kind, "simId": sim_id})
+    return params, seeded, None
+
+
 async def _run_simulation(
     code: str, manifest: dict[str, object] | None, minutes: int, log_path: Path
 ) -> dict[str, object]:
@@ -139,34 +171,17 @@ async def _run_simulation(
     the matching kind, so the QA polls a real sim world instead of empty
     air. Returns {error, devices, virtualMinutes}; the log lands in
     log_path."""
-    from ..engine import SIM_DEVICES_DIR, LuaEngine
+    from ..engine import LuaEngine
 
     minutes = max(1, min(int(minutes or 5), 30))
     engine = LuaEngine(speed=_SIM_SPEED, api_mode="local")
     engine.set_log_mode("text", str(log_path))
-    seeded: list[dict[str, object]] = []
-    params: dict[str, object] = {}
     qa_info: dict[str, object] | None = None
     error: str | None = None
     await engine.start()
     try:
-        if manifest:
-            for param in manifest.get("params", []):
-                if param.get("kind") != "device" or not param.get("filter"):
-                    continue
-                name = str(param["name"])
-                baked = re.search(rf"^--%%var:{re.escape(name)}=(\d+)", code, re.M)
-                if not baked or int(baked.group(1)) == 0:
-                    continue  # unset — the recipe prints its hint instead
-                kind = str(param["filter"]).split(".")[-1]
-                if not (SIM_DEVICES_DIR / f"{kind}.lua").is_file():
-                    continue
-                sim_id, sim_err = engine.load_sim_device(kind)
-                if sim_id is None:
-                    error = f"sim device {kind}: {sim_err}"
-                    break
-                params[name] = sim_id
-                seeded.append({"name": name, "kind": kind, "simId": sim_id})
+        params, seeded, seed_err = _seed_sim_devices(engine, code, manifest)
+        error = seed_err
         if error is None:
             run_code = bake_params(code, params) if params else code
             qa_path = engine.qa_temp_file(run_code)
@@ -190,6 +205,87 @@ async def _run_simulation(
         "qa": qa_info,
         "clock": clock,
     }
+
+
+# the live UI session: one engine + viewer, kept running for the browser
+# tab until the next View UI click or the builder exits. The engine pump
+# and the viewer live on a dedicated asyncio loop in a daemon thread, so
+# the builder's sync HTTP handler stays untouched.
+_UI_LOCK = threading.Lock()
+_UI_SESSION: dict[str, object] = {}
+
+
+def _stop_ui_session() -> None:
+    """Stop the live engine + viewer, if one is running. Idempotent."""
+    with _UI_LOCK:
+        session = dict(_UI_SESSION)
+        _UI_SESSION.clear()
+    loop = session.get("loop")
+    if not isinstance(loop, asyncio.AbstractEventLoop):
+        return
+
+    async def _stop() -> None:
+        server = session.get("server")
+        engine = session.get("engine")
+        if server is not None:
+            with contextlib.suppress(Exception):
+                await server.stop()  # type: ignore[attr-defined]
+        if engine is not None:
+            with contextlib.suppress(Exception):
+                await engine.stop()  # type: ignore[attr-defined]
+
+    try:
+        asyncio.run_coroutine_threadsafe(_stop(), loop).result(timeout=10)
+    except Exception:
+        pass  # a broken session is dropped, not nursed
+    loop.call_soon_threadsafe(loop.stop)
+
+
+def _start_ui_session(
+    code: str, manifest: dict[str, object] | None
+) -> tuple[str, dict[str, object], list[dict[str, object]]]:
+    """Boot the generated QA on a persistent engine and serve its web view.
+    Returns (url, qa, seeded); the last code wins — a new click replaces
+    the previous session."""
+    from ..engine import LuaEngine
+    from ..http_server import ApiServer
+
+    _stop_ui_session()
+    loop = asyncio.new_event_loop()
+
+    async def _start() -> tuple[object, object, int, list[dict[str, object]]]:
+        engine = LuaEngine(api_mode="local")
+        await engine.start()
+        try:
+            params, seeded, seed_err = _seed_sim_devices(engine, code, manifest)
+            if seed_err is not None:
+                raise RuntimeError(seed_err)
+            run_code = bake_params(code, params) if params else code
+            qa_path = engine.qa_temp_file(run_code)
+            qa_id, qa_err = engine.load_qa_file(qa_path)
+            if qa_id is None:
+                raise RuntimeError(qa_err or "cannot load the QA")
+            engine.qa_keep_alive(qa_id)
+            server = ApiServer(engine.api, port=0)
+            await server.start()
+            engine.set_sim_api_port(server.port)
+        except BaseException:
+            await engine.stop()
+            raise
+        return engine, server, qa_id, seeded
+
+    threading.Thread(target=loop.run_forever, name="flua-builder-ui", daemon=True).start()
+    try:
+        engine, server, qa_id, seeded = asyncio.run_coroutine_threadsafe(
+            _start(), loop
+        ).result(timeout=30)
+    except BaseException:
+        loop.call_soon_threadsafe(loop.stop)
+        raise
+    with _UI_LOCK:
+        _UI_SESSION.update(engine=engine, server=server, loop=loop)
+    qa = {"id": qa_id, "name": (manifest or {}).get("title") or "QuickApp"}
+    return f"http://127.0.0.1:{server.port}/", qa, seeded
 
 
 class _BuilderHandler(http.server.BaseHTTPRequestHandler):
@@ -308,6 +404,20 @@ class _BuilderHandler(http.server.BaseHTTPRequestHandler):
                 return
             self._json(200, {"device": device})
             return
+        if parsed.path == "/api/viewui":
+            rid = str(request.get("id") or "")
+            code = request.get("code")
+            if not isinstance(code, str) or not code.strip():
+                self._json(400, {"error": "code is required"})
+                return
+            manifest = _manifest_for(rid) if re.fullmatch(r"[a-z0-9-]+", rid) else None
+            try:
+                url, qa, seeded = _start_ui_session(code, manifest)
+            except Exception as exc:
+                self._json(502, {"error": str(exc)})
+                return
+            self._json(200, {"url": url, "qa": qa, "devices": seeded})
+            return
         if parsed.path == "/api/simulate":
             rid = str(request.get("id") or "")
             code = request.get("code")
@@ -347,6 +457,10 @@ class BuilderServer(http.server.ThreadingHTTPServer):
         self.hc3_base = hc3_base
         self.hc3_auth = hc3_auth
         super().__init__(("127.0.0.1", port), _BuilderHandler)
+
+    def server_close(self) -> None:
+        _stop_ui_session()  # the viewer tab dies with the builder
+        super().server_close()
 
 
 def _hc3() -> tuple[str | None, str | None, str | None, str | None]:

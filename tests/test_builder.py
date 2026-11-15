@@ -368,3 +368,35 @@ def test_builder_simulate_seeds_sim_devices(monkeypatch) -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_builder_serves_the_qa_web_view(monkeypatch) -> None:
+    # View UI boots the generated code on a persistent engine and serves
+    # the HC3-style viewer; the seeded sim devices are listed in the world
+    server, base = _serve(monkeypatch)
+    try:
+        generated = json.loads(
+            _post(
+                base,
+                "/api/generate",
+                {"id": "leak-alert", "params": {"floodId": 9, "sirenId": 8}},
+            )[1]
+        )["code"]
+        status, body = _post(base, "/api/viewui", {"id": "leak-alert", "code": generated})
+        assert status == 200
+        data = json.loads(body)
+        assert data["url"].startswith("http://127.0.0.1:")
+        assert data["devices"] == [
+            {"name": "floodId", "kind": "binarySensor", "simId": 5000},
+            {"name": "sirenId", "kind": "binarySwitch", "simId": 5001},
+        ]
+        page = urllib.request.urlopen(data["url"], timeout=10).read()
+        assert b"<html" in page  # the viewer page serves
+        devices = json.loads(
+            urllib.request.urlopen(data["url"] + "devices", timeout=10).read()
+        )
+        ids = [device["id"] for device in devices]
+        assert 5000 in ids and 5001 in ids  # the sim world is live
+    finally:
+        server.shutdown()
+        server.server_close()  # also stops the UI session
