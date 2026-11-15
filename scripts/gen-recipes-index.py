@@ -87,6 +87,13 @@ def load_manifests(root: Path) -> tuple[list[dict], list[str]]:
                         problems.append(f"{folder.name}: a device step needs a call")
                     elif used[0] == "check" and not isinstance(step.get("check"), dict):
                         problems.append(f"{folder.name}: a check step needs device/log")
+                start = verify.get("start")
+                if start is not None and (
+                    not isinstance(start, dict) or start.get("before") != "sunset"
+                ):
+                    problems.append(
+                        f"{folder.name}: verify start must be {{before='sunset', by='2m'}}"
+                    )
         recipes.append(manifest)
     return recipes, problems
 

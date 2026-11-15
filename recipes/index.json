@@ -219,7 +219,34 @@
       ],
       "categories": [
         "Lights"
-      ]
+      ],
+      "verify": {
+        "start": {
+          "before": "sunset",
+          "by": "2m"
+        },
+        "params": {
+          "deviceId": 1,
+          "offset": 1
+        },
+        "steps": [
+          {
+            "check": {
+              "device": "deviceId",
+              "value": false
+            }
+          },
+          {
+            "wait": "5m"
+          },
+          {
+            "check": {
+              "device": "deviceId",
+              "value": true
+            }
+          }
+        ]
+      }
     },
     {
       "id": "motion-lights",

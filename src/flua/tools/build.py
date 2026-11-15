@@ -185,6 +185,22 @@ async def _run_verification(manifest: dict[str, object]) -> dict[str, object]:
         engine.set_log_mode("text", str(log_path))
         await engine.start()
         try:
+            start = scenario.get("start")
+            if isinstance(start, dict) and start.get("before") == "sunset":
+                # rewind the virtual clock to just before the sim's actual
+                # sunset (read live, so any configured location works) —
+                # the recipe's scheduleNext then fires within the scenario
+                by = _parse_wait(start.get("by", "0s"))
+                device1, _status = engine.api.dispatch("GET", "/devices/1")  # type: ignore[attr-defined]
+                sunset = (device1 or {}).get("properties", {}).get("sunsetHour")
+                match = re.fullmatch(r"(\d{1,2}):(\d{2})", str(sunset or ""))
+                if not match:
+                    return {"id": rid, "ok": False, "error": f"no sunset info ({sunset!r})"}
+                now = datetime.fromtimestamp(engine.virtual_now())  # type: ignore[attr-defined]
+                epoch = datetime(
+                    now.year, now.month, now.day, int(match.group(1)), int(match.group(2))
+                ).timestamp()
+                engine.clock.set_start(epoch - by)  # type: ignore[attr-defined]
             verify_params = scenario.get("params")
             run_code = bake_params(code, verify_params if isinstance(verify_params, dict) else {})
             params, seeded, _extra, seed_err = _seed_sim_devices(engine, run_code, manifest)
