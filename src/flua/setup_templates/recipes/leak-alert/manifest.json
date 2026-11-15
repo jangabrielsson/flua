@@ -3,7 +3,7 @@
   "title": "Leak alert",
   "description": "Pushes a phone notification when a flood sensor detects water, optionally switches something on.",
   "params": [
-    {"name": "floodId", "label": "Flood sensor", "kind": "device", "filter": "com.fibaro.floodSensor", "default": 0},
+    {"name": "floodId", "label": "Flood sensor", "kind": "device", "filter": "com.fibaro.binarySensor", "default": 0},
     {"name": "sirenId", "label": "Siren / switch (optional)", "kind": "device", "filter": "com.fibaro.binarySwitch", "default": 0}
   ]
 }

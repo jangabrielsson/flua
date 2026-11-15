@@ -9,7 +9,7 @@
           "name": "humidityId",
           "label": "Humidity sensor",
           "kind": "device",
-          "filter": "com.fibaro.humiditySensor",
+          "filter": "com.fibaro.multilevelSensor",
           "default": 0
         },
         {
@@ -36,7 +36,7 @@
           "name": "floodId",
           "label": "Flood sensor",
           "kind": "device",
-          "filter": "com.fibaro.floodSensor",
+          "filter": "com.fibaro.binarySensor",
           "default": 0
         },
         {

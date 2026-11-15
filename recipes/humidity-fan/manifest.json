@@ -3,7 +3,7 @@
   "title": "Fan on high humidity",
   "description": "Starts a fan above a humidity threshold, stops it 5% below (hysteresis).",
   "params": [
-    {"name": "humidityId", "label": "Humidity sensor", "kind": "device", "filter": "com.fibaro.humiditySensor", "default": 0},
+    {"name": "humidityId", "label": "Humidity sensor", "kind": "device", "filter": "com.fibaro.multilevelSensor", "default": 0},
     {"name": "fanId", "label": "Fan / switch", "kind": "device", "filter": "com.fibaro.binarySwitch", "default": 0},
     {"name": "threshold", "label": "Humidity % to start", "kind": "number", "default": 65}
   ]
