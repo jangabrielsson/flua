@@ -106,6 +106,24 @@ if not self:getVariable("auto") then return end
 In manual mode the lamp leaves the light alone — the user has taken over.
 `return` means "stop this function right here".
 
+### Your own icon
+
+A QA's tile icon is the `deviceIcon` property — an icon **id** from the
+controller's library. While you develop, preview a custom icon set
+straight from a folder: put the icons next to the QA in the upload naming
+(`icon.png`, `icon0.png` + `icon100.png` for a binarySwitch, …) and point
+at them:
+
+```lua
+--%%icons:icons
+```
+
+flua then uses the QA's own id as its `deviceIcon` and the web view
+renders and switches the folder's icons with `value`/`state` — no HC3, no
+upload (`examples/local-icons.lua` is the runnable demo). The directive is
+preview-only and never travels into a packed `.fqa`; production icons come
+from the controller (chapter 06).
+
 ### QuickApp variables: `--%%var`
 
 Both header lines starting with `--%%var` give the lamp **variables** —

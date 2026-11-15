@@ -106,6 +106,39 @@ hang your machine: it waits a while, then reports:
 `setInterval(function() end, 1000)` somewhere, run `flua test --timeout 5`,
 then put both back.)
 
+## Step 5 — mock the outside world
+
+Real QAs talk to real services — the lamp may grow a cloud API, a broker,
+a player. The sim can **host** those services so the test stays offline:
+the `net.*Server` family (a flua extension, no HC3 counterpart) runs inside
+a QA and answers the client code:
+
+```lua
+local http = net.HTTPServer()
+http:listen(0, function(req) return {status = 200, body = "ok"} end)
+
+local ws = net.WebSocketServer()
+ws:listen(0, function(message, isBinary, conn)
+  if message == "subscribe" then
+    setTimeout(function() ws:send(conn, "event:on") end, 50)  -- push!
+    return "subscribed"
+  end
+end)
+```
+
+- HTTP/TCP/UDP servers answer request → reply; the WebSocket server also
+  **talks first** (`ws:send` / `ws:broadcast`), closes connections
+  (`ws:disconnect`), and reports `connected`/`disconnected` events — the
+  shape of event-driven services (subscribe, then pushed events).
+- The mock can be a sibling file loaded with `require("mocklib")` — it runs
+  in the QA's own environment and is never packaged into the `.fqa`.
+
+One trap when tests meet the network: **socket round-trips run in wall
+time, timers in virtual time.** At `--speed 50` a 300 ms virtual delay is
+~6 ms wall — shorter than a localhost reply — so never wait for network
+effects with fixed delays; poll the condition with a generous timeout
+(scaled with `--speed`).
+
 ## What did we just learn?
 
 - `require("flua-test")` + `t:expect`/`t:assert_eq`/`t:finish()` — a test
@@ -117,6 +150,9 @@ then put both back.)
 - The assertions can even travel to the real HC3 — declare the library as a
   QA file (`--%%file:$flua-test.lua,flua_test`, the chapter-09 move) and the
   same test code turns into no-ops on the controller.
+- `net.*Server` mocks the outside world inside the sim — HTTP/TCP/UDP
+  request→reply, and WebSocket servers that push events and drop
+  connections like the real services do.
 
 ## Where you are now
 

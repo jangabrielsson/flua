@@ -70,6 +70,18 @@ On/Off buttons.
 That's your action running on the HC3, exactly as it ran in the viewer.
 Welcome to home automation.
 
+**Pack first, or verify after.** `uploadQA` packages on the fly; when you
+distribute the QA as a `.fqa`, `flua --tool pack sunset_lamp_ui.lua
+--verify` proves the artifact came out right (inventory, variables,
+placeholder and leak scan) — and `flua --tool inspectFQA sunset_lamp_ui.fqa
+--json` re-checks any package later, machines included.
+
+**Custom icons.** The HC3 ships the standard icon library; your own icons
+are `User<id>` sets, managed in the browser with `flua --tool icons ui`
+(list, preview, upload per device type, delete). A QA can even install its
+own set on first boot — `examples/iconInstall.lua` is the complete recipe
+(download, deduplicate by content, upload once, reinstall-safe).
+
 ## Step 3 — fix it, update it
 
 Found something to improve? Edit the file, then update the QA in place (the

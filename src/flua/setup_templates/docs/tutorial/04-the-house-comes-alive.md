@@ -115,17 +115,19 @@ evening of lamp logic, tested in under a second.
 
 The two flags:
 
-- `--instant` — timers fire immediately, and virtual time jumps ahead by
-  each delay instead of waiting. A one-minute interval becomes "check the
-  sun, jump a minute, check again…"
+- `--instant` — **deadline-ordered fast-forward**: the clock jumps to each
+  timer's deadline before its callback runs, one at a time. A one-minute
+  interval becomes "check the sun, jump a minute, check again…" — and
+  `os.time()` inside the callbacks is correct at every step.
 - `--max-hours 1` — a safety leash: stop after 1 virtual hour. Without it,
   an instant lamp would check minutes until the end of time (instantly).
 
 There's also `--speed 60` for "60 times faster than real life" — same idea,
-but you watch it run — and `--step` for a fast run that is also
-`os.time()`-coherent: timers fire one deadline at a time, with the clock
-set to each deadline before its callback runs (the mode for event engines
-that compute their next delay from `os.time()`).
+but you watch it run — and `--step`, the same deadline-ordered discipline
+under its plua `speedTime` name. `--instant` and `--step` are equivalent
+for the QA (`--instant` used to collapse the whole timer heap into one
+pass, which broke `os.time()`-relative scheduling; that is fixed) — either
+one suits event engines that compute their next delay from `os.time()`.
 
 > ✅ **You should see** `Lamp on` stamped `18:13:00` — the sunset from the
 > `sunsetHour` calculation, to the minute.
