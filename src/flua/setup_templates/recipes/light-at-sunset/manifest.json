@@ -3,7 +3,21 @@
   "title": "Turn a light on at sunset",
   "description": "Switches a light on every day at sunset (adjustable by minutes).",
   "params": [
-    {"name": "deviceId", "label": "Light", "kind": "device", "filter": "com.fibaro.binarySwitch", "default": 0},
-    {"name": "offset", "label": "Minutes before sunset", "kind": "number", "default": -30}
+    {
+      "name": "deviceId",
+      "label": "Light",
+      "kind": "device",
+      "filter": "com.fibaro.binarySwitch",
+      "default": 0
+    },
+    {
+      "name": "offset",
+      "label": "Minutes before sunset",
+      "kind": "number",
+      "default": -30
+    }
+  ],
+  "categories": [
+    "Lights"
   ]
 }

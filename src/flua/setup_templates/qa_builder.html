@@ -26,6 +26,13 @@
   .recipe.active { border-color: var(--accent); background: #f0f5ff; }
   .recipe .title { font-weight: 600; }
   .recipe .desc { color: var(--muted); font-size: 13px; }
+  .recipe .cats { color: var(--muted); font-size: 11.5px; margin-top: 4px; }
+  .cats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .chip { font: 12.5px/1 inherit; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; }
+  .chip:hover { border-color: var(--accent); }
+  .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .chip .n { opacity: .65; }
   .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
   label { color: var(--muted); font-size: 13px; min-width: 140px; }
   select, input { font: inherit; padding: 6px 10px; border-radius: 6px;
@@ -53,6 +60,7 @@
 <main>
   <section class="card">
     <h2>Pick a recipe</h2>
+    <div id="cats" class="cats"></div>
     <div id="recipes"></div>
   </section>
 
@@ -75,7 +83,64 @@
 <script>
 "use strict";
 const $ = (sel) => document.querySelector(sel);
-let INDEX = [], current = null, DEVICES = [], ROOMS = [], SCENES = [], FILTERED = {};
+let INDEX = [], current = null, DEVICES = [], ROOMS = [], SCENES = [], FILTERED = {}, CATEGORY = null;
+
+// the taxonomy — keep in sync with tests/test_recipes.py; categories
+// arriving from GitHub that are not listed here get appended to the selector
+const CATEGORY_ORDER = ["Lights", "Climate", "Alerts & alarms", "Doors & windows", "Presence"];
+
+function chip(name, count) {
+  const el = document.createElement("button");
+  el.className = "chip"; el.type = "button";
+  const label = document.createElement("span"); label.textContent = name;
+  const n = document.createElement("span"); n.className = "n"; n.textContent = " " + count;
+  el.append(label, n);
+  return el;
+}
+
+function renderCats() {
+  const counts = new Map();
+  for (const recipe of INDEX) {
+    for (const cat of recipe.categories || []) counts.set(cat, (counts.get(cat) || 0) + 1);
+  }
+  const names = CATEGORY_ORDER.filter((c) => counts.has(c));
+  for (const cat of counts.keys()) if (!CATEGORY_ORDER.includes(cat)) names.push(cat);
+  const wrap = $("#cats");
+  wrap.textContent = "";
+  const all = chip("All", INDEX.length);
+  all.classList.toggle("active", CATEGORY === null);
+  all.onclick = () => { CATEGORY = null; renderCats(); renderRecipes(); };
+  wrap.appendChild(all);
+  for (const name of names) {
+    const el = chip(name, counts.get(name));
+    el.classList.toggle("active", CATEGORY === name);
+    el.onclick = () => { CATEGORY = name; renderCats(); renderRecipes(); };
+    wrap.appendChild(el);
+  }
+}
+
+function renderRecipes() {
+  const wrap = $("#recipes");
+  wrap.textContent = "";
+  for (const recipe of INDEX) {
+    if (CATEGORY && !(recipe.categories || []).includes(CATEGORY)) continue;
+    const el = document.createElement("div");
+    el.className = "recipe";
+    el.dataset.id = recipe.id;
+    const title = document.createElement("div");
+    title.className = "title"; title.textContent = recipe.title;
+    const desc = document.createElement("div");
+    desc.className = "desc"; desc.textContent = recipe.description;
+    el.append(title, desc);
+    if (recipe.categories && recipe.categories.length) {
+      const cats = document.createElement("div");
+      cats.className = "cats"; cats.textContent = recipe.categories.join(" · ");
+      el.append(cats);
+    }
+    el.onclick = () => select(recipe);
+    wrap.appendChild(el);
+  }
+}
 
 function status(msg, kind) {
   const el = $("#status");
@@ -94,20 +159,9 @@ async function loadIndex(refresh) {
   status("loading recipes…");
   const data = await api("/api/index" + (refresh ? "?refresh=1" : ""));
   INDEX = data.recipes || [];
-  const wrap = $("#recipes");
-  wrap.textContent = "";
-  for (const recipe of INDEX) {
-    const el = document.createElement("div");
-    el.className = "recipe";
-    el.dataset.id = recipe.id;
-    const title = document.createElement("div");
-    title.className = "title"; title.textContent = recipe.title;
-    const desc = document.createElement("div");
-    desc.className = "desc"; desc.textContent = recipe.description;
-    el.append(title, desc);
-    el.onclick = () => select(recipe);
-    wrap.appendChild(el);
-  }
+  CATEGORY = null;  // a refresh resets the filter
+  renderCats();
+  renderRecipes();
   status(INDEX.length + " recipe(s) ready", "ok");
   await loadHouse();  // pickers need the index (per-type filters) first
 }

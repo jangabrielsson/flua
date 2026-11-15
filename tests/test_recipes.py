@@ -91,3 +91,23 @@ def test_recipes_use_fibaro_call_for_device_actions() -> None:
     for main in sorted((REPO / "recipes").glob("*/main.lua")):
         text = main.read_text(encoding="utf-8")
         assert 'api.post("/devices/' not in text, f"{main}: raw device post"
+
+
+# the builder's category selector — keep in sync with CATEGORY_ORDER in
+# src/flua/setup_templates/qa_builder.html; adding a category is a
+# deliberate taxonomy change, so it must be made on both sides
+CATEGORY_ORDER = ["Lights", "Climate", "Alerts & alarms", "Doors & windows", "Presence"]
+
+
+def test_recipes_declare_known_categories() -> None:
+    used: set[str] = set()
+    for folder in sorted((REPO / "recipes").iterdir()):
+        if not folder.is_dir():
+            continue
+        manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
+        cats = manifest["categories"]
+        assert cats and all(isinstance(c, str) and c for c in cats), f"{folder.name}: categories"
+        used.update(cats)
+    assert used == set(CATEGORY_ORDER), (
+        f"recipe categories drift from the taxonomy: {sorted(used)} vs {CATEGORY_ORDER}"
+    )

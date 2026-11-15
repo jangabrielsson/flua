@@ -39,6 +39,11 @@ def load_manifests(root: Path) -> tuple[list[dict], list[str]]:
         seen.add(manifest.get("id"))
         if not manifest.get("title") or not manifest.get("description"):
             problems.append(f"{folder.name}: manifest needs a title and a description")
+        categories = manifest.get("categories")
+        if not isinstance(categories, list) or not categories or not all(
+            isinstance(c, str) and c for c in categories
+        ):
+            problems.append(f"{folder.name}: manifest needs non-empty string categories")
         params = manifest.get("params")
         if not isinstance(params, list) or not params:
             problems.append(f"{folder.name}: manifest needs at least one param")

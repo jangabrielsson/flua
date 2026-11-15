@@ -46,6 +46,7 @@ def test_builder_serves_the_page_and_index(monkeypatch) -> None:
     try:
         page = urllib.request.urlopen(f"{base}/", timeout=10).read()
         assert b"QA Builder" in page
+        assert b'id="cats"' in page  # the category selector above the templates
         index = json.loads(urllib.request.urlopen(f"{base}/api/index", timeout=10).read())
         ids = [recipe["id"] for recipe in index["recipes"]]
         assert len(ids) == 5

@@ -25,6 +25,9 @@
           "kind": "number",
           "default": 65
         }
+      ],
+      "categories": [
+        "Climate"
       ]
     },
     {
@@ -46,6 +49,9 @@
           "filter": "com.fibaro.binarySwitch",
           "default": 0
         }
+      ],
+      "categories": [
+        "Alerts & alarms"
       ]
     },
     {
@@ -66,6 +72,9 @@
           "kind": "number",
           "default": -30
         }
+      ],
+      "categories": [
+        "Lights"
       ]
     },
     {
@@ -93,6 +102,10 @@
           "kind": "number",
           "default": 5
         }
+      ],
+      "categories": [
+        "Lights",
+        "Presence"
       ]
     },
     {
@@ -113,6 +126,10 @@
           "kind": "text",
           "default": "The door opened"
         }
+      ],
+      "categories": [
+        "Doors & windows",
+        "Alerts & alarms"
       ]
     }
   ]
