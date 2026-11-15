@@ -17,7 +17,22 @@ function QuickApp:onInit()
     return
   end
   self._sent = false
-  setInterval(function() self:checkDoor() end, 5000)
+  -- react to the door sensor instantly: the refreshStates event feed
+  -- (RefreshStateSubscriber is the HC3 mechanism; flua simulates it)
+  local events = RefreshStateSubscriber()
+  events:subscribe(
+    function(event)
+      return event.type == "DevicePropertyUpdatedEvent"
+        and event.data and event.data.id == DOOR
+        and event.data.property == "value"
+    end,
+    function() self:checkDoor() end
+  )
+  events:run()
+  self:checkDoor()  -- the state at boot (the door may already be open)
+  -- a slow reconcile poll: self-heals a missed event, and keeps the QA
+  -- alive in flua (a QA with no pending work drains)
+  setInterval(function() self:checkDoor() end, 300000)
 end
 
 function QuickApp:checkDoor()

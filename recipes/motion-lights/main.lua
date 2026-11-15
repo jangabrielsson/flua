@@ -22,7 +22,22 @@ function QuickApp:onInit()
     return
   end
   self._offTimer = nil
-  setInterval(function() self:checkMotion() end, 3000)
+  -- react to the motion sensor instantly: the refreshStates event feed
+  -- (RefreshStateSubscriber is the HC3 mechanism; flua simulates it)
+  local events = RefreshStateSubscriber()
+  events:subscribe(
+    function(event)
+      return event.type == "DevicePropertyUpdatedEvent"
+        and event.data and event.data.id == MOTION
+        and event.data.property == "value"
+    end,
+    function() self:checkMotion() end
+  )
+  events:run()
+  self:checkMotion()  -- the state at boot (the sensor may already be breached)
+  -- a slow reconcile poll: self-heals a missed event, and keeps the QA
+  -- alive in flua (a QA with no pending work drains)
+  setInterval(function() self:checkMotion() end, 300000)
 end
 
 function QuickApp:checkMotion()

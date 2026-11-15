@@ -16,14 +16,36 @@ function QuickApp:onInit()
     self:debug("set floodId (the flood sensor's id) and restart")
     return
   end
-  setInterval(function() self:checkFlood() end, 5000)
+  self._wet = false
+  -- react to the flood sensor instantly: the refreshStates event feed
+  -- (RefreshStateSubscriber is the HC3 mechanism; flua simulates it)
+  local events = RefreshStateSubscriber()
+  events:subscribe(
+    function(event)
+      return event.type == "DevicePropertyUpdatedEvent"
+        and event.data and event.data.id == FLOOD
+        and event.data.property == "value"
+    end,
+    function() self:checkFlood() end
+  )
+  events:run()
+  self:checkFlood()  -- the state at boot (the floor may already be wet)
+  -- a slow reconcile poll: self-heals a missed event, and keeps the QA
+  -- alive in flua (a QA with no pending work drains)
+  setInterval(function() self:checkFlood() end, 300000)
 end
 
 function QuickApp:checkFlood()
   local flood = api.get("/devices/" .. FLOOD)
-  if flood and flood.properties and flood.properties.value == true then
+  local wet = flood and flood.properties and flood.properties.value == true
+  if wet and not self._wet then  -- dry -> wet: push once, sound the siren
+    self._wet = true
     fibaro.call(2, "sendPush", "Water detected!")
     if SIREN > 0 then fibaro.call(SIREN, "turnOn") end
     self:debug("water detected")
+  elseif not wet and self._wet then  -- wet -> dry: silence the siren
+    self._wet = false
+    if SIREN > 0 then fibaro.call(SIREN, "turnOff") end
+    self:debug("water cleared")
   end
 end

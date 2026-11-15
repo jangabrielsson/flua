@@ -176,3 +176,61 @@ async def test_recipe_sliders_update_quickapp_variables() -> None:
         assert "95" in json.dumps(layout)
     finally:
         await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_motion_lights_reacts_to_the_breach_event() -> None:
+    # the light follows the motion sensor INSTANTLY through the refreshStates
+    # feed — 0.3s after the breach, far inside the old 3s poll, it is on
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        motion, _ = engine.load_sim_device("motionSensor")
+        light, _ = engine.load_sim_device("binarySwitch")
+        main = REPO / "recipes" / "motion-lights" / "main.lua"
+        qa_id, err = engine.load_qa_file(
+            str(main), [f"var:motionId={motion}", f"var:lightId={light}", "var:minutes=5"]
+        )
+        assert qa_id is not None and err is None, err
+        await asyncio.sleep(0.3)
+        assert engine.api.state.devices[light]["properties"]["value"] is False
+        # the viewer's tap on the sensor's Breach button
+        engine.api.dispatch(
+            "GET", f"/plugins/callUIEvent?deviceID={motion}&elementName=btnBreach"
+            "&eventType=onReleased"
+        )
+        await asyncio.sleep(0.3)
+        assert engine.api.state.devices[light]["properties"]["value"] is True
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_leak_alert_siren_follows_the_flood_transitions() -> None:
+    # the siren sounds on the dry->wet edge (one push, not a poll repeat)
+    # and goes silent on the wet->dry edge — both through the event feed
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        flood, _ = engine.load_sim_device("floodSensor")
+        siren, _ = engine.load_sim_device("binarySwitch")
+        main = REPO / "recipes" / "leak-alert" / "main.lua"
+        qa_id, err = engine.load_qa_file(
+            str(main), [f"var:floodId={flood}", f"var:sirenId={siren}"]
+        )
+        assert qa_id is not None and err is None, err
+        await asyncio.sleep(0.3)
+        engine.api.dispatch(
+            "GET", f"/plugins/callUIEvent?deviceID={flood}&elementName=btnBreach"
+            "&eventType=onReleased"
+        )
+        await asyncio.sleep(0.3)
+        assert engine.api.state.devices[siren]["properties"]["value"] is True
+        engine.api.dispatch(
+            "GET", f"/plugins/callUIEvent?deviceID={flood}&elementName=btnClear"
+            "&eventType=onReleased"
+        )
+        await asyncio.sleep(0.3)
+        assert engine.api.state.devices[siren]["properties"]["value"] is False
+    finally:
+        await engine.stop()
