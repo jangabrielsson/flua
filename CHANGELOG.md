@@ -4,6 +4,16 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.167] - 2026-11-15
+
+### Changed
+- recipes: widen the humidity and flood pickers to their base types
+- recipes: device actions through fibaro.call, not raw api.post
+- qa builder MVP: flua --tool build — recipes to QAs in the browser
+- recipes: read variables in onInit, never at module scope
+- The recipe library: finished QAs for the builder and the forum
+- Tutorial refresh + the wider-audience plan
+
 ## [0.1.166] - 2026-11-14
 
 ### Changed
