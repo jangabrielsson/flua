@@ -1,0 +1,9 @@
+{
+  "id": "notify-when-door-opens",
+  "title": "Notify when a door opens",
+  "description": "Sends a phone push when a door sensor opens (re-arms when it closes).",
+  "params": [
+    {"name": "doorId", "label": "Door sensor", "kind": "device", "filter": "com.fibaro.doorSensor", "default": 0},
+    {"name": "message", "label": "Message", "kind": "text", "default": "The door opened"}
+  ]
+}

@@ -28,6 +28,14 @@ echo "synced $SRC_DIR -> $DEST"
 DOCS_SRC="${DOCS_SRC:-docs}"
 DOCS_DEST="${DOCS_DEST:-src/flua/setup_templates/docs}"
 
+# the QA builder's offline snapshot: the recipe library ships with the
+# wheel (the builder refreshes from the flua repo on GitHub). Regenerate
+# the index first — a broken recipe fails the sync, not silently ships.
+python3 scripts/gen-recipes-index.py
+rm -rf src/flua/setup_templates/recipes
+cp -R recipes src/flua/setup_templates/recipes
+echo "synced recipes -> src/flua/setup_templates/recipes"
+
 # the web docs landing page regenerates from the forum set before the copy
 python3 scripts/gen-forum-index.py
 

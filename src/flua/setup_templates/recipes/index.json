@@ -1,0 +1,119 @@
+{
+  "recipes": [
+    {
+      "id": "humidity-fan",
+      "title": "Fan on high humidity",
+      "description": "Starts a fan above a humidity threshold, stops it 5% below (hysteresis).",
+      "params": [
+        {
+          "name": "humidityId",
+          "label": "Humidity sensor",
+          "kind": "device",
+          "filter": "com.fibaro.humiditySensor",
+          "default": 0
+        },
+        {
+          "name": "fanId",
+          "label": "Fan / switch",
+          "kind": "device",
+          "filter": "com.fibaro.binarySwitch",
+          "default": 0
+        },
+        {
+          "name": "threshold",
+          "label": "Humidity % to start",
+          "kind": "number",
+          "default": 65
+        }
+      ]
+    },
+    {
+      "id": "leak-alert",
+      "title": "Leak alert",
+      "description": "Pushes a phone notification when a flood sensor detects water, optionally switches something on.",
+      "params": [
+        {
+          "name": "floodId",
+          "label": "Flood sensor",
+          "kind": "device",
+          "filter": "com.fibaro.floodSensor",
+          "default": 0
+        },
+        {
+          "name": "sirenId",
+          "label": "Siren / switch (optional)",
+          "kind": "device",
+          "filter": "com.fibaro.binarySwitch",
+          "default": 0
+        }
+      ]
+    },
+    {
+      "id": "light-at-sunset",
+      "title": "Turn a light on at sunset",
+      "description": "Switches a light on every day at sunset (adjustable by minutes).",
+      "params": [
+        {
+          "name": "deviceId",
+          "label": "Light",
+          "kind": "device",
+          "filter": "com.fibaro.binarySwitch",
+          "default": 0
+        },
+        {
+          "name": "offset",
+          "label": "Minutes before sunset",
+          "kind": "number",
+          "default": -30
+        }
+      ]
+    },
+    {
+      "id": "motion-lights",
+      "title": "Lights on motion",
+      "description": "Turns a light on when a motion sensor sees movement, off after a delay.",
+      "params": [
+        {
+          "name": "motionId",
+          "label": "Motion sensor",
+          "kind": "device",
+          "filter": "com.fibaro.motionSensor",
+          "default": 0
+        },
+        {
+          "name": "lightId",
+          "label": "Light",
+          "kind": "device",
+          "filter": "com.fibaro.binarySwitch",
+          "default": 0
+        },
+        {
+          "name": "minutes",
+          "label": "On for (minutes)",
+          "kind": "number",
+          "default": 5
+        }
+      ]
+    },
+    {
+      "id": "notify-when-door-opens",
+      "title": "Notify when a door opens",
+      "description": "Sends a phone push when a door sensor opens (re-arms when it closes).",
+      "params": [
+        {
+          "name": "doorId",
+          "label": "Door sensor",
+          "kind": "device",
+          "filter": "com.fibaro.doorSensor",
+          "default": 0
+        },
+        {
+          "name": "message",
+          "label": "Message",
+          "kind": "text",
+          "default": "The door opened"
+        }
+      ]
+    }
+  ]
+}

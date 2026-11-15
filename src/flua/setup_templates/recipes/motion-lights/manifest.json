@@ -1,0 +1,10 @@
+{
+  "id": "motion-lights",
+  "title": "Lights on motion",
+  "description": "Turns a light on when a motion sensor sees movement, off after a delay.",
+  "params": [
+    {"name": "motionId", "label": "Motion sensor", "kind": "device", "filter": "com.fibaro.motionSensor", "default": 0},
+    {"name": "lightId", "label": "Light", "kind": "device", "filter": "com.fibaro.binarySwitch", "default": 0},
+    {"name": "minutes", "label": "On for (minutes)", "kind": "number", "default": 5}
+  ]
+}
