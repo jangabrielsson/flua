@@ -9,6 +9,7 @@ This module stays free of asyncio and lupa on purpose.
 from __future__ import annotations
 
 import copy
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -74,13 +75,22 @@ def forward_to_proxy(req: ApiRequest, is_proxy: bool) -> None:
         req.remote(req.method, req.path, req.body)
 
 
-def _readonly_block(method: str, readonly: bool) -> tuple[Any, int] | None:
+def _readonly_block(
+    method: str, path: str, readonly: bool, allow_call: bool = False
+) -> tuple[Any, int] | None:
     """--%%mode:readonly: a mutating verb that would reach the HC3 is
     refused with 403 (GET/HEAD pass; sim-side writes are unaffected —
-    they never touch the controller)."""
-    if readonly and method.upper() not in ("GET", "HEAD"):
-        return None, 403
-    return None
+    they never touch the controller). ``allow_call`` (readonly+call)
+    unlocks POST /devices/{id}/action/... — the fibaro.call channel a
+    test QA needs to flip a light; creating/deleting stays blocked."""
+    if not readonly or method.upper() in ("GET", "HEAD"):
+        return None
+    if allow_call and method.upper() == "POST" and _ACTION_CALL_RE.fullmatch(path):
+        return None
+    return None, 403
+
+
+_ACTION_CALL_RE = re.compile(r"/devices/\d+/action/[^/]+")
 
 
 def remote_get(req: ApiRequest, path: str, version: str | None = None) -> tuple[Any, int] | None:

@@ -339,6 +339,7 @@ Parsing stops at the end-of-header marker:
 | `--%%mode:proxy` | proxy mode: mirror this QA onto the HC3 (online only, see below) |
 | `--%%mode:proxy,noUI` | proxy mode, but leave the proxy's UI untouched (you edit it in the HC3's UI editor) |
 | `--%%mode:readonly` | online for reads, never for writes: a mutating `api.*` call that would reach the HC3 is refused with 403 (sim-owned writes still work — they never touch the controller) |
+| `--%%mode:readonly+call` | the same, plus device actions pass through (`POST /devices/{id}/action/...`, the `fibaro.call` channel — test code flips a light to see it work); creating or deleting resources stays blocked |
 | `--%%debug:refreshState=true,api=true,http=true` | debug logging: refreshStates events / `api.*` calls / `net.HTTPClient` requests (global) |
 | `--%%debug:ws=true` | debug logging: byte-level `net.WebSocketClient` traffic — handshake leftovers, per-frame rx/tx with masked previews, close codes (global) |
 | `--%%debug:true` | shorthand for all three debug channels (`:false` disables them) |
@@ -358,7 +359,9 @@ both appear). `--%%mode:readonly` is the safety posture for exploring the
 live HC3: reads behave exactly like online mode, and any mutating verb
 (POST/PUT/DELETE) that would reach the controller is refused with 403 —
 writes the sim owns stay local. Without a configured HC3 it degrades to
-plain offline.
+plain offline. `--%%mode:readonly+call` unlocks exactly one more channel:
+device actions (`fibaro.call`) pass through, so test code can flip a
+light on and off — creating or deleting resources stays blocked.
 
 ### The emulator database (`--%%db`)
 

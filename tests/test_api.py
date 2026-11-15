@@ -2206,3 +2206,47 @@ def test_readonly_mode_refuses_remote_writes_at_the_gate() -> None:
     data, status = api.dispatch("PUT", "/devices/45", {"name": "x"}, qa_id=5001)
     assert status == 200
     assert calls == ["GET /devices/45", "PUT /devices/45"]
+
+
+def test_readonly_plus_call_unlocks_device_actions_only() -> None:
+    # --%%mode:readonly+call: fibaro.call's POST /devices/{id}/action/
+    # passes through (test code flips a light), every other mutating verb
+    # stays refused — and plain readonly blocks even the action
+    calls: list[str] = []
+
+    class _Remote:
+        def request(self, method, path, query, body, version=None):
+            calls.append(f"{method} {path}")
+            return {}, 200
+
+    class _Engine:
+        clock = None
+
+        def qa_is_offline(self, qa_id):
+            return False
+
+        def qa_is_readonly(self, qa_id):
+            return True
+
+        def qa_readonly_call(self, qa_id):
+            return qa_id == 5000
+
+        def mark_db_dirty(self):
+            pass
+
+        def trace_event(self, category, qa_id, data):
+            pass
+
+    api = Api()
+    api._engine = _Engine()
+    api._remote = _Remote()
+    data, status = api.dispatch("POST", "/devices/45/action/turnOn", {}, qa_id=5000)
+    assert status == 200
+    assert calls == ["POST /devices/45/action/turnOn"]
+    data, status = api.dispatch("PUT", "/devices/45", {"name": "x"}, qa_id=5000)
+    assert status == 403
+    data, status = api.dispatch("DELETE", "/devices/45", qa_id=5000)
+    assert status == 403
+    assert calls == ["POST /devices/45/action/turnOn"]  # only the action went out
+    data, status = api.dispatch("POST", "/devices/45/action/turnOn", {}, qa_id=5001)
+    assert status == 403  # plain readonly refuses even the action

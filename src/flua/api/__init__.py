@@ -365,13 +365,14 @@ class Api:
         # and the 404 fallback all stay in the sim.
         offline = self._engine is not None and self._engine.qa_is_offline(qa_id)
         readonly = self._engine is not None and self._engine.qa_is_readonly(qa_id)
+        readonly_call = self._engine is not None and self._engine.qa_readonly_call(qa_id)
         remote_hook = self._remote_hook if (self._remote is not None and not offline) else None
         if readonly and remote_hook is not None:
             # --%%mode:readonly: reads pass through, mutating remote verbs
             # are refused before they reach the controller
             def _guard(hook: Callable[..., tuple[Any, int]]) -> Callable[..., tuple[Any, int]]:
                 def wrapped(method: str, path: str, body: Any = None, version: str | None = None):
-                    blocked = _readonly_block(method, True)
+                    blocked = _readonly_block(method, path, readonly, readonly_call)
                     if blocked is not None:
                         logger.warning(
                             "readonly QA %s: %s %s refused (no HC3 writes)",
@@ -422,7 +423,7 @@ class Api:
                 # variables endpoints it refuses to external REST callers
                 # go through the FluaHelper QA (the controller's local
                 # context) instead of the plain REST transport.
-                blocked = _readonly_block(method, readonly)
+                blocked = _readonly_block(method, path, readonly, readonly_call)
                 if blocked is not None:
                     logger.warning(
                         "readonly QA %s: %s %s refused (no HC3 writes)",
@@ -443,7 +444,7 @@ class Api:
         )
         if remote_hook is not None and not flua_id:
             # online mode: anything the sim doesn't own goes to the real HC3
-            blocked = _readonly_block(method, readonly)
+            blocked = _readonly_block(method, path, readonly, readonly_call)
             if blocked is not None:
                 logger.warning(
                     "readonly QA %s: %s %s refused (no HC3 writes)",

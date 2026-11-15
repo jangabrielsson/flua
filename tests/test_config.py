@@ -495,3 +495,19 @@ def test_mode_directive_readonly_normalizes_flags() -> None:
     }
     assert "readonly" not in _apply_mode({"mode": "online"})
     assert "readonly" not in _apply_mode({"mode": "offline"})
+
+
+def test_mode_directive_readonly_plus_call() -> None:
+    # --%%mode:readonly+call: the readonly posture plus device actions
+    # (fibaro.call) — the raw-config form normalizes in _apply_mode, the
+    # directive form parses the "+call" modifier
+    assert _apply_mode({"mode": "readonly+call"}) == {
+        "mode": "readonly",
+        "offline": False,
+        "proxy": False,
+        "readonly": True,
+        "readonlyCall": True,
+    }
+    annotations = parse_annotations("--%%mode:readonly+call\n")
+    assert annotations["readonlyCall"] is True
+    assert _apply_mode(annotations)["readonly"] is True

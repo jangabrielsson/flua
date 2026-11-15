@@ -45,9 +45,13 @@ model) and ARCHITECTURE.md (components).
 - **A `--%%mode:readonly` QA reads the HC3 but never mutates it** — any
   POST/PUT/DELETE that would reach the controller is refused with 403
   before dispatch; sim-owned writes still work (they never touch the
-  controller).
+  controller). `readonly+call` unlocks exactly the device-action channel
+  (`POST /devices/{id}/action/...`, `fibaro.call`) — create/delete stays
+  blocked.
   *Pinned by:* `tests/test_api.py::test_readonly_mode_refuses_remote_writes_at_the_gate`,
-  `tests/test_hc3.py::test_readonly_mode_reads_online_but_never_writes`
+  `tests/test_api.py::test_readonly_plus_call_unlocks_device_actions_only`,
+  `tests/test_hc3.py::test_readonly_mode_reads_online_but_never_writes`,
+  `tests/test_hc3.py::test_readonly_plus_call_runs_actions_but_blocks_writes`
 
 ## refreshStates feed & events
 

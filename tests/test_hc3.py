@@ -317,6 +317,9 @@ class _MockHc3(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         length = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(length) if length else b""
+        if re.fullmatch(r"/api/devices/\d+/action/[^/]+", path):
+            self._send_json(None, 202)  # the real HC3's action channel
+            return
         if path == "/api/quickApp/import":
             # the web UI's wire format (multipart/form-data: file + roomId) —
             # the endpoint uploadQA/uploadFQA use against a real HC3: it
@@ -2123,3 +2126,36 @@ async def test_readonly_mode_reads_online_but_never_writes(
         await engine.stop()
     assert "READ 200 hc3-device" in out  # reads pass through
     assert "WRITE 403" in out  # writes are refused
+
+
+@pytest.mark.asyncio
+async def test_readonly_plus_call_runs_actions_but_blocks_writes(
+    tmp_path, capsys, mock_hc3, monkeypatch
+) -> None:
+    # --%%mode:readonly+call: fibaro.call reaches the HC3 (flip a light to
+    # see it work); anything else mutating stays refused
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    script = tmp_path / "readonly_call.lua"
+    script.write_text(
+        "setTimeout(function()\n"
+        "  local dev, status = api.get('/devices/45')\n"
+        "  print('READ', status)\n"
+        "  local data, call = fibaro.call(45, 'turnOn')\n"
+        "  print('CALL', call)\n"
+        "  local d, put = api.put('/devices/45', {properties={userDescription='x'}})\n"
+        "  print('WRITE', put)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine(api_mode="remote")
+    await engine.start()
+    try:
+        engine.start_qa(str(script), None, {"mode": "readonly+call"}, str(script))
+        out = await _wait_for_output(capsys, "WRITE")
+    finally:
+        await engine.stop()
+    assert "READ 200" in out
+    assert "CALL 202" in out  # the action reached the controller
+    assert "WRITE 403" in out  # the write did not

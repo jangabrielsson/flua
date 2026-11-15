@@ -565,12 +565,19 @@ def parse_annotations(source: str, warn_unknown: bool = True) -> dict[str, Any]:
                 "persist": db_path.startswith("+"),
             }
         elif name == "mode":
-            # --%%mode:online|offline|proxy|readonly[,noUI] — the mode
-            # directive; the optional "noUI" (proxy mode only) connects to
-            # the existing proxy WITHOUT clobbering its UI (developers who
-            # edit the proxy's UI in the HC3's UI editor)
+            # --%%mode:online|offline|proxy|readonly[+call][,noUI] — the mode
+            # directive; "+call" (readonly) unlocks device actions (the
+            # fibaro.call channel), the optional "noUI" (proxy mode only)
+            # connects to the existing proxy WITHOUT clobbering its UI
+            # (developers who edit the proxy's UI in the HC3's UI editor)
             parts = [part.strip() for part in value.split(",")]
-            config["mode"] = parts[0] if parts and parts[0] else None
+            mode = parts[0] if parts and parts[0] else None
+            if isinstance(mode, str) and "+" in mode:
+                base, _, extras = mode.partition("+")
+                mode = base
+                if "call" in extras.split("+"):
+                    config["readonlyCall"] = True
+            config["mode"] = mode
             if "noUI" in parts:
                 config["proxyNoUI"] = True
         elif name == "debug" and "=" not in value:
@@ -608,6 +615,10 @@ def _apply_mode(config: dict[str, Any]) -> dict[str, Any]:
     like parsed annotations.
     """
     mode = config.get("mode")
+    if isinstance(mode, str) and mode.endswith("+call"):
+        # the raw-config form of --%%mode:readonly+call (engine callers)
+        config["mode"] = mode = mode[: -len("+call")]
+        config["readonlyCall"] = True
     if mode not in _MODE_VALUES:
         mode = None
         if config.get("offline") is True:

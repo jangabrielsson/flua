@@ -434,6 +434,16 @@ class LuaEngine:
         info = self._qas.get(int(qa_id))
         return bool(info and info.get("config", {}).get("readonly"))
 
+    def qa_readonly_call(self, qa_id: int | None) -> bool:
+        """--%%mode:readonly+call: the readonly QA may still run device
+        actions (POST /devices/{id}/action/..., the fibaro.call channel) —
+        test code wants to flip a light to see it work; creating or
+        deleting resources stays blocked."""
+        if qa_id is None:
+            return False
+        info = self._qas.get(int(qa_id))
+        return bool(info and info.get("config", {}).get("readonlyCall"))
+
     def qa_mode(self, qa_id: int) -> str:
         """The QA's effective runtime mode ("proxy" | "online" | "offline"):
         a proxy QA in a remote run is proxy; otherwise remote, unless the QA
