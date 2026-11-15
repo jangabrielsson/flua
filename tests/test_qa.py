@@ -2072,3 +2072,49 @@ def test_engine_forces_c_locale_for_lua_patterns() -> None:
     # platform limit, not asserted here.)
     assert lua.eval("('ą'):match('%s')") is None  # neither byte is a space
     assert lua.eval("('ą'):match('%S+') == 'ą'") is True  # no mid-byte split
+
+
+@pytest.mark.asyncio
+async def test_sim_device_sensor_ui(capsys) -> None:
+    # the sensor sim devices carry a UI: binary sensors get Breach/Clear
+    # buttons, multilevel ones a slider — and the viewer's callUIEvent
+    # channel (a tap/drag in the web view) drives them, so the builder's
+    # View UI tab is a working test bench
+    loader_code = (
+        "setTimeout(function()\n"
+        "  local motion = _FLUA.loadSimDevice('motionSensor')\n"
+        "  local temp = _FLUA.loadSimDevice('temperatureSensor')\n"
+        "  setTimeout(function()\n"
+        "    local mdev = api.get('/devices/'..motion)\n"
+        "    print('MVIEW', json.encode(mdev.properties.viewLayout):find('btnBreach') ~= nil)\n"
+        "    local tdev = api.get('/devices/'..temp)\n"
+        "    print('TVIEW', json.encode(tdev.properties.viewLayout):find('valueSlider') ~= nil)\n"
+        "    print('TDEFAULT', tostring(tdev.properties.value))\n"
+        "    -- the viewer's channels: tap the breach button, drag the slider\n"
+        "    api.get('/plugins/callUIEvent?deviceID='..motion"
+        "      ..'&elementName=btnBreach&eventType=onReleased')\n"
+        "    api.get('/plugins/callUIEvent?deviceID='..temp"
+        "      ..'&elementName=valueSlider&eventType=onChanged&value=21.5')\n"
+        "    setTimeout(function()\n"
+        "      mdev = api.get('/devices/'..motion)\n"
+        "      tdev = api.get('/devices/'..temp)\n"
+        "      print('BREACHUI', tostring(mdev.properties.value))\n"
+        "      print('SLIDERUI', tostring(tdev.properties.value))\n"
+        "      _FLUA.exit(0)\n"
+        "    end, 100)\n"
+        "  end, 100)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(None, loader_code, {}, "loader")
+        await wait_until(lambda: not engine.is_running())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "MVIEW true" in out  # the breach/clear buttons are in the view
+    assert "TVIEW true" in out  # the slider is in the view
+    assert "TDEFAULT 0" in out  # boot value is a number, not the skeleton's ""
+    assert "BREACHUI true" in out  # the button breaches the sensor
+    assert "SLIDERUI 21.5" in out  # the slider sets the value

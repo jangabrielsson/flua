@@ -8,6 +8,8 @@
 --
 --   fibaro.call(id, "setValue", bool) / "breach" / "clearBreach"
 
+--%%u:{{button='btnBreach',text='Breach / on',onReleased='breach'},{button='btnClear',text='Clear / off',onReleased='clearBreach'}}
+
 function QuickApp:onInit()
   self:debug("sim device ready, id", self.id)
   -- stay up for the whole run (a drained QA stops answering)

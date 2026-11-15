@@ -1394,6 +1394,15 @@ their stock actions (`arm`/`disarm`/`setArmed`, `setThermostatMode`,
 `setHeatingThermostatSetpoint`, `setColor`, `createChild`, …). Drive one and
 watch scenes and reacting QAs fire like on a real device.
 
+Sensors also carry a UI for the web view (the `--ui`/builder tab): every
+binary sensor (motion, door, flood, smoke, …) gets Breach/Clear buttons,
+and every multilevel one (temperature, humidity, light, meters, …) a slider
+over its real range and unit. Tapping them in the view is exactly a
+`callUIEvent` — the sensor's `value` changes and reacting QAs notice, so
+the view doubles as a test bench. The initial value is a number (0), never
+the skeleton's empty string, so recipes comparing `value > threshold`
+cannot crash against it.
+
 `alarmEndpoint` is the system-level one: it serves the `/alarms/v1/*`
 endpoints with the HC3's partition model — the built-in partitions,
 deployed `com.fibaro.alarmPartition` QAs (arming dispatches to the QA's

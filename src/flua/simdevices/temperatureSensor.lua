@@ -8,10 +8,20 @@
 --
 --   fibaro.call(id, "setValue", 21.5, "C")  -- value + optional unit (C or F)
 
+--%%u:{slider='valueSlider',text='Value',min=-40,max=60,unit='°C',onChanged='_setValue'}
+
+-- UI: the viewer delivers the slider's new value in event.values[1]
+function QuickApp:_setValue(event)
+  self:setValue(event.values and event.values[1])
+end
+
 function QuickApp:onInit()
   self:debug("sim device ready, id", self.id)
   -- stay up for the whole run (a drained QA stops answering)
   _FLUA.keepAlive()
+  local value = tonumber(self.properties.value) or 0
+  self:updateProperty("value", value)
+  self:updateView("valueSlider", "value", tostring(value))
 end
 function QuickApp:setValue(value, unit)
   value = tonumber(value)
