@@ -11,6 +11,7 @@ recipe is one merge, no release.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import http.server
 import json
 import re
@@ -18,6 +19,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 
 from ..http import http_call
@@ -29,6 +31,7 @@ RECIPES_ROOT = Path(__file__).resolve().parent.parent / "setup_templates" / "rec
 INDEX_URL = "https://raw.githubusercontent.com/jangabrielsson/flua/main/recipes/index.json"
 RECIPE_URL = "https://raw.githubusercontent.com/jangabrielsson/flua/main/recipes/{id}/main.lua"
 _CACHE_ROOT = Path.home() / ".flua" / "recipes"
+_SIM_SPEED = 600.0  # 1 wall second = 10 virtual minutes in the sim
 
 _PAGE_PATH = Path(__file__).resolve().parent.parent / "setup_templates" / "qa_builder.html"
 
@@ -117,6 +120,75 @@ def _recipe_code(rid: str) -> str | None:
         return shipped.read_text(encoding="utf-8")
     status, code = _fetch(RECIPE_URL.format(id=rid))
     return code if status == 200 else None
+
+
+def _manifest_for(rid: str) -> dict[str, object] | None:
+    for recipe in cached_index().get("recipes", []):
+        if recipe.get("id") == rid:
+            return recipe
+    return None
+
+
+async def _run_simulation(
+    code: str, manifest: dict[str, object] | None, minutes: int, log_path: Path
+) -> dict[str, object]:
+    """Boot the generated QA in the offline sim and run it for ``minutes``
+    virtual minutes (the clock runs 600x, so 1 wall second = 10 virtual
+    minutes). Picked device ids are re-pointed at bundled sim devices of
+    the matching kind, so the QA polls a real sim world instead of empty
+    air. Returns {error, devices, virtualMinutes}; the log lands in
+    log_path."""
+    from ..engine import SIM_DEVICES_DIR, LuaEngine
+
+    minutes = max(1, min(int(minutes or 5), 30))
+    engine = LuaEngine(speed=_SIM_SPEED, api_mode="local")
+    engine.set_log_mode("text", str(log_path))
+    seeded: list[dict[str, object]] = []
+    params: dict[str, object] = {}
+    qa_info: dict[str, object] | None = None
+    error: str | None = None
+    await engine.start()
+    try:
+        if manifest:
+            for param in manifest.get("params", []):
+                if param.get("kind") != "device" or not param.get("filter"):
+                    continue
+                name = str(param["name"])
+                baked = re.search(rf"^--%%var:{re.escape(name)}=(\d+)", code, re.M)
+                if not baked or int(baked.group(1)) == 0:
+                    continue  # unset — the recipe prints its hint instead
+                kind = str(param["filter"]).split(".")[-1]
+                if not (SIM_DEVICES_DIR / f"{kind}.lua").is_file():
+                    continue
+                sim_id, sim_err = engine.load_sim_device(kind)
+                if sim_id is None:
+                    error = f"sim device {kind}: {sim_err}"
+                    break
+                params[name] = sim_id
+                seeded.append({"name": name, "kind": kind, "simId": sim_id})
+        if error is None:
+            run_code = bake_params(code, params) if params else code
+            qa_path = engine.qa_temp_file(run_code)
+            qa_id, qa_err = engine.load_qa_file(qa_path)
+            if qa_id is None:
+                error = qa_err or "cannot load the QA"
+            else:
+                qa_info = {
+                    "id": qa_id,
+                    "name": (manifest or {}).get("title") or "QuickApp",
+                }
+        if error is None:
+            await asyncio.sleep(minutes * 60 / _SIM_SPEED + 0.05)
+    finally:
+        await engine.stop()
+    clock = datetime.fromtimestamp(engine.clock.time).strftime("%d.%m.%Y %H:%M:%S")
+    return {
+        "error": error,
+        "devices": seeded,
+        "virtualMinutes": minutes,
+        "qa": qa_info,
+        "clock": clock,
+    }
 
 
 class _BuilderHandler(http.server.BaseHTTPRequestHandler):
@@ -234,6 +306,26 @@ class _BuilderHandler(http.server.BaseHTTPRequestHandler):
                 self._json(502, {"error": error})
                 return
             self._json(200, {"device": device})
+            return
+        if parsed.path == "/api/simulate":
+            rid = str(request.get("id") or "")
+            code = request.get("code")
+            if not isinstance(code, str) or not code.strip():
+                self._json(400, {"error": "code is required"})
+                return
+            try:
+                minutes = int(request.get("minutes"))
+            except (TypeError, ValueError):
+                minutes = 5
+            manifest = _manifest_for(rid) if re.fullmatch(r"[a-z0-9-]+", rid) else None
+            log_path = _CACHE_ROOT.parent / "sim.log"
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            result = asyncio.run(_run_simulation(code, manifest, minutes, log_path))
+            try:
+                result["log"] = log_path.read_text(encoding="utf-8")
+            except OSError:
+                result["log"] = ""
+            self._json(200, result)
             return
         self._json(404, {"error": "not found"})
 

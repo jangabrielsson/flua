@@ -95,6 +95,7 @@ that already serves `examples/iconInstall.lua`'s icons
    **Shipped as the MVP**: `flua --tool build` serves the builder page —
    recipe list from the index (GitHub refresh + shipped fallback), HC3-fed
    pickers with typed-id fallback, param baking into the marked --%%var
-   lines, and a `.lua` download. Simulate-in-place and upload are the next
-   slice.
+   lines, a `.lua` download, direct upload to the HC3 (import endpoint),
+   and simulate-in-place: the generated QA runs on the laptop with a
+   virtual clock, picked devices re-pointed at bundled sim devices.
 3. One-click installers (macOS/Windows) once the builder is worth opening.

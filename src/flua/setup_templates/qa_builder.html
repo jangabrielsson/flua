@@ -44,6 +44,7 @@
     border-radius: 8px; border: none; font: 12.5px/1.5 ui-monospace, Menlo, monospace;
     width: 100%; height: calc(100vh - 380px); min-height: 320px;
     overflow: auto; white-space: pre; }
+  #simlog { height: auto; max-height: 240px; min-height: 0; }
   .hint { color: var(--muted); font-size: 13px; }
   #status { grid-column: 1 / -1; color: var(--muted); font-size: 13px; min-height: 1.2em; }
   #status.error { color: #b91c1c; }
@@ -74,6 +75,13 @@
       <span class="hint">The code below is editable — tweak it, then download or
         upload it to your HC3.</span>
     </div>
+    <div class="row">
+      <button class="primary" id="simulate" style="background:#7c3aed">Simulate</button>
+      <input type="number" id="simMinutes" value="5" min="1" max="30">
+      <span class="hint">virtual minutes on your laptop (no HC3 needed — the picked
+        devices become simulated devices)</span>
+    </div>
+    <pre id="simlog" class="hidden"></pre>
     <textarea id="code" class="code hidden" spellcheck="false"></textarea>
   </section>
 
@@ -320,10 +328,41 @@ async function upload() {
   btn.disabled = false;
 }
 
+async function simulate() {
+  const code = $("#code");
+  if (!code.value.trim()) {
+    await generate(false);
+    if (!$("#code").value.trim()) return;
+  }
+  const minutes = Math.max(1, Math.min(30, parseInt($("#simMinutes").value, 10) || 5));
+  const log = $("#simlog");
+  log.classList.remove("hidden");
+  log.textContent = "simulating " + minutes + " virtual minutes…";
+  const btn = $("#simulate");
+  btn.disabled = true;
+  try {
+    const data = await api("/api/simulate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: current.id, code: code.value, minutes }),
+    });
+    const devices = (data.devices || [])
+      .map((d) => d.name + " \u2192 sim device " + d.simId + " (" + d.kind + ")")
+      .join(", ");
+    const head = "simulated " + (data.qa ? data.qa.name + " (id " + data.qa.id + ")" : "the QA")
+      + " — " + (data.virtualMinutes || 0) + " virtual minutes, clock " + (data.clock || "");
+    log.textContent = (devices ? "sim devices: " + devices + "\n" : "") + head + "\n\n"
+      + (data.log || "") + "\n"
+      + (data.error ? "ERROR: " + data.error : "no errors");
+  } catch (err) { log.textContent = "simulation failed: " + err.message; }
+  btn.disabled = false;
+}
+
 $("#refresh").onclick = () => loadIndex(true).catch((err) => status(err.message, "error"));
 $("#generate").onclick = () => generate(false);
 $("#download").onclick = () => generate(true);
 $("#upload").onclick = upload;
+$("#simulate").onclick = simulate;
 (async function init() {
   try {
     await loadIndex(true);  // live index; falls back to the cache/snapshot offline

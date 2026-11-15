@@ -312,3 +312,59 @@ def test_builder_index_prefers_the_cache_without_refresh(monkeypatch, tmp_path) 
     )
     cached = build.cached_index()
     assert [r["id"] for r in cached["recipes"]] == ["brand-new-recipe"]
+
+
+def test_builder_simulates_the_generated_qa(monkeypatch) -> None:
+    # simulate runs the generated code in the offline sim (no HC3): the QA
+    # boots, prints its hint for unset params, and reports no errors
+    server, base = _serve(monkeypatch)
+    try:
+        generated = json.loads(
+            _post(
+                base,
+                "/api/generate",
+                {"id": "light-at-sunset", "params": {"deviceId": 0, "offset": -15}},
+            )[1]
+        )["code"]
+        status, body = _post(
+            base,
+            "/api/simulate",
+            {"id": "light-at-sunset", "code": generated, "minutes": 1},
+        )
+        assert status == 200
+        result = json.loads(body)
+        assert result["error"] is None
+        assert result["devices"] == []
+        assert result["qa"]["id"] == 5000
+        assert "set deviceId (the light's id) and restart" in result["log"]
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_builder_simulate_seeds_sim_devices(monkeypatch) -> None:
+    # a picked device id is re-pointed at a bundled sim device of the same
+    # kind, so the QA polls a real sim world (the sim device logs its boot)
+    server, base = _serve(monkeypatch)
+    try:
+        generated = json.loads(
+            _post(
+                base,
+                "/api/generate",
+                {"id": "light-at-sunset", "params": {"deviceId": 999, "offset": -15}},
+            )[1]
+        )["code"]
+        status, body = _post(
+            base,
+            "/api/simulate",
+            {"id": "light-at-sunset", "code": generated, "minutes": 1},
+        )
+        assert status == 200
+        result = json.loads(body)
+        assert result["error"] is None
+        assert result["devices"] == [{"name": "deviceId", "kind": "binarySwitch", "simId": 5000}]
+        assert result["qa"]["id"] == 5001
+        assert "sim device ready, id 5000" in result["log"]
+    finally:
+        server.shutdown()
+        server.server_close()
