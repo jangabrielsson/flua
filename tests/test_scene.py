@@ -269,10 +269,12 @@ async def test_date_trigger_evaluates_at_scheduled_fire_time(tmp_path, capsys) -
     engine = LuaEngine()
     await engine.start()
     try:
-        # the next minute boundary, pinned as the cron's minute AND hour
-        # (so the hour rollover cannot shift the match)
+        # a minute boundary pinned as the cron's minute AND hour (so the
+        # hour rollover cannot shift the match), far enough ahead that a
+        # slow CI boot (the 0.3 s settle below) can never cross it — the
+        # next boundary would legitimately fire mid-assert under load
         now = int(engine.clock.time)
-        boundary = now - now % 60 + 60
+        boundary = now - now % 60 + 60 + 120
         t = time.localtime(boundary)
         minute, hour = str(t.tm_min), str(t.tm_hour)
         script = tmp_path / "scene.lua"
