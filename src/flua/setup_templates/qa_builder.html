@@ -97,7 +97,7 @@
 <script>
 "use strict";
 const $ = (sel) => document.querySelector(sel);
-let INDEX = [], current = null, DEVICES = [], ROOMS = [], SCENES = [], FILTERED = {}, CATEGORY = null;
+let INDEX = [], current = null, DEVICES = [], ROOMS = [], SCENES = [], FILTERED = {}, CATEGORY = null, SIMDEVICES = [];
 
 // the taxonomy — keep in sync with tests/test_recipes.py; categories
 // arriving from GitHub that are not listed here get appended to the selector
@@ -186,6 +186,7 @@ async function loadHouse() {
     DEVICES = devices.items || [];
     ROOMS = (await api("/api/rooms")).items || [];
     SCENES = (await api("/api/scenes")).items || [];
+    SIMDEVICES = (await api("/api/simdevices")).items || [];
     // per-type lists for the device pickers: ?isTypeOf= matches the whole
     // inheritance chain, so a "Light" shows binarySwitch children too
     const filters = new Set();
@@ -197,9 +198,11 @@ async function loadHouse() {
     for (const filter of filters) {
       FILTERED[filter] = (await api("/api/devices?isTypeOf=" + encodeURIComponent(filter))).items || [];
     }
-    $("#hc3").textContent = devices.hc3 ? "HC3: " + devices.hc3 : "no HC3 configured — type ids manually";
+    $("#hc3").textContent = devices.hc3
+      ? "HC3: " + devices.hc3
+      : "no HC3 configured — pick simulated devices or type ids";
   } catch (err) {
-    $("#hc3").textContent = "no HC3 configured — type ids manually";
+    $("#hc3").textContent = "no HC3 configured — pick simulated devices or type ids";
   }
 }
 
@@ -242,6 +245,24 @@ function select(recipe) {
         ? (param.filter ? FILTERED[param.filter] || [] : DEVICES)
         : param.kind === "room" ? ROOMS : SCENES;
       for (const opt of optionList(items)) input.appendChild(opt);
+      // the simulated devices that fit this param's type filter: without
+      // an HC3 (or before the sensor is installed) they make the sim run
+      // work — the picker value is 'sim:<device>', baked as id 0 + marker
+      if (param.kind === "device") {
+        const fitting = SIMDEVICES.filter((d) =>
+          !param.filter || (d.types || []).includes(param.filter));
+        if (fitting.length) {
+          const group = document.createElement("optgroup");
+          group.label = "simulated (your laptop)";
+          for (const d of fitting) {
+            const o = document.createElement("option");
+            o.value = "sim:" + d.name;
+            o.textContent = "sim: " + d.name + (d.type ? " (" + d.type.split(".").pop() + ")" : "");
+            group.appendChild(o);
+          }
+          input.appendChild(group);
+        }
+      }
       input.value = String(param.default ?? 0);
     } else {
       input.type = param.kind === "number" ? "number" : param.kind === "boolean" ? "checkbox" : "text";
@@ -275,8 +296,9 @@ function collect() {
     const kind = el.dataset.kind;
     if (el.tagName === "SELECT") {
       const manual = document.querySelector(`#form [data-manual-for="${name}"]`);
-      const value = manual && manual.value !== "" ? Number(manual.value) : Number(el.value);
-      params[name] = value || Number(el.value);
+      if (manual && manual.value !== "") { params[name] = Number(manual.value); continue; }
+      const value = el.value;
+      params[name] = value.startsWith("sim:") ? value : Number(value);
     } else if (el.type === "checkbox") {
       params[name] = el.checked;
     } else if (el.type === "number") {
@@ -313,7 +335,10 @@ async function generate(download) {
     const code = $("#code");
     code.value = data.code;
     code.classList.remove("hidden");
-    status("generated — the code is editable; review, then download or upload", "ok");
+    const simPicks = Object.values(params).filter((v) => typeof v === "string" && v.startsWith("sim:"));
+    status(simPicks.length
+      ? "generated — simulated devices picked (" + simPicks.join(", ") + "): set real ids before uploading to the HC3"
+      : "generated — the code is editable; review, then download or upload", "ok");
   } catch (err) { status("failed: " + err.message, "error"); }
 }
 

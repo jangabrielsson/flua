@@ -1628,6 +1628,12 @@ step advances virtual time until a device reaches a value (with a
 timeout). `scripts/gen-recipes-index.py` regenerates the index and
 validates every field.
 
+Offline — or before the real sensor is installed — the builder's device
+pickers also offer the bundled simulated devices that fit the param's
+type filter: picking one keeps the variable at 0 (the recipe prints its
+hint until a real id is set) and the sim run seeds exactly that device,
+so the whole generate → simulate → view loop works without an HC3.
+
 The HC3's standard icon library (~13,000 state files, ~65 MB) is Fibaro
 copyrighted artwork, so flua ships only the manifest (`devices/
 icon_manifest.json`, built by `scripts/extract_icon_files.py` — live-probed

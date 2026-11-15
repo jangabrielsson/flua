@@ -56,9 +56,18 @@ def _lua_literal(value: object) -> str:
 def bake_params(code: str, params: dict[str, object]) -> str:
     """Replace the recipe's marked --%%var lines with the picked values —
     plain, readable string surgery (the result is ordinary Lua). The whole
-    value up to a trailing comment is replaced; the comment stays."""
+    value up to a trailing comment is replaced; the comment stays. A
+    ``sim:<kind>`` value keeps the id at 0 (no real device) and rides the
+    kind in a trailing ``[sim:<kind>]`` marker the sim seeding reads."""
     for name, value in params.items():
         line_re = re.compile(rf"^(--%%var:{re.escape(str(name))}=).*?(\s*--.*)?$", re.M)
+        if isinstance(value, str) and value.startswith("sim:"):
+            kind = value[4:]
+            code = line_re.sub(
+                lambda match, k=kind: f"{match.group(1)}0{match.group(2) or ''} [sim:{k}]",
+                code,
+            )
+            continue
         literal = _lua_literal(value)
         code = line_re.sub(
             lambda match, lit=literal: f"{match.group(1)}{lit}{match.group(2) or ''}", code
@@ -127,6 +136,33 @@ def _recipe_code(rid: str) -> str | None:
         return shipped.read_text(encoding="utf-8")
     status, code = _fetch(RECIPE_URL.format(id=rid))
     return code if status == 200 else None
+
+
+def _sim_device_items() -> list[dict[str, object]]:
+    """The bundled sim devices with their type inheritance chains — the
+    offline pickers: without an HC3 (or before the sensor is installed) a
+    user picks 'sim: MotionSensor' and the sim run seeds exactly that."""
+    from ..devices import schema_for
+    from ..engine import SIM_DEVICES_DIR
+
+    items: list[dict[str, object]] = []
+    for path in sorted(SIM_DEVICES_DIR.glob("*.lua")):
+        device_type: str | None = None
+        for line in path.read_text(encoding="utf-8").splitlines()[:10]:
+            match = re.match(r"--%%type:\s*(.+)", line.strip())
+            if match:
+                device_type = match.group(1).strip()
+                break
+        chain: list[str] = []
+        seen: set[str] = set()
+        current = device_type
+        while current and current not in seen:
+            seen.add(current)
+            chain.append(current)
+            schema = schema_for(current)
+            current = schema and str(schema.get("baseType") or "") or None
+        items.append({"name": path.stem, "type": device_type, "types": chain})
+    return items
 
 
 def _manifest_for(rid: str) -> dict[str, object] | None:
@@ -350,13 +386,19 @@ def _seed_sim_devices(
     if not manifest:
         return params, seeded, extra, None
     for param in manifest.get("params", []):
-        if param.get("kind") != "device" or not param.get("filter"):
+        if param.get("kind") != "device":
             continue
         name = str(param["name"])
-        baked = re.search(rf"^--%%var:{re.escape(name)}=(\d+)", code, re.M)
-        if not baked or int(baked.group(1)) == 0:
-            continue  # unset — the recipe prints its hint instead
-        kind = str(param["filter"]).split(".")[-1]
+        baked = re.search(rf"^--%%var:{re.escape(name)}=(\d+)(.*)$", code, re.M)
+        if not baked:
+            continue
+        marker = re.search(r"\[sim:([a-zA-Z0-9]+)\]", baked.group(2) or "")
+        if marker:
+            kind = marker.group(1)  # an explicit simulated-device pick
+        else:
+            if not param.get("filter") or int(baked.group(1)) == 0:
+                continue  # unset — the recipe prints its hint instead
+            kind = str(param["filter"]).split(".")[-1]
         if not (SIM_DEVICES_DIR / f"{kind}.lua").is_file():
             continue
         sim_id, sim_err = engine.load_sim_device(kind)
@@ -539,6 +581,9 @@ class _BuilderHandler(http.server.BaseHTTPRequestHandler):
                 self._json(404, {"error": "recipe not found"})
                 return
             self._json(200, {"id": rid, "code": code})
+            return
+        if parsed.path == "/api/simdevices":
+            self._json(200, {"items": _sim_device_items()})
             return
         if parsed.path in ("/api/devices", "/api/rooms", "/api/scenes"):
             self._proxy_hc3()

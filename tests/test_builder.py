@@ -499,3 +499,57 @@ def test_builder_verify_all_runs_every_scenario(monkeypatch) -> None:
     assert verdict["skipped"] == []
     ids = [result["id"] for result in verdict["results"]]
     assert "light-at-sunset" in ids
+
+
+def test_builder_offers_sim_devices_for_offline_picking(monkeypatch) -> None:
+    # without an HC3 the device pickers offer the bundled sim devices whose
+    # type chains fit the param's filter (a flood sensor fits binarySensor)
+    server, base = _serve(monkeypatch)
+    try:
+        data = json.loads(
+            urllib.request.urlopen(f"{base}/api/simdevices", timeout=10).read()
+        )
+        by_name = {item["name"]: item for item in data["items"]}
+        assert "motionSensor" in by_name
+        assert "com.fibaro.motionSensor" in by_name["motionSensor"]["types"]
+        assert "com.fibaro.binarySensor" in by_name["floodSensor"]["types"]
+        assert "com.fibaro.multilevelSensor" in by_name["humiditySensor"]["types"]
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_builder_bakes_and_seeds_a_sim_device_pick(monkeypatch) -> None:
+    # a picked 'sim:motionSensor' keeps the var at 0 (no real device yet)
+    # and seeds exactly that sim device in the sim run, whatever the filter
+    server, base = _serve(monkeypatch)
+    try:
+        status, body = _post(
+            base,
+            "/api/generate",
+            {
+                "id": "motion-lights",
+                "params": {
+                    "motionId": "sim:motionSensor",
+                    "lightId": "sim:binarySwitch",
+                    "minutes": 2,
+                },
+            },
+        )
+        assert status == 200
+        code = json.loads(body)["code"]
+        assert "--%%var:motionId=0" in code
+        assert "[sim:motionSensor]" in code
+        assert "--%%var:lightId=0" in code
+        assert "[sim:binarySwitch]" in code
+        status, body = _post(
+            base, "/api/simulate", {"id": "motion-lights", "code": code, "minutes": 1}
+        )
+        result = json.loads(body)
+        assert result["error"] is None, result
+        kinds = [(entry["name"], entry["kind"]) for entry in result["devices"]]
+        assert ("motionId", "motionSensor") in kinds
+        assert ("lightId", "binarySwitch") in kinds
+    finally:
+        server.shutdown()
+        server.server_close()
