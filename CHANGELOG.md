@@ -4,6 +4,25 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.168] - 2026-11-15
+
+### Changed
+- builder: simulated-device picks — the offline (and not-yet-installed) path
+- verify: fixed start times + waitUntil — the noon-anchored sunset scenario
+- verify: the sunset scenario — rewind the clock to just before sunset
+- ci: verify-all — the template scenarios as a paths-gated gate
+- builder: --list and --verify — run a recipe's scenario in the sim
+- recipes: event-driven reactions for motion, door, and flood
+- recipes: threshold sliders in the QA UI, synced both ways
+- the recipe manifest schema (params, filters, categories, simDevices)
+- recipes: heat-when-cold + simDevices — recipes can declare world devices
+- simdevices: sensor UIs — breach buttons and value sliders in the web view
+- tests: de-flake the ws server disconnect test (CI 3.11 failure)
+- builder: View UI — the HC3-style web view of the running QA
+- builder: a fresh sim log per run, not one shared appended file
+- builder: simulate-in-place — run the generated QA on the laptop
+- builder: a category selector above the template list
+
 ## [0.1.167] - 2026-11-15
 
 ### Changed
