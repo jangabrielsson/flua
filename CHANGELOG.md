@@ -4,6 +4,19 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.170] - 2026-11-16
+
+### Changed
+- caps: regenerate the index — the feedback tool joined the registry
+- feedback: the tool half of the loop — scaffold, list, file as an issue
+- caps: the integration-protocol story — workflow, device models, mock peers
+- caps: the complete net.* surface — sockets, servers, ws client, mqtt
+- caps: ten more entries — the tooling, agent, and runtime surfaces
+- caps: the derived half — tools, sim devices, REST routes in the index
+- caps: twelve more curated entries — the runtime knowledge agents need
+- caps: the capabilities index — curated, pinned knowledge for agents
+- tests: de-flake the scene date-trigger test (CI minute-boundary race)
+
 ## [0.1.169] - 2026-11-15
 
 ### Changed
