@@ -92,6 +92,17 @@
       "file": "entries/icons-x-fibaro-version.md"
     },
     {
+      "id": "integration-protocol-workflow",
+      "topic": "patterns",
+      "title": "Implementing an integration protocol — the flua workflow",
+      "pins": [
+        "tests/test_server.py::test_mock_server_example_self_tests",
+        "tests/test_qa.py::test_examples_qa_pair_calls_each_other"
+      ],
+      "verified": "flua 0.1.169",
+      "file": "entries/integration-protocol-workflow.md"
+    },
+    {
       "id": "istypeof-vs-type",
       "topic": "hc3-api",
       "title": "/devices?isTypeOf= follows the inheritance tree; ?type= is exact",
@@ -111,6 +122,28 @@
       ],
       "verified": "flua 0.1.169",
       "file": "entries/mcp-server-basics.md"
+    },
+    {
+      "id": "mock-peer-testing",
+      "topic": "testing",
+      "title": "Mock peers — localhost servers in the test files, not external processes",
+      "pins": [
+        "tests/test_server.py::test_require_loads_sibling_test_libs",
+        "tests/test_mqtt.py::test_mqtt_connect_subscribe_publish_roundtrip"
+      ],
+      "verified": "flua 0.1.169",
+      "file": "entries/mock-peer-testing.md"
+    },
+    {
+      "id": "modeling-external-devices",
+      "topic": "sim-world",
+      "title": "Model the external device as a sim QA speaking the real protocol",
+      "pins": [
+        "tests/test_modbus_mock.py::test_solaredge_mock_serves_both_wire_bases",
+        "tests/test_modbus_mock.py::test_modbus_server_write_functions_round_trip"
+      ],
+      "verified": "flua 0.1.169",
+      "file": "entries/modeling-external-devices.md"
     },
     {
       "id": "mqtt-client",
