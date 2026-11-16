@@ -21,6 +21,16 @@
       "file": "entries/bridge-debug.md"
     },
     {
+      "id": "builder-tool",
+      "topic": "tooling",
+      "title": "The QA builder — recipes to QAs, parked as a PoC",
+      "pins": [
+        "tests/test_builder.py::test_builder_serves_the_page_and_index"
+      ],
+      "verified": "flua 0.1.170",
+      "file": "entries/builder-tool.md"
+    },
+    {
       "id": "child-devices",
       "topic": "qa",
       "title": "Child devices — createChildDevice and the ownership guards",
@@ -41,6 +51,27 @@
       "file": "entries/db-seed-persist-replay.md"
     },
     {
+      "id": "debugger",
+      "topic": "debugging",
+      "title": "The mobdebug debugger — VS Code attach over --debugger",
+      "pins": [
+        "tests/test_qa.py::test_mobdebug_e_bootstrap_does_not_consume_qa_id"
+      ],
+      "verified": "flua 0.1.170",
+      "file": "entries/debugger.md"
+    },
+    {
+      "id": "deploy-loop",
+      "topic": "deploy",
+      "title": "The deploy loop — develop unpacked, the HC3 sees .fqa",
+      "pins": [
+        "tests/test_tools.py::test_pack_unpack_tools_roundtrip",
+        "tests/test_tools.py::test_upload_file_pushes_single_file"
+      ],
+      "verified": "flua 0.1.170",
+      "file": "entries/deploy-loop.md"
+    },
+    {
       "id": "fibaro-call-device-actions",
       "topic": "hc3-api",
       "title": "Device actions go through fibaro.call, not raw api.post",
@@ -49,6 +80,17 @@
       ],
       "verified": "flua 0.1.168",
       "file": "entries/fibaro-call-device-actions.md"
+    },
+    {
+      "id": "flua-test-library",
+      "topic": "testing",
+      "title": "Self-asserting QAs — the flua-test library and --strict-tests",
+      "pins": [
+        "tests/test_qa.py::test_example_self_test_passes_and_exits_zero",
+        "tests/test_dx.py::test_strict_tests_sticky_callback_failure"
+      ],
+      "verified": "flua 0.1.170",
+      "file": "entries/flua-test-library.md"
     },
     {
       "id": "house-tool",
@@ -70,6 +112,16 @@
       ],
       "verified": "flua 0.1.169",
       "file": "entries/hybrid-routing.md"
+    },
+    {
+      "id": "icon-install-pattern",
+      "topic": "patterns",
+      "title": "First-run detection — internalStorage flags vs quickAppVariables",
+      "pins": [
+        "tests/test_hc3.py::test_example_icon_install_uploads_on_fresh_install"
+      ],
+      "verified": "flua 0.1.170",
+      "file": "entries/icon-install-pattern.md"
     },
     {
       "id": "icon-tooling",
@@ -122,6 +174,16 @@
       ],
       "verified": "flua 0.1.169",
       "file": "entries/mcp-server-basics.md"
+    },
+    {
+      "id": "migrate-tool",
+      "topic": "tooling",
+      "title": "The migrate tool — one-pass plua-leftover scan",
+      "pins": [
+        "tests/test_tools.py::test_migrate_tool_scans_a_project"
+      ],
+      "verified": "flua 0.1.170",
+      "file": "entries/migrate-tool.md"
     },
     {
       "id": "mock-peer-testing",
