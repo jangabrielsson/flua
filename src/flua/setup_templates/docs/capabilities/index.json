@@ -113,6 +113,17 @@
       "file": "entries/mcp-server-basics.md"
     },
     {
+      "id": "mqtt-client",
+      "topic": "runtime-net",
+      "title": "mqtt.Client — the HC3's MQTT 3.1.1 API",
+      "pins": [
+        "tests/test_mqtt.py::test_mqtt_connect_subscribe_publish_roundtrip",
+        "tests/test_mqtt.py::test_tls_use_sni_option"
+      ],
+      "verified": "flua 0.1.166",
+      "file": "entries/mqtt-client.md"
+    },
+    {
       "id": "multi-file-qas",
       "topic": "packaging",
       "title": "Multi-file QAs — --%%file extras and bundled libs travel in the .fqa",
@@ -121,6 +132,18 @@
       ],
       "verified": "flua 0.1.166",
       "file": "entries/multi-file-qas.md"
+    },
+    {
+      "id": "net-fixture-servers",
+      "topic": "runtime-net",
+      "title": "net.HTTPServer / TCPServer / UDPServer — in-QA fixture servers",
+      "pins": [
+        "tests/test_server.py::test_tcp_udp_ws_servers_round_trip",
+        "tests/test_server.py::test_handler_error_is_http_500",
+        "tests/test_server.py::test_tcp_server_persistent_connection_and_binary"
+      ],
+      "verified": "flua 0.1.166",
+      "file": "entries/net-fixture-servers.md"
     },
     {
       "id": "net-httpclient",
@@ -132,6 +155,28 @@
       ],
       "verified": "flua 0.1.166",
       "file": "entries/net-httpclient.md"
+    },
+    {
+      "id": "net-tcp-udp-sockets",
+      "topic": "runtime-net",
+      "title": "net.TCPSocket / net.UDPSocket — raw sockets from QA code",
+      "pins": [
+        "tests/test_tcp.py::test_tcp_echo_roundtrip",
+        "tests/test_server.py::test_tcp_udp_ws_servers_round_trip"
+      ],
+      "verified": "flua 0.1.166",
+      "file": "entries/net-tcp-udp-sockets.md"
+    },
+    {
+      "id": "net-websocket-client",
+      "topic": "runtime-net",
+      "title": "net.WebSocketClient — the client side (TLS without cert checks)",
+      "pins": [
+        "tests/test_websocket.py::test_websocket_echo_roundtrip",
+        "tests/test_websocket.py::test_wss_self_signed_default_skips_verification"
+      ],
+      "verified": "flua 0.1.166",
+      "file": "entries/net-websocket-client.md"
     },
     {
       "id": "offline-first-default",
