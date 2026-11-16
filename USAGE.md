@@ -1610,6 +1610,8 @@ format (individual `.lua` files) and only the HC3 sees `.fqa`:
 .venv/bin/flua --tool build --list                 # the installed recipe templates
 .venv/bin/flua --tool build --verify leak-alert    # run the recipe's verify scenario in the sim (--json for agents)
 .venv/bin/flua --tool build --verify-all           # every declared scenario — the CI gate when templates change
+.venv/bin/flua --tool caps --list                  # the capabilities index: curated, pinned knowledge for agents
+.venv/bin/flua --tool caps --search "websocket push" # ...search it (--show <id> reads an entry; --json everywhere)
 .venv/bin/flua --tool inspectFQA my.fqa [--json]  # what a packed .fqa contains: inventory, vars, leak scan
 .venv/bin/flua --tool pack qa.lua --verify        # pack, then inspect the artifact (placeholder/leak checks)
 

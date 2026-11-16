@@ -18,6 +18,8 @@ Honesty rules (the forum feedback's demand):
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 # category -> list of {name, status, note}
@@ -262,3 +264,77 @@ def report(engine: Any, runtime: dict[str, Any]) -> dict[str, Any]:
         # column), extension = flua-only surface with no HC3 counterpart
         "rest": rest,
     }
+
+
+# -- the capabilities INDEX: curated prose entries with pins ---------------
+#
+# A second, complementary layer over the table above: short knowledge
+# entries (quirks, idioms, how-tos) for agents. Each entry is a markdown
+# file with front-matter (id/topic/title/pins/verified) under
+# docs/capabilities/entries, indexed by scripts/gen-capabilities-index.py
+# (the test suite regenerates + compares, so the index cannot drift).
+# ``pins`` name the tests/probes/ADRs that prove the entry; the test
+# suite checks that every pin resolves, so entries cannot rot silently.
+# The same files ship in the wheel and double as MCP doc resources.
+
+INDEX_DIR = Path(__file__).resolve().parent / "setup_templates" / "docs" / "capabilities"
+
+
+def load_index() -> dict[str, Any]:
+    """The capabilities index: {entries: [{id, topic, title, pins,
+    verified, file}]}. Empty when the wheel lacks the files."""
+    try:
+        return json.loads((INDEX_DIR / "index.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"entries": []}
+
+
+def entries() -> list[dict[str, Any]]:
+    return list(load_index().get("entries", []))
+
+
+def get_entry(entry_id: str) -> dict[str, Any] | None:
+    """One entry: the index metadata plus its markdown body."""
+    for entry in entries():
+        if entry.get("id") == entry_id:
+            body = ""
+            try:
+                body = (INDEX_DIR / str(entry["file"])).read_text(encoding="utf-8")
+            except OSError:
+                pass
+            return {**entry, "body": body}
+    return None
+
+
+def search(terms: str, limit: int = 20) -> list[dict[str, Any]]:
+    """Case-insensitive substring search over id/topic/title/body, ranked
+    by the number of terms hit, then by title. Zero dependencies."""
+    words = [word.lower() for word in terms.split() if word.strip()]
+    if not words:
+        return []
+    scored: list[tuple[int, dict[str, Any]]] = []
+    for entry in entries():
+        meta = get_entry(str(entry.get("id")))
+        if meta is None:
+            continue
+        haystacks = {
+            "id": str(meta.get("id", "")).lower(),
+            "topic": str(meta.get("topic", "")).lower(),
+            "title": str(meta.get("title", "")).lower(),
+            "body": str(meta.get("body", "")).lower(),
+        }
+        hits = sum(1 for word in words if any(word in text for text in haystacks.values()))
+        if hits:
+            scored.append(
+                (
+                    hits,
+                    {
+                        "id": meta["id"],
+                        "topic": meta["topic"],
+                        "title": meta["title"],
+                        "score": hits,
+                    },
+                )
+            )
+    scored.sort(key=lambda pair: (-pair[0], str(pair[1]["title"]).lower()))
+    return [pair[1] for pair in scored[:limit]]

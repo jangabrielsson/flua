@@ -1,0 +1,47 @@
+{
+  "entries": [
+    {
+      "id": "icons-x-fibaro-version",
+      "topic": "hc3-api",
+      "title": "/icons is shaped by the X-Fibaro-Version header",
+      "pins": [
+        "tests/test_hc3.py::test_hc3_remote_sends_fibaro_version_header"
+      ],
+      "verified": "flua 0.1.167, HC3 5.221",
+      "file": "entries/icons-x-fibaro-version.md"
+    },
+    {
+      "id": "istypeof-vs-type",
+      "topic": "hc3-api",
+      "title": "/devices?isTypeOf= follows the inheritance tree; ?type= is exact",
+      "pins": [
+        "tests/test_api.py::test_devices_query_filters"
+      ],
+      "verified": "flua 0.1.168, HC3 5.221",
+      "file": "entries/istypeof-vs-type.md"
+    },
+    {
+      "id": "readonly-modes",
+      "topic": "safety",
+      "title": "--%%mode:readonly[+call] — explore the live HC3 without mutating it",
+      "pins": [
+        "tests/test_api.py::test_readonly_mode_refuses_remote_writes_at_the_gate",
+        "tests/test_api.py::test_readonly_plus_call_unlocks_device_actions_only",
+        "tests/test_hc3.py::test_readonly_mode_reads_online_but_never_writes",
+        "tests/test_hc3.py::test_readonly_plus_call_runs_actions_but_blocks_writes"
+      ],
+      "verified": "flua 0.1.169",
+      "file": "entries/readonly-modes.md"
+    },
+    {
+      "id": "websocket-server-push",
+      "topic": "runtime-net",
+      "title": "net.WebSocketServer can push and disconnect — event-driven server protocols",
+      "pins": [
+        "tests/test_server.py::test_ws_server_push_disconnect_and_events"
+      ],
+      "verified": "flua 0.1.165",
+      "file": "entries/websocket-server-push.md"
+    }
+  ]
+}
