@@ -1,6 +1,27 @@
 {
   "entries": [
     {
+      "id": "fibaro-call-device-actions",
+      "topic": "hc3-api",
+      "title": "Device actions go through fibaro.call, not raw api.post",
+      "pins": [
+        "tests/test_recipes.py::test_recipes_use_fibaro_call_for_device_actions"
+      ],
+      "verified": "flua 0.1.168",
+      "file": "entries/fibaro-call-device-actions.md"
+    },
+    {
+      "id": "hybrid-routing",
+      "topic": "hc3-api",
+      "title": "Hybrid routing — the sim answers first, unknown ids forward to the HC3",
+      "pins": [
+        "tests/test_hc3.py::test_hybrid_routing_local_sim_and_remote_hc3",
+        "tests/test_api.py::test_readonly_mode_refuses_remote_writes_at_the_gate"
+      ],
+      "verified": "flua 0.1.169",
+      "file": "entries/hybrid-routing.md"
+    },
+    {
       "id": "icons-x-fibaro-version",
       "topic": "hc3-api",
       "title": "/icons is shaped by the X-Fibaro-Version header",
@@ -21,6 +42,57 @@
       "file": "entries/istypeof-vs-type.md"
     },
     {
+      "id": "multi-file-qas",
+      "topic": "packaging",
+      "title": "Multi-file QAs — --%%file extras and bundled libs travel in the .fqa",
+      "pins": [
+        "docs/tutorial/09-multi-file-qas.md"
+      ],
+      "verified": "flua 0.1.166",
+      "file": "entries/multi-file-qas.md"
+    },
+    {
+      "id": "offline-first-default",
+      "topic": "modes",
+      "title": "Offline is the default; online is opt-in",
+      "pins": [
+        "docs/decisions/0001-default-mode-is-offline.md"
+      ],
+      "verified": "flua 0.1.169",
+      "file": "entries/offline-first-default.md"
+    },
+    {
+      "id": "proxy-mode",
+      "topic": "deploy",
+      "title": "Proxy mode — the QA runs on the HC3 with a sim shadow of the same id",
+      "pins": [
+        "tests/test_proxy.py::test_proxy_fresh_deploy_reuses_id_and_connects"
+      ],
+      "verified": "flua 0.1.166",
+      "file": "entries/proxy-mode.md"
+    },
+    {
+      "id": "qa-ui-elements",
+      "topic": "ui",
+      "title": "QA UI — --%%u rows, updateView, and how taps arrive",
+      "pins": [
+        "tests/test_ui_server.py::test_update_view_visible_over_http",
+        "tests/test_qa.py::test_sim_device_sensor_ui"
+      ],
+      "verified": "flua 0.1.168",
+      "file": "entries/qa-ui-elements.md"
+    },
+    {
+      "id": "quickapp-variables-vs-internalstorage",
+      "topic": "packaging",
+      "title": "quickAppVariables travel with downloads; internalStorage is fresh-install state",
+      "pins": [
+        "tests/test_api.py::test_qa_uses_api_offline"
+      ],
+      "verified": "flua 0.1.169",
+      "file": "entries/quickapp-variables-vs-internalstorage.md"
+    },
+    {
       "id": "readonly-modes",
       "topic": "safety",
       "title": "--%%mode:readonly[+call] — explore the live HC3 without mutating it",
@@ -32,6 +104,57 @@
       ],
       "verified": "flua 0.1.169",
       "file": "entries/readonly-modes.md"
+    },
+    {
+      "id": "recipe-verify-scenarios",
+      "topic": "tooling",
+      "title": "Verify scenarios — declarative sim runs that prove a template works",
+      "pins": [
+        "tests/test_builder.py::test_builder_verify_all_runs_every_scenario"
+      ],
+      "verified": "flua 0.1.169",
+      "file": "entries/recipe-verify-scenarios.md"
+    },
+    {
+      "id": "refreshstate-subscriber",
+      "topic": "events",
+      "title": "RefreshStateSubscriber — the HC3 event feed, simulated by flua",
+      "pins": [
+        "tests/test_recipes.py::test_motion_lights_reacts_to_the_breach_event"
+      ],
+      "verified": "flua 0.1.168",
+      "file": "entries/refreshstate-subscriber.md"
+    },
+    {
+      "id": "scene-triggers",
+      "topic": "scenes",
+      "title": "Scenes — COND triggers and sourceTrigger, testable in the sim",
+      "pins": [
+        "tests/test_scene.py::test_date_trigger_evaluates_at_scheduled_fire_time"
+      ],
+      "verified": "flua 0.1.166",
+      "file": "entries/scene-triggers.md"
+    },
+    {
+      "id": "sim-devices",
+      "topic": "sim-world",
+      "title": "The bundled sim devices — drive a world without an HC3",
+      "pins": [
+        "tests/test_qa.py::test_sim_device_sensor_ui",
+        "tests/test_qa.py::test_load_sim_device_bundled"
+      ],
+      "verified": "flua 0.1.168",
+      "file": "entries/sim-devices.md"
+    },
+    {
+      "id": "virtual-clock-modes",
+      "topic": "runtime",
+      "title": "The virtual clock — realtime, accelerated, and instant runs",
+      "pins": [
+        "tests/test_virtual_time.py::test_instant_mode_advances_virtual_time"
+      ],
+      "verified": "flua 0.1.166",
+      "file": "entries/virtual-clock-modes.md"
     },
     {
       "id": "websocket-server-push",
