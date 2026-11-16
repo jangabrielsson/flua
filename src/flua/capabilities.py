@@ -293,6 +293,13 @@ def entries() -> list[dict[str, Any]]:
     return list(load_index().get("entries", []))
 
 
+def derived() -> dict[str, Any]:
+    """The machine-derived half of the index: {tools, simDevices, rest} —
+    assembled from the tool registry, the bundled sim devices, and the
+    REST route table by the generator."""
+    return dict(load_index().get("derived", {}))
+
+
 def get_entry(entry_id: str) -> dict[str, Any] | None:
     """One entry: the index metadata plus its markdown body."""
     for entry in entries():
@@ -307,34 +314,71 @@ def get_entry(entry_id: str) -> dict[str, Any] | None:
 
 
 def search(terms: str, limit: int = 20) -> list[dict[str, Any]]:
-    """Case-insensitive substring search over id/topic/title/body, ranked
-    by the number of terms hit, then by title. Zero dependencies."""
+    """Case-insensitive substring search over the curated entries AND the
+    derived sections (tools, sim devices, REST routes), ranked by the
+    number of terms hit, then by title. Results carry a ``kind``. Zero
+    dependencies."""
     words = [word.lower() for word in terms.split() if word.strip()]
     if not words:
         return []
     scored: list[tuple[int, dict[str, Any]]] = []
-    for entry in entries():
-        meta = get_entry(str(entry.get("id")))
-        if meta is None:
-            continue
-        haystacks = {
-            "id": str(meta.get("id", "")).lower(),
-            "topic": str(meta.get("topic", "")).lower(),
-            "title": str(meta.get("title", "")).lower(),
-            "body": str(meta.get("body", "")).lower(),
-        }
-        hits = sum(1 for word in words if any(word in text for text in haystacks.values()))
+
+    def consider(kind: str, fields: dict[str, str], meta: dict[str, Any]) -> None:
+        hits = sum(
+            1 for word in words if any(word in text for text in fields.values())
+        )
         if hits:
-            scored.append(
-                (
-                    hits,
-                    {
-                        "id": meta["id"],
-                        "topic": meta["topic"],
-                        "title": meta["title"],
-                        "score": hits,
-                    },
-                )
-            )
+            scored.append((hits, {"kind": kind, "score": hits, **meta}))
+
+    for entry in entries():
+        full = get_entry(str(entry.get("id")))
+        if full is None:
+            continue
+        consider(
+            "entry",
+            {
+                "id": str(entry.get("id", "")).lower(),
+                "topic": str(entry.get("topic", "")).lower(),
+                "title": str(entry.get("title", "")).lower(),
+                "body": str(full.get("body", "")).lower(),
+            },
+            {
+                "id": entry["id"],
+                "topic": entry.get("topic"),
+                "title": entry.get("title"),
+            },
+        )
+    for tool in derived().get("tools", []):
+        consider(
+            "tool",
+            {
+                "id": str(tool.get("name", "")).lower(),
+                "title": str(tool.get("name", "")).lower(),
+                "help": str(tool.get("help", "")).lower(),
+            },
+            {"id": tool.get("name"), "title": tool.get("name")},
+        )
+    for device in derived().get("simDevices", []):
+        consider(
+            "sim",
+            {
+                "id": str(device.get("name", "")).lower(),
+                "title": str(device.get("name", "")).lower(),
+                "type": str(device.get("type", "")).lower(),
+                "description": str(device.get("description", "")).lower(),
+            },
+            {
+                "id": device.get("name"),
+                "title": device.get("name"),
+                "type": device.get("type"),
+            },
+        )
+    for route in derived().get("rest", []):
+        title = f"{route.get('method')} {route.get('path')}"
+        consider(
+            "rest",
+            {"id": title.lower(), "title": title.lower()},
+            {"id": title, "title": title, "status": route.get("status")},
+        )
     scored.sort(key=lambda pair: (-pair[0], str(pair[1]["title"]).lower()))
     return [pair[1] for pair in scored[:limit]]

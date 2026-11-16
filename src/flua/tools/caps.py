@@ -25,6 +25,11 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="every entry: id, title, topic (--json adds pins and verified stamps)",
     )
+    parser.add_argument(
+        "--derived",
+        action="store_true",
+        help="the machine-derived half: tools, sim devices, REST route statuses",
+    )
     parser.add_argument("--show", metavar="ID", help="one entry's full markdown")
     parser.add_argument("--search", metavar="TERMS", help="substring search over the entries")
     parser.add_argument(
@@ -42,6 +47,21 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         for entry in capabilities.entries():
             print(f"{entry.get('id')}  {entry.get('title')} [{entry.get('topic')}]")
         return 0
+    if args.derived:
+        data = capabilities.derived()
+        if args.json:
+            print(json.dumps(data, indent=2, ensure_ascii=False))
+        else:
+            print(f"tools ({len(data.get('tools', []))}):")
+            for tool in data.get("tools", []):
+                print(f"  {tool.get('name')} — {tool.get('help')}")
+            print(f"sim devices ({len(data.get('simDevices', []))}):")
+            for device in data.get("simDevices", []):
+                print(f"  {device.get('name')} — {device.get('type')}")
+            print(f"REST routes ({len(data.get('rest', []))}):")
+            for route in data.get("rest", []):
+                print(f"  {route.get('method')} {route.get('path')} ({route.get('status')})")
+        return 0
     if args.show:
         entry = capabilities.get_entry(str(args.show))
         if entry is None:
@@ -58,7 +78,7 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
             print(json.dumps(hits, indent=2, ensure_ascii=False))
         else:
             for hit in hits:
-                print(f"{hit['score']}  {hit['id']}  {hit['title']}")
+                print(f"{hit['score']}  {hit['kind']}:{hit['id']}  {hit['title']}")
         return 0
     parser.print_help()
     return 1

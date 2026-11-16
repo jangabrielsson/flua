@@ -85,13 +85,55 @@ def main() -> int:
         for problem in problems:
             print(f"capabilities problem: {problem}", file=sys.stderr)
         return 1
+    payload: dict = {"entries": entries, "derived": derived_sections(root)}
     out = root / "index.json"
     out.write_text(
-        json.dumps({"entries": entries}, indent=2, ensure_ascii=False) + "\n",
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
-    print(f"wrote {out} ({len(entries)} entries)")
+    print(f"wrote {out} ({len(entries)} entries + derived sections)")
     return 0
+
+
+def derived_sections(root: Path) -> dict[str, object]:
+    """The machine-derived half of the index: the tool registry, the
+    bundled sim devices, and the REST route table with its real/stub/
+    extension classification — the same sources --capabilities-json
+    reads, so the two surfaces cannot disagree."""
+    import re
+
+    from flua import tools as tool_registry
+    from flua.api import route_classification
+    from flua.api.routes import ROUTES
+
+    tools = []
+    for name in tool_registry.tool_names():
+        module = tool_registry._TOOLS[name]
+        tools.append({"name": name, "help": getattr(module, "HELP", "")})
+
+    repo = root.parent.parent
+    sim_root = repo / "src" / "flua" / "simdevices"
+    sim_devices = []
+    for path in sorted(sim_root.glob("*.lua")):
+        device_type: str | None = None
+        description = ""
+        for line in path.read_text(encoding="utf-8").splitlines()[:10]:
+            match = re.match(r"--%%type:\s*(.+)", line.strip())
+            if match:
+                device_type = match.group(1).strip()
+            match = re.match(r"--%%description:\s*\"?(.+?)\"?\s*$", line.strip())
+            if match:
+                description = match.group(1)
+        sim_devices.append(
+            {"name": path.stem, "type": device_type, "description": description}
+        )
+
+    rest = [
+        {"method": method, "path": pattern, "status": route_classification(method, pattern)}
+        for method, pattern, _handler in ROUTES
+    ]
+    rest.sort(key=lambda entry: (entry["path"], entry["method"]))
+    return {"tools": tools, "simDevices": sim_devices, "rest": rest}
 
 
 if __name__ == "__main__":

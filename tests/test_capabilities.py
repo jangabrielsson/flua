@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from flua.capabilities import entries, get_entry, load_index, search
+from flua.capabilities import derived, entries, get_entry, load_index, search
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -64,3 +64,29 @@ def test_capabilities_search_ranks_and_gets() -> None:
     assert entry is not None
     assert "--%%mode:readonly" in entry["body"]
     assert json.loads(json.dumps(load_index()))["entries"][0]["id"] == entries()[0]["id"]
+
+
+def test_capabilities_derived_sections_are_assembled() -> None:
+    # the machine-derived half: tools, sim devices, and the REST table —
+    # the same sources --capabilities-json reads, so they cannot disagree
+    data = derived()
+    names = [tool["name"] for tool in data["tools"]]
+    assert "caps" in names and "icons" in names and "build" in names
+    sims = {device["name"]: device for device in data["simDevices"]}
+    assert sims["motionSensor"]["type"] == "com.fibaro.motionSensor"
+    assert sims["weatherMgr"]["type"] == "com.fibaro.genericDevice"
+    routes = {(route["method"], route["path"]) for route in data["rest"]}
+    assert ("GET", "/devices") in routes
+    assert ("POST", "/devices/{id}/action/{action}") in routes
+    assert any(route["status"] == "stub" for route in data["rest"])
+
+
+def test_capabilities_search_covers_the_derived_sections() -> None:
+    # search spans curated entries AND the machine surface: tools by name,
+    # sim devices by type/description, REST routes by path
+    hits = search("downloadQA")
+    assert any(hit["kind"] == "tool" and hit["id"] == "downloadQA" for hit in hits)
+    hits = search("motionSensor")
+    assert any(hit["kind"] == "sim" and hit["id"] == "motionSensor" for hit in hits)
+    hits = search("refreshStates")
+    assert any(hit["kind"] == "rest" and "refreshStates" in hit["id"] for hit in hits)

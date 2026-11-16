@@ -166,5 +166,746 @@
       "verified": "flua 0.1.165",
       "file": "entries/websocket-server-push.md"
     }
-  ]
+  ],
+  "derived": {
+    "tools": [
+      {
+        "name": "build",
+        "help": "QA builder: a browser page to turn recipes into QuickApps"
+      },
+      {
+        "name": "caps",
+        "help": "the flua capabilities index: curated, pinned knowledge (agents: list/show/search, --json)"
+      },
+      {
+        "name": "catalog",
+        "help": "list the device types the sim supports (the --%%type catalog)"
+      },
+      {
+        "name": "createDB",
+        "help": "build an offline db from the HC3 (device 1, location, panels)"
+      },
+      {
+        "name": "downloadFQA",
+        "help": "download a QA from the HC3 as a .fqa file"
+      },
+      {
+        "name": "downloadQA",
+        "help": "download a QA from the HC3 and unpack it into individual Lua files"
+      },
+      {
+        "name": "house",
+        "help": "the house (devices, globals, scenes, custom events) as one JSON document"
+      },
+      {
+        "name": "hub",
+        "help": "named HC3 profiles: add/list/switch/remove controllers for the .env chain"
+      },
+      {
+        "name": "hubList",
+        "help": "list a hub's QuickApps and hub info as one JSON document"
+      },
+      {
+        "name": "icons",
+        "help": "populate the icon cache (icons download)"
+      },
+      {
+        "name": "inspectFQA",
+        "help": "inspect a packed .fqa: metadata, inventory, variables, leak scan"
+      },
+      {
+        "name": "installHelper",
+        "help": "deploy the FluaHelper QA to the HC3 and point it at this machine"
+      },
+      {
+        "name": "migrate",
+        "help": "scan a project for plua leftovers and migration hazards"
+      },
+      {
+        "name": "newQA",
+        "help": "scaffold a QA from a standard device type template (30 types)"
+      },
+      {
+        "name": "pack",
+        "help": "package a QA project (main file + --%%file extras) into a .fqa file on disk"
+      },
+      {
+        "name": "parityCapture",
+        "help": "capture REST shape fixtures from a real HC3 for offline parity replay"
+      },
+      {
+        "name": "parityCleanup",
+        "help": "list and remove flua_p_* parity artifacts left on an HC3"
+      },
+      {
+        "name": "setup",
+        "help": "scaffold a QA project: .vscode configs + agent files (per-file policies; -f overrides)"
+      },
+      {
+        "name": "state",
+        "help": "inspect simulator state from a seed/db file (dump, alias scan, tree check)"
+      },
+      {
+        "name": "typeinfo",
+        "help": "a type's or interface's properties and actions (the QA implementation contract)"
+      },
+      {
+        "name": "ui",
+        "help": "print a QA's DECLARED UI as text (elements, callbacks, options) — static, not live state; --device ID fetches an HC3 device's UI and renders it back to --%%u rows + the raw JSON; for post-init values and callback behavior see examples/ui-interaction-test.lua"
+      },
+      {
+        "name": "unpack",
+        "help": "unpack a .fqa file into a flua project (<QA-name>_main.lua + one file per QA file)"
+      },
+      {
+        "name": "updateQA",
+        "help": "update an existing QA on the HC3 from an unpacked project (all files at once)"
+      },
+      {
+        "name": "uploadFQA",
+        "help": "upload a .fqa package to the HC3 as a NEW QuickApp"
+      },
+      {
+        "name": "uploadFile",
+        "help": "update one QA file on the HC3 (reads --%%deviceId/--%%qaFile from the file)"
+      },
+      {
+        "name": "uploadQA",
+        "help": "package an unpacked QA project and upload it to the HC3 (new QA, or the id in a downloaded <Name>_main_<id>.lua)"
+      },
+      {
+        "name": "ws",
+        "help": "probe a WebSocket endpoint: handshake, send frames, soak with pings"
+      }
+    ],
+    "simDevices": [
+      {
+        "name": "alarmEndpoint",
+        "type": "com.fibaro.genericDevice",
+        "description": "Simulated alarm system endpoints (bundled with flua)"
+      },
+      {
+        "name": "alarmPanel",
+        "type": "com.fibaro.genericDevice",
+        "description": "Alarm system control panel (bundled with flua)"
+      },
+      {
+        "name": "alarmPartition",
+        "type": "com.fibaro.alarmPartition",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "binarySensor",
+        "type": "com.fibaro.binarySensor",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "binarySwitch",
+        "type": "com.fibaro.binarySwitch",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "coDetector",
+        "type": "com.fibaro.coDetector",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "colorController",
+        "type": "com.fibaro.colorController",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "deviceController",
+        "type": "com.fibaro.deviceController",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "doorSensor",
+        "type": "com.fibaro.doorSensor",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "energyMeter",
+        "type": "com.fibaro.energyMeter",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "fireDetector",
+        "type": "com.fibaro.fireDetector",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "floodSensor",
+        "type": "com.fibaro.floodSensor",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "genericDevice",
+        "type": "com.fibaro.genericDevice",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "heatDetector",
+        "type": "com.fibaro.heatDetector",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "humiditySensor",
+        "type": "com.fibaro.humiditySensor",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "hvacSystemAuto",
+        "type": "com.fibaro.hvacSystemAuto",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "hvacSystemCool",
+        "type": "com.fibaro.hvacSystemCool",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "hvacSystemHeat",
+        "type": "com.fibaro.hvacSystemHeat",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "lightSensor",
+        "type": "com.fibaro.lightSensor",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "motionSensor",
+        "type": "com.fibaro.motionSensor",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "multilevelSensor",
+        "type": "com.fibaro.multilevelSensor",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "multilevelSwitch",
+        "type": "com.fibaro.multilevelSwitch",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "player",
+        "type": "com.fibaro.player",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "powerMeter",
+        "type": "com.fibaro.powerMeter",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "rainDetector",
+        "type": "com.fibaro.rainDetector",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "rainSensor",
+        "type": "com.fibaro.rainSensor",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "remoteController",
+        "type": "com.fibaro.remoteController",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "smokeSensor",
+        "type": "com.fibaro.smokeSensor",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "temperatureSensor",
+        "type": "com.fibaro.temperatureSensor",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "weather",
+        "type": "com.fibaro.weather",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "weatherMgr",
+        "type": "com.fibaro.genericDevice",
+        "description": "Simulates the HC3 weather: change it from the UI or programmatically with fibaro.call."
+      },
+      {
+        "name": "windSensor",
+        "type": "com.fibaro.windSensor",
+        "description": "Simulated device bundled with flua"
+      },
+      {
+        "name": "windowSensor",
+        "type": "com.fibaro.windowSensor",
+        "description": "Simulated device bundled with flua"
+      }
+    ],
+    "rest": [
+      {
+        "method": "GET",
+        "path": "/alarms/v1/devices",
+        "status": "stub"
+      },
+      {
+        "method": "GET",
+        "path": "/alarms/v1/partitions",
+        "status": "state"
+      },
+      {
+        "method": "POST",
+        "path": "/alarms/v1/partitions/actions/arm",
+        "status": "state"
+      },
+      {
+        "method": "DELETE",
+        "path": "/alarms/v1/partitions/actions/disarm",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/alarms/v1/partitions/breached",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/alarms/v1/partitions/{id}",
+        "status": "state"
+      },
+      {
+        "method": "POST",
+        "path": "/alarms/v1/partitions/{id}/actions/arm",
+        "status": "state"
+      },
+      {
+        "method": "DELETE",
+        "path": "/alarms/v1/partitions/{id}/actions/disarm",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/customEvents",
+        "status": "state"
+      },
+      {
+        "method": "POST",
+        "path": "/customEvents",
+        "status": "state"
+      },
+      {
+        "method": "DELETE",
+        "path": "/customEvents/{name}",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/customEvents/{name}",
+        "status": "state"
+      },
+      {
+        "method": "POST",
+        "path": "/customEvents/{name}",
+        "status": "state"
+      },
+      {
+        "method": "PUT",
+        "path": "/customEvents/{name}",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/customEvents/{name}/publish",
+        "status": "state"
+      },
+      {
+        "method": "DELETE",
+        "path": "/debugMessages",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/debugMessages",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/debugMessages/tags",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/devices",
+        "status": "state"
+      },
+      {
+        "method": "POST",
+        "path": "/devices",
+        "status": "extension"
+      },
+      {
+        "method": "POST",
+        "path": "/devices/groupAction/{action}",
+        "status": "state"
+      },
+      {
+        "method": "DELETE",
+        "path": "/devices/{id}",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/devices/{id}",
+        "status": "state"
+      },
+      {
+        "method": "PUT",
+        "path": "/devices/{id}",
+        "status": "state"
+      },
+      {
+        "method": "POST",
+        "path": "/devices/{id}/action/{action}",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/devices/{id}/properties/{name}",
+        "status": "state"
+      },
+      {
+        "method": "PUT",
+        "path": "/devices/{id}/properties/{name}",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/diagnostics",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/energy/devices",
+        "status": "stub"
+      },
+      {
+        "method": "GET",
+        "path": "/flua/devices",
+        "status": "extension"
+      },
+      {
+        "method": "GET",
+        "path": "/flua/embeddedUI",
+        "status": "extension"
+      },
+      {
+        "method": "GET",
+        "path": "/flua/iconMap",
+        "status": "extension"
+      },
+      {
+        "method": "DELETE",
+        "path": "/flua/systemLog",
+        "status": "extension"
+      },
+      {
+        "method": "GET",
+        "path": "/flua/systemLog",
+        "status": "extension"
+      },
+      {
+        "method": "GET",
+        "path": "/flua/theme",
+        "status": "extension"
+      },
+      {
+        "method": "GET",
+        "path": "/globalVariables",
+        "status": "state"
+      },
+      {
+        "method": "POST",
+        "path": "/globalVariables",
+        "status": "state"
+      },
+      {
+        "method": "DELETE",
+        "path": "/globalVariables/{name}",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/globalVariables/{name}",
+        "status": "state"
+      },
+      {
+        "method": "PUT",
+        "path": "/globalVariables/{name}",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/home",
+        "status": "state"
+      },
+      {
+        "method": "PUT",
+        "path": "/home",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/icons",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/iosDevices",
+        "status": "stub"
+      },
+      {
+        "method": "GET",
+        "path": "/notificationCenter",
+        "status": "stub"
+      },
+      {
+        "method": "GET",
+        "path": "/panels/climate",
+        "status": "stub"
+      },
+      {
+        "method": "GET",
+        "path": "/panels/climate/{id}",
+        "status": "stub"
+      },
+      {
+        "method": "GET",
+        "path": "/panels/family",
+        "status": "stub"
+      },
+      {
+        "method": "GET",
+        "path": "/panels/favoriteColors",
+        "status": "stub"
+      },
+      {
+        "method": "GET",
+        "path": "/panels/favoriteColors/v2",
+        "status": "stub"
+      },
+      {
+        "method": "GET",
+        "path": "/panels/humidity",
+        "status": "stub"
+      },
+      {
+        "method": "GET",
+        "path": "/panels/location",
+        "status": "state"
+      },
+      {
+        "method": "PUT",
+        "path": "/panels/location/{id}",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/panels/notifications",
+        "status": "stub"
+      },
+      {
+        "method": "GET",
+        "path": "/panels/sprinklers",
+        "status": "stub"
+      },
+      {
+        "method": "GET",
+        "path": "/plugins",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/plugins/callUIEvent",
+        "status": "state"
+      },
+      {
+        "method": "POST",
+        "path": "/plugins/callUIEvent",
+        "status": "state"
+      },
+      {
+        "method": "POST",
+        "path": "/plugins/createChildDevice",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/plugins/getView",
+        "status": "state"
+      },
+      {
+        "method": "POST",
+        "path": "/plugins/interfaces",
+        "status": "state"
+      },
+      {
+        "method": "DELETE",
+        "path": "/plugins/removeChildDevice/{id}",
+        "status": "state"
+      },
+      {
+        "method": "POST",
+        "path": "/plugins/restart",
+        "status": "state"
+      },
+      {
+        "method": "POST",
+        "path": "/plugins/updateProperty",
+        "status": "state"
+      },
+      {
+        "method": "POST",
+        "path": "/plugins/updateView",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/plugins/{id}",
+        "status": "state"
+      },
+      {
+        "method": "DELETE",
+        "path": "/plugins/{id}/variables",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/plugins/{id}/variables",
+        "status": "state"
+      },
+      {
+        "method": "POST",
+        "path": "/plugins/{id}/variables",
+        "status": "state"
+      },
+      {
+        "method": "DELETE",
+        "path": "/plugins/{id}/variables/{key}",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/plugins/{id}/variables/{key}",
+        "status": "state"
+      },
+      {
+        "method": "PUT",
+        "path": "/plugins/{id}/variables/{key}",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/profiles",
+        "status": "state"
+      },
+      {
+        "method": "POST",
+        "path": "/profiles/activeProfile/{id}",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/profiles/{id}",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/proxy",
+        "status": "extension"
+      },
+      {
+        "method": "GET",
+        "path": "/refreshStates",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/rooms",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/rooms/{id}",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/scenes",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/scenes/{id}",
+        "status": "state"
+      },
+      {
+        "method": "POST",
+        "path": "/scenes/{id}/execute",
+        "status": "state"
+      },
+      {
+        "method": "POST",
+        "path": "/scenes/{id}/kill",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/sections",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/sections/{id}",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/settings/info",
+        "status": "state"
+      },
+      {
+        "method": "PUT",
+        "path": "/settings/info",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/settings/location",
+        "status": "state"
+      },
+      {
+        "method": "PUT",
+        "path": "/settings/location",
+        "status": "state"
+      },
+      {
+        "method": "GET",
+        "path": "/users",
+        "status": "stub"
+      },
+      {
+        "method": "GET",
+        "path": "/weather",
+        "status": "state"
+      },
+      {
+        "method": "PUT",
+        "path": "/weather",
+        "status": "extension"
+      }
+    ]
+  }
 }
