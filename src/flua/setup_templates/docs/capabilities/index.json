@@ -376,6 +376,10 @@
         "help": "download a QA from the HC3 and unpack it into individual Lua files"
       },
       {
+        "name": "feedback",
+        "help": "agent feedback: scaffold and list experience reports (docs/feedback/)"
+      },
+      {
         "name": "house",
         "help": "the house (devices, globals, scenes, custom events) as one JSON document"
       },

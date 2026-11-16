@@ -9,7 +9,11 @@ maintainer run the same process.
 - **Preferred: a GitHub issue** — use the *Feedback / experience report*
   template (`.github/ISSUE_TEMPLATE/feedback.md`). It prompts for the
   version trail, the environment, results, findings and priorities — the
-  fields that make a report actionable.
+  fields that make a report actionable. The tool half scaffolds and
+  files the same shape: `flua --tool feedback new --topic <slug>` writes
+  a dated report to `~/.flua/feedback/`, and `feedback publish <file>`
+  runs `gh issue create --label feedback --body-file` (needs `gh`
+  authenticated against the repo).
 - Forum posts and pasted messages are fine too: file them as
   `docs/feedback/<author>_<topic>.md` (this directory) so the context
   survives, and treat them exactly like an issue.

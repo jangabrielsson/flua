@@ -35,6 +35,7 @@ def test_registry_discovers_all_tools() -> None:
         "createDB",
         "downloadFQA",
         "downloadQA",
+        "feedback",
         "house",
         "hub",
         "hubList",
@@ -2065,3 +2066,57 @@ def test_pack_verify_reports_and_checks(tmp_path, capsys) -> None:
     out2 = capsys.readouterr().out
     assert "verify: ok" in out2
     assert "real IP" in out2  # the leak scan warns — intentional literals are fine
+
+
+def test_feedback_tool_scaffolds_and_lists_reports(monkeypatch, tmp_path, capsys) -> None:
+    # agents outside the repo scaffold a dated report into the local
+    # feedback dir; list reports their statuses — HOME-isolated
+    monkeypatch.setenv("HOME", str(tmp_path))
+    from flua import tools
+
+    module = tools._TOOLS["feedback"]
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    module.add_arguments(parser)
+    assert module.run(parser, parser.parse_args(["--new", "--topic", "Sonos QA"])) == 0
+    reports = tmp_path / ".flua" / "feedback"
+    files = list(reports.glob("*.md"))
+    assert len(files) == 1
+    text = files[0].read_text()
+    assert files[0].name.startswith("sonos-qa_flua_")
+    assert "Status: open" in text
+    assert "flua 0.1" in text  # the version is stamped
+    assert module.run(parser, parser.parse_args(["--list", "--json"])) == 0
+    out = capsys.readouterr().out
+    assert "sonos-qa_flua_" in out and '"status": "open"' in out
+
+
+def test_feedback_publish_shells_out_to_gh(monkeypatch, tmp_path, capsys) -> None:
+    # the preferred channel: the report becomes a GitHub issue via gh
+    report = tmp_path / "report.md"
+    report.write_text("findings...", encoding="utf-8")
+    seen: list[list] = []
+
+    def fake_which(name):
+        return "/usr/bin/gh"
+
+    def fake_run(command, **kwargs):
+        seen.append(command)
+        return subprocess.CompletedProcess(
+            command, 0, stdout="https://github.com/x/issues/7\n", stderr=""
+        )
+
+    monkeypatch.setattr("shutil.which", fake_which)
+    monkeypatch.setattr("subprocess.run", fake_run)
+    from flua import tools
+
+    module = tools._TOOLS["feedback"]
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    module.add_arguments(parser)
+    assert module.run(parser, parser.parse_args(["--publish", str(report)])) == 0
+    assert seen[0][:4] == ["gh", "issue", "create", "--label"]
+    assert "--body-file" in seen[0] and str(report) in seen[0]
+    assert "issues/7" in capsys.readouterr().out
