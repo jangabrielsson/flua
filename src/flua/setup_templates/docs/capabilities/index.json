@@ -1,6 +1,46 @@
 {
   "entries": [
     {
+      "id": "alarm-endpoint",
+      "topic": "sim-world",
+      "title": "The alarm system — alarmEndpoint, alarmPanel, and /alarms/v1",
+      "pins": [
+        "tests/test_qa.py::test_load_sim_device_alarm_endpoint"
+      ],
+      "verified": "flua 0.1.166",
+      "file": "entries/alarm-endpoint.md"
+    },
+    {
+      "id": "bridge-debug",
+      "topic": "debugging",
+      "title": "--bridge-debug — when the Lua↔Python bridge drops a payload",
+      "pins": [
+        "tests/test_bridge_debug.py::test_bridge_debug_dumps_failing_payload_and_records_event"
+      ],
+      "verified": "flua 0.1.166",
+      "file": "entries/bridge-debug.md"
+    },
+    {
+      "id": "child-devices",
+      "topic": "qa",
+      "title": "Child devices — createChildDevice and the ownership guards",
+      "pins": [
+        "tests/test_quickapp.py::test_remove_child_device_guards_foreign_children"
+      ],
+      "verified": "flua 0.1.166",
+      "file": "entries/child-devices.md"
+    },
+    {
+      "id": "db-seed-persist-replay",
+      "topic": "sim-world",
+      "title": "--%%db seeds and persists the house; --%%replay replays a session",
+      "pins": [
+        "tests/test_db.py::test_db_offline_persists_and_restores"
+      ],
+      "verified": "flua 0.1.169",
+      "file": "entries/db-seed-persist-replay.md"
+    },
+    {
       "id": "fibaro-call-device-actions",
       "topic": "hc3-api",
       "title": "Device actions go through fibaro.call, not raw api.post",
@@ -9,6 +49,16 @@
       ],
       "verified": "flua 0.1.168",
       "file": "entries/fibaro-call-device-actions.md"
+    },
+    {
+      "id": "house-tool",
+      "topic": "tooling",
+      "title": "The house as one JSON — ground truth for agents",
+      "pins": [
+        "tests/test_house.py::test_house_from_hub"
+      ],
+      "verified": "flua 0.1.169",
+      "file": "entries/house-tool.md"
     },
     {
       "id": "hybrid-routing",
@@ -20,6 +70,16 @@
       ],
       "verified": "flua 0.1.169",
       "file": "entries/hybrid-routing.md"
+    },
+    {
+      "id": "icon-tooling",
+      "topic": "tooling",
+      "title": "Icon cache and the icon manager — user icon sets without the HC3 editor",
+      "pins": [
+        "tests/test_tools.py::test_icons_download_enumerates_live_custom_sets"
+      ],
+      "verified": "flua 0.1.168",
+      "file": "entries/icon-tooling.md"
     },
     {
       "id": "icons-x-fibaro-version",
@@ -42,6 +102,17 @@
       "file": "entries/istypeof-vs-type.md"
     },
     {
+      "id": "mcp-server-basics",
+      "topic": "agents",
+      "title": "flua-mcp — the agent server over the same machinery",
+      "pins": [
+        "tests/test_mcp.py::test_initialize_handshake",
+        "tests/test_mcp.py::test_resources_list_serves_the_packaged_docs"
+      ],
+      "verified": "flua 0.1.169",
+      "file": "entries/mcp-server-basics.md"
+    },
+    {
       "id": "multi-file-qas",
       "topic": "packaging",
       "title": "Multi-file QAs — --%%file extras and bundled libs travel in the .fqa",
@@ -52,6 +123,17 @@
       "file": "entries/multi-file-qas.md"
     },
     {
+      "id": "net-httpclient",
+      "topic": "runtime-net",
+      "title": "net.HTTPClient — REST, SSE streaming, and clean cancellation",
+      "pins": [
+        "tests/test_http.py::test_http_sse_streams_events",
+        "tests/test_http.py::test_qa_exit_cancels_open_sse_stream"
+      ],
+      "verified": "flua 0.1.166",
+      "file": "entries/net-httpclient.md"
+    },
+    {
       "id": "offline-first-default",
       "topic": "modes",
       "title": "Offline is the default; online is opt-in",
@@ -60,6 +142,17 @@
       ],
       "verified": "flua 0.1.169",
       "file": "entries/offline-first-default.md"
+    },
+    {
+      "id": "pack-inspect-verify",
+      "topic": "tooling",
+      "title": "pack, inspectFQA, and pack --verify — trust the artifact",
+      "pins": [
+        "tests/test_tools.py::test_inspect_fqa_reports_pack_contents",
+        "tests/test_tools.py::test_pack_verify_reports_and_checks"
+      ],
+      "verified": "flua 0.1.166",
+      "file": "entries/pack-inspect-verify.md"
     },
     {
       "id": "proxy-mode",
@@ -145,6 +238,17 @@
       ],
       "verified": "flua 0.1.168",
       "file": "entries/sim-devices.md"
+    },
+    {
+      "id": "syslog-and-tracing",
+      "topic": "debugging",
+      "title": "--syslog and --trace — the machine-readable run history for agents",
+      "pins": [
+        "tests/test_qa.py::test_syslog_file_records_system_events",
+        "tests/test_trace.py::test_trace_categories_filtered_into_syslog"
+      ],
+      "verified": "flua 0.1.166",
+      "file": "entries/syslog-and-tracing.md"
     },
     {
       "id": "virtual-clock-modes",

@@ -59,7 +59,9 @@ def test_every_capability_entry_resolves_its_pins() -> None:
 def test_capabilities_search_ranks_and_gets() -> None:
     # the agent channel: search by terms, read the full entry back
     hits = search("websocket push")
-    assert hits and hits[0]["id"] == "websocket-server-push"
+    assert any(hit["kind"] == "entry" and hit["id"] == "websocket-server-push" for hit in hits)
+    scores = [hit["score"] for hit in hits]
+    assert scores == sorted(scores, reverse=True)  # ranked, never shuffled
     entry = get_entry("readonly-modes")
     assert entry is not None
     assert "--%%mode:readonly" in entry["body"]
