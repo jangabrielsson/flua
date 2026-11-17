@@ -50,9 +50,16 @@ FLUA_GLOBALS = (
     "RefreshStateSubscriber",
     "class",
     "util",
+    # the std tables are mutable in QA code: Utils.lua defines
+    # table.copy / string.buff and other closure files use them —
+    # allow_defined covers globals, not std-table FIELDS
+    "table",
+    "math",
+    "string",
+    "os",
 )
 # standard Lua globals luacheck's default std may not include for 5.4
-LUA_GLOBALS = ("os", "io", "assert", "load", "collectgarbage", "utf8")
+LUA_GLOBALS = ("io", "assert", "load", "collectgarbage", "utf8")
 
 
 def _class_names(paths: list[str]) -> list[str]:
@@ -70,17 +77,43 @@ def _class_names(paths: list[str]) -> list[str]:
     return names
 
 
+def _runtime_globals() -> list[str]:
+    """The `__`-prefixed globals the installed runtime defines
+    (__assert_type, __fibaro_get_devices, __ternary, __TAG, ...) — derived
+    at tool time, so a runtime addition is whitelisted the moment it ships."""
+    root = Path(__file__).resolve().parent.parent / "lua"
+    names: list[str] = []
+    seen: set[str] = set()
+    for path in root.rglob("*.lua"):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            match = re.match(r"^(?:function (__[A-Za-z_0-9]+)|(__[A-Za-z_0-9]+)\s*=)", line)
+            if match:
+                name = match.group(1) or match.group(2)
+                if name and name not in seen:
+                    seen.add(name)
+                    names.append(name)
+    return names
+
+
 def luacheck_config(class_names: list[str] | None = None) -> str:
     """The generated .luacheckrc: 5.4 std, the flua/HC3 whitelist,
     allow_defined (a global assigned in ANY closure file is legal — the
     whole closure lints in one invocation, so cross-file project globals
-    stay quiet while truly undefined names still flag), and the
-    `class 'Name'` globals the closure declares. (The CLI --globals form
-    is greedy in luacheck 1.x — it would swallow the file paths — so the
-    config file is the transport.)"""
-    names = [*FLUA_GLOBALS, *LUA_GLOBALS, *(class_names or [])]
+    stay quiet while truly undefined names still flag), the
+    `class 'Name'` globals the closure declares, the `__`-prefixed
+    runtime globals, and the std tables made mutable (QA code extends
+    table/string/os cross-file). max_line_length is off — brownfield QAs
+    do not need a style gate, and a project .luacheckrc can opt back in.
+    (The CLI --globals form is greedy in luacheck 1.x — it would swallow
+    the file paths — so the config file is the transport.)"""
+    names = [*FLUA_GLOBALS, *LUA_GLOBALS, *_runtime_globals(), *(class_names or [])]
     body = ", ".join(f'"{name}"' for name in names)
-    return 'std = "lua54"\nallow_defined = true\nglobals = {' + body + "}\n"
+    return (
+        'std = "lua54"\n'
+        "allow_defined = true\n"
+        "max_line_length = false\n"
+        "globals = {" + body + "}\n"
+    )
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:

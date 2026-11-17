@@ -2193,8 +2193,11 @@ def test_luacheck_tool_lints_the_file_closure(monkeypatch, tmp_path, capsys) -> 
     config = luacheck_config(["WSConnection"])
     assert 'std = "lua54"' in config
     assert "allow_defined = true" in config  # cross-file project globals stay quiet
+    assert "max_line_length = false" in config  # brownfield QAs get no style gate
     assert '"fibaro"' in config and '"api"' in config and '"net"' in config
     assert '"class"' in config and '"WSConnection"' in config
+    assert '"table"' in config and '"string"' in config  # std fields extendable
+    assert '"__assert_type"' in config  # the __-runtime sweep (qwikchild uses it)
 
 
 def test_luacheck_tool_errors_cleanly_without_luacheck(monkeypatch, tmp_path, capsys) -> None:
