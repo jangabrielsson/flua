@@ -4,6 +4,13 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.172] - 2026-11-17
+
+### Changed
+- luacheck: the config-file form, the class global, and a clean-recipes gate
+- luacheck tool: the ecosystem linter over a QA's file closure
+- HassQA field report (issue #4): triage — fixes, aliases, the test runner
+
 ## [0.1.171] - 2026-11-16
 
 ### Changed
