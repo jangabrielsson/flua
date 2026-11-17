@@ -297,3 +297,29 @@ def test_tool_ui_renders_nested_containers(tmp_path) -> None:
     dump = ui_dump(str(script))
     names = [e.get("name") for e in dump["elements"] if e.get("name")]
     assert "b1" in names and "b2" in names
+
+
+def test_flua_test_assertions_survive_table_messages(tmp_path) -> None:
+    # the field report's crash: a table message concatenated raw. assert_eq
+    # and assert_json stringify messages safely — no lib-internal error
+    import subprocess
+    import sys
+
+    script = tmp_path / "test_badmsg.lua"
+    script.write_text(
+        "local t = require('flua-test').new()\n"
+        "t:assert_eq({1}, {2}, {reason='oops'})\n"
+        "t:assert_json('not json', {reason='oops'})\n"
+        "t:finish()\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--api", "local", str(script)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 1  # the assertions failed, not the lib
+    assert "FAIL:" in result.stdout
+    assert "failures: 2" in result.stdout
+    assert "attempt to concatenate" not in result.stdout + result.stderr

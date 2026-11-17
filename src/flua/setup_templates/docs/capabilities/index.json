@@ -401,6 +401,17 @@
       "file": "entries/virtual-clock-modes.md"
     },
     {
+      "id": "websocket-lifecycle",
+      "topic": "runtime-net",
+      "title": "WebSocket lifecycle — close fires disconnected once; fresh client per reconnect",
+      "pins": [
+        "tests/test_websocket.py::test_websocket_close_before_connected_fires_only_disconnected",
+        "tests/test_websocket.py::test_server_initiated_close_sends_exactly_one_close_frame"
+      ],
+      "verified": "flua 0.1.171",
+      "file": "entries/websocket-lifecycle.md"
+    },
+    {
       "id": "websocket-server-push",
       "topic": "runtime-net",
       "title": "net.WebSocketServer can push and disconnect — event-driven server protocols",
@@ -492,6 +503,10 @@
       {
         "name": "state",
         "help": "inspect simulator state from a seed/db file (dump, alias scan, tree check)"
+      },
+      {
+        "name": "test",
+        "help": "run a project's test_*.lua suite — one summary, nonzero exit (agents: --json)"
       },
       {
         "name": "typeinfo",

@@ -7,6 +7,11 @@ local json = {}
 
 json.encode = function(value) return _PY.to_json(value) end
 json.decode = function(text) return _PY.parse_json(text) end
+-- Pretty-printed JSON (the HC3's compact encoder stays the default for
+-- string-exact assertions); indent defaults to 2 spaces.
+json.encodeFormatted = function(value, indent)
+  return _PY.to_json(value, indent or 2)
+end
 
 -- HC3 compatibility: mark a table as an array so the encoder renders it as
 -- "[...]" — including an empty table as "[]" instead of "{}", which is the

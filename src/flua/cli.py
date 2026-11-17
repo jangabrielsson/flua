@@ -22,6 +22,7 @@ import locale
 import logging
 import math
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -85,6 +86,14 @@ def _build_parser() -> argparse.ArgumentParser:
         "foreign code without editing it",
     )
     parser.add_argument(
+        "--var",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="set a quickAppVariable from the CLI (shorthand for -D var:KEY=VALUE; "
+        "repeatable) — testing a QA against a stub without editing its header",
+    )
+    parser.add_argument(
         "--debug",
         action="append",
         default=[],
@@ -115,6 +124,15 @@ def _build_parser() -> argparse.ArgumentParser:
         "run short with work pending); N<0 = exactly abs(N) virtual s "
         "(step mode: run until idle, at most abs(N) wall s — timers beyond "
         "N still fire)",
+    )
+    parser.add_argument(
+        "--deadline",
+        type=float,
+        default=None,
+        dest="run_for",
+        metavar="SEC",
+        help="alias for --run-for SEC — the CI kill switch: a hung run exits "
+        "nonzero at the wall-clock deadline",
     )
     parser.add_argument(
         "--debugger",
@@ -360,6 +378,16 @@ def _load_qas(
         if not isinstance(entry, str) or not entry.strip():
             parser.error("-D needs a directive string, e.g. -D mode:online")
         annotations = parse_annotations("--%%" + entry)
+        injected = annotations if injected is None else merge_annotations(injected, annotations)
+    for entry in args.var:
+        if not isinstance(entry, str) or "=" not in entry:
+            parser.error("--var needs KEY=VALUE, e.g. --var url=127.0.0.1:8777")
+        key, _, value = entry.partition("=")
+        # the var value is a Lua expression (like the header form): numbers
+        # and booleans stay bare, everything else becomes a quoted string
+        if not (re.fullmatch(r"-?\d+(\.\d+)?", value) or value in ("true", "false")):
+            value = '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+        annotations = parse_annotations(f"--%%var:{key}={value}")
         injected = annotations if injected is None else merge_annotations(injected, annotations)
     for channels in args.debug:
         if not isinstance(channels, str) or not channels.strip():

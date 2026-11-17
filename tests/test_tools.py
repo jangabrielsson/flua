@@ -49,6 +49,7 @@ def test_registry_discovers_all_tools() -> None:
         "parityCleanup",
         "setup",
         "state",
+        "test",
         "typeinfo",
         "ui",
         "unpack",
@@ -2120,3 +2121,26 @@ def test_feedback_publish_shells_out_to_gh(monkeypatch, tmp_path, capsys) -> Non
     assert seen[0][:4] == ["gh", "issue", "create", "--label"]
     assert "--body-file" in seen[0] and str(report) in seen[0]
     assert "issues/7" in capsys.readouterr().out
+
+
+def test_test_tool_runs_a_project_suite(monkeypatch, tmp_path, capsys) -> None:
+    # the CI shape every project hand-rolls: discover test_*.lua, run each,
+    # one summary, nonzero exit on any failure
+    good = tmp_path / "test_good.lua"
+    good.write_text('print("ok")\n_FLUA.exit(0)\n')
+    bad = tmp_path / "test_bad.lua"
+    bad.write_text('print("bad")\n_FLUA.exit(1)\n')
+    from flua import tools
+
+    module = tools._TOOLS["test"]
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    module.add_arguments(parser)
+    assert module.run(parser, parser.parse_args(["--dir", str(tmp_path)])) == 1
+    out = capsys.readouterr().out
+    assert "PASS  " in out and "FAIL  " in out
+    assert "1 passed, 1 failed" in out
+    assert module.run(parser, parser.parse_args(["--dir", str(tmp_path), "--json"])) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["passed"] == 1 and payload["failed"] == 1

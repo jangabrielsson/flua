@@ -4,6 +4,8 @@ import pytest
 
 pytest.importorskip("lupa")
 
+import json
+
 from flua.engine import LuaEngine  # noqa: E402
 
 
@@ -47,5 +49,23 @@ assert(json.decode("[]") ~= nil)
 assert(json.decode("{}") ~= nil)
 """
         )
+    finally:
+        await engine.stop()
+
+
+async def test_json_encode_formatted_pretty_prints() -> None:
+    # the field-report ask: json.encodeFormatted for fixture dumps; the
+    # compact encoder stays the byte-exact default
+    engine = LuaEngine(api_mode="local")
+    await engine.start()
+    try:
+        result = engine.execute(
+            'return json.encode({a=1,b={2,3}}), json.encodeFormatted({a=1,b={2,3}})'
+        )
+        compact, pretty = result
+        assert json.loads(compact) == {"a": 1, "b": [2, 3]}  # unchanged shape
+        assert ", " not in compact  # the compact separator stays byte-tight
+        assert "\n" in pretty and '"a": 1' in pretty and '    ' in pretty
+        assert json.loads(pretty) == {"a": 1, "b": [2, 3]}
     finally:
         await engine.stop()

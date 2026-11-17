@@ -905,3 +905,36 @@ def test_example_ui_interaction_suite() -> None:
     assert "PASS btnA -> A" in result.stdout
     assert "PASS btnC -> C" in result.stdout
     assert "VERDICT: all passed" in result.stdout
+
+
+def test_var_and_deadline_cli_flags(tmp_path) -> None:
+    # the field-report asks: --var KEY=VALUE overrides a var from the CLI,
+    # --deadline SEC is the wall-clock kill switch for hung runs
+    script = tmp_path / "cli.lua"
+    script.write_text(
+        "--%%var:url=default\n"
+        "function QuickApp:onInit()\n"
+        "  print('URL', self:getVariable('url'))\n"
+        "end\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--api", "local", "--var", "url=127.0.0.1:8777",
+         "--deadline", "5", str(script)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "URL 127.0.0.1:8777" in result.stdout
+    # a hung QA (forever interval) dies nonzero at the deadline
+    hung = tmp_path / "hung.lua"
+    hung.write_text("setInterval(function() end, 1000)\n")
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--api", "local", "--deadline", "1", str(hung)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode != 0

@@ -288,10 +288,13 @@ def install_bindings(engine: "LuaEngine") -> None:
     # here). Both converters honor json.util.InitArray's __isArray marker, so
     # an empty marked table crosses as [] instead of {} — the one case the
     # 1..n key heuristic cannot decide.
-    def to_json(value: object) -> str:
+    def to_json(value: object, indent: int | None = None) -> str:
         # compact separators like the HC3's encoder: json.encode({2,4,6})
         # is "[2,4,6]", not Python's default "[2, 4, 6]" — string-exact
-        # assertions written for the HC3/plua compare byte-for-byte
+        # assertions written for the HC3/plua compare byte-for-byte. An
+        # explicit indent (json.encodeFormatted) opts into pretty output.
+        if indent:
+            return json.dumps(_json_to_python(value, lua), indent=int(indent))
         return json.dumps(_json_to_python(value, lua), separators=(",", ":"))
 
     def parse_json(text: str | bytes) -> object:
@@ -426,7 +429,7 @@ def install_bindings(engine: "LuaEngine") -> None:
         engine.flua_log(
             "warning",
             int(qa_id),
-            f"updateProperty: {mismatch} (the real HC3 silently ignores the update)",
+            f"updateProperty: {mismatch}",
         )
 
     def api_call(

@@ -300,3 +300,13 @@ Parked 2026-11-12, from the custom-icon work (User<id> sets, uploadExternalIconS
   the same session: a `_FLUA.saveIcon(set, file, bytes)` bridge call and
   lazy fetch+cache in the icon channel (online/proxy) so the viewer warms
   the cache on demand — both "wait for now".
+
+## Static undefined-global detection in `--check` (HassQA field report, 2026-11-17)
+
+A luacheck-style pass over the `--%%file` closure — known flua/HC3 globals
+whitelisted — would have caught three real bugs statically (an undefined
+`PCALL`, a `d.state` typo, a wrong variable in an error path) that
+`--check` passed. Highest-value single item in the report. Needs a real
+static-analysis pass over compiled bytecode (a mini-linter), not a patch;
+the runtime `--%%warn:stubApi`/`bridge-debug` channels catch the dynamic
+half meanwhile.

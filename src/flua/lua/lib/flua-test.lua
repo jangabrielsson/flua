@@ -59,6 +59,16 @@ local function deep_eq(a, b)
   return true
 end
 
+-- messages survive any value: a table message must not crash the lib
+-- (stringify to a debug shape rather than concatenating it raw)
+local function s(value)
+  local t = type(value)
+  if t == "string" then
+    return value
+  end
+  return tostring(value)
+end
+
 function Test.new()
   local self = setmetatable({}, Test)
   self.passes = 0
@@ -85,7 +95,7 @@ function Test:assert_eq(got, want, msg)
   if not isFlua then
     return true
   end
-  return self:expect(deep_eq(got, want), (msg and msg .. " — " or "") .. "expected "
+  return self:expect(deep_eq(got, want), (msg and s(msg) .. " — " or "") .. "expected "
     .. tostring(want) .. ", got " .. tostring(got))
 end
 
@@ -94,11 +104,11 @@ function Test:assert_json(text, msg)
     return true
   end
   if not json_decode then
-    return self:expect(false, (msg and msg .. " — " or "") .. "json module unavailable")
+    return self:expect(false, (msg and s(msg) .. " — " or "") .. "json module unavailable")
   end
   local ok, decoded = pcall(json_decode, text)
   if not ok then
-    return self:expect(false, (msg and msg .. " — " or "") .. "invalid JSON: " .. tostring(decoded))
+    return self:expect(false, (msg and s(msg) .. " — " or "") .. "invalid JSON: " .. tostring(decoded))
   end
   return self:expect(true, msg or "valid JSON")
 end

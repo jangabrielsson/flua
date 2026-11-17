@@ -1449,6 +1449,16 @@ run in your QA, timers keep running while requests are in flight):
   (`write` is the HC3-documented alias of `send`)
 - `net.UDPSocket({broadcast, timeout})` → `sendTo/receive` — `examples/udp.lua`
 - `net.WebSocketClient()/WebSocketClientTls()` → `addEventListener`, `connect`, `send`, `sendBinary` — `examples/websocket.lua` (`connect(url, headers)` takes a headers table, like the HC3; `sendBinary` sends binary frames, and `dataReceived(payload, isBinary)` receives them — the new HC3 binary mode). The 5.221 semantics are matched: `Sec-WebSocket-Protocol` entries split on commas, join canonically, and reject non-HTTP tokens with an error; `send()` rejects non-UTF-8 text with an error pointing at `sendBinary`; `close()` before the handshake completes delivers only `disconnected`. Like the HC3, the TLS client does **not** verify certificates by default (embedded bridges ship self-signed certs — e.g. Dirigera); the flua extension `connect(url, headers, {checkCertificate = true})` opts back into verification. `examples/mqtt-over-websocket.lua` shows the 5.221 pattern of building MQTT in Lua on top of the client (varint/`mqttString` packet assembly, the receive accumulator) — binary payloads arrive latin-1-decoded (one char per byte, 0–255), so `string.byte` round-trips exactly.
+
+**Socket lifecycle (reconnect semantics):** `ws:close()` fires the
+`disconnected` listener **exactly once** (whether the handshake had
+completed or not — closing before it delivers only `disconnected`,
+pinned). A client instance owns one connection; for reconnect logic the
+supported pattern is a **fresh client per reconnect** (construct →
+connect → listen), not re-`connect()` on a failed/closed instance. The
+server side mirrors it: `disconnected` fires once per connection, and a
+server-side `ws:disconnect(conn)` closes the connection from the
+listener's side.
 - `mqtt.Client.connect(uri, options)` → `subscribe/publish/unsubscribe/disconnect`, `mqtt.QoS` — `examples/mqtt.lua` (`mqtts://` or `options.tls` enables TLS: `useSNI` on by default like the HC3 ≥ 5.191, `tls.useSNI = false` switches SNI off; also `allowUnauthorized`, `certificateAuthority`, `clientCertificate`)
 
 TCP/UDP payloads are **binary-safe**: raw bytes (including NUL and values
