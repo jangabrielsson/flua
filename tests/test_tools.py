@@ -42,6 +42,7 @@ def test_registry_discovers_all_tools() -> None:
         "icons",
         "inspectFQA",
         "installHelper",
+        "luacheck",
         "migrate",
         "newQA",
         "pack",
@@ -2144,3 +2145,62 @@ def test_test_tool_runs_a_project_suite(monkeypatch, tmp_path, capsys) -> None:
     assert module.run(parser, parser.parse_args(["--dir", str(tmp_path), "--json"])) == 1
     payload = json.loads(capsys.readouterr().out)
     assert payload["passed"] == 1 and payload["failed"] == 1
+
+
+def test_luacheck_globals_exist_in_the_runtime() -> None:
+    REPO = Path(__file__).resolve().parent.parent
+    # the whitelist cannot rot silently: every flua/HC3 global it declares
+    # must still exist in the Lua runtime (a rename fails here)
+    from flua.tools.luacheck_tool import FLUA_GLOBALS
+
+    root = REPO / "src" / "flua" / "lua"
+    haystack = "\n".join(path.read_text(encoding="utf-8") for path in root.rglob("*.lua"))
+    for name in FLUA_GLOBALS:
+        assert name in haystack, f"{name}: not defined anywhere in src/flua/lua"
+
+
+def test_luacheck_tool_lints_the_file_closure(monkeypatch, tmp_path, capsys) -> None:
+    # the two hand-rolled parts: the closure (main + --%%file extras) and
+    # the globals whitelist — a fake luacheck records exactly what it got
+    fake = tmp_path / "luacheck"
+    fake.write_text(
+        "#!/bin/sh\necho \"$@\"\nexit 0\n"
+    )
+    fake.chmod(0o755)
+    monkeypatch.setattr("shutil.which", lambda name: str(fake) if name == "luacheck" else None)
+    project = tmp_path / "qa"
+    project.mkdir()
+    (project / "main.lua").write_text(
+        "--%%file:lib.lua,lib\nfunction QuickApp:onInit() end\n"
+    )
+    (project / "lib.lua").write_text("PCALL(1)\n")  # the undefined-global class of bug
+    from flua import tools
+
+    module = tools._TOOLS["luacheck"]
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    module.add_arguments(parser)
+    assert module.run(parser, parser.parse_args([str(project / "main.lua")])) == 0
+    invocation = capsys.readouterr().out.splitlines()[0].split()
+    assert "--globals" in invocation
+    assert "fibaro" in invocation and "api" in invocation and "net" in invocation
+    assert any(part.endswith("main.lua") for part in invocation)
+    assert any(part.endswith("lib.lua") for part in invocation)
+
+
+def test_luacheck_tool_errors_cleanly_without_luacheck(monkeypatch, tmp_path, capsys) -> None:
+    # the tool shells out — no luacheck on PATH is a clear error, not a
+    # bundled-parser mess (the linter stays a user install)
+    monkeypatch.setattr("shutil.which", lambda name: None)
+    script = tmp_path / "qa.lua"
+    script.write_text("function QuickApp:onInit() end\n")
+    from flua import tools
+
+    module = tools._TOOLS["luacheck"]
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    module.add_arguments(parser)
+    assert module.run(parser, parser.parse_args([str(script)])) == 2
+    assert "not installed" in capsys.readouterr().err

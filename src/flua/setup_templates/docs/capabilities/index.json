@@ -165,6 +165,17 @@
       "file": "entries/istypeof-vs-type.md"
     },
     {
+      "id": "luacheck-tool",
+      "topic": "tooling",
+      "title": "The luacheck tool — a linter over the QA's file closure",
+      "pins": [
+        "tests/test_tools.py::test_luacheck_tool_lints_the_file_closure",
+        "tests/test_tools.py::test_luacheck_globals_exist_in_the_runtime"
+      ],
+      "verified": "flua 0.1.171",
+      "file": "entries/luacheck-tool.md"
+    },
+    {
       "id": "mcp-server-basics",
       "topic": "agents",
       "title": "flua-mcp — the agent server over the same machinery",
@@ -475,6 +486,10 @@
       {
         "name": "installHelper",
         "help": "deploy the FluaHelper QA to the HC3 and point it at this machine"
+      },
+      {
+        "name": "luacheck",
+        "help": "run the luacheck linter over a QA's file closure (needs luacheck on PATH)"
       },
       {
         "name": "migrate",
