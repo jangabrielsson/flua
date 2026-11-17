@@ -2183,10 +2183,16 @@ def test_luacheck_tool_lints_the_file_closure(monkeypatch, tmp_path, capsys) -> 
     module.add_arguments(parser)
     assert module.run(parser, parser.parse_args([str(project / "main.lua")])) == 0
     invocation = capsys.readouterr().out.splitlines()[0].split()
-    assert "--globals" in invocation
-    assert "fibaro" in invocation and "api" in invocation and "net" in invocation
+    assert "--config" in invocation and "--no-color" in invocation
     assert any(part.endswith("main.lua") for part in invocation)
     assert any(part.endswith("lib.lua") for part in invocation)
+    # the whitelist rides the generated config (the --globals CLI form is
+    # greedy in luacheck 1.x and would swallow the file paths)
+    from flua.tools.luacheck_tool import luacheck_config
+
+    config = luacheck_config()
+    assert 'std = "lua54"' in config
+    assert '"fibaro"' in config and '"api"' in config and '"net"' in config and '"class"' in config
 
 
 def test_luacheck_tool_errors_cleanly_without_luacheck(monkeypatch, tmp_path, capsys) -> None:
@@ -2204,3 +2210,37 @@ def test_luacheck_tool_errors_cleanly_without_luacheck(monkeypatch, tmp_path, ca
     module.add_arguments(parser)
     assert module.run(parser, parser.parse_args([str(script)])) == 2
     assert "not installed" in capsys.readouterr().err
+
+
+@pytest.mark.skipif(
+    shutil.which("luacheck") is None, reason="luacheck is a user install, not a CI dependency"
+)
+def test_luacheck_finds_the_recipes_clean() -> None:
+    REPO = Path(__file__).resolve().parent.parent
+    # the templates are the product: wherever luacheck exists, the recipe
+    # library must lint clean (the real-luacheck counterpart of the
+    # fake-invocation test)
+    import subprocess
+
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--tool", "luacheck", "--json"],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 2, "the tool needs a script argument"  # sanity of the CLI shape
+    for main in sorted((REPO / "recipes").glob("*/main.lua")):
+        result = subprocess.run(
+            [sys.executable, "-m", "flua", "--tool", "luacheck", "--json", str(main)],
+            cwd=REPO,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        payload = json.loads(result.stdout)
+        assert result.returncode == 0, f"{main}: {payload['output']}"
+        assert "0 errors" in payload["output"], f"{main}: {payload['output']}"
+        assert "warnings" not in payload["output"] or "0 warnings" in payload["output"], (
+            f"{main}: {payload['output']}"
+        )

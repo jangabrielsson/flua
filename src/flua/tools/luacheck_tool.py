@@ -47,10 +47,19 @@ FLUA_GLOBALS = (
     "_sceneId",
     "sourceTrigger",
     "RefreshStateSubscriber",
+    "class",
     "util",
 )
 # standard Lua globals luacheck's default std may not include for 5.4
 LUA_GLOBALS = ("os", "io", "assert", "load", "collectgarbage", "utf8")
+
+
+def luacheck_config() -> str:
+    """The generated .luacheckrc: 5.4 std plus the flua/HC3 whitelist.
+    (The CLI --globals form is greedy in luacheck 1.x — it would swallow
+    the file paths — so the config file is the transport.)"""
+    names = ", ".join(f'"{name}"' for name in (*FLUA_GLOBALS, *LUA_GLOBALS))
+    return 'std = "lua54"\nglobals = {' + names + "}\n"
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -93,7 +102,9 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
             path = Path(directory) / file_name
             path.write_text(content, encoding="utf-8")
             paths.append(str(path))
-        command = [luacheck, "--globals", *FLUA_GLOBALS, *LUA_GLOBALS, *paths]
+        config = Path(directory) / ".luacheckrc"
+        config.write_text(luacheck_config(), encoding="utf-8")
+        command = [luacheck, "--config", str(config), "--no-color", *paths]
         result = subprocess.run(command, capture_output=True, text=True)
         output = result.stdout + result.stderr
         if args.json:
