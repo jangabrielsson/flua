@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.174] - 2026-11-18
+
+### Changed
+- luacheck: the leftovers — __-runtime sweep, std-table fields, no style gate
+
 ## [0.1.173] - 2026-11-17
 
 ### Changed
