@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.173] - 2026-11-17
+
+### Changed
+- luacheck: allow_defined, class scanning, project config wins
+
 ## [0.1.172] - 2026-11-17
 
 ### Changed
