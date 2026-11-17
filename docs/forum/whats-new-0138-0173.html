@@ -1,0 +1,143 @@
+<h2>What's new in flua — 0.1.138 through 0.1.173</h2>
+
+<p>Thirty-six releases in a little over a month — the repo changelog has the
+details; this is the human version of what actually changed and why you
+should care. The short version: <b>flua grew a QA builder</b>, the
+simulator <b>became a test bench</b> with buttons and sliders, the
+controller gained a <b>read-only safety mode</b>, and the thing agents
+need — <b>knowledge they can retrieve and trust</b> — got a first-class
+surface. Most of it was built against real field reports, so almost
+everything here exists because someone hit a wall first.</p>
+
+<h3>The big one: a QA builder on top of the engine</h3>
+
+<p>The engine stays the product — but the releases from 0.1.161 on add the
+first app on top of it, for the people who will never write Lua: a recipe
+library plus <code>flua --tool build</code>, a browser page that turns
+recipes into finished QuickApps.</p>
+
+<ul>
+<li><b>Pick a recipe, pick your devices.</b> Six templates (motion lights,
+fan on humidity, heater on cold weather, leak alert, door notification,
+light at sunset) with categories; the device pickers read your real HC3
+and filter by the <i>type inheritance tree</i>, so a flood sensor shows up
+where a binary sensor is expected. No HC3, or the sensor not installed
+yet? Pick a <b>simulated device</b> instead — the whole loop works on
+your laptop.</li>
+<li><b>Simulate before you upload.</b> The generated QA runs in the sim on
+a 600&times; clock, with your picked devices seeded as simulated devices
+— plus any <i>world devices</i> the recipe declares, like the weather
+manager with its sliders. <b>View UI</b> opens the HC3-style web view of
+the running QA in a new tab.</li>
+<li><b>Every recipe proves itself.</b> Each template carries a declarative
+<i>verify scenario</i> (breach the sensor, drag the slider, check the
+result) that runs in a couple of seconds —
+<code>flua --tool build --verify-all</code> — and CI gates template
+changes on it. A faulty template cannot ship.</li>
+<li><b>Recipes are controller-correct Lua.</b> Device actions through
+<code>fibaro.call</code>, variables read in <code>onInit</code>, threshold
+sliders that sync with quickAppVariables both ways, and the reactive ones
+subscribe to the <code>refreshStates</code> event feed — a breach lights
+the room <i>instantly</i>, not after a poll. Status: a parked proof of
+concept, delimited by its own decision record (ADR 0015).</li>
+</ul>
+
+<h3>The simulator became a test bench</h3>
+
+<ul>
+<li><b>Simulated devices got user interfaces.</b> Every binary sensor in
+the bundled set has Breach/Clear buttons in the web view; every multilevel
+one a slider over its real range and unit. Tap the motion sensor, watch
+the light QA react — the view doubles as the test rig.</li>
+<li><b>The weather is drivable.</b> The weather manager's sliders write
+<code>/weather</code>; a heater recipe reads the same endpoint a real HC3
+serves, so the QA runs identically on the controller.</li>
+<li><b>Everything is mockable from plain Lua.</b> The Skoda pair (control
+QA + a My&Scaron;koda API mock) and the Modbus server demo ship as living
+fixtures — write the far side as a sim QA speaking the real protocol,
+and the integration is testable offline.</li>
+</ul>
+
+<h3>Safety: read-only modes for the live controller</h3>
+
+<ul>
+<li><b><code>--%%mode:readonly</code></b> — reads behave exactly like
+online mode; any write that would reach the HC3 is refused with 403 before
+it leaves. Sim-owned writes still work, so you lose nothing.</li>
+<li><b><code>--%%mode:readonly+call</code></b> — one deliberate unlock:
+<code>fibaro.call</code> actions pass through, so test code can flip a
+light on and off to see it work, while creating or deleting anything stays
+blocked.</li>
+</ul>
+
+<h3>The agent environment — the part that compounds</h3>
+
+<p>Most releases in this stretch were about making flua a better
+<i>place to be</i> for coding agents, and the pieces now connect:</p>
+
+<ul>
+<li><b>The capabilities index.</b> <code>flua --tool caps</code> —
+40 curated knowledge entries (quirks, idioms, how-tos), every one
+<b>pinned to the test that proves it</b>, plus a machine-derived half
+(the 28 tools, the sim devices, the REST route table with real/stub
+status). <code>caps --search "websocket push"</code> answers the
+questions agents used to dig through Python source for. The same content
+ships in the wheel and doubles as MCP resources.</li>
+<li><b>The feedback loop, tooled.</b> <code>flua --tool feedback new</code>
+scaffolds a dated experience report; <code>feedback publish</code> files
+it as a GitHub issue in one command. The last two triage rounds (Sonos,
+HassQA) each turned into fixes within hours — and every fix carries its
+pinning test.</li>
+<li><b>One-command test runs.</b> <code>flua --tool test</code> discovers
+<code>test_*.lua</code>, runs each on the instant clock, one summary
+line, nonzero exit — the CI shell loop every project hand-rolled.
+<code>--deadline SEC</code> is the kill switch a hung test cannot
+survive.</li>
+<li><b>A real linter, finally.</b> <code>flua --tool luacheck</code>
+resolves the QA's whole file closure and runs the user-installed luacheck
+over it with the flua/HC3 globals whitelisted — output flags <i>your</i>
+undefined variables, not the noise of <code>fibaro</code>/<code>api</code>
+being "undefined". Three rounds of HassQA feedback took a multi-file QA
+from ~350 warnings to zero, with the genuinely undefined
+<code>PCALL</code>-class bugs left standing.</li>
+<li><b>Trust the artifact.</b> <code>inspectFQA</code> and
+<code>pack --verify</code> show exactly what a package contains — the
+second time an agent asked for it, it became a tool.</li>
+</ul>
+
+<h3>HC3 fidelity, quietly deepened</h3>
+
+<ul>
+<li><b>The type/interface schema is the law</b> (ADR 0014) — device
+structures, property types and enums derive from the distilled HC3 schema;
+<code>--tool typeinfo</code> prints a type's implementation contract, and
+<code>updateProperty</code> now warns when a property the type does not
+declare would be silently ignored on the real controller.</li>
+<li><b>Remote REST rides <code>X-Fibaro-Version: 2</code></b> like the web
+UI; <code>GET /icons</code> serves the v2 type table for QAs;
+<code>/devices?isTypeOf=</code> follows the inheritance tree, matching
+live-verified HC3 behavior.</li>
+<li><b>Uploads go through the HC3's web-import endpoint</b> — the
+package-preserving path, multipart as a real file part; legacy UI exports
+match the HC3's own shape byte-for-byte.</li>
+<li><b>WebSocket servers can push.</b> <code>net.WebSocketServer</code>
+grew server-initiated frames, per-connection lifecycle events, and
+server-side disconnect — built for the Sonos offline suite, whose
+reconnect test caught a real long-standing bug.</li>
+</ul>
+
+<h3>The little things</h3>
+
+<ul>
+<li><code>json.encodeFormatted()</code> for readable fixture dumps;
+<code>--var KEY=VALUE</code> overrides variables from the CLI;
+<code>--deadline SEC</code> as the run kill switch alias.</li>
+<li>Sensor sim devices boot with a numeric value, never the skeleton's
+empty string — a whole class of <code>value &gt; threshold</code> crashes
+cannot happen.</li>
+<li>The icon manager probes the asset tree instead of trusting metadata;
+room/scene custom icons serve flat; icon families resolve through the
+type hierarchy.</li>
+<li>Two WS flake fixes and one scene date-trigger race — the CI matrix is
+green again, and the fixes are the tests.</li>
+</ul>
