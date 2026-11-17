@@ -2190,9 +2190,11 @@ def test_luacheck_tool_lints_the_file_closure(monkeypatch, tmp_path, capsys) -> 
     # greedy in luacheck 1.x and would swallow the file paths)
     from flua.tools.luacheck_tool import luacheck_config
 
-    config = luacheck_config()
+    config = luacheck_config(["WSConnection"])
     assert 'std = "lua54"' in config
-    assert '"fibaro"' in config and '"api"' in config and '"net"' in config and '"class"' in config
+    assert "allow_defined = true" in config  # cross-file project globals stay quiet
+    assert '"fibaro"' in config and '"api"' in config and '"net"' in config
+    assert '"class"' in config and '"WSConnection"' in config
 
 
 def test_luacheck_tool_errors_cleanly_without_luacheck(monkeypatch, tmp_path, capsys) -> None:
@@ -2244,3 +2246,28 @@ def test_luacheck_finds_the_recipes_clean() -> None:
         assert "warnings" not in payload["output"] or "0 warnings" in payload["output"], (
             f"{main}: {payload['output']}"
         )
+
+
+def test_luacheck_tool_project_config_wins(monkeypatch, tmp_path, capsys) -> None:
+    # a project .luacheckrc next to the main file is the project's call —
+    # it replaces the generated config (per-project style preferences)
+    fake = tmp_path / "luacheck"
+    fake.write_text("#!/bin/sh\necho \"$@\"\nexit 0\n")
+    fake.chmod(0o755)
+    monkeypatch.setattr("shutil.which", lambda name: str(fake) if name == "luacheck" else None)
+    project = tmp_path / "qa"
+    project.mkdir()
+    (project / "main.lua").write_text("function QuickApp:onInit() end\n")
+    (project / ".luacheckrc").write_text('std = "lua54"\nignore = {"211"}\n')
+    from flua import tools
+
+    module = tools._TOOLS["luacheck"]
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    module.add_arguments(parser)
+    monkeypatch.chdir(tmp_path)
+    assert module.run(parser, parser.parse_args([str(project / "main.lua")])) == 0
+    invocation = capsys.readouterr().out.splitlines()[0].split()
+    config_index = invocation.index("--config")
+    assert invocation[config_index + 1] == str(project / ".luacheckrc")

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -54,12 +55,32 @@ FLUA_GLOBALS = (
 LUA_GLOBALS = ("os", "io", "assert", "load", "collectgarbage", "utf8")
 
 
-def luacheck_config() -> str:
-    """The generated .luacheckrc: 5.4 std plus the flua/HC3 whitelist.
-    (The CLI --globals form is greedy in luacheck 1.x — it would swallow
-    the file paths — so the config file is the transport.)"""
-    names = ", ".join(f'"{name}"' for name in (*FLUA_GLOBALS, *LUA_GLOBALS))
-    return 'std = "lua54"\nglobals = {' + names + "}\n"
+def _class_names(paths: list[str]) -> list[str]:
+    """`class 'Name'` declarations in the closure: allow_defined only sees
+    assignments, so class-created globals are appended explicitly."""
+    names: list[str] = []
+    seen: set[str] = set()
+    for path in paths:
+        text = Path(path).read_text(encoding="utf-8")
+        for match in re.finditer(r"class\s+['\"]([A-Za-z0-9_]+)['\"]", text):
+            name = match.group(1)
+            if name not in seen:
+                seen.add(name)
+                names.append(name)
+    return names
+
+
+def luacheck_config(class_names: list[str] | None = None) -> str:
+    """The generated .luacheckrc: 5.4 std, the flua/HC3 whitelist,
+    allow_defined (a global assigned in ANY closure file is legal — the
+    whole closure lints in one invocation, so cross-file project globals
+    stay quiet while truly undefined names still flag), and the
+    `class 'Name'` globals the closure declares. (The CLI --globals form
+    is greedy in luacheck 1.x — it would swallow the file paths — so the
+    config file is the transport.)"""
+    names = [*FLUA_GLOBALS, *LUA_GLOBALS, *(class_names or [])]
+    body = ", ".join(f'"{name}"' for name in names)
+    return 'std = "lua54"\nallow_defined = true\nglobals = {' + body + "}\n"
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -102,8 +123,16 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
             path = Path(directory) / file_name
             path.write_text(content, encoding="utf-8")
             paths.append(str(path))
-        config = Path(directory) / ".luacheckrc"
-        config.write_text(luacheck_config(), encoding="utf-8")
+        # a project .luacheckrc (next to the main file, else the cwd) wins
+        # over the generated one — per-project style is the project's call
+        project_config = Path(str(args.script)).resolve().parent / ".luacheckrc"
+        if not project_config.is_file():
+            project_config = Path(".luacheckrc")
+        if project_config.is_file():
+            config = project_config
+        else:
+            config = Path(directory) / ".luacheckrc"
+            config.write_text(luacheck_config(_class_names(paths)), encoding="utf-8")
         command = [luacheck, "--config", str(config), "--no-color", *paths]
         result = subprocess.run(command, capture_output=True, text=True)
         output = result.stdout + result.stderr

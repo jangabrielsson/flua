@@ -19,11 +19,16 @@ The two things the tool adds over raw luacheck:
 
 - **The globals whitelist** — flua/HC3 globals (`fibaro`, `api`,
   `net`, `mqtt`, `json`, `QuickApp`, timers, `RefreshStateSubscriber`,
-  …) are declared, so the output flags *real* undefined variables
-  (the `PCALL` class of bug the HASS round found) instead of
+  `class`, …) are declared, so the output flags *real* undefined
+  variables (the `PCALL` class of bug the HASS round found) instead of
   expected-global noise. The whitelist is pinned: every name must
   still exist in the Lua runtime or the test fails.
-- **The closure** — one command covers the whole QA.
+- **The closure** — one command covers the whole QA, with
+  `allow_defined` so a global *assigned in any closure file* is legal
+  everywhere (multi-file project state like a shared `HASS` table
+  stays quiet) and `class 'Name'` declarations recognized as globals.
+  A project `.luacheckrc` next to the main file (or in the cwd) wins
+  over the generated config — per-project style is the project's call.
 
 luacheck itself is **not bundled** — Lua linters ship platform-specific
 parsers, so it stays a user install (`luarocks install luacheck` /
