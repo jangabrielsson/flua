@@ -4,6 +4,11 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.176] - 2026-11-18
+
+### Changed
+- test runner: the deadline is the runner's own wall clock
+
 ## [0.1.175] - 2026-11-18
 
 ### Changed
