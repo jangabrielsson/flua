@@ -127,7 +127,6 @@ do
         local elm,etyp = event.elementName, event.eventType
         local cb = obj.uiCallbacks or {}
         if obj[elm] then return obj:callAction(elm, event) end
-        local a = cb[elm][etyp]
         if cb[elm] and cb[elm][etyp] and obj[cb[elm][etyp]] then return obj:callAction(cb[elm][etyp], event) end
         if obj[elm.."Clicked"] then return obj:callAction(elm.."Clicked", event) end
         self:warning("UI callback for element:", elm, " not found-")

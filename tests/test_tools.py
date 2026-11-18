@@ -2274,3 +2274,33 @@ def test_luacheck_tool_project_config_wins(monkeypatch, tmp_path, capsys) -> Non
     invocation = capsys.readouterr().out.splitlines()[0].split()
     config_index = invocation.index("--config")
     assert invocation[config_index + 1] == str(project / ".luacheckrc")
+
+
+@pytest.mark.skipif(
+    shutil.which("luacheck") is None, reason="luacheck is a user install, not a CI dependency"
+)
+def test_luacheck_bundled_lib_style_is_suppressed(tmp_path) -> None:
+    REPO = Path(__file__).resolve().parent.parent
+    # a vendored copy of a bundled lib lints clean under the generated
+    # config (style classes suppressed for flua's own code), while the
+    # undefined-variable class stays active for it
+    import subprocess
+
+    lib = REPO / "src" / "flua" / "lua" / "lib" / "qwikchild.lua"
+    project = tmp_path / "qa"
+    project.mkdir()
+    (project / "qwikchild.lua").write_text(lib.read_text(encoding="utf-8"))
+    (project / "main.lua").write_text(
+        "--%%file:qwikchild.lua,qwikchild\n"
+        "function QuickApp:onInit() self:debug('ok') end\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--tool", "luacheck", "--json", str(project / "main.lua")],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert "0 warnings / 0 errors" in payload["output"], payload["output"]

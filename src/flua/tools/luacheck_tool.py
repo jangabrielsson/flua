@@ -25,7 +25,11 @@ import tempfile
 from pathlib import Path
 
 NAME = "luacheck"
-HELP = "run the luacheck linter over a QA's file closure (needs luacheck on PATH)"
+HELP = (
+    "run the luacheck linter over a QA's file closure (needs luacheck on PATH); "
+    "a project .luacheckrc next to the main file fully replaces the generated "
+    "config — include the runtime globals you use"
+)
 
 # the flua/HC3 globals a QA may use without definition — pinned by
 # tests/test_tools.py::test_luacheck_globals_exist_in_the_runtime, so a
@@ -95,6 +99,15 @@ def _runtime_globals() -> list[str]:
     return names
 
 
+def _bundled_lib_stems() -> set[str]:
+    """The `$`-includable bundled libs (src/flua/lua/lib): flua's own code —
+    a QA developer cannot fix their style warnings, so the generated
+    config suppresses the style classes for exactly these basenames while
+    the undefined-global class (2xx) stays active."""
+    root = Path(__file__).resolve().parent.parent / "lua" / "lib"
+    return {path.stem for path in root.glob("*.lua")}
+
+
 def luacheck_config(class_names: list[str] | None = None) -> str:
     """The generated .luacheckrc: 5.4 std, the flua/HC3 whitelist,
     allow_defined (a global assigned in ANY closure file is legal — the
@@ -104,15 +117,22 @@ def luacheck_config(class_names: list[str] | None = None) -> str:
     runtime globals, and the std tables made mutable (QA code extends
     table/string/os cross-file). max_line_length is off — brownfield QAs
     do not need a style gate, and a project .luacheckrc can opt back in.
+    Bundled libs (qwikchild, eventlib, ...) get their style classes
+    (3xx/4xx/6xx) ignored — flua's code, not the QA author's.
     (The CLI --globals form is greedy in luacheck 1.x — it would swallow
     the file paths — so the config file is the transport.)"""
     names = [*FLUA_GLOBALS, *LUA_GLOBALS, *_runtime_globals(), *(class_names or [])]
     body = ", ".join(f'"{name}"' for name in names)
+    files = ",\n".join(
+        f'  ["{stem}.lua"] = {{ ignore = {{ "212", "3..", "4..", "5..", "6.." }} }}'
+        for stem in sorted(_bundled_lib_stems())
+    )
     return (
         'std = "lua54"\n'
         "allow_defined = true\n"
         "max_line_length = false\n"
         "globals = {" + body + "}\n"
+        "files = {\n" + files + "\n}\n"
     )
 
 
@@ -144,35 +164,40 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         print(f"luacheck: {args.script} has no files", file=sys.stderr)
         return 2
     with tempfile.TemporaryDirectory(prefix="flua-luacheck-") as directory:
-        paths: list[str] = []
+        names: list[str] = []
         for entry in files:
-            name = str(entry.get("name") or f"file{len(paths)}.lua")
+            name = str(entry.get("name") or f"file{len(names)}.lua")
             content = entry.get("content")
             if not isinstance(content, str):
                 continue
             file_name = Path(name).name
             if not Path(name).suffix:
                 file_name += ".lua"  # luacheck's format sniffing likes extensions
-            path = Path(directory) / file_name
-            path.write_text(content, encoding="utf-8")
-            paths.append(str(path))
+            (Path(directory) / file_name).write_text(content, encoding="utf-8")
+            names.append(file_name)
         # a project .luacheckrc (next to the main file, else the cwd) wins
         # over the generated one — per-project style is the project's call
         project_config = Path(str(args.script)).resolve().parent / ".luacheckrc"
         if not project_config.is_file():
             project_config = Path(".luacheckrc")
         if project_config.is_file():
-            config = project_config
+            config_arg = str(project_config)
         else:
-            config = Path(directory) / ".luacheckrc"
-            config.write_text(luacheck_config(_class_names(paths)), encoding="utf-8")
-        command = [luacheck, "--config", str(config), "--no-color", *paths]
-        result = subprocess.run(command, capture_output=True, text=True)
+            (Path(directory) / ".luacheckrc").write_text(
+                luacheck_config(_class_names([str(Path(directory) / n) for n in names])),
+                encoding="utf-8",
+            )
+            config_arg = ".luacheckrc"
+        # cwd is the temp dir and the paths are bare names: luacheck matches
+        # its files-patterns against the path AS PASSED, so the bundled-lib
+        # basename overrides only work this way
+        command = [luacheck, "--config", config_arg, "--no-color", *names]
+        result = subprocess.run(command, capture_output=True, text=True, cwd=directory)
         output = result.stdout + result.stderr
         if args.json:
-            print(json.dumps({"exit": result.returncode, "files": paths, "output": output}))
+            print(json.dumps({"exit": result.returncode, "files": names, "output": output}))
         else:
             print(output, end="")
             if result.returncode == 0:
-                print(f"luacheck: {len(paths)} file(s) clean")
+                print(f"luacheck: {len(names)} file(s) clean")
         return result.returncode

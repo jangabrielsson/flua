@@ -489,7 +489,7 @@
       },
       {
         "name": "luacheck",
-        "help": "run the luacheck linter over a QA's file closure (needs luacheck on PATH)"
+        "help": "run the luacheck linter over a QA's file closure (needs luacheck on PATH); a project .luacheckrc next to the main file fully replaces the generated config — include the runtime globals you use"
       },
       {
         "name": "migrate",

@@ -27,8 +27,13 @@ The two things the tool adds over raw luacheck:
   `allow_defined` so a global *assigned in any closure file* is legal
   everywhere (multi-file project state like a shared `HASS` table
   stays quiet) and `class 'Name'` declarations recognized as globals.
-  A project `.luacheckrc` next to the main file (or in the cwd) wins
-  over the generated config — per-project style is the project's call.
+  A project `.luacheckrc` next to the main file (or in the cwd)
+  **fully replaces** the generated config — per-project style is the
+  project's call, and the project must then include the runtime
+  globals it uses. Bundled-lib basenames (qwikchild, eventlib, ...)
+  get their style classes (212/3xx/4xx/5xx/6xx) suppressed — flua's
+  code, not the QA author's — while undefined-variable/field (21x)
+  stays active.
 
 luacheck itself is **not bundled** — Lua linters ship platform-specific
 parsers, so it stays a user install (`luarocks install luacheck` /
