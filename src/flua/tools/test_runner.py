@@ -41,8 +41,8 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         "--deadline",
         type=float,
         metavar="SEC",
-        help="wall-clock kill switch per test (the --deadline/--run-for flag) — "
-        "a hung test exits nonzero instead of hanging CI",
+        help="wall-clock cap per test, enforced by the runner: a finished test "
+        "ends instantly, a hung one is killed and counted as failed",
     )
     parser.add_argument("--json", action="store_true", help="machine-readable results (agents)")
 
@@ -60,10 +60,28 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         command = [sys.executable, "-m", "flua", "--api", args.api]
         if args.instant:
             command.append("--instant")
-        if args.deadline is not None:
-            command.extend(["--deadline", str(args.deadline)])
         command.append(str(path))
-        result = subprocess.run(command, capture_output=True, text=True)
+        if args.deadline is not None:
+            # the runner's own wall clock — NOT --run-for, whose "at least
+            # N virtual s" semantics would extend fast tests to their full
+            # deadline instead of capping only hung ones
+            try:
+                result = subprocess.run(
+                    command, capture_output=True, text=True, timeout=args.deadline
+                )
+            except subprocess.TimeoutExpired:
+                results.append(
+                    {
+                        "name": str(path),
+                        "exit": -1,
+                        "output": f"deadline exceeded ({args.deadline:g}s) — hung test\n",
+                    }
+                )
+                if not args.json:
+                    print(f"FAIL  {path}")
+                continue
+        else:
+            result = subprocess.run(command, capture_output=True, text=True)
         results.append(
             {
                 "name": str(path),

@@ -2304,3 +2304,29 @@ def test_luacheck_bundled_lib_style_is_suppressed(tmp_path) -> None:
     assert result.returncode == 0, result.stdout
     payload = json.loads(result.stdout)
     assert "0 warnings / 0 errors" in payload["output"], payload["output"]
+
+
+def test_test_tool_deadline_caps_hung_tests_only(monkeypatch, tmp_path, capsys) -> None:
+    # the runner's own wall clock: a finished test ends instantly even with
+    # a generous deadline, a hung one is killed and counted failed — the
+    # --run-for semantics would extend fast tests to their full deadline
+    import time
+
+    fast = tmp_path / "test_fast.lua"
+    fast.write_text("print('done')\n_FLUA.exit(0)\n")
+    hung = tmp_path / "test_hung.lua"
+    hung.write_text("setInterval(function() end, 1000)\n")
+    from flua import tools
+
+    module = tools._TOOLS["test"]
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    module.add_arguments(parser)
+    started = time.monotonic()
+    assert module.run(parser, parser.parse_args(["--dir", str(tmp_path), "--deadline", "1"])) == 1
+    elapsed = time.monotonic() - started
+    assert elapsed < 5, f"the runner waited {elapsed:.1f}s — fast tests must not extend"
+    out = capsys.readouterr().out
+    assert "PASS  " in out and "FAIL  " in out
+    assert "1 passed, 1 failed" in out
