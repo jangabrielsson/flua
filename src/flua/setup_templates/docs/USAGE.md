@@ -662,15 +662,43 @@ QuickApp methods. `useUiView` (default `false`) selects the new format:
 --%%u:{{button="onBtn",text="On",onReleased="turnOn"},{button="offBtn",text="Off",onReleased="turnOff"}}
 ```
 
-Elements: `label`, `button`, `slider`, `switch`, `select`, `multi`. Callbacks
-(`onReleased`, `onChanged`, `onToggled`, …) name QuickApp methods; sliders
-take `min`/`max`/`step`/`value`, selects and multis take `options` (each
-`{type='option',text=…,value=…}`) plus `value`/`values`. Values in the
-directive are Lua literals — strings need quotes, numbers and `true`/`false`
-don't. Long rows may continue on following comment lines. At runtime the
-device's `properties.viewLayout`, `properties.uiView`, and
-`properties.uiCallbacks` hold the generated structures, and
-`self:updateView(elm, prop, value)` updates them.
+Elements: `label`, `button`, `slider`, `switch`, `select`, `multi`,
+`tabView`. Callbacks (`onReleased`, `onChanged`, `onToggled`, …) name
+QuickApp methods; sliders take `min`/`max`/`step`/`value`, selects and
+multis take `options` (each `{type='option',text=…,value=…}`) plus
+`value`/`values`. Values in the directive are Lua literals — strings need
+quotes, numbers and `true`/`false` don't. Long rows may continue on
+following comment lines. At runtime the device's `properties.viewLayout`,
+`properties.uiView`, and `properties.uiCallbacks` hold the generated
+structures, and `self:updateView(elm, prop, value)` updates them.
+
+A `tabView` groups rows under named tabs. It is full-width — it must sit
+alone on its row. Tabs take `name` and `text` plus their own list of rows
+(the same row shapes as top-level directives); the tabView itself takes
+`activeTab` and an optional `onTabChanged` method, called with the event
+(`event.values[1]` is the new tab name):
+
+```lua
+--%%u:{tabView="mainTabs",activeTab="picker",onTabChanged="tabChanged",tabs={
+--  {name="picker",text="Picker",components={
+--    {{button="onBtn",text="On",onReleased="turnOn"}},
+--    {{slider="dim",text="Brightness",min="0",max="100",value="50",onChanged="dim"}}
+--  }},
+--  {name="settings",text="Settings",components={
+--    {{switch="auto",text="Auto",value="false",onReleased="handleSwitch"}}
+--  }}}}
+```
+
+`self:updateView("mainTabs", "activeTab", "settings")` switches tabs at
+runtime; the viewer also switches tabs on click (sending `onTabChanged`
+when declared). See `examples/tabs.lua` for a runnable demo. The tabView
+travels in BOTH output structures — a single item in the legacy `$jason`
+body (the shape the HC3's own tabbed views use, e.g. the sonosGroup plugin)
+and a full-width component in `uiView`.
+
+On the real HC3 the app draws the tabView from the `uiView` format — a
+tabbed QA must declare `--%%useUiView:true` (live-verified on 5.221; the
+legacy `$jason` renderer leaves a tabView-only view blank).
 
 Declared event handlers (`onReleased`, `onChanged`, `onToggled`, …) live
 in `uiCallbacks` — the table both flua and the HC3 dispatch through. For
@@ -748,13 +776,14 @@ open that device's full panel.
 The viewer polls `GET /flua/devices` (the emulated devices only — in online
 mode the HC3's own QAs stay out of the list), renders `properties.uiView`
 (labels,
-buttons, sliders, switches, single and multi selects — styled after the HC3
+buttons, sliders, switches, single and multi selects, tabViews — styled
+after the HC3
 look), and sends interactions back through `GET /plugins/callUIEvent` — the
 same contract the real HC3 UI uses, so your `onReleased`/`onChanged`/
-`onToggled` methods fire exactly as on the controller. `self:updateView`
-changes land live (the viewer merges `device.view` over the static
-properties). The API server stays up after the QA's timers drain, so the
-viewer keeps working while you tweak the file.
+`onToggled`/`onTabChanged` methods fire exactly as on the controller.
+`self:updateView` changes land live (the viewer merges `device.view` over
+the static properties). The API server stays up after the QA's timers
+drain, so the viewer keeps working while you tweak the file.
 
 Two more flua-only channels round out the machine surface:
 

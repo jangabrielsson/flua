@@ -50,9 +50,7 @@ def test_ui_to_u_rows_roundtrip() -> None:
     ui = compile_ui(rows, 5000)
     from flua.config import parse_lua_literal
 
-    out = ui_to_u_rows(
-        ui_view=ui["uiView"], ui_callbacks=ui["uiCallbacks"]
-    )
+    out = ui_to_u_rows(ui_view=ui["uiView"], ui_callbacks=ui["uiCallbacks"])
     assert len(out) == len(rows)
     parsed = [parse_lua_literal(row) for row in out]
     assert [list(p)[0] for p in parsed] == [
@@ -83,9 +81,7 @@ def test_ui_to_u_rows_legacy_viewlayout() -> None:
     ui = compile_ui(rows, 5000)
     from flua.config import parse_lua_literal
 
-    out = ui_to_u_rows(
-        view_layout=ui["viewLayout"], ui_callbacks=ui["uiCallbacks"]
-    )
+    out = ui_to_u_rows(view_layout=ui["viewLayout"], ui_callbacks=ui["uiCallbacks"])
     parsed = [parse_lua_literal(row) for row in out]
     assert [list(p)[0] for p in parsed] == ["button", "slider"]
     assert parsed[0]["button"] == "on" and parsed[0]["onReleased"] == "turnOn"
@@ -255,6 +251,146 @@ def test_multi_element_row_weights_and_legacy_horizontal() -> None:
     assert len(ui["uiCallbacks"]) == 6  # 3 events per button
 
 
+def test_tabview_compiles_to_uiview_and_legacy() -> None:
+    # a tabView is full-width (alone on its row): tabs hold rows, elements
+    # inside tabs normalize like top-level ones, onTabChanged routes through
+    # uiCallbacks (legacy) and an eventBinding (uiView)
+    rows = [
+        {
+            "tabView": "mainTabs",
+            "activeTab": "picker",
+            "onTabChanged": "tabChanged",
+            "tabs": [
+                {
+                    "name": "picker",
+                    "text": "Picker",
+                    "components": [
+                        [{"button": "onBtn", "text": "On", "onReleased": "turnOn"}],
+                        [
+                            {
+                                "slider": "dim",
+                                "text": "Dim",
+                                "min": "0",
+                                "max": "100",
+                                "value": "50",
+                                "onChanged": "dim",
+                            }
+                        ],
+                    ],
+                },
+                {
+                    "name": "settings",
+                    "text": "Settings",
+                    "components": [
+                        [{"switch": "auto", "text": "Auto", "value": "false", "onReleased": "auto"}]
+                    ],
+                },
+            ],
+        }
+    ]
+    ui = compile_ui(rows, 5000)
+    # uiView: one row whose single component is the tabView; its tabs carry
+    # uiView rows of components
+    assert len(ui["uiView"]) == 1
+    tv = ui["uiView"][0]["components"][0]
+    assert tv["type"] == "tabView" and tv["name"] == "mainTabs"
+    assert tv["activeTab"] == "picker"
+    assert tv["eventBinding"]["onTabChanged"] == [
+        {
+            "params": {
+                "actionName": "UIAction",
+                "args": ["onTabChanged", "mainTabs", "$event.value"],
+            },
+            "type": "deviceAction",
+        }
+    ]
+    assert [t["name"] for t in tv["tabs"]] == ["picker", "settings"]
+    picker = tv["tabs"][0]
+    assert picker["type"] == "tab" and picker["text"] == "Picker"
+    assert len(picker["components"]) == 2
+    assert picker["components"][0]["type"] == "horizontal"
+    btn = picker["components"][0]["components"][0]
+    assert btn["type"] == "button" and btn["name"] == "onBtn"
+    sld = picker["components"][1]["components"][0]
+    # nested elements got the same defaults (stringified slider bounds)
+    assert sld["type"] == "slider" and sld["min"] == "0" and sld["max"] == "100"
+    # legacy viewLayout: one tabView item, tabs hold legacy rows, no event
+    # fields (the legacy convention: the binding lives in uiCallbacks only)
+    items = ui["viewLayout"]["$jason"]["body"]["sections"]["items"]
+    assert len(items) == 1
+    assert items[0]["type"] == "tabView"
+    assert items[0]["name"] == "mainTabs" and items[0]["activeTab"] == "picker"
+    assert "eventBinding" not in items[0]
+    assert items[0]["tabs"][0]["components"][0]["type"] == "vertical"
+    # uiCallbacks carries the tab change for both formats
+    assert {"callback": "tabChanged", "eventType": "onTabChanged", "name": "mainTabs"} in ui[
+        "uiCallbacks"
+    ]
+
+
+def test_tabview_must_sit_alone_on_row() -> None:
+    rows = [[{"tabView": "t", "tabs": []}, {"button": "b", "text": "x"}]]
+    with pytest.raises(ValueError, match="alone"):
+        compile_ui(rows, 5000)
+
+
+def test_tabview_roundtrip() -> None:
+    rows = [
+        {
+            "tabView": "mainTabs",
+            "activeTab": "picker",
+            "onTabChanged": "tabChanged",
+            "tabs": [
+                {
+                    "name": "picker",
+                    "text": "Picker",
+                    "components": [
+                        [{"button": "onBtn", "text": "On", "onReleased": "turnOn"}],
+                        [
+                            {
+                                "slider": "dim",
+                                "text": "Dim",
+                                "min": "0",
+                                "max": "100",
+                                "value": "50",
+                                "onChanged": "dim",
+                            }
+                        ],
+                    ],
+                },
+                {
+                    "name": "settings",
+                    "text": "Settings",
+                    "components": [[{"switch": "auto", "text": "Auto", "value": "false"}]],
+                },
+            ],
+        }
+    ]
+    ui = compile_ui(rows, 5000)
+    from flua.config import parse_lua_literal
+
+    out = ui_to_u_rows(ui_view=ui["uiView"], ui_callbacks=ui["uiCallbacks"])
+    assert len(out) == 1
+    parsed = parse_lua_literal(out[0])
+    assert parsed["tabView"] == "mainTabs"
+    assert parsed["onTabChanged"] == "tabChanged"
+    assert [t["name"] for t in parsed["tabs"]] == ["picker", "settings"]
+    assert parsed["tabs"][0]["components"] == [
+        [{"button": "onBtn", "text": "On", "onReleased": "turnOn"}],
+        [
+            {
+                "slider": "dim",
+                "text": "Dim",
+                "min": "0",
+                "max": "100",
+                "step": "1",
+                "value": "50",
+                "onChanged": "dim",
+            }
+        ],
+    ]
+
+
 @pytest.mark.asyncio
 async def test_qa_device_gets_ui_properties(tmp_path) -> None:
     # end to end: --%%u directives in a real file -> parsed config -> device
@@ -301,6 +437,64 @@ async def test_use_ui_view_false_directive(tmp_path) -> None:
         # both structures are still generated
         assert device["properties"]["viewLayout"]["$jason"]["head"]["title"]
         assert device["properties"]["uiView"][0]["components"][0]["type"] == "label"
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_tabview_update_view_and_tab_changed_callback(tmp_path, capsys) -> None:
+    # updateView patches elements inside a tabView's tabs (the uiView search
+    # recurses through tabs), the tabView's own activeTab updates the same
+    # way, and UIAction("onTabChanged", ...) routes through uiCallbacks
+    script = tmp_path / "tabs.lua"
+    script.write_text(
+        '--%%u:{tabView="mainTabs",activeTab="a",onTabChanged="tabChanged",tabs={'
+        '{name="a",text="A",components={{{label="lbl",text="Hi"}}}}'
+        "}}\n"
+        "function QuickApp:tabChanged(event)\n"
+        "  print('TAB', event.values[1])\n"
+        "end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        qa_id = engine.load_qa_file(str(script))[0]
+        # an element nested inside the tab: reached through the tab walk
+        status = engine.api.dispatch(
+            "POST",
+            "/plugins/updateView",
+            {
+                "deviceId": qa_id,
+                "componentName": "lbl",
+                "propertyName": "text",
+                "newValue": "Live!",
+            },
+        )[1]
+        assert status == 204
+        device, _ = engine.api.dispatch("GET", f"/devices/{qa_id}")
+        tab = device["properties"]["uiView"][0]["components"][0]["tabs"][0]
+        assert tab["components"][0]["components"][0]["text"] == "Live!"
+        # the tabView's own activeTab changes through the same channel
+        engine.api.dispatch(
+            "POST",
+            "/plugins/updateView",
+            {
+                "deviceId": qa_id,
+                "componentName": "mainTabs",
+                "propertyName": "activeTab",
+                "newValue": "b",
+            },
+        )
+        device, _ = engine.api.dispatch("GET", f"/devices/{qa_id}")
+        assert device["properties"]["uiView"][0]["components"][0]["activeTab"] == "b"
+        # onTabChanged routes to the QA method through uiCallbacks
+        engine.api.dispatch(
+            "GET",
+            f"/plugins/callUIEvent?deviceID={qa_id}&elementName=mainTabs"
+            "&eventType=onTabChanged&value=b",
+        )
+        await asyncio.sleep(0.4)
+        assert "TAB b" in capsys.readouterr().out
     finally:
         await engine.stop()
 
@@ -580,9 +774,7 @@ def test_device_ui_renders_from_an_hc3_device() -> None:
                     ],
                 }
             ],
-            "uiCallbacks": [
-                {"name": "B1", "eventType": "onReleased", "callback": "tap"}
-            ],
+            "uiCallbacks": [{"name": "B1", "eventType": "onReleased", "callback": "tap"}],
         },
     }
     title, rows, raw = device_ui(device)

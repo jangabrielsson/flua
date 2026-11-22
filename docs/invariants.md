@@ -191,6 +191,14 @@ model) and ARCHITECTURE.md (components).
   non-header lines are ignored, `--%%var`/`--%%property` merge per key,
   `--%%file` collects in order.
   *Pinned by:* `tests/test_config.py`, `tests/test_annotations.py`
+- **`--%%u` tabView**: full-width (alone on its row), tabs hold rows in the
+  same shapes as top-level directives; emitted into `uiView` as a
+  full-width row component and into the legacy `$jason` as a section item;
+  `onTabChanged` routes through `uiCallbacks`; `updateView` reaches
+  elements nested inside tabs.
+  *Pinned by:* `tests/test_ui.py::test_tabview_compiles_to_uiview_and_legacy`,
+  `test_tabview_update_view_and_tab_changed_callback`,
+  `tests/test_qa.py::test_example_tabs_updateview_reaches_nested_elements`
 - **The examples are living fixtures** — the test suite runs them; they must
   keep terminating unless their purpose is to run forever.
   *Pinned by:* `tests/test_sleep.py::test_example_*`, `tests/test_qa.py::test_example_*`

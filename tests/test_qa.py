@@ -329,6 +329,29 @@ def test_example_self_test_passes_and_exits_zero() -> None:
     assert "failures: 0" in result.stdout
 
 
+@pytest.mark.asyncio
+async def test_example_tabs_updateview_reaches_nested_elements() -> None:
+    # examples/tabs.lua — the living tabView fixture: its updateView timers
+    # switch activeTab and patch a label INSIDE a tab (the recursive uiView
+    # updateView path), then the run drains cleanly
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        qa_id = engine.load_qa_file(str(REPO_ROOT / "examples" / "tabs.lua"))[0]
+        await wait_until(lambda: not engine.has_pending_work())
+        device, status = engine.api.dispatch("GET", f"/devices/{qa_id}")
+        assert status == 200
+        tv = device["properties"]["uiView"][0]["components"][0]
+        assert tv["type"] == "tabView"
+        assert [t["name"] for t in tv["tabs"]] == ["control", "settings", "about"]
+        assert tv["activeTab"] == "about"  # the 1000ms timer switched it
+        control_rows = tv["tabs"][0]["components"]
+        label = control_rows[0]["components"][0]
+        assert label["text"] == "updated from updateView"  # patched inside the tab
+    finally:
+        await engine.stop()
+
+
 def test_examples_qa_pair_calls_each_other() -> None:
     # examples/qa3.lua + qa4.lua: QAs find each other by name and drive each
     # other through fibaro.call (device actions via the pump).

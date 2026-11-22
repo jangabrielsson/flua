@@ -350,14 +350,28 @@ def plugin_update_view(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     # legacy tree merge above does not cover them)
     ui_view = (dev.get("properties") or {}).get("uiView")
     if isinstance(ui_view, list):
+
+        def _patch(component: dict[str, Any]) -> bool:
+            # walk rows, tabs and nested components so updateView reaches
+            # elements inside a tabView (their names never appear in the
+            # top-level rows)
+            if component.get("name") == component_name:
+                # store an independent copy: the same object must never
+                # live in two state paths — lupa's table_from dedup
+                # breaks on such aliases ('lost reference')
+                component[property_name] = copy.deepcopy(new_value)
+                return True
+            for child in component.get("components") or []:
+                if _patch(child):
+                    return True
+            for tab in component.get("tabs") or []:
+                if _patch(tab):
+                    return True
+            return False
+
         for row in ui_view:
             for comp in row.get("components") or []:
-                if comp.get("name") == component_name:
-                    # store an independent copy: the same object must never
-                    # live in two state paths — lupa's table_from dedup
-                    # breaks on such aliases ('lost reference')
-                    comp[property_name] = copy.deepcopy(new_value)
-                    break
+                _patch(comp)
     if state.is_proxy(dev["id"]) and req.remote is not None:
         # the HC3's /plugins/updateView rejects external callers (400
         # 'The document is empty', live-verified) and cross-QA local calls
@@ -393,6 +407,8 @@ def _merge_view_state(node: Any, view: dict[str, Any]) -> None:
             node[key] = value
     for child in node.get("components") or []:
         _merge_view_state(child, view)
+    for tab in node.get("tabs") or []:
+        _merge_view_state(tab, view)
 
 
 def plugin_get_view(state: SimState, req: ApiRequest) -> tuple[Any, int]:

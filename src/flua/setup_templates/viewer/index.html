@@ -44,6 +44,17 @@
   .device h2 small { color: var(--muted); font-weight: 400; margin-left: 6px; }
   .row { display: flex; gap: 12px; align-items: center; margin: 10px 0; }
   .row > button.ctl { flex: 1 1 0; width: auto; }  /* side-by-side buttons share the row */
+  /* tabView: a tab bar with one panel per tab (the HC3's tabbed views) */
+  .tab-bar { display: flex; gap: 4px; margin: 6px 0 2px; }
+  button.tab {
+    flex: 1 1 0; padding: 8px 10px; border: none; border-radius: 8px;
+    background: transparent; color: var(--muted); cursor: pointer;
+    font: inherit; font-size: 14px;
+  }
+  button.tab.active { background: var(--blue); color: #fff; }
+  button.tab .ctl-icon svg { vertical-align: -4px; }
+  .tab-panels { flex: 1 1 auto; min-width: 0; }
+  .tab-panel.hidden { display: none; }
   .component-label {
     flex: 0 0 110px; color: var(--ink); font-size: 14px;
   }
@@ -335,6 +346,7 @@ function eventFor(component) {
   if (b.onReleased) return "onReleased";
   if (b.onToggled) return "onToggled";
   if (b.onChanged) return "onChanged";
+  if (b.onTabChanged) return "onTabChanged";
   return null;
 }
 
@@ -718,6 +730,56 @@ function renderComponent(device, component, row) {
     control.appendChild(field);
     control.appendChild(panel);
     row.appendChild(control);
+  } else if (t === "tabView") {
+    // a tab bar plus one panel per tab; the tab's components render with
+    // the ordinary rows (the same renderer, nested). The active tab comes
+    // from updateView(activeTab) first, then the local viewer choice, then
+    // the declared default; a tab click stores locally and fires
+    // onTabChanged like the HC3's tabView.
+    name.remove();
+    const tabs = component.tabs || [];
+    const liveActive = live.activeTab;
+    const localActive = uiValues[device.id] && uiValues[device.id][component.name];
+    const active =
+      liveActive !== undefined ? liveActive
+      : localActive !== undefined ? localActive
+      : component.activeTab !== undefined ? component.activeTab
+      : (tabs[0] && tabs[0].name) || "";
+    const bar = document.createElement("div");
+    bar.className = "tab-bar";
+    const panels = document.createElement("div");
+    panels.className = "tab-panels";
+    tabs.forEach((tab, i) => {
+      const header = document.createElement("button");
+      header.type = "button";
+      header.className = "tab" + (tab.name === active ? " active" : "");
+      header.textContent = tab.text || tab.name;
+      withIcon(header, tab.image);
+      header.onclick = () => {
+        // remember locally AND stamp the panel through setComponentValue:
+        // the poll's value key then includes the choice, so the next poll
+        // sees no change and never rebuilds the panel back to the declared
+        // (or server-side) activeTab — the flip-back bug. Then swap the
+        // tabs and panels in place (panel order mirrors tab order).
+        setComponentValue(device, component, tab.name);
+        if (eventFor(component) === "onTabChanged") {
+          uiEvent(device.id, component.name, "onTabChanged", tab.name);
+        }
+        bar.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b === header));
+        panels.querySelectorAll(".tab-panel").forEach((p, j) =>
+          p.classList.toggle("hidden", j !== i));
+        // release focus like the button/switch branches: a focused element
+        // makes the poll skip value refreshes for the whole panel
+        header.blur();
+      };
+      bar.appendChild(header);
+      const panelDiv = document.createElement("div");
+      panelDiv.className = "tab-panel" + (tab.name === active ? "" : " hidden");
+      appendRows(panelDiv, tab.components || [], device);
+      panels.appendChild(panelDiv);
+    });
+    row.appendChild(bar);
+    row.appendChild(panels);
   }
 }
 
@@ -841,6 +903,20 @@ function deviceIconImg(device, className) {
   return img;
 }
 
+// one .row per UI line: components in the same line share it
+// (e.g. two buttons side by side). Used for the top-level rows and for
+// the rows nested inside a tabView's tabs.
+function appendRows(container, rows, device) {
+  for (const uiRow of rows) {
+    const row = document.createElement("div");
+    row.className = "row";
+    for (const component of uiRow.components || []) {
+      renderComponent(device, component, row);
+    }
+    container.appendChild(row);
+  }
+}
+
 function renderDevice(device) {
   const panel = document.createElement("div");
   panel.className = "device";
@@ -884,16 +960,8 @@ function renderDevice(device) {
   // one .row per UI line: components in the same line share it
   // (e.g. two buttons side by side). Embedded rows come first, like the
   // HC3 renders its default view above the QA's custom UI.
-  const appendRow = (uiRow) => {
-    const row = document.createElement("div");
-    row.className = "row";
-    for (const component of uiRow.components || []) {
-      renderComponent(device, component, row);
-    }
-    panel.appendChild(row);
-  };
-  for (const uiRow of embedded ? embedded.uiView : []) appendRow(uiRow);
-  for (const uiRow of props.uiView || []) appendRow(uiRow);
+  appendRows(panel, embedded ? embedded.uiView : [], device);
+  appendRows(panel, props.uiView || [], device);
   // the "log" property: a centered status line at the bottom of the panel
   if (typeof props.log === "string" && props.log.length) {
     const log = document.createElement("div");
@@ -911,20 +979,34 @@ function allRows(device) {
   return [...(embedded ? embedded.uiView : []), ...(props.uiView || [])];
 }
 
+// walk every component of every row, descending into tabView tabs — the
+// structure/value keys must see elements nested inside tabs too
+function walkComponents(rows, fn) {
+  for (const row of rows) {
+    for (const c of row.components || []) {
+      fn(c);
+      if (c.type === "tabView") {
+        for (const tab of c.tabs || []) walkComponents(tab.components || [], fn);
+      }
+    }
+  }
+}
+
 // structure key: re-render the panel only when the UI shape changes,
 // otherwise refresh values in place (keeps slider drags stable)
 function structureKey(device) {
-  return JSON.stringify(allRows(device).map((row) =>
-    (row.components || []).map((c) => {
-      // the option list can change at runtime (updateView "options") —
-      // that is a structure change, the dropdown must rebuild
-      const live = liveState(device, c);
-      return [
-        c.type, c.name, c.action, c.value, c.min, c.max, c.step, c.disabled, c.calls, c.unit,
-        live.options !== undefined ? live.options : (c.options || null),
-      ];
-    })
-  ));
+  const parts = [];
+  walkComponents(allRows(device), (c) => {
+    // the option list can change at runtime (updateView "options") —
+    // that is a structure change, the dropdown must rebuild
+    const live = liveState(device, c);
+    parts.push([
+      c.type, c.name, c.action, c.value, c.min, c.max, c.step, c.disabled, c.calls, c.unit,
+      live.options !== undefined ? live.options : (c.options || null),
+      c.type === "tabView" ? (c.tabs || []).map((t) => t.name + ":" + t.text) : null,
+    ]);
+  });
+  return JSON.stringify(parts);
 }
 
 // value key: the panel's rendered state — component values (live state,
@@ -933,7 +1015,7 @@ function structureKey(device) {
 // alone.
 function valueKey(device) {
   const props = device.properties || {};
-  return JSON.stringify([
+  const parts = [
     props.log || "",
     // health changes (dead/battery/icon/value/state) must refresh the
     // panel title and its icon too
@@ -943,17 +1025,17 @@ function valueKey(device) {
     props.deviceIcon,
     props.value,
     props.state,
-    allRows(device).flatMap((row) =>
-      (row.components || []).map((c) => {
-        const live = liveState(device, c);
-        return [
-          c.name,
-          componentValue(device, c),
-          live.text !== undefined ? live.text : c.text,
-        ];
-      })
-    ),
-  ]);
+  ];
+  walkComponents(allRows(device), (c) => {
+    const live = liveState(device, c);
+    parts.push([
+      c.name,
+      componentValue(device, c),
+      live.text !== undefined ? live.text : c.text,
+      c.type === "tabView" ? live.activeTab : null,
+    ]);
+  });
+  return JSON.stringify(parts);
 }
 
 // render + stamp the panel with its device id, structure key and value key —
