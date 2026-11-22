@@ -1016,6 +1016,38 @@ libraries) can stay out of the package: plain Lua `require("name")` finds
 `name.lua` next to the main file at runtime, and require'd files are never
 packaged.
 
+## Classes (`class`)
+
+`class(name)` is the HC3's Lua class helper — flua implements the HC3's
+(undocumented) contract, which matters when you port QAs that build their
+own class hierarchies (the Fibaro manual documents `net.HTTPClient` and
+friends but never `class` itself). The contract:
+
+- `class("X")` installs the class object as the global `X` and **returns
+  the parent-setter, not the class**. To get the class object itself,
+  read it back — real-HC3 QAs do the same dance, so this is HC3 behavior,
+  not a flua quirk:
+
+  ```lua
+  class 'MyDevice'(QuickApp)   -- the returned function sets the parent
+  local MyDevice = _G.MyDevice -- the class object
+  ```
+
+- Instantiation asserts the class defines its **own `__init`** — a parent's
+  `__init` is not inherited. Every subclass declares its own and chains the
+  parent explicitly:
+
+  ```lua
+  class 'A'
+  function A:__init(v) self.v = v end
+  class 'B'(A)
+  function B:__init(v) A.__init(self, v) end  -- no implicit inheritance
+  local b = B(42)
+  ```
+
+  Methods *are* inherited (the class metatable's `__index` chain) — only
+  the constructor must be redeclared per class.
+
 ## The offline HC3
 
 ### Online mode — the real HC3
@@ -1578,6 +1610,28 @@ contract is therefore the reverse one: a QA that stays inside the HC3's
 sandbox surface runs the same in flua; flua-only conveniences must be
 guarded, or the QA stays emulator-bound.
 
+### Loading files into a QA's environment
+
+flua keeps the loaders the HC3 nils, but which environment a loaded file
+runs in is easy to get wrong. Inside a QA, the QA's `_G` **is** its own
+environment (`fibaro`/`api`/`net` live there); the *shared* runtime `_G`
+has none of them. Which one each loader uses:
+
+- `require("name")` — rebound per QA: the file loads and runs in the QA's
+  own environment, so it can use `fibaro`, timers, `net.*Server` directly.
+- `dofile(path)` — rebound per QA the same way (flua-only: the HC3 nils
+  it). A dofile'd file behaves like a `--%%file` include, but is never
+  packaged.
+- `_FLUA.loadFile(path)` — the sanctioned loader for harness/test code that
+  drives a QA's real files at runtime. Returns a chunk bound to the QA's
+  environment (call it to run): same env as `dofile`, but explicit, so
+  tooling never needs to know about the `_G` aliasing.
+- Raw `load`/`loadfile` — stock: with no env they compile against the
+  shared runtime `_G`, where `fibaro`/`api`/`net` are **nil**. To run a
+  loaded file with QA globals, pass the QA's own `_G`:
+  `loadfile(path, "bt", _G)`. (On the real HC3 all of these are nil; any
+  use of them is flua-only.)
+
 Or let flua talk to the HC3 directly with the `--tool` (alias `-t`)
 commands — they package/unpack for you, so you develop in the unpacked
 format (individual `.lua` files) and only the HC3 sees `.fqa`:
@@ -2037,6 +2091,10 @@ live on `_FLUA` so your code stays portable:
   exit clears it. The bundled sim devices call it in `onInit` (no
   `setInterval` hack needed)
 - `_FLUA.qa(id)` — another QA's QuickApp instance (lupa proxy)
+- `_FLUA.loadFile(path)` — load a Lua file and return a chunk bound to this
+  QA's environment (`fibaro`/`api`/`net` visible inside): the sanctioned
+  runtime loader for harness and test code; `dofile` does the same
+  implicitly, `load`/`loadfile` need the QA's `_G` passed explicitly
 - `_FLUA.loadQAfromFile(path, directives?)` / `_FLUA.loadQAfromString(code, directives?)` — dynamic QA loading; `directives` is an optional table of directive strings added to the loaded QA's config
 - `_FLUA.loadFQAfromFile(path, directives?)` — like `loadQAfromFile` for a
   `.fqa` package: unpacks it to a temp dir first (the CLI's pipeline),

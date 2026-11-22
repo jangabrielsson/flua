@@ -194,6 +194,43 @@ def test_qa_g_aliases_its_own_environment(tmp_path) -> None:
     assert "B nil" in result.stdout  # writes never leak into another QA
 
 
+def test_qa_dofile_and_loadfile_run_in_qa_env(tmp_path) -> None:
+    # dofile is rebound per QA (like require): a dofile'd file runs in the
+    # QA's own environment and sees its globals. _FLUA.loadFile(path) is
+    # the sanctioned loader for harness code — it returns a chunk bound to
+    # the QA env. Raw load/loadfile still compile with the shared _G,
+    # where fibaro/api/net are nil (pass the QA's _G explicitly there).
+    a = tmp_path / "a.lua"
+    a.write_text(
+        "--%%name:loader_env\n"
+        "local lib = _FLUA.mainPath .. 'lib.lua'\n"
+        "local f = io.open(lib, 'w')\n"
+        "f:write(\"print('LIB', fibaro ~= nil, api ~= nil, net ~= nil)\\n\")\n"
+        "f:close()\n"
+        "print('QA', fibaro ~= nil, api ~= nil)\n"
+        "dofile(lib)\n"
+        "local chunk = _FLUA.loadFile(lib)\n"
+        "print('CHUNK', type(chunk))\n"
+        "chunk()\n"
+        "local raw = load(\"print('RAW', tostring(fibaro))\", 't')\n"
+        "raw()\n"
+        "os.remove(lib)\n"
+        "exit(0)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "flua", "--api", "local", str(a)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "QA true true" in result.stdout
+    assert result.stdout.count("LIB true true true") == 2  # dofile + _FLUA.loadFile
+    assert "CHUNK function" in result.stdout
+    assert "RAW\tnil" in result.stdout  # raw load still compiles with the shared _G
+
+
 @pytest.mark.asyncio
 async def test_bundled_library_dollar_files(tmp_path, capsys) -> None:
     # --%%file:$name.lua loads a library bundled WITH flua

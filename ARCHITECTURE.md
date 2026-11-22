@@ -139,7 +139,10 @@ src/flua/
   through the same sanitizer before `_PY.log`.
 - **Per-QA environments.** Each QA gets its own `_FLUA` (qaId/config/arg)
   whose metatable falls through to the shared engine table; runtime libs
-  are loaded into the QA's env before its code.
+  are loaded into the QA's env before its code. `require` and `dofile` are
+  rebound per QA so loaded files run in the QA's env (`_FLUA.loadFile` is
+  the chunk-returning form); raw `load`/`loadfile` still compile against
+  the shared `_G`.
 - **Bootstrap.** `startQaInEnv` is the shared QA boot: merge `.flua.lua`,
   evaluate `--%%var` expressions (`load("return "..expr, nil, "t", {config, os})`),
   load extra files, pcall the chunk, construct the QuickApp instance.

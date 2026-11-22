@@ -957,6 +957,15 @@ local function qaEnvFor(qaId)
     return env.package.loaded[name]
   end
   env.require = qaRequire
+  -- dofile: stock dofile loads with the DEFAULT environment (the shared
+  -- _G) — a dofile'd file could never see this QA's globals (fibaro, api,
+  -- net, setInterval...), the same trap require has. Rebind it like
+  -- require: the chunk runs in THIS QA's env, so a dofile'd file behaves
+  -- like a --%%file include. (load/loadfile stay stock — pass the QA's own
+  -- _G explicitly: loadfile(path, "bt", _G).)
+  env.dofile = function(filename)
+    return assert(loadfile(filename, "bt", env))()
+  end
   return env
 end
 
@@ -1061,6 +1070,13 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
         url = url .. "&value=" .. tostring(value)
       end
       return env.api.get(url)
+    end,
+    -- loadFile(path): load a Lua file and return a chunk bound to THIS QA's
+    -- env — the sanctioned loader for harness/test code that drives a QA's
+    -- real files at runtime. (Raw loadfile compiles with the shared _G,
+    -- where fibaro/api/net are nil; a loadFile chunk sees the QA globals.)
+    loadFile = function(path)
+      return assert(loadfile(path, "bt", env))
     end,
     -- keepAlive(): keep this QA (and with it the run) alive past idle — no
     -- setInterval hack needed. The engine counts the flag in its

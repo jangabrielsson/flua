@@ -171,6 +171,13 @@ model) and ARCHITECTURE.md (components).
 - **QAs are isolated**: per-QA environments, globals, and timers; a QA's
   `x = ...` never leaks into another.
   *Pinned by:* `tests/test_qa.py::test_qa_environments_are_isolated`
+- **A QA's loaders run loaded code in the QA's own environment**: `require`
+  and `dofile` are rebound per QA (a dofile'd file sees `fibaro`/`api`/`net`,
+  like a `--%%file` include), and `_FLUA.loadFile(path)` returns a chunk
+  bound to the QA's env. Raw `load`/`loadfile` with no env still compile
+  against the shared runtime `_G` (HC3 globals nil there) — pass the QA's
+  own `_G` explicitly.
+  *Pinned by:* `tests/test_qa.py::test_qa_dofile_and_loadfile_run_in_qa_env`
 - **`flua-test` assertions are inert without flua** — shipped to a real HC3,
   every assertion is a no-op and `finish()` returns 0.
   *Pinned by:* `tests/test_agent_dx.py::test_flua_test_noop_without_flua_runtime`
