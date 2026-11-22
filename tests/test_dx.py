@@ -123,6 +123,30 @@ def test_check_flags_deprecated_api() -> None:
         assert "deprecated API: GET /quickApp/export/5000" in result.stdout
 
 
+def test_check_flags_v2_ui_elements_without_use_ui_view() -> None:
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        script = Path(d) / "v2.lua"
+        script.write_text(
+            "--%%u:{tabView=\"main\",activeTab=\"a\",tabs={}}\n"
+            "--%%u:{collapsible=\"c\",components={}}\n"
+        )
+        result = _run("--check", str(script))
+        assert result.returncode == 0
+        assert "v2 UI element 'tabView' declared without --%%useUiView:true" in result.stdout
+        assert "v2 UI element 'collapsible' declared without --%%useUiView:true" in result.stdout
+        # declared with useUiView: the findings go away
+        script.write_text(
+            "--%%useUiView:true\n"
+            "--%%u:{tabView=\"main\",activeTab=\"a\",tabs={}}\n"
+            "--%%u:{collapsible=\"c\",components={}}\n"
+        )
+        result = _run("--check", str(script))
+        assert result.returncode == 0
+        assert "v2 UI element" not in result.stdout
+
+
 def test_version_machine_json() -> None:
     # --version --machine: one JSON line agents/installers can probe
     result = _run("--version", "--machine")

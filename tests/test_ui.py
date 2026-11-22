@@ -334,6 +334,75 @@ def test_tabview_must_sit_alone_on_row() -> None:
         compile_ui(rows, 5000)
 
 
+def test_image_and_collapsible_compile() -> None:
+    rows = [
+        [
+            {"image": "art", "url": "http://example.com/a.png", "useProxy": True},
+            {"button": "b", "text": "Go", "onReleased": "go"},
+        ],
+        {
+            "collapsible": "favs",
+            "text": "Favorites",
+            "collapsed": False,
+            "disabled": False,
+            "components": [[{"button": "play", "text": "Play", "onReleased": "play"}]],
+        },
+    ]
+    ui = compile_ui(rows, 5000)
+    # uiView: the image rides inline in the shared row; the collapsible is
+    # full-width (alone on its row) and holds uiView rows
+    row0 = ui["uiView"][0]["components"]
+    assert [c["type"] for c in row0] == ["image", "button"]
+    img = row0[0]
+    assert img["name"] == "art" and img["url"] == "http://example.com/a.png"
+    assert img["useProxy"] is True
+    col = ui["uiView"][1]["components"][0]
+    assert col["type"] == "collapsible" and col["name"] == "favs"
+    assert col["text"] == "Favorites" and col["collapsed"] is False
+    assert col["components"][0]["components"][0]["type"] == "button"
+    # legacy: collapsible item + the image inside the shared legacy row
+    # (a vertical row wrapping the horizontal image+button line)
+    items = ui["viewLayout"]["$jason"]["body"]["sections"]["items"]
+    assert items[0]["type"] == "vertical"
+    inner = items[0]["components"][0]
+    assert inner["type"] == "horizontal"
+    assert [c["type"] for c in inner["components"]] == ["image", "button"]
+    assert items[1]["type"] == "collapsible"
+    assert items[1]["components"][0]["components"][0]["type"] == "button"
+    # callbacks: the button inside the collapsible routes like a top-level one
+    assert {"callback": "play", "eventType": "onReleased", "name": "play"} in ui[
+        "uiCallbacks"
+    ]
+
+
+def test_collapsible_must_sit_alone_on_row() -> None:
+    rows = [[{"collapsible": "c", "components": []}, {"button": "b", "text": "x"}]]
+    with pytest.raises(ValueError, match="alone"):
+        compile_ui(rows, 5000)
+
+
+def test_image_and_collapsible_roundtrip() -> None:
+    rows = [
+        [{"image": "art", "url": "http://example.com/a.png"}],
+        {
+            "collapsible": "favs",
+            "text": "Favorites",
+            "collapsed": True,
+            "components": [[{"button": "play", "text": "Play", "onReleased": "play"}]],
+        },
+    ]
+    ui = compile_ui(rows, 5000)
+    from flua.config import parse_lua_literal
+
+    out = ui_to_u_rows(ui_view=ui["uiView"], ui_callbacks=ui["uiCallbacks"])
+    parsed = [parse_lua_literal(row) for row in out]
+    assert parsed[0] == {"image": "art", "url": "http://example.com/a.png"}
+    col = parsed[1]
+    assert col["collapsible"] == "favs" and col["text"] == "Favorites"
+    assert col["collapsed"] is True
+    assert col["components"] == [[{"button": "play", "text": "Play", "onReleased": "play"}]]
+
+
 def test_tabview_roundtrip() -> None:
     rows = [
         {
@@ -495,6 +564,42 @@ async def test_tabview_update_view_and_tab_changed_callback(tmp_path, capsys) ->
         )
         await asyncio.sleep(0.4)
         assert "TAB b" in capsys.readouterr().out
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_image_and_collapsible_update_view(tmp_path) -> None:
+    # updateView patches elements inside a collapsible body (the recursive
+    # uiView walk) and the image's url — both through the same channel
+    script = tmp_path / "img_col.lua"
+    script.write_text(
+        "--%%u:{image=\"art\",url=\"http://example.com/a.png\"}\n"
+        "--%%u:{collapsible=\"favs\",text=\"Favorites\",components={{{label=\"lbl\",text=\"Hi\"}}}}\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        qa_id = engine.load_qa_file(str(script))[0]
+        for name, prop, value in (
+            ("lbl", "text", "Live!"),
+            ("art", "url", "http://example.com/b.png"),
+            ("favs", "collapsed", True),
+        ):
+            status = engine.api.dispatch(
+                "POST",
+                "/plugins/updateView",
+                {"deviceId": qa_id, "componentName": name, "propertyName": prop, "newValue": value},
+            )[1]
+            assert status == 204
+        device, _ = engine.api.dispatch("GET", f"/devices/{qa_id}")
+        ui_view = device["properties"]["uiView"]
+        img = ui_view[0]["components"][0]
+        assert img["url"] == "http://example.com/b.png"
+        col = ui_view[1]["components"][0]
+        assert col["collapsed"] is True
+        label = col["components"][0]["components"][0]
+        assert label["text"] == "Live!"  # reached inside the collapsible body
     finally:
         await engine.stop()
 

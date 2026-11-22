@@ -242,6 +242,26 @@ def check_source(
                     column,
                 )
             )
+    # v2 UI elements need the uiView format on the real HC3: the app draws
+    # tabView/collapsible only from uiView, and a QA exported with the
+    # default legacy layout ships no uiView — the view comes out blank.
+    # (flua's own viewer renders them either way.)
+    if not bool(annotations.get("useUiView")):
+        for key in ("tabView", "collapsible"):
+            pattern = rf"^--%%u:[^\n]*\b{key}\s*="
+            for match in re.finditer(pattern, source, re.MULTILINE):
+                line, column = _line_col(source, match.start())
+                findings.append(
+                    finding(
+                        name,
+                        "warning",
+                        f"v2 UI element {key!r} declared without --%%useUiView:true — "
+                        "on the real HC3 the app renders it only from the uiView "
+                        "format (the legacy $jason view comes out blank)",
+                        line,
+                        column,
+                    )
+                )
     return findings
 
 

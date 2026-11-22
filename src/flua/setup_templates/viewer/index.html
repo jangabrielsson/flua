@@ -53,8 +53,25 @@
   }
   button.tab.active { background: var(--blue); color: #fff; }
   button.tab .ctl-icon svg { vertical-align: -4px; }
+  /* tabView/collapsible holders: the row is a flex line — the wrapper
+     stacks its children vertically so the bar/header sits ABOVE the body */
+  .tabview, .collapsible { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
   .tab-panels { flex: 1 1 auto; min-width: 0; }
   .tab-panel.hidden { display: none; }
+  /* image: the HC3's picture elements (album art, intercom frames) */
+  img.ctl-image { max-width: 100%; border-radius: 10px; display: block; margin: 0 auto; }
+  /* collapsible: a header toggling a body of rows (the sonosGroup shape) */
+  button.collapsible-header {
+    display: block; width: 100%; text-align: left; background: none;
+    border: 1px solid var(--line); border-radius: 10px; color: var(--ink);
+    padding: 10px 14px; cursor: pointer; font: inherit; font-size: 15px;
+    margin-bottom: 4px;
+  }
+  button.collapsible-header::after {
+    content: "\25BE"; float: right; color: var(--muted);
+  }
+  button.collapsible-header.collapsed::after { content: "\25B8"; }
+  .collapsible-body.hidden { display: none; }
   .component-label {
     flex: 0 0 110px; color: var(--ink); font-size: 14px;
   }
@@ -749,6 +766,10 @@ function renderComponent(device, component, row) {
     bar.className = "tab-bar";
     const panels = document.createElement("div");
     panels.className = "tab-panels";
+    const holder = document.createElement("div");
+    holder.className = "tabview";  // column: the bar sits above the panels
+    holder.appendChild(bar);
+    holder.appendChild(panels);
     tabs.forEach((tab, i) => {
       const header = document.createElement("button");
       header.type = "button";
@@ -778,8 +799,57 @@ function renderComponent(device, component, row) {
       appendRows(panelDiv, tab.components || [], device);
       panels.appendChild(panelDiv);
     });
-    row.appendChild(bar);
-    row.appendChild(panels);
+    row.appendChild(holder);
+  } else if (t === "image") {
+    // an <img> from the url property (live-updatable via updateView "url");
+    // templated {{device.properties.x}} urls are resolved by the HC3
+    // client — the viewer renders the raw string, and a failed load
+    // removes the image like the device icons do
+    name.remove();
+    const url = live.url !== undefined ? live.url : component.url;
+    if (url) {
+      const img = document.createElement("img");
+      img.className = "ctl-image";
+      img.alt = component.name || "";
+      img.src = String(url);
+      img.onerror = () => img.remove();
+      row.appendChild(img);
+    }
+  } else if (t === "collapsible") {
+    // a header toggling a body of rows. State: updateView "collapsed"
+    // first, then the local viewer choice, then the declared default —
+    // stamped through setComponentValue like the tabView's activeTab, so
+    // the poll never re-collapses the panel the user just opened.
+    name.remove();
+    const liveCollapsed = live.collapsed;
+    const localCollapsed = uiValues[device.id] && uiValues[device.id][component.name];
+    const collapsedNow =
+      liveCollapsed !== undefined ? liveCollapsed
+      : localCollapsed !== undefined ? localCollapsed
+      : (component.collapsed === true);
+    const header = document.createElement("button");
+    header.type = "button";
+    header.className = "collapsible-header" + (collapsedNow ? " collapsed" : "");
+    header.textContent = component.text || component.name;
+    header.disabled = component.disabled === true;
+    const body = document.createElement("div");
+    body.className = "collapsible-body" + (collapsedNow ? " hidden" : "");
+    appendRows(body, component.components || [], device);
+    header.onclick = () => {
+      // toggle from the CURRENT DOM state, never a render-time snapshot:
+      // collapsedNow is computed once at render, so a second click would
+      // re-toggle to the same value (the "works once per load" bug)
+      const next = !header.classList.contains("collapsed");
+      setComponentValue(device, component, next);
+      header.classList.toggle("collapsed", next);
+      body.classList.toggle("hidden", next);
+      header.blur();
+    };
+    const holder = document.createElement("div");
+    holder.className = "collapsible";  // column: the header sits above the body
+    holder.appendChild(header);
+    holder.appendChild(body);
+    row.appendChild(holder);
   }
 }
 
@@ -979,14 +1049,17 @@ function allRows(device) {
   return [...(embedded ? embedded.uiView : []), ...(props.uiView || [])];
 }
 
-// walk every component of every row, descending into tabView tabs — the
-// structure/value keys must see elements nested inside tabs too
+// walk every component of every row, descending into tabView tabs and
+// collapsible bodies — the structure/value keys must see elements nested
+// there too
 function walkComponents(rows, fn) {
   for (const row of rows) {
     for (const c of row.components || []) {
       fn(c);
       if (c.type === "tabView") {
         for (const tab of c.tabs || []) walkComponents(tab.components || [], fn);
+      } else if (c.type === "collapsible") {
+        walkComponents(c.components || [], fn);
       }
     }
   }
@@ -1032,7 +1105,7 @@ function valueKey(device) {
       c.name,
       componentValue(device, c),
       live.text !== undefined ? live.text : c.text,
-      c.type === "tabView" ? live.activeTab : null,
+      c.type === "tabView" ? live.activeTab : c.type === "collapsible" ? live.collapsed : null,
     ]);
   });
   return JSON.stringify(parts);

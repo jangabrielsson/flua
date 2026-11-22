@@ -27,7 +27,17 @@ from typing import Any
 # Per-element weight by row size in the uiView format (the exact table).
 _UI_VIEW_WEIGHTS = {1: "1.0", 2: "0.5", 3: "0.25", 4: "0.33", 5: "0.20"}
 
-_ELEMENT_KEYS = ("button", "slider", "label", "select", "switch", "multi", "tabView")
+_ELEMENT_KEYS = (
+    "button",
+    "slider",
+    "label",
+    "select",
+    "switch",
+    "multi",
+    "tabView",
+    "image",
+    "collapsible",
+)
 
 
 def compile_ui(rows: list[Any], device_id: int) -> dict[str, Any]:
@@ -58,8 +68,10 @@ def _apply_defaults(rows: list[list[dict[str, Any]]]) -> None:
     """extendUI port: normalize every element (type/id/text/visible defaults,
     stringified slider bounds, switch value)."""
     for row in rows:
-        if len(row) > 1 and any("tabView" in el for el in row):
-            raise ValueError("a tabView must sit alone on its --%%u row (it is full-width)")
+        if len(row) > 1 and any(k in el for el in row for k in ("tabView", "collapsible")):
+            raise ValueError(
+                "a tabView/collapsible must sit alone on its --%%u row (it is full-width)"
+            )
     for row in rows:
         for el in row:
             typ = _type_of(el)
@@ -118,12 +130,32 @@ def _apply_defaults(rows: list[list[dict[str, Any]]]) -> None:
                 el["tabs"] = tabs
                 el.setdefault("activeTab", tabs[0]["name"] if tabs else "")
                 el["weight"] = "1.0"
-    # elements inside tabs normalize exactly like top-level ones
+            elif typ == "image":
+                el.setdefault("url", "")
+                el.setdefault("visible", True)
+            elif typ == "collapsible":
+                # a collapsible section holds rows exactly like a tab does
+                el.setdefault("collapsed", False)
+                el.setdefault("disabled", False)
+                el.setdefault("visible", True)
+                el.setdefault("text", "")
+                body_rows: list[list[dict[str, Any]]] = []
+                for raw_row in el.get("components") or []:
+                    if isinstance(raw_row, list):
+                        body_rows.append([dict(e) for e in raw_row])
+                    else:
+                        body_rows.append([dict(raw_row)])
+                el["rows"] = body_rows
+                el["weight"] = "1.0"
+    # elements inside tabs and collapsibles normalize exactly like
+    # top-level ones
     for row in rows:
         for el in row:
             if el["type"] == "tabView":
                 for tab in el["tabs"]:
                     _apply_defaults(tab["rows"])
+            elif el["type"] == "collapsible":
+                _apply_defaults(el["rows"])
 
 
 def _callbacks(rows: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
@@ -160,6 +192,10 @@ def _callbacks(rows: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
                 )
                 for tab in el["tabs"]:
                     callbacks.extend(_callbacks(tab["rows"]))
+            elif typ == "collapsible":
+                # no events of its own: elements inside it route like
+                # top-level ones
+                callbacks.extend(_callbacks(el["rows"]))
     return callbacks
 
 
@@ -228,6 +264,21 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
         if el.get("unit"):
             element["unit"] = el["unit"]
         return element
+    if typ == "image":
+        # the HC3's own legacy views carry image elements (russound's
+        # album art in json/view.json): url + useProxy, no events
+        element = {
+            "name": name,
+            "visible": el.get("visible", True),
+            "url": el["url"],
+            "style": {"weight": style_weight},
+            "type": "image",
+        }
+        if el.get("useProxy"):
+            element["useProxy"] = True
+        if el.get("classes"):
+            element["classes"] = list(el["classes"])
+        return element
     # label
     return {
         "name": name,
@@ -276,15 +327,34 @@ def _layout_tabview(el: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _layout_collapsible(el: dict[str, Any]) -> dict[str, Any]:
+    """One legacy viewLayout collapsible item (the sonosGroup v2 shape,
+    minus event fields — the legacy convention, see _layout_element)."""
+    return {
+        "type": "collapsible",
+        "name": el["id"],
+        "text": el["text"],
+        "collapsed": el["collapsed"],
+        "disabled": el["disabled"],
+        "visible": el.get("visible", True),
+        "style": {"weight": "1"},
+        "components": [_layout_row(row) for row in el["rows"]],
+    }
+
+
 def _view_layout(rows: list[list[dict[str, Any]]], device_id: int) -> dict[str, Any]:
     """mkViewLayout port: the legacy ``$jason`` structure."""
     title = f"quickApp_device_{device_id}"
-    items = [
-        _layout_tabview(row[0])
-        if len(row) == 1 and row[0]["type"] == "tabView"
-        else _layout_row(row)
-        for row in rows
-    ]
+
+    def _item(row: list[dict[str, Any]]) -> dict[str, Any]:
+        if len(row) == 1:
+            if row[0]["type"] == "tabView":
+                return _layout_tabview(row[0])
+            if row[0]["type"] == "collapsible":
+                return _layout_collapsible(row[0])
+        return _layout_row(row)
+
+    items = [_item(row) for row in rows]
     return {
         "$jason": {
             "body": {
@@ -349,6 +419,12 @@ def _ui_view_component(el: dict[str, Any], weight: str) -> dict[str, Any]:
         component["selectionType"] = "single" if typ == "select" else "multi"
     if typ == "switch":
         component["value"] = el["value"]
+    if typ == "image":
+        component["url"] = el["url"]
+        if el.get("useProxy"):
+            component["useProxy"] = True
+        if el.get("classes"):
+            component["classes"] = list(el["classes"])
     # the 5.221 element properties the viewer renders: named icons,
     # switch hints, disabled state, slider units
     for key in ("image", "hint", "disabled"):
@@ -395,20 +471,36 @@ def _ui_view_tabview(el: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _ui_view_collapsible(el: dict[str, Any]) -> dict[str, Any]:
+    """One uiView collapsible component: a named section holding uiView
+    rows (the sonosGroup v2 shape — collapsed/disabled toggles the body)."""
+    return {
+        "type": "collapsible",
+        "name": el["id"],
+        "text": el["text"],
+        "collapsed": el["collapsed"],
+        "disabled": el["disabled"],
+        "visible": el.get("visible", True),
+        "style": {"weight": "1"},
+        "components": [_ui_view_row(row) for row in el["rows"]],
+    }
+
+
 def _ui_view(rows: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
     """UI2NewUiView port: the new component format."""
     out: list[dict[str, Any]] = []
     for row in rows:
-        if len(row) == 1 and row[0]["type"] == "tabView":
-            # a tabView is full-width: it must sit alone on its row (the
-            # compile raises otherwise) — still wrapped in a row so every
-            # uiView entry keeps the uniform row shape (the viewer and the
-            # inverse both iterate row.components)
+        if len(row) == 1 and row[0]["type"] in ("tabView", "collapsible"):
+            # full-width elements: alone on their row (the compile raises
+            # otherwise) — still wrapped in a row so every uiView entry
+            # keeps the uniform row shape (the viewer and the inverse both
+            # iterate row.components)
+            builder = _ui_view_tabview if row[0]["type"] == "tabView" else _ui_view_collapsible
             out.append(
                 {
                     "style": {"weight": "1.0"},
                     "type": "horizontal",
-                    "components": [_ui_view_tabview(row[0])],
+                    "components": [builder(row[0])],
                 }
             )
         else:
@@ -518,6 +610,32 @@ def _element(component: dict[str, Any], callbacks: dict[str, dict[str, str]]) ->
             element["value"] = component["values"][0]
         if event_target("onToggled"):
             element["onToggled"] = event_target("onToggled")
+    elif typ == "image":
+        element = {"image": name, "url": str(component.get("url") or "")}
+        if component.get("useProxy") is True:
+            element["useProxy"] = True
+        if isinstance(component.get("classes"), list):
+            element["classes"] = list(component["classes"])
+    elif typ == "collapsible":
+        # the body comes back as rows re-mapped through _element
+        body_rows: list[list[dict[str, Any]]] = []
+        for row in component.get("components") or []:
+            if not isinstance(row, dict):
+                continue
+            elements = [
+                _element(inner, callbacks)
+                for inner in row.get("components") or []
+                if isinstance(inner, dict)
+            ]
+            if elements:
+                body_rows.append(elements)
+        element = {
+            "collapsible": name,
+            "text": text,
+            "collapsed": component.get("collapsed") is True,
+            "disabled": component.get("disabled") is True,
+            "components": body_rows,
+        }
     elif typ == "tabView":
         # tabs come back with their rows re-mapped through _element (a tab's
         # components are uiView/legacy rows, not flat elements)

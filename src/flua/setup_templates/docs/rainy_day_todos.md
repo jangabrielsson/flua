@@ -310,3 +310,18 @@ whitelisted — would have caught three real bugs statically (an undefined
 static-analysis pass over compiled bytecode (a mini-linter), not a patch;
 the runtime `--%%warn:stubApi`/`bridge-debug` channels catch the dynamic
 half meanwhile.
+
+## UI `list` element + `onElementReleased` (HC3 plugin-view scan, 2026-11-22)
+
+- **What**: the sonosGroup v2 view's data-bound `list` — `data` (client-
+  populated), an item template in `components` using `{{data.<field>}}`
+  templating (text, image urls, per-item `visible`), `classes:["dividers"]`,
+  and the `onElementReleased` event binding with `{{data.<field>}}` action
+  args (e.g. `playFavoriteItem` ← `{{data.favoriteId}}`).
+- **Why parked**: only one plugin uses it, and the `data` channel is
+  client-populated in a way not observable offline — implementing it
+  without a live-HC3 data contract risks building the wrong half.
+  `image`/`collapsible` (which 13+ plugins use) shipped first.
+- **Pinning test**: a list QA driven through the viewer (data push,
+  item tap → onElementReleased callback) once the contract is captured
+  against a live HC3.

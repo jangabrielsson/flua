@@ -663,14 +663,61 @@ QuickApp methods. `useUiView` (default `false`) selects the new format:
 ```
 
 Elements: `label`, `button`, `slider`, `switch`, `select`, `multi`,
-`tabView`. Callbacks (`onReleased`, `onChanged`, `onToggled`, …) name
-QuickApp methods; sliders take `min`/`max`/`step`/`value`, selects and
-multis take `options` (each `{type='option',text=…,value=…}`) plus
-`value`/`values`. Values in the directive are Lua literals — strings need
-quotes, numbers and `true`/`false` don't. Long rows may continue on
-following comment lines. At runtime the device's `properties.viewLayout`,
-`properties.uiView`, and `properties.uiCallbacks` hold the generated
-structures, and `self:updateView(elm, prop, value)` updates them.
+`tabView`, `image`, `collapsible`. Callbacks (`onReleased`, `onChanged`,
+`onToggled`, …) name QuickApp methods; sliders take
+`min`/`max`/`step`/`value`, selects and multis take `options` (each
+`{type='option',text=…,value=…}`) plus `value`/`values`. Values in the
+directive are Lua literals — strings need quotes, numbers and `true`/`false`
+don't. Long rows may continue on following comment lines. At runtime the
+device's `properties.viewLayout`, `properties.uiView`, and
+`properties.uiCallbacks` hold the generated structures, and
+`self:updateView(elm, prop, value)` updates them.
+
+`tabView` and `collapsible` are **v2 elements**. On the real HC3 the app
+renders them only from the `uiView` format — a QA using either must
+declare `--%%useUiView:true` (live-verified on 5.221 for both; the legacy
+`$jason` renderer draws neither, leaving a full-width-only view blank).
+flua's own viewer renders them regardless of `useUiView` — the
+requirement is about the HC3 app.
+
+Neither is editable on the HC3: the web UI editor doesn't know the
+elements, so it cannot edit them and an edit there can rewrite the view
+and drop them. Keep tabbed/collapsible QAs flua-authored and update them
+with `--tool updateQA`/`uploadQA`.
+
+An `image` shows a picture from its `url` (live-updatable via
+`updateView(elm, "url", …)`; the HC3's own legacy views carry them, e.g.
+russound's album art). It sits inline in a row like a button:
+
+```lua
+--%%u:{image="albumArt",url="http://host/art.png"}
+```
+
+On the real HC3, `{{device.properties.x}}` templated urls and `useProxy`
+are resolved by the app client; flua's viewer renders the raw url. The
+viewer loads whatever a browser `<img>` can — including `data:` URIs, so
+inline SVGs work there (utf8 or base64). The HC3 app's image element
+renders **no** data URIs (utf8 and base64 both placeholders — live-verified
+5.221); the label route (`self:updateView(lbl, "text", '<img
+src="data:image/svg+xml;base64,…" />')`) works on the HC3 only in the
+**legacy v1 view** (`useUiView` false), not in uiView/v2 — so a tabbed
+(v2) QA cannot use inline SVG art on the app and serves its art over
+http(s) instead. A
+`collapsible` is a full-width section header that expands/collapses its
+rows (the sonosGroup shape) — it must sit alone on its row, takes `text`,
+`collapsed`/`disabled`, and its own list of rows:
+
+```lua
+--%%u:{collapsible="favs",text="Favorites",collapsed=false,components={
+--  {{button="play",text="Play",onReleased="play"}}
+--}}
+```
+
+`self:updateView("favs", "collapsed", true)` collapses it at runtime;
+the viewer toggles it on click (no event — it is client-side state, like
+on the HC3). A v2 element — on the real HC3 it needs `--%%useUiView:true`
+like `tabView` (see the note above). See `examples/ui-extras.lua` for a
+runnable demo of both.
 
 A `tabView` groups rows under named tabs. It is full-width — it must sit
 alone on its row. Tabs take `name` and `text` plus their own list of rows
@@ -694,11 +741,8 @@ runtime; the viewer also switches tabs on click (sending `onTabChanged`
 when declared). See `examples/tabs.lua` for a runnable demo. The tabView
 travels in BOTH output structures — a single item in the legacy `$jason`
 body (the shape the HC3's own tabbed views use, e.g. the sonosGroup plugin)
-and a full-width component in `uiView`.
-
-On the real HC3 the app draws the tabView from the `uiView` format — a
-tabbed QA must declare `--%%useUiView:true` (live-verified on 5.221; the
-legacy `$jason` renderer leaves a tabView-only view blank).
+and a full-width component in `uiView`. A v2 element — on the real HC3 it
+needs `--%%useUiView:true` (see the note above).
 
 Declared event handlers (`onReleased`, `onChanged`, `onToggled`, …) live
 in `uiCallbacks` — the table both flua and the HC3 dispatch through. For
@@ -1857,6 +1901,9 @@ Ready for editing and debugging.
 ```
 
 Checks syntax, unknown `--%%` directives (typos), and deprecated API calls.
+It also warns when a v2 UI element (`tabView`/`collapsible`) is declared
+without `--%%useUiView:true` — on the real HC3 those render only from the
+`uiView` format, so the packaged legacy view would come out blank.
 Warnings don't fail the run; syntax errors exit 1. Good in CI. It checks the
 **whole project**: the main file plus every `--%%file` include (a missing
 include is an error, and `$name` entries resolve to flua's bundled

@@ -330,6 +330,103 @@ def test_example_self_test_passes_and_exits_zero() -> None:
 
 
 @pytest.mark.asyncio
+async def test_example_label_svg_v1_route(tmp_path) -> None:
+    # examples/label-svg.lua — the v1 label-HTML route for inline SVG art:
+    # base64 <img> set as the label's text at boot (the known-good HC3
+    # pattern, live-verified in the legacy view)
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        qa_id = engine.load_qa_file(str(REPO_ROOT / "examples" / "label-svg.lua"))[0]
+
+        def svg_set() -> bool:
+            device, _ = engine.api.dispatch("GET", f"/devices/{qa_id}")
+            label = device["properties"]["uiView"][0]["components"][0]
+            return '<img src="data:image/svg+xml;base64,' in str(label["text"])
+
+        await wait_until(svg_set)
+        device, status = engine.api.dispatch("GET", f"/devices/{qa_id}")
+        assert status == 200
+        assert device["properties"]["useUiView"] is False  # deliberately v1
+        label = device["properties"]["uiView"][0]["components"][0]
+        assert label["type"] == "label"
+        # the base64 payload decodes back to the SVG
+        import base64
+
+        payload = label["text"].split("base64,")[1].split('"')[0]
+        assert base64.b64decode(payload).decode().strip().startswith("<svg")
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_example_ui_probe_compiles_data_uri_and_collapsible() -> None:
+    # examples/ui-probe.lua — the HC3 upload-test fixture: an inline SVG
+    # data-URI image, a network image, and a collapsible with a callback
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        qa_id = engine.load_qa_file(str(REPO_ROOT / "examples" / "ui-probe.lua"))[0]
+        # the QA keeps itself alive (keepAlive) — wait for onInit's
+        # updateView to land instead of the pending-work drain
+
+        def svg_url_set() -> bool:
+            device, _ = engine.api.dispatch("GET", f"/devices/{qa_id}")
+            url = device["properties"]["uiView"][0]["components"][0]["url"]
+            return str(url).startswith("data:image/svg+xml;base64,")
+
+        await wait_until(svg_url_set)
+        device, status = engine.api.dispatch("GET", f"/devices/{qa_id}")
+        assert status == 200
+        ui_view = device["properties"]["uiView"]
+        svg = ui_view[0]["components"][0]
+        assert svg["type"] == "image"
+        # the boot-time updateView set a base64 data URI (the utf8 form
+        # showed a placeholder on the HC3 app — the probe tests base64)
+        assert svg["url"].startswith("data:image/svg+xml;base64,")
+        net = ui_view[1]["components"][0]
+        assert net["type"] == "image" and net["url"].startswith("https://")
+        label = ui_view[2]["components"][0]
+        assert label["type"] == "label"
+        assert '<img src="data:image/svg+xml;base64,' in label["text"]
+        col = ui_view[3]["components"][0]
+        assert col["type"] == "collapsible"
+        assert {"callback": "play", "eventType": "onReleased", "name": "play"} in device[
+            "properties"
+        ]["uiCallbacks"]
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_example_ui_extras_updateview_reaches_collapsible_and_image() -> None:
+    # examples/ui-extras.lua — the image/collapsible living fixture: its
+    # updateView timer patches a label INSIDE the collapsible body and the
+    # image's url, then the run drains cleanly
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        qa_id = engine.load_qa_file(str(REPO_ROOT / "examples" / "ui-extras.lua"))[0]
+        await wait_until(lambda: not engine.has_pending_work())
+        device, status = engine.api.dispatch("GET", f"/devices/{qa_id}")
+        assert status == 200
+        ui_view = device["properties"]["uiView"]
+        img = ui_view[0]["components"][0]
+        assert img["type"] == "image"
+        assert img["url"] == "https://placehold.co/120x80?text=flua!"  # updated
+        col = ui_view[1]["components"][0]
+        assert col["type"] == "collapsible" and col["name"] == "favs"
+        label = col["components"][0]["components"][0]
+        assert label["text"] == "updated from updateView"  # patched inside the body
+        # the button inside the collapsible routes through uiCallbacks
+        assert {"callback": "play", "eventType": "onReleased", "name": "play"} in device[
+            "properties"
+        ]["uiCallbacks"]
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
 async def test_example_tabs_updateview_reaches_nested_elements() -> None:
     # examples/tabs.lua — the living tabView fixture: its updateView timers
     # switch activeTab and patch a label INSIDE a tab (the recursive uiView

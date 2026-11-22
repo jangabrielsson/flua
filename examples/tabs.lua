@@ -3,7 +3,8 @@
 --%%useUiView:true
 -- (useUiView is required for tabView on the real HC3: the app draws tabs
 -- from the uiView format — live-verified on 5.221; the legacy $jason
--- renderer leaves a tabView-only view blank)
+-- renderer leaves a tabView-only view blank. tabView is NOT editable in
+-- the HC3's UI editor — keep this QA flua-authored, update via updateQA)
 
 -- A tabView groups rows under named tabs: full-width (alone on its row),
 -- tabs take name/text and their own rows, the tabView takes activeTab and
