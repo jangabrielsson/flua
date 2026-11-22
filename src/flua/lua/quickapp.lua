@@ -208,7 +208,9 @@ end
 -- @param name - The interface name to check for
 -- @return True if the device has the interface, false otherwise
 ---@diagnostic disable-next-line: undefined-field
-function QuickAppBase:hasInterface(name) return table.member(name, self.interfaces) end
+function QuickAppBase:hasInterface(name) 
+  for _,i in ipairs(self.interfaces or {}) do if i == name then return true end end
+end
 
 -- Adds new interfaces to the device
 -- @param values - Table of interface names to add
