@@ -4,6 +4,14 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.177] - 2026-11-22
+
+### Changed
+- fix
+
+### Fixed
+- dofile and _FLUA.loadFile run in the QA env; document class() and loader contracts
+
 ## [0.1.176] - 2026-11-18
 
 ### Changed
