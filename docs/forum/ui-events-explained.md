@@ -63,15 +63,11 @@ eventBinding = { onReleased = {{ type="deviceAction",
   params = { actionName = "turnOn", args = json.array() } }} }
 ```
 
-**4. The editor-copy trick.** The HC3's UI editor has a button that copies a QA's uiView as JSON — and that JSON can go straight into `createChildDevice`. A child reusing the *main QA's* view keeps the main's `UIAction` bindings, and those events resolve through the *main QA's* phone book. That's why the copy works: the main QA still owns the callbacks.
+**4. Copying the MAIN QA's view onto a child.** The editor's copy button hands you the main QA's uiView, `UIAction` bindings and all. Put that view on a child and `UIAction` runs *on the child* — it converts the call into a UI event and looks the method up in the MAIN QA's phone book. So a copied view only works when the main QA declares the same elements (and the method that runs is the main's). For a child's own UI, skip the middleman: name the method directly in the binding, and the child's class answers.
 
 ## Where flua fits
 
-flua's viewer plays the exact same game as the app: non-`UIAction` bindings fire as device actions, `UIAction` bindings go through the phone book, and the simulated `onAction`/`onUIEvent` route identically — so the QA you debug in the viewer behaves the same once uploaded (all of the above is live-verified on 5.221). And when you want a child with a tabbed UI:
-
-```bash
-flua --tool ui --as-lua --child script.lua   # paste-ready uiView for createChildDevice
-```
+flua's viewer plays the exact same game as the app: non-`UIAction` bindings fire as device actions, `UIAction` bindings go through the phone book, and the simulated `onAction`/`onUIEvent` route identically — so the QA you debug in the viewer behaves the same once uploaded (all of the above is live-verified on 5.221). And when you want a child with a tabbed UI, `flua --tool ui --as-lua` prints the compiled view as a paste-ready Lua table for `createChildDevice` — same format, with the bindings naming your methods directly, the way a child's view needs them.
 
 `examples/ui-3-children.lua` is the complete pattern: a tabbed child with button, slider, switch and select, working identically offline and on the controller.
 
