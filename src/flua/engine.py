@@ -1200,15 +1200,24 @@ class LuaEngine:
             ]
         rsrc_source = self._rsrc_source(config)
         if rsrc_source is not None:
-            # before main: the HC3 loads files in order, and the QA's code
-            # reads fibaro.RSRC in onInit — define it first
-            files.insert(0, {
-                "name": "rsrc",
-                "path": "",
-                "isMain": False,
-                "type": "lua",
-                "source": rsrc_source,
-            })
+            if any(entry.get("name") == "rsrc" for entry in config.get("files") or []):
+                # the project declares its own rsrc.lua — it owns the name;
+                # synthesizing a second file would double-define the table
+                logger.warning(
+                    "--%%rsrc declarations AND a --%%file named 'rsrc': the declared "
+                    "file owns the name and ships as-is (the --%%rsrc resources "
+                    "are not packaged — move them into the file or rename it)"
+                )
+            else:
+                # before main: the HC3 loads files in order, and the QA's code
+                # reads fibaro.RSRC in onInit — define it first
+                files.insert(0, {
+                    "name": "rsrc",
+                    "path": "",
+                    "isMain": False,
+                    "type": "lua",
+                    "source": rsrc_source,
+                })
         for entry in config.get("files") or []:
             source = self._read_source(entry["path"]) if entry.get("path") else ""
             files.append(

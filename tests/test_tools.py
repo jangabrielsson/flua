@@ -2610,3 +2610,54 @@ def test_rsrc_roundtrip_package_then_unpack(tmp_path) -> None:
             await engine.stop()
 
     asyncio.run(_run())
+
+
+def test_rsrc_roundtrip_repackages_without_double_resources(tmp_path) -> None:
+    # package -> unpack -> package again: the materialized rsrc.lua ships
+    # as a plain extra and the original directives are below the EOH, so no
+    # second file is synthesized — exactly one rsrc, one definition.
+    import json as _json
+
+    from flua.tools.common import build_fqa
+
+    script = tmp_path / "main.lua"
+    script.write_text(
+        "--%%name:rsrcqa\n"
+        "--%%rsrc:guiChild1:{{button=\"b\",text=\"B\",onReleased=\"press\"}}\n"
+        "function QuickApp:onInit() end\n"
+    )
+    fqa1, _ = build_fqa(str(script))
+    fqa_path = tmp_path / "rsrcqa.fqa"
+    fqa_path.write_text(_json.dumps(fqa1))
+    assert tools.run_tool("unpack", [str(fqa_path), "-d", str(tmp_path / "out")]) == 0
+    # second packaging of the UNPACKED project
+    fqa2, _ = build_fqa(str(tmp_path / "out" / "rsrcqa_main.lua"))
+    rsrc_files = [f for f in fqa2["files"] if f["name"] == "rsrc"]
+    assert len(rsrc_files) == 1  # the shipped extra, no synthesized twin
+    content = rsrc_files[0]["content"]
+    assert content.count("fibaro.RSRC = fibaro.RSRC or {}") == 1
+    assert "fibaro.RSRC.guiChild1 = " in content
+    # the shipped file IS the materialized rsrc.lua (its header comment rides
+    # along); what matters is that no SECOND file was synthesized
+    assert len(fqa2["files"]) == 2  # main + the shipped rsrc
+
+
+def test_rsrc_declared_file_owns_the_name(tmp_path, caplog) -> None:
+    # a project that declares its OWN file named 'rsrc' alongside --%%rsrc:
+    # the declared file wins (no synthesized twin, no double definition) and
+    # a warning says the --%%rsrc resources are not packaged.
+    from flua.tools.common import build_fqa
+
+    (tmp_path / "rsrc.lua").write_text("fibaro.RSRC = {}\n")
+    main = tmp_path / "main.lua"
+    main.write_text(
+        "--%%name:rsrcqa\n"
+        "--%%file:rsrc.lua,rsrc\n"
+        "--%%rsrc:guiChild1:{{button=\"b\",text=\"B\",onReleased=\"press\"}}\n"
+        "function QuickApp:onInit() end\n"
+    )
+    fqa, _ = build_fqa(str(main))
+    rsrc_files = [f for f in fqa["files"] if f["name"] == "rsrc"]
+    assert len(rsrc_files) == 1
+    assert rsrc_files[0]["content"] == "fibaro.RSRC = {}\n"
+    assert any("owns the name" in r.message for r in caplog.records)
