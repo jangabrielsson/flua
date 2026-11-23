@@ -694,21 +694,21 @@ elements only, exactly what the `.fqa` package ships: the stock
 (embedded, `__`-prefixed) elements the HC3 app adds per device type are
 never included (`--as-lua --device` strips them too).
 
-The uiView format is the SAME for the main QA and children — the HC3's
-UI editor can copy a QA's uiView as JSON and that JSON feeds
-`createChildDevice` directly. Child UI events arrive as device actions,
-with two delivery routes:
+The uiView format is ONE and the same for the main QA and children — the
+HC3's UI editor can copy a QA's uiView as JSON and that JSON feeds
+`createChildDevice` directly, and `flua --tool ui --as-lua` prints exactly
+that format. Paste it into a child and keep the `--%%u` declarations on
+the MAIN QA (whose `uiCallbacks` table receives the child's events):
 
-- `UIAction` bindings (a child reusing the MAIN QA's uiView): the event
-  resolves through the main QA's `uiCallbacks` and runs the MAIN's method
-  — the editor-copy workflow.
-- direct `actionName` bindings (`flua --tool ui --as-lua --child`): the
-  event runs the CHILD class's method with plain args — children never
-  register a `uiCallbacks` table of their own (live-verified 5.221).
+- `UIAction` bindings (the standard form, editor-copy workflow): the event
+  resolves through the main QA's `uiCallbacks` and runs the MAIN's method.
+- optionally, direct `actionName` bindings (`--as-lua --child`) deliver to
+  the CHILD class's methods with plain args instead — a hand-authored
+  style the HC3 also supports, not a different format.
 
-flua's viewer executes both routes (UIAction via callUIEvent, direct
-actionNames as device actions). See `examples/child-ui.lua` for the
-child-class pattern:
+flua's viewer executes both (UIAction via callUIEvent, direct actionNames
+as device actions). See `examples/child-ui.lua` for the child-class
+pattern:
 
 ```lua
 -- pasted output: plugin.createChildDevice({

@@ -43,11 +43,12 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--child",
         action="store_true",
-        help="with --as-lua: emit CHILD-class bindings — each event binds the "
-        "QA method as the actionName directly (no UIAction wrapper), delivered "
-        "to the child class's method with plain args. The other child route is "
-        "the editor-copy workflow: a child reusing the main QA's uiView keeps "
-        "UIAction bindings and runs the MAIN QA's methods via its uiCallbacks",
+        help="with --as-lua: OPTIONAL delivery choice, not a format difference "
+        "— emit direct actionName bindings that run the CHILD class's methods "
+        "with plain args (hand-authored HC3 style). The default output is the "
+        "one uiView format for both: pasted into a child it keeps UIAction "
+        "bindings and runs the MAIN QA's methods via its uiCallbacks "
+        "(the editor-copy workflow)",
     )
     parser.add_argument(
         "--device",
@@ -297,16 +298,16 @@ _VALUE_EVENTS = {"onChanged", "onToggled", "onToggleOn", "onToggleOff", "onTabCh
 
 
 def _child_bindings(ui_view: Any, ui_callbacks: Any) -> Any:
-    """Rewrite a compiled uiView for the CHILD-class delivery route. The
-    uiView format is the same for the main QA and children; two routes
-    exist (live-verified 5.221): a child reusing the main QA's uiView
-    keeps UIAction bindings and runs the MAIN's methods via its
-    uiCallbacks (the editor-copy workflow), while direct actionName
-    bindings run the CHILD class's method with plain args — children
-    never register a uiCallbacks table of their own. This transform emits
-    the latter: UIAction wrappers become direct method bindings
-    (value-carrying events get $event.value), events with no declared
-    method drop their binding."""
+    """Rewrite a compiled uiView for the OPTIONAL child-class delivery
+    route — a delivery choice, not a format difference: the uiView format
+    is the same for the main QA and children. In the default (editor-copy)
+    route a child reuses the main QA's uiView with UIAction bindings and
+    runs the MAIN's methods via its uiCallbacks; this transform instead
+    emits direct actionName bindings that run the CHILD class's method
+    with plain args (children never register a uiCallbacks table of their
+    own — live-verified 5.221). UIAction wrappers become direct method
+    bindings (value-carrying events get $event.value), events with no
+    declared method drop their binding."""
     import copy
 
     cbs: dict[str, dict[str, str]] = {}
