@@ -4,6 +4,24 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.181] - 2026-11-23
+
+### Changed
+- fix
+- forum index lists the new UI-events post
+- forum post as HTML, in the series format
+- forum post — v1/v2 described by their actual structure
+- forum post — replace the two-roads framing with the three cases
+- drop the wrong child-dispatch claim — each child resolves its own methods
+- forum post — fix the child-dispatch passages
+- forum post — how QuickApp UI events really work on the HC3
+- the HC3 UI event dispatch model (QA, children, v1, v2)
+- one uiView format for main QA and children — --child is a delivery choice
+
+### Fixed
+- guard _FLUA.keepAlive() in the uploadable examples
+- --as-lua --child argless bindings emit json.array() — the HC3 app drops {} args
+
 ## [0.1.180] - 2026-11-23
 
 ### Added
