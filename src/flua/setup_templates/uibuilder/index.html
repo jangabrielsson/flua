@@ -295,7 +295,10 @@ function propsFor(el) {
     render(); changed();
   };
   body.appendChild(del);
-  const bump = () => { render(); changed(); };
+  // property edits must NOT rebuild the properties panel — that would
+  // destroy the focused input on every keystroke. Refresh only the layout
+  // (chips reflect the new name) and recompile.
+  const bump = () => { renderLayout(); changed(); };
   body.appendChild(fieldRow("name", textInput(el[kind], (v) => { el[kind] = v; bump(); }, "element name")));
   for (const f of meta.fields) {
     if (f === "tabs") {
@@ -329,7 +332,7 @@ function propsFor(el) {
   }
 }
 
-function render() {
+function renderLayout() {
   const palette = $("palette");
   palette.innerHTML = "";
   const phead = document.createElement("h3");
@@ -358,7 +361,9 @@ function render() {
     p.textContent = "pick an element from the palette to start";
     rowsDiv.appendChild(p);
   }
+}
 
+function renderProps() {
   const inModel = !!selection && (() => {
     const walk = (rows) => rows.some((row) => row.includes(selection) ||
       row.some((e) =>
@@ -368,6 +373,11 @@ function render() {
   })();
   if (inModel) propsFor(selection);
   else { $("propsBody").innerHTML = ""; $("noSel").style.display = ""; }
+}
+
+function render() {
+  renderLayout();
+  renderProps();
 }
 
 function changed() {
@@ -393,6 +403,8 @@ async function compile() {
       model.target === "main-v2" ? "add --%%useUiView:true to the QA" :
       model.target === "child" ? "paste into the QA that creates the child" :
       "the QA renders this as the legacy layout";
+    // the iframe reload can steal focus from a properties field — restore it
+    pendingFocus = document.activeElement;
     $("preview").src = "/viewer?embed=1&t=" + Date.now();
   } catch (e) { $("exportHint").textContent = "compile failed: " + e; }
 }
@@ -426,7 +438,12 @@ $("importBtn").onclick = async () => {
   } catch (e) { $("importErr").textContent = String(e); }
 };
 
+let pendingFocus = null;
 $("preview").onload = () => {
+  if (pendingFocus && document.contains(pendingFocus)) {
+    pendingFocus.focus();
+    pendingFocus = null;
+  }
   const doc = $("preview").contentDocument;
   if (!doc) return;
   // same origin: map clicks in the preview to element selection
