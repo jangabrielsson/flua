@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.178] - 2026-11-23
+
+### Added
+- image + collapsible UI elements, v2 check guard, live-verified HC3 notes
+- tabView UI element — declaration, viewer rendering, HC3-verified upload
+
 ## [0.1.177] - 2026-11-22
 
 ### Changed
