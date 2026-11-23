@@ -22,17 +22,17 @@ that did nothing</a>.)</p>
 
 <p>So a tabbed child is a <code>uiView</code> table plus a class with the
 methods. The table is the annoying part to write by hand — it is the same
-shape flua's compiler produces. Which is exactly what
-<code>--as-lua</code> prints for you:</p>
+shape flua's compiler produces. <code>flua --tool ui --as-lua</code>
+prints any declared UI as a paste-ready table with the method names baked
+into the bindings, the way a child's view needs them:</p>
 
 <pre>
-flua --tool ui --as-lua --child script.lua
 -- local uiView = {...}   # child bindings, paste-ready
 </pre>
 
 <h3>The main act: declare them, don't paste them</h3>
 
-<p>Pasting works, but pasted tables are a maintenance tax — the moment the
+<p>Pasting works — but pasted tables are a maintenance tax: the moment the
 UI changes, the paste goes stale. flua 0.1.182 added a better way: the
 <code>--%%rsrc</code> directive. Declare each child UI in the QA file
 itself, in the same row language as <code>--%%u</code>:</p>
