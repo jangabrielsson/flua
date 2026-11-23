@@ -22,7 +22,17 @@ defaults it to false (the legacy layout is still the common case),
 ``--%%useUiView:true`` selects the new format.
 """
 
+# Lua identifiers (bare table keys) and reserved words — other keys emit in
+# the bracket form ['$jason']=... so lua_literal output is always valid Lua.
+import re
 from typing import Any
+
+_LUA_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_LUA_KEYWORDS = {
+    "and", "break", "do", "else", "elseif", "end", "false", "for",
+    "function", "goto", "if", "in", "local", "nil", "not", "or",
+    "repeat", "return", "then", "true", "until", "while",
+}
 
 # Per-element weight by row size in the uiView format (the exact table).
 _UI_VIEW_WEIGHTS = {1: "1.0", 2: "0.5", 3: "0.25", 4: "0.33", 5: "0.20"}
@@ -513,7 +523,8 @@ def _ui_view(rows: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
 
 def lua_literal(value: Any) -> str:
     """Serialize a JSON-compatible value as a Lua literal (the ``--%%u`` and
-    ``--%%var`` value format)."""
+    ``--%%var`` value format). Non-identifier table keys (like ``$jason``)
+    emit in the bracket form so the output is valid Lua."""
     if value is None:
         return "nil"
     if value is True:
@@ -528,7 +539,12 @@ def lua_literal(value: Any) -> str:
     if isinstance(value, list):
         return "{" + ",".join(lua_literal(item) for item in value) + "}"
     if isinstance(value, dict):
-        return "{" + ",".join(f"{key}={lua_literal(val)}" for key, val in value.items()) + "}"
+        return "{" + ",".join(
+            f"{key}={lua_literal(val)}"
+            if _LUA_IDENT_RE.fullmatch(key) and key not in _LUA_KEYWORDS
+            else f"[{lua_literal(key)}]={lua_literal(val)}"
+            for key, val in value.items()
+        ) + "}"
     return lua_literal(str(value))
 
 

@@ -102,9 +102,16 @@ def test_tool_ui_as_lua_prints_paste_ready_literal(tmp_path, capsys) -> None:
     assert tools.run_tool("ui", [str(script), "--as-lua"]) == 0
     out = capsys.readouterr().out
     assert "local uiView = {" in out
-    assert "local viewLayout = {" in out
+    assert "local viewLayout = {['$jason']" in out  # $jason quoted: valid Lua key
     assert "local uiCallbacks = {" in out
     assert "type='tabView'" in out and "type='image'" in out and "type='collapsible'" in out
+    # a blank line separates the locals: select one table at a time
+    lines = out.splitlines()
+    assert lines[1].startswith("local uiView")
+    assert lines[2] == ""
+    assert lines[3].startswith("local viewLayout")
+    assert lines[4] == ""
+    assert lines[5].startswith("local uiCallbacks")
     # the printed literal IS the compiler's output (single source of truth)
     from flua.config import parse_annotations
     from flua.ui import compile_ui, lua_literal
@@ -112,12 +119,17 @@ def test_tool_ui_as_lua_prints_paste_ready_literal(tmp_path, capsys) -> None:
     rows = parse_annotations(script.read_text())["u"]
     ui = compile_ui(rows, 5000)
     assert f"local uiView = {lua_literal(ui['uiView'])}" in out
-    # and it evaluates as Lua: one row per directive, tabView first
+    # the WHOLE block evaluates as Lua: one row per directive, tabView
+    # first, and the quoted $jason key reaches its body
     from lupa import LuaRuntime
 
     lua = LuaRuntime()
-    result = lua.execute(out.splitlines()[1] + "\nreturn #uiView, uiView[1].components[1].type")
-    assert result[0] == 3 and result[1] == "tabView"
+    result = lua.execute(
+        out
+        + "\nreturn #uiView, uiView[1].components[1].type, "
+        + "viewLayout['$jason'].body ~= nil, type(uiCallbacks)"
+    )
+    assert result == (3, "tabView", True, "table")
     # the printed uiView is exactly what the .fqa ships (no stock/embedded
     # elements — those are type-level, the HC3 app adds them itself)
     from flua.tools.common import build_fqa
