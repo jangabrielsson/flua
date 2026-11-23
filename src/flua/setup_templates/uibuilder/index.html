@@ -14,26 +14,24 @@
   select, input[type=text], input[type=number] { padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; }
   button { padding:5px 12px; border:1px solid var(--line); border-radius:6px; background:#fff; cursor:pointer; }
   button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
-  main { display:flex; gap:12px; padding:12px 16px; align-items:flex-start; }
-  aside { width:180px; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px; position:sticky; top:12px; }
-  aside button { display:block; width:100%; margin:4px 0; text-align:left; }
-  aside button:disabled { opacity:.4; cursor:default; }
-  #rows { flex:1; min-width:0; }
-  .row { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:8px 10px; margin-bottom:10px; }
-  .row-head { display:flex; gap:8px; align-items:center; margin-bottom:6px; }
-  .row-head .label { font-weight:600; font-size:12px; color:var(--muted); flex:1; }
-  .el { border:1px dashed var(--line); border-radius:8px; padding:8px; margin:6px 0; background:#fafbfc; }
-  .el-head { display:flex; gap:8px; align-items:center; margin-bottom:6px; }
-  .el-head b { flex:1; font-size:13px; }
+  button:disabled { opacity:.4; cursor:default; }
+  main { display:grid; grid-template-columns:180px 1fr 340px; gap:12px; padding:12px 16px; align-items:start; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px; margin-bottom:10px; }
+  section h3 { margin:0 0 6px; font-size:13px; }
+  #palette button { display:block; width:100%; margin:4px 0; text-align:left; }
+  #palette button:disabled { opacity:.4; cursor:default; }
+  .rowstrip { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:6px 10px; margin-bottom:8px; }
+  .rowstrip .head { display:flex; gap:8px; align-items:center; }
+  .rowstrip .head .label { font-weight:600; font-size:12px; color:var(--muted); flex:1; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+  .chip { border:1px solid var(--line); border-radius:14px; padding:2px 10px; cursor:pointer; font-size:12px; background:#fafbfc; }
+  .chip.sel { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .nested { margin-left:16px; border-left:2px solid var(--line); padding-left:8px; }
   .field { display:flex; gap:6px; align-items:center; margin:4px 0; flex-wrap:wrap; }
   .field label { width:110px; font-size:12px; color:var(--muted); }
   .field input[type=text], .field input[type=number] { flex:1; min-width:80px; }
   .field textarea { flex:1; min-width:200px; height:48px; }
-  .nested { margin-left:18px; border-left:2px solid var(--line); padding-left:8px; }
-  .panel { width:340px; display:flex; flex-direction:column; gap:10px; position:sticky; top:12px; }
-  .panel section { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px; }
-  .panel h3 { margin:0 0 6px; font-size:13px; }
-  #preview { width:100%; height:420px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+  #preview { width:100%; height:380px; border:1px solid var(--line); border-radius:8px; background:#fff; margin-top:8px; }
   textarea { width:100%; font-family:ui-monospace, monospace; font-size:12px; }
   .hint { font-size:12px; color:var(--muted); }
 </style>
@@ -52,17 +50,28 @@
   <span class="hint" id="targetHint"></span>
 </header>
 <main>
-  <aside id="palette"></aside>
-  <div id="rows"></div>
-  <div class="panel">
+  <section id="palette">
+    <h3>Elements</h3>
+  </section>
+  <div>
     <section>
-      <h3>Preview</h3>
-      <iframe id="preview" src="/viewer"></iframe>
-      <p class="hint">rendered by the real viewer — interactions are local/inert</p>
+      <h3>Layout</h3>
+      <div id="rows"></div>
+    </section>
+    <section>
+      <h3>Preview <span class="hint">(click an element to select)</span></h3>
+      <iframe id="preview" src="/viewer?embed=1"></iframe>
+    </section>
+  </div>
+  <div>
+    <section id="props">
+      <h3>Properties</h3>
+      <p class="hint" id="noSel">select an element in the layout (or click it in the preview)</p>
+      <div id="propsBody"></div>
     </section>
     <section>
       <h3>Directives <button id="copyBtn" class="primary" style="float:right">copy</button></h3>
-      <textarea id="export" rows="8" placeholder="--%%u lines appear here"></textarea>
+      <textarea id="export" rows="7" placeholder="--%%u lines appear here"></textarea>
       <p class="hint" id="exportHint"></p>
     </section>
     <section>
@@ -77,15 +86,15 @@
 const $ = (id) => document.getElementById(id);
 
 const ELEMENTS = {
-  label:      { name: "Label", fields: ["text"], v2: false, hint: "v1 labels may carry HTML" },
-  button:     { name: "Button", fields: ["text", "onReleased"], v2: false },
-  slider:     { name: "Slider", fields: ["text", "min", "max", "value", "onChanged"], v2: false },
-  switch:     { name: "Switch", fields: ["text", "value", "onReleased"], v2: false },
-  select:     { name: "Select", fields: ["text", "value", "onToggled", "options"], v2: false },
-  multi:      { name: "Multi select", fields: ["text", "values", "onToggled", "options"], v2: false },
-  image:      { name: "Image", fields: ["url"], v2: true },
-  tabView:    { name: "Tabs", fields: ["activeTab", "onTabChanged", "tabs"], v2: true },
-  collapsible:{ name: "Collapsible", fields: ["text", "collapsed"], v2: true },
+  label:       { name: "Label", fields: ["text"], v2: false, hint: "v1 labels may carry HTML" },
+  button:      { name: "Button", fields: ["text", "onReleased"], v2: false },
+  slider:      { name: "Slider", fields: ["text", "min", "max", "value", "onChanged"], v2: false },
+  switch:      { name: "Switch", fields: ["text", "value", "onReleased"], v2: false },
+  select:      { name: "Select", fields: ["text", "value", "onToggled", "options"], v2: false },
+  multi:       { name: "Multi select", fields: ["text", "values", "onToggled", "options"], v2: false },
+  image:       { name: "Image", fields: ["url"], v2: true },
+  tabView:     { name: "Tabs", fields: ["activeTab", "onTabChanged", "tabs"], v2: true },
+  collapsible: { name: "Collapsible", fields: ["text", "collapsed"], v2: true },
 };
 
 const targetHints = {
@@ -95,6 +104,7 @@ const targetHints = {
 };
 
 let model = { target: "main-v2", resourceName: "ui", rows: [] };
+let selection = null;  // the selected model element
 let timer = null;
 
 const elOf = (e) => Object.keys(e).find((k) => ELEMENTS[k]);
@@ -103,13 +113,38 @@ function newElement(kind) {
   const base = { text: "", visible: true };
   if (kind === "slider") Object.assign(base, { min: "0", max: "100", value: "50" });
   if (kind === "switch") base.value = "false";
-  if (kind === "select") base.value = "";
   if (kind === "multi") base.values = [];
   if (kind === "tabView") Object.assign(base, { activeTab: "", onTabChanged: "", tabs: [] });
   if (kind === "collapsible") Object.assign(base, { collapsed: false });
   if (kind === "image") base.url = "";
   base[kind] = "";
   return base;
+}
+
+function rowAllows(el) {
+  return !["tabView", "collapsible"].includes(elOf(el));
+}
+
+function findByName(name) {
+  const walk = (rows) => {
+    for (const row of rows) {
+      for (const el of row) {
+        if (el[elOf(el)] === name) return el;
+        if (elOf(el) === "tabView") {
+          for (const tab of el.tabs || []) {
+            const hit = walk(tab.components || []);
+            if (hit) return hit;
+          }
+        }
+        if (elOf(el) === "collapsible") {
+          const hit = walk(el.components || []);
+          if (hit) return hit;
+        }
+      }
+    }
+    return null;
+  };
+  return walk(model.rows);
 }
 
 function fieldRow(label, inputEl) {
@@ -144,95 +179,35 @@ function optionsEditor(options, onChange) {
   return ta;
 }
 
-function elementCard(el, elPath) {
-  const kind = elOf(el);
-  const meta = ELEMENTS[kind];
-  const card = document.createElement("div");
-  card.className = "el";
-  const head = document.createElement("div");
-  head.className = "el-head";
-  const title = document.createElement("b");
-  title.textContent = meta.name;
-  head.appendChild(title);
-  head.appendChild(fieldRow("name", textInput(el[kind], (v) => { el[kind] = v; changed(); }, "element name")));
-  const rm = document.createElement("button");
-  rm.textContent = "✕";
-  rm.onclick = () => { elPath.splice(elPath.indexOf(el), 1); render(); changed(); };
-  head.appendChild(rm);
-  card.appendChild(head);
-
-  for (const f of meta.fields) {
-    if (f === "tabs") {
-      const tabs = el.tabs || [];
-      tabs.forEach((tab, ti) => {
-        const box = document.createElement("div");
-        box.className = "nested";
-        box.appendChild(fieldRow("tab name", textInput(tab.name, (v) => { tab.name = v; changed(); })));
-        box.appendChild(fieldRow("tab text", textInput(tab.text, (v) => { tab.text = v; changed(); })));
-        renderRows(box, tab.components, "tab " + tab.name);
-        card.appendChild(box);
-      });
-      const addTab = document.createElement("button");
-      addTab.textContent = "＋ tab";
-      addTab.onclick = () => {
-        el.tabs = el.tabs || [];
-        el.tabs.push({ name: "tab" + (el.tabs.length + 1), text: "", components: [] });
-        render(); changed();
-      };
-      card.appendChild(addTab);
-    } else if (f === "options") {
-      card.appendChild(fieldRow("options", optionsEditor(el.options, (o) => { el.options = o; changed(); })));
-    } else if (f === "onReleased" || f === "onChanged" || f === "onToggled" || f === "onTabChanged") {
-      card.appendChild(fieldRow(f, textInput(el[f], (v) => { el[f] = v; changed(); }, "method name")));
-    } else if (f === "collapsed") {
-      const s = document.createElement("select");
-      s.innerHTML = "<option value='false'>expanded</option><option value='true'>collapsed</option>";
-      s.value = String(el.collapsed ?? false);
-      s.onchange = () => { el.collapsed = s.value === "true"; changed(); };
-      card.appendChild(fieldRow("collapsed", s));
-    } else if (f === "values") {
-      card.appendChild(fieldRow("values", textInput((el.values || []).join(","), (v) => { el.values = v ? v.split(",") : []; changed(); })));
-    } else if (f === "components") {
-      const box = document.createElement("div");
-      box.className = "nested";
-      el.components = el.components || [];
-      renderRows(box, el.components, "body");
-      card.appendChild(box);
-    } else {
-      card.appendChild(fieldRow(f, textInput(el[f], (v) => { el[f] = v; changed(); })));
-    }
-  }
-  return card;
-}
-
-function renderRows(container, rows, label) {
+// ---- the layout pane: row strips with selectable element chips ----------
+function rowStrip(container, rows, label, depth) {
   const list = document.createElement("div");
   rows.forEach((row, ri) => {
     const box = document.createElement("div");
-    box.className = "row";
+    box.className = "rowstrip";
+    if (depth) box.classList.add("nested");
     const head = document.createElement("div");
-    head.className = "row-head";
+    head.className = "head";
     const rl = document.createElement("span");
     rl.className = "label";
     rl.textContent = (label ? label + " — " : "") + "row " + (ri + 1)
-      + (row.length ? " (" + row.length + " element(s))" : " (empty)");
+      + (row.length ? " (" + row.length + ")" : " (empty)");
     head.appendChild(rl);
     const rm = document.createElement("button");
     rm.textContent = "✕";
-    rm.onclick = () => { rows.splice(ri, 1); render(); changed(); };
+    rm.onclick = () => { rows.splice(ri, 1); selection = null; render(); changed(); };
     head.appendChild(rm);
     const kindSel = document.createElement("select");
     for (const [kind, meta] of Object.entries(ELEMENTS)) {
       if ($("target").value === "main-v1" && meta.v2) continue;
       const o = document.createElement("option");
-      o.value = kind;
-      o.textContent = meta.name;
+      o.value = kind; o.textContent = meta.name;
       kindSel.appendChild(o);
     }
     head.appendChild(kindSel);
     const addEl = document.createElement("button");
     addEl.textContent = "＋ element";
-    const fullWidth = row.some((el) => ["tabView", "collapsible"].includes(elOf(el)));
+    const fullWidth = row.some((el) => !rowAllows(el));
     if (row.length >= 10) {
       addEl.disabled = true;
       addEl.title = "max 10 elements per row (the HC3 editor allows 5, flua 10)";
@@ -240,11 +215,52 @@ function renderRows(container, rows, label) {
       addEl.disabled = true;
       addEl.title = "tabView/collapsible sit alone on their row";
     } else {
-      addEl.onclick = () => { row.push(newElement(kindSel.value)); render(); changed(); };
+      addEl.onclick = () => {
+        const el = newElement(kindSel.value);
+        row.push(el);
+        selection = el;
+        render(); changed();
+      };
     }
     head.appendChild(addEl);
     box.appendChild(head);
-    row.forEach((el) => box.appendChild(elementCard(el, row)));
+
+    const chips = document.createElement("div");
+    chips.className = "chips";
+    row.forEach((el) => {
+      const chip = document.createElement("span");
+      chip.className = "chip" + (el === selection ? " sel" : "");
+      const kind = elOf(el);
+      chip.textContent = ELEMENTS[kind].name + (el[kind] ? ": " + el[kind] : "");
+      chip.onclick = () => { selection = el; render(); };
+      chips.appendChild(chip);
+    });
+    box.appendChild(chips);
+
+    // nested bodies: tabs and collapsibles
+    row.forEach((el) => {
+      const kind = elOf(el);
+      if (kind === "tabView") {
+        (el.tabs || []).forEach((tab) => {
+          const sub = document.createElement("div");
+          sub.className = "nested";
+          sub.style.marginTop = "6px";
+          const h = document.createElement("span");
+          h.className = "label";
+          h.textContent = "tab: " + (tab.name || "?");
+          sub.appendChild(h);
+          rowStrip(sub, tab.components || [], null, depth + 1);
+          box.appendChild(sub);
+        });
+      } else if (kind === "collapsible") {
+        const sub = document.createElement("div");
+        sub.className = "nested";
+        sub.style.marginTop = "6px";
+        el.components = el.components || [];
+        rowStrip(sub, el.components, "body", depth + 1);
+        box.appendChild(sub);
+      }
+    });
     list.appendChild(box);
   });
   const addRow = document.createElement("button");
@@ -254,30 +270,104 @@ function renderRows(container, rows, label) {
   container.appendChild(list);
 }
 
+// ---- the properties pane -----------------------------------------------
+function propsFor(el) {
+  const kind = elOf(el);
+  const meta = ELEMENTS[kind];
+  const body = $("propsBody");
+  body.innerHTML = "";
+  $("noSel").style.display = "none";
+  const title = document.createElement("p");
+  title.innerHTML = "<b>" + meta.name + "</b>" + (meta.hint ? " <span class='hint'>(" + meta.hint + ")</span>" : "");
+  body.appendChild(title);
+  const del = document.createElement("button");
+  del.textContent = "remove element";
+  del.onclick = () => {
+    const walk = (rows) => rows.some((row) => {
+      const i = row.indexOf(el);
+      if (i >= 0) { row.splice(i, 1); return true; }
+      return row.some((e) =>
+        (elOf(e) === "tabView" && (e.tabs || []).some((t) => walk(t.components || []))) ||
+        (elOf(e) === "collapsible" && walk(e.components || [])));
+    });
+    walk(model.rows);
+    selection = null;
+    render(); changed();
+  };
+  body.appendChild(del);
+  const bump = () => { render(); changed(); };
+  body.appendChild(fieldRow("name", textInput(el[kind], (v) => { el[kind] = v; bump(); }, "element name")));
+  for (const f of meta.fields) {
+    if (f === "tabs") {
+      const addTab = document.createElement("button");
+      addTab.textContent = "＋ tab";
+      addTab.onclick = () => {
+        el.tabs = el.tabs || [];
+        el.tabs.push({ name: "tab" + (el.tabs.length + 1), text: "", components: [] });
+        bump();
+      };
+      body.appendChild(addTab);
+      (el.tabs || []).forEach((tab, ti) => {
+        body.appendChild(fieldRow("tab " + (ti + 1) + " name", textInput(tab.name, (v) => { tab.name = v; bump(); })));
+        body.appendChild(fieldRow("tab " + (ti + 1) + " text", textInput(tab.text, (v) => { tab.text = v; bump(); })));
+      });
+    } else if (f === "options") {
+      body.appendChild(fieldRow("options", optionsEditor(el.options, (o) => { el.options = o; bump(); })));
+    } else if (["onReleased", "onChanged", "onToggled", "onTabChanged"].includes(f)) {
+      body.appendChild(fieldRow(f, textInput(el[f], (v) => { el[f] = v; bump(); }, "method name")));
+    } else if (f === "collapsed") {
+      const s = document.createElement("select");
+      s.innerHTML = "<option value='false'>expanded</option><option value='true'>collapsed</option>";
+      s.value = String(el.collapsed ?? false);
+      s.onchange = () => { el.collapsed = s.value === "true"; bump(); };
+      body.appendChild(fieldRow("collapsed", s));
+    } else if (f === "values") {
+      body.appendChild(fieldRow("values", textInput((el.values || []).join(","), (v) => { el.values = v ? v.split(",") : []; bump(); })));
+    } else {
+      body.appendChild(fieldRow(f, textInput(el[f], (v) => { el[f] = v; bump(); })));
+    }
+  }
+}
+
 function render() {
   const palette = $("palette");
-  palette.innerHTML = "<b>" + ($("target").value === "main-v1" ? "v1 elements" : "elements") + "</b>";
+  palette.innerHTML = "";
+  const phead = document.createElement("h3");
+  phead.textContent = "Elements";
+  palette.appendChild(phead);
   for (const [kind, meta] of Object.entries(ELEMENTS)) {
     const b = document.createElement("button");
     b.textContent = meta.name;
     b.disabled = $("target").value === "main-v1" && meta.v2;
-    b.onclick = () => { model.rows.push([newElement(kind)]); render(); changed(); };
+    b.title = b.disabled ? "v2 element — not available in the v1 layout" : "";
+    b.onclick = () => {
+      const el = newElement(kind);
+      model.rows.push([el]);
+      selection = el;
+      render(); changed();
+    };
     palette.appendChild(b);
   }
-  const addRow = document.createElement("button");
-  addRow.textContent = "＋ empty row";
-  addRow.onclick = () => { model.rows.push([]); render(); changed(); };
-  palette.appendChild(addRow);
 
   const rowsDiv = $("rows");
   rowsDiv.innerHTML = "";
-  renderRows(rowsDiv, model.rows, null);
+  rowStrip(rowsDiv, model.rows, null, 0);
   if (!model.rows.length) {
     const p = document.createElement("p");
     p.className = "hint";
     p.textContent = "pick an element from the palette to start";
     rowsDiv.appendChild(p);
   }
+
+  const inModel = !!selection && (() => {
+    const walk = (rows) => rows.some((row) => row.includes(selection) ||
+      row.some((e) =>
+        (elOf(e) === "tabView" && (e.tabs || []).some((t) => walk(t.components || []))) ||
+        (elOf(e) === "collapsible" && walk(e.components || []))));
+    return walk(model.rows);
+  })();
+  if (inModel) propsFor(selection);
+  else { $("propsBody").innerHTML = ""; $("noSel").style.display = ""; }
 }
 
 function changed() {
@@ -303,7 +393,7 @@ async function compile() {
       model.target === "main-v2" ? "add --%%useUiView:true to the QA" :
       model.target === "child" ? "paste into the QA that creates the child" :
       "the QA renders this as the legacy layout";
-    $("preview").src = "/viewer?t=" + Date.now();
+    $("preview").src = "/viewer?embed=1&t=" + Date.now();
   } catch (e) { $("exportHint").textContent = "compile failed: " + e; }
 }
 
@@ -327,6 +417,7 @@ $("importBtn").onclick = async () => {
       model.rows = data.rows || [];
       model.target = "main-v2";
     }
+    selection = null;
     $("target").value = model.target;
     $("rsrcName").value = model.resourceName;
     $("importErr").textContent = "";
@@ -338,11 +429,13 @@ $("importBtn").onclick = async () => {
 $("preview").onload = () => {
   const doc = $("preview").contentDocument;
   if (!doc) return;
-  const base = doc.getElementById("base");
-  if (base && base.value !== location.origin) {
-    base.value = location.origin;
-    doc.getElementById("connect").click();
-  }
+  // same origin: map clicks in the preview to element selection
+  doc.addEventListener("click", (e) => {
+    const hit = e.target.closest("[data-cname]");
+    if (!hit) return;
+    const el = findByName(hit.dataset.cname);
+    if (el) { selection = el; render(); }
+  }, true);
 };
 
 render();

@@ -540,6 +540,7 @@ function renderComponent(device, component, row) {
   const name = document.createElement("span");
   name.className = "component-label";
   name.textContent = component.text ?? component.name;
+  name.dataset.cname = component.name;  // the uibuilder preview maps clicks
   row.appendChild(name);
 
   const live = liveState(device, component);
@@ -568,6 +569,7 @@ function renderComponent(device, component, row) {
     row.removeChild(name);
     const btn = document.createElement("button");
     btn.className = "ctl";
+    btn.dataset.cname = component.name;
     btn.textContent = text ?? component.name;
     withIcon(btn, component.image);
     if (component.disabled) btn.disabled = true;
@@ -602,6 +604,7 @@ function renderComponent(device, component, row) {
     }
     const control = document.createElement("div");
     control.className = "control";
+    control.dataset.cname = component.name;
     const slider = document.createElement("input");
     slider.type = "range";
     slider.min = component.min ?? "0";
@@ -655,6 +658,7 @@ function renderComponent(device, component, row) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "ctl toggle";
+    btn.dataset.cname = component.name;
     btn.textContent = text || component.name;
     withIcon(btn, component.image);
     const paint = () => {
@@ -697,6 +701,7 @@ function renderComponent(device, component, row) {
     name.remove();
     const control = document.createElement("div");
     control.className = "control";
+    control.dataset.cname = component.name;
     const field = document.createElement("button");
     field.type = "button";
     field.className = "dropdown-field";
@@ -825,6 +830,7 @@ function renderComponent(device, component, row) {
     panels.className = "tab-panels";
     const holder = document.createElement("div");
     holder.className = "tabview";  // column: the bar sits above the panels
+    holder.dataset.cname = component.name;
     holder.appendChild(bar);
     holder.appendChild(panels);
     tabs.forEach((tab, i) => {
@@ -869,6 +875,7 @@ function renderComponent(device, component, row) {
     if (url) {
       const img = document.createElement("img");
       img.className = "ctl-image";
+      img.dataset.cname = component.name;
       img.alt = component.name || "";
       img.src = String(url);
       img.onerror = () => img.remove();
@@ -906,6 +913,7 @@ function renderComponent(device, component, row) {
     };
     const holder = document.createElement("div");
     holder.className = "collapsible";  // column: the header sits above the body
+    holder.dataset.cname = component.name;
     holder.appendChild(header);
     holder.appendChild(body);
     row.appendChild(holder);
@@ -1441,6 +1449,18 @@ $("viewtoggle").onclick = () => {
   history.replaceState(null, "", url.toString());
   poll();
 };
+// embed mode (the uibuilder preview): hide the connection chrome and
+// talk to our own origin — the preview is always a local flua view
+const embed = new URLSearchParams(location.search).get("embed") === "1";
+if (embed) {
+  document.querySelector("header").style.display = "none";
+  $("base").value = location.origin;
+  // preview-only: interactions are inert (no QA behind the page) — clicks
+  // select elements in the uibuilder instead of firing events
+  window.uiEvent = async () => {};
+  window.deviceAction = async () => {};
+  window.deviceActionArgs = async () => {};
+}
 start();
 </script>
 </body>
