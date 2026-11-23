@@ -17,21 +17,15 @@ The HC3 has two ways to describe a QuickApp's interface:
 
 You choose with `--%%useUiView:true`. Tabs and collapsibles *only exist in v2* — declare them without it and the app shows you a blank view. (flua's `--check` now warns you about exactly that.)
 
-## The two roads a button press can take
+## How a press becomes a method call
 
-This is the part that clears everything up. When someone taps a control, the app sends the controller *one of two things*:
+When someone taps a control, exactly one thing happens: the controller calls a method. What differs is *how the view names that method* — and that depends on the format and who owns the view. Three cases:
 
-**Road 1 — the action.** The view says: "when pressed, call the method `turnOn`." The controller calls `turnOn`. Direct, simple, no middleman.
+**The old layout (v1), main QA.** The layout carries no method names at all. The app sends a UI event — "the element `onBtn` got the event `onReleased`" — and the controller looks it up in the QA's phone book (the `uiCallbacks` table, built from your `--%%u:` declarations). The method runs, receiving the event table (`event.values[1]` is the value).
 
-**Road 2 — the event.** The view says: "the element named `onBtn` got the event `onReleased`." The controller takes that and looks it up in a phone book — the QA's `uiCallbacks` table — finds `turnOn`, and calls it, this time handing over an event table (`event.values[1]` is the value).
+**The new view (v2), main QA.** The binding says `UIAction` with the element and event names. The controller turns that right back into the same phone-book lookup — v2 kept v1's behavior, just wrapped in an action. Same delivery, newer transport.
 
-Both roads end at a method. The difference is *who knows which method*.
-
-## Who owns the phone book
-
-The phone book (`uiCallbacks`) belongs to the **main QuickApp** — it's built from your `--%%u:` declarations and registered at startup.
-
-**Children have no phone book.** Their views don't say "element X was pressed"; they say "call this method" — the action name *is* the method name, and the method lives on the child's own class (the one you pass to `createChildDevice` as the second argument):
+**The new view (v2), child.** The binding *is* the method: `actionName = "turnOn"` means call `turnOn`. The controller does exactly that, on the child's own class (the one you pass to `createChildDevice` as the second argument), with the values as plain arguments. No phone book anywhere — and because each child names its own methods, two children can both have a "Turn On" button that calls their *own* `turnOn`.
 
 ```lua
 Child = {}
@@ -47,7 +41,7 @@ function QuickApp:onInit()
 end
 ```
 
-So: main QA → phone book. Child → the view names the method. One uiView format, two delivery styles.
+In short: main QA → phone book (v1 and v2 alike). Child → the view names the method. One uiView format, three cases.
 
 ## The four gotchas (all caught in the wild)
 
@@ -77,4 +71,4 @@ flua's viewer plays the exact same game as the app: non-`UIAction` bindings fire
 - v2 = uiView. Main QA: `UIAction` bindings → phone book. Child: `actionName` = the method on the child's class.
 - Tabs/collapsibles: v2 only, `useUiView:true`, never edit them in the HC3 editor.
 - Argless child bindings need `json.array()` — the plain `{}` button press dies silently.
-- flua's viewer and sim mirror both roads — develop offline, upload with confidence.
+- flua's viewer and sim mirror all three cases — develop offline, upload with confidence.
