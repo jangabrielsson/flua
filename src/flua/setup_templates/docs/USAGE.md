@@ -1745,8 +1745,8 @@ has none of them. Which one each loader uses:
 
 ### UI event dispatch on the HC3 (QA, children, v1, v2)
 
-How an interaction becomes a method call — live-verified on 5.221 plus the
-extracted runtime sources. Two channels exist:
+How an interaction becomes a method call — observed live on 5.221; the
+model below is our best reading of that behavior. Two channels exist:
 
 - **deviceAction execution**: the app executes each `eventBinding` entry
   as a device action; the runtime's `onAction(deviceId, action)` calls

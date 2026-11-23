@@ -1,4 +1,4 @@
-<h2>The button that did nothing — how QuickApp UI events really work on the HC3</h2>
+<h2>The button that did nothing — how QuickApp UI events probably work on the HC3</h2>
 
 <p>It started as a mystery. A QuickApp with a child device — a small sensor
 with its own little UI: a button, a slider, a tabbed panel. In flua's web
@@ -33,8 +33,8 @@ that.)</p>
 
 <h3>How a press becomes a method call</h3>
 
-<p>When someone taps a control, exactly one thing happens: the controller
-calls a method. What differs is <em>how the view names that method</em> —
+<p>When someone taps a control, one thing happens in the end: a method
+gets called. What differs is <em>how the view names that method</em> —
 and that depends on the format and who owns the view. Three cases:</p>
 
 <p><strong>The old layout (v1), main QA.</strong> The layout carries no
@@ -46,12 +46,12 @@ receiving the event table (<code>event.values[1]</code> is the value).</p>
 
 <p><strong>The new view (v2), main QA.</strong> The binding says
 <code>UIAction</code> with the element and event names. The controller
-turns that right back into the same phone-book lookup — v2 kept v1's
-behavior, just wrapped in an action. Same delivery, newer transport.</p>
+turns that right back into the same phone-book lookup — v2 seems to keep
+v1's behavior, wrapped in an action. Same delivery, newer transport.</p>
 
 <p><strong>The new view (v2), child.</strong> The binding <em>is</em> the
 method: <code>actionName = "turnOn"</code> means call <code>turnOn</code>.
-The controller does exactly that, on the child's own class (the one you
+The controller appears to do exactly that, on the child's own class (the one you
 pass to <code>createChildDevice</code> as the second argument), with the
 values as plain arguments. No phone book anywhere — the binding alone says what runs.</p>
 
@@ -119,7 +119,8 @@ simply won't resolve.</p>
 bindings fire as device actions, <code>UIAction</code> bindings go through
 the phone book, and the simulated <code>onAction</code>/<code>onUIEvent</code>
 route identically — so the QA you debug in the viewer behaves the same once
-uploaded (all of the above is live-verified on 5.221). And when you want a
+uploaded. The traces and logs above came from live 5.221 behavior; the
+model is our best reading of them, not the source code. And when you want a
 child with a tabbed UI, <code>flua --tool ui --as-lua</code> prints the
 compiled view as a paste-ready Lua table for <code>createChildDevice</code> —
 same format, with the bindings naming your methods directly, the way a
@@ -139,6 +140,9 @@ child's view needs them.</p>
   <li>flua's viewer and sim mirror all three cases — develop offline,
   upload with confidence.</li>
 </ul>
+
+<p>If you know better, or have a correction — please comment. This is
+our best reading of observed behavior, not Fibaro's source.</p>
 
 <p><small>Example: <code>examples/ui-3-children.lua</code> (a tabbed child
 with button, slider, switch and select, identical offline and on the
