@@ -705,8 +705,7 @@ owns the view:
 - on a **child**, the binding's `actionName` **is** the method, delivered
   via `onAction` to the child's class (the `classRepresentation` passed to
   `createChildDevice`) with plain args — each child resolves its own
-  methods, so same-named buttons on several children call their own
-  actions. `--as-lua --child` emits these child bindings; argless bindings
+  methods. `--as-lua --child` emits these child bindings; argless bindings
   (buttons) must use `json.array()` — a plain `{}` JSON-encodes as an
   object and the HC3 app silently drops the action (live-verified).
 

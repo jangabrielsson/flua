@@ -300,8 +300,7 @@ def _child_bindings(ui_view: Any, ui_callbacks: Any) -> Any:
     child model: each event's actionName IS the method on the child's
     class, delivered via onAction with plain args (children never register
     a uiCallbacks table of their own — each child resolves its own
-    methods, so same-named buttons on several children call their own
-    actions). Same uiView format as the main QA, different binding target.
+    methods). Same uiView format as the main QA, different binding target.
     UIAction wrappers become direct method bindings (value-carrying events
     get $event.value), events with no declared method drop their binding."""
     import copy

@@ -53,9 +53,7 @@ behavior, just wrapped in an action. Same delivery, newer transport.</p>
 method: <code>actionName = "turnOn"</code> means call <code>turnOn</code>.
 The controller does exactly that, on the child's own class (the one you
 pass to <code>createChildDevice</code> as the second argument), with the
-values as plain arguments. No phone book anywhere — and because each child
-names its own methods, two children can both have a "Turn On" button that
-calls their <em>own</em> <code>turnOn</code>.</p>
+values as plain arguments. No phone book anywhere — the binding alone says what runs.</p>
 
 <pre>
 Child = {}
@@ -102,8 +100,8 @@ eventBinding = { onReleased = {{ type="deviceAction",
 </pre>
 
 <p><strong>4. One view, one owner.</strong> A child's uiView names the
-child's methods — per child, so two children can both have a "Turn On"
-button calling their own <code>turnOn</code>. Don't reuse a binding that
+child's methods directly — each view calls the methods of the class it
+belongs to. Don't reuse a binding that
 targets a method that doesn't exist on that child's class: the action
 simply won't resolve.</p>
 
