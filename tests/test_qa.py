@@ -360,6 +360,99 @@ async def test_example_label_svg_v1_route(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_example_child_ui_action_delivery(tmp_path, capsys) -> None:
+    # examples/child-ui.lua — the HC3-verified child UI model: the child's
+    # uiView binds the child class's methods as actionNames directly (no
+    # UIAction wrapper, no uiCallbacks), and a device action on the child
+    # delivers to the class via callAction — exactly like the HC3's onAction
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        qa_id = engine.load_qa_file(str(REPO_ROOT / "examples" / "child-ui.lua"))[0]
+
+        def child_ready() -> bool:
+            return any(
+                d.get("parentId") == qa_id and d.get("id", 0) >= 900000
+                for d in engine.api.state.devices.values()
+            )
+
+        await wait_until(child_ready)
+        child_id = next(
+            d["id"]
+            for d in engine.api.state.devices.values()
+            if d.get("parentId") == qa_id and d.get("id", 0) >= 900000
+        )
+        device, _ = engine.api.dispatch("GET", f"/devices/{child_id}")
+        tv = device["properties"]["uiView"][0]["components"][0]
+        assert tv["type"] == "tabView"
+        btn = tv["tabs"][0]["components"][0]["components"][0]
+        assert btn["eventBinding"]["onReleased"][0]["params"]["actionName"] == "turnOn"
+        # a device action on the child routes to the child class's method
+        status = engine.api.dispatch(
+            "POST", f"/devices/{child_id}/action/turnOn", {"args": []}
+        )[1]
+        assert status == 202
+        await asyncio.sleep(0.4)
+        assert "Tabs child Turn On pressed" in capsys.readouterr().out
+        # and a value-carrying action passes the arg through (tabChanged)
+        engine.api.dispatch(
+            "POST", f"/devices/{child_id}/action/tabChanged", {"args": ["settings"]}
+        )
+        await asyncio.sleep(0.4)
+        assert "Tabs child TAB CHANGED TO settings" in capsys.readouterr().out
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_child_reusing_main_uiaction_ui_view_routes_to_main_callbacks(
+    tmp_path, capsys
+) -> None:
+    # the HC3 editor-copy workflow: the uiView format is the SAME for the
+    # main QA and children — a child given the main QA's uiView (UIAction
+    # bindings) delivers its events through the main QA's uiCallbacks, so
+    # the MAIN's methods run. flua matches: callUIEvent on the child's
+    # element resolves in the main QA's table.
+    script = tmp_path / "main.lua"
+    script.write_text(
+        '--%%u:{button="onBtn",text="On",onReleased="turnOn"}\n'
+        "function QuickApp:onInit()\n"
+        "  self:createChildDevice({\n"
+        "    name = 'A', type = 'com.fibaro.floodSensor',\n"
+        "    initialProperties = { uiView = self.properties.uiView },\n"
+        "  })\n"
+        "end\n"
+        "function QuickApp:turnOn() print('MAIN TURN ON') end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        qa_id = engine.load_qa_file(str(script))[0]
+
+        def child_ready() -> bool:
+            return any(
+                d.get("parentId") == qa_id and d.get("id", 0) >= 900000
+                for d in engine.api.state.devices.values()
+            )
+
+        await wait_until(child_ready)
+        child_id = next(
+            d["id"]
+            for d in engine.api.state.devices.values()
+            if d.get("parentId") == qa_id and d.get("id", 0) >= 900000
+        )
+        engine.api.dispatch(
+            "GET",
+            f"/plugins/callUIEvent?deviceID={child_id}&elementName=onBtn"
+            "&eventType=onReleased",
+        )
+        await asyncio.sleep(0.4)
+        assert "MAIN TURN ON" in capsys.readouterr().out
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
 async def test_example_ui_probe_compiles_data_uri_and_collapsible() -> None:
     # examples/ui-probe.lua — the HC3 upload-test fixture: an inline SVG
     # data-URI image, a network image, and a collapsible with a callback

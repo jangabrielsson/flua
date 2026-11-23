@@ -694,6 +694,22 @@ elements only, exactly what the `.fqa` package ships: the stock
 (embedded, `__`-prefixed) elements the HC3 app adds per device type are
 never included (`--as-lua --device` strips them too).
 
+The uiView format is the SAME for the main QA and children — the HC3's
+UI editor can copy a QA's uiView as JSON and that JSON feeds
+`createChildDevice` directly. Child UI events arrive as device actions,
+with two delivery routes:
+
+- `UIAction` bindings (a child reusing the MAIN QA's uiView): the event
+  resolves through the main QA's `uiCallbacks` and runs the MAIN's method
+  — the editor-copy workflow.
+- direct `actionName` bindings (`flua --tool ui --as-lua --child`): the
+  event runs the CHILD class's method with plain args — children never
+  register a `uiCallbacks` table of their own (live-verified 5.221).
+
+flua's viewer executes both routes (UIAction via callUIEvent, direct
+actionNames as device actions). See `examples/child-ui.lua` for the
+child-class pattern:
+
 ```lua
 -- pasted output: plugin.createChildDevice({
 --   name = "zone control", type = "com.fibaro.genericDevice",
@@ -841,6 +857,9 @@ after the HC3
 look), and sends interactions back through `GET /plugins/callUIEvent` — the
 same contract the real HC3 UI uses, so your `onReleased`/`onChanged`/
 `onToggled`/`onTabChanged` methods fire exactly as on the controller.
+Declarative `deviceAction` bindings (child UIs, `--as-lua --child`) are
+executed as real device actions instead — `UIAction` bindings stay on the
+callUIEvent path.
 `self:updateView` changes land live (the viewer merges `device.view` over
 the static properties). The API server stays up after the QA's timers
 drain, so the viewer keeps working while you tweak the file.

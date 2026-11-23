@@ -325,3 +325,13 @@ half meanwhile.
 - **Pinning test**: a list QA driven through the viewer (data push,
   item tap → onElementReleased callback) once the contract is captured
   against a live HC3.
+
+## Declarative eventBinding execution — the remaining half (2026-11-23)
+
+- **Shipped**: `deviceAction` bindings now execute in flua's viewer as real
+  device actions (the child-UI path — `--tool ui --as-lua --child`,
+  live-verified HC3 delivery: actionName = the child class's method).
+- **Still parked**: `updateClientView` / `updateDeviceProperty` bindings
+  and `{{device.properties.x}}` / `{{data.x}}` argument templating — the
+  HC3 client resolves them, flua's viewer does not. Same trigger as before:
+  promote when a QA ported from the new firmware needs them offline.

@@ -138,6 +138,50 @@ def test_tool_ui_as_lua_prints_paste_ready_literal(tmp_path, capsys) -> None:
     assert f"local uiView = {lua_literal(fqa['initialProperties']['uiView'])}" in out
 
 
+def test_tool_ui_as_lua_child_bindings(capsys) -> None:
+    # --as-lua --child: the HC3 delivers child UI events as device actions
+    # whose actionName IS the QA method (children have no uiCallbacks). The
+    # UIAction wrapper is replaced; value events carry $event.value; button
+    # events carry no args; --child without --as-lua is an error.
+    import tempfile
+
+    from flua.tools.ui import _child_bindings
+
+    with tempfile.TemporaryDirectory() as d:
+        script = Path(d) / "child.lua"
+        script.write_text(
+            "--%%u:{button=\"onBtn\",text=\"On\",onReleased=\"turnOn\"}\n"
+            "--%%u:{slider=\"dim\",text=\"Dim\",min=\"0\",max=\"100\",value=\"50\",onChanged=\"dim\"}\n"
+        )
+        assert tools.run_tool("ui", [str(script), "--as-lua", "--child"]) == 0
+        out = capsys.readouterr().out
+        assert "actionName='turnOn',args={}" in out
+        assert "actionName='dim',args={'$event.value'}" in out
+        assert "local viewLayout" not in out and "local uiCallbacks" not in out
+        assert "UIAction" not in out
+        # the pure transform: bindings rewritten, no UIAction left
+        from flua.config import parse_annotations
+        from flua.ui import compile_ui
+
+        rows = parse_annotations(script.read_text())["u"]
+        ui = compile_ui(rows, 5000)
+        child_view = _child_bindings(ui["uiView"], ui["uiCallbacks"])
+        btn = child_view[0]["components"][0]
+        assert btn["eventBinding"]["onReleased"][0]["params"]["actionName"] == "turnOn"
+        assert btn["eventBinding"]["onReleased"][0]["params"]["args"] == []
+        sld = child_view[1]["components"][0]
+        assert sld["eventBinding"]["onChanged"][0]["params"]["args"] == ["$event.value"]
+        # the original compiled uiView is untouched (the transform copies)
+        assert ui["uiView"][0]["components"][0]["eventBinding"]["onReleased"][0]["params"][
+            "actionName"
+        ] == "UIAction"
+    # --child without --as-lua is refused
+    with pytest.raises(SystemExit) as exc_info:
+        tools.run_tool("ui", [str(script), "--child"])
+    assert exc_info.value.code == 2
+    assert "--child requires --as-lua" in capsys.readouterr().err
+
+
 def test_tool_ui_as_lua_strips_stock_elements_from_device_dump() -> None:
     # --as-lua --device: the HC3 materializes its stock (embedded) UI into
     # the device's stored view — '__'-prefixed ids. The paste-ready dump

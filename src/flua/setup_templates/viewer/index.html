@@ -367,6 +367,38 @@ function eventFor(component) {
   return null;
 }
 
+// a declarative eventBinding: the HC3 app executes these as device actions
+// (POST /devices/<id>/action/<name>) — child uiViews bind the QA's method
+// as the actionName directly. The UIAction wrapper is the uiCallbacks
+// back-compat path, so it stays on callUIEvent.
+function boundAction(component, eventName) {
+  const bindings = (component.eventBinding || {})[eventName];
+  if (!Array.isArray(bindings) || !bindings.length) return null;
+  const first = bindings[0];
+  if (!first || first.type !== "deviceAction" || !first.params) return null;
+  const name = first.params.actionName;
+  if (!name || name === "UIAction") return null;
+  // an empty Lua table round-trips through JSON as {} (object), not [] —
+  // treat a non-array args as no args (the HC3 unpacks {} to nothing)
+  const rawArgs = first.params.args;
+  return { name, args: Array.isArray(rawArgs) ? rawArgs : [] };
+}
+
+function resolveArgs(args, value) {
+  return (args || []).map((a) => (a === "$event.value" ? value : a));
+}
+
+async function deviceActionArgs(deviceId, actionName, args) {
+  const url = $("base").value.replace(/\/+$/, "") +
+    "/devices/" + encodeURIComponent(deviceId) +
+    "/action/" + encodeURIComponent(actionName);
+  await json(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ args }),
+  });
+}
+
 // the HC3's named button/switch icons (5.221 image property) — a curated
 // inline-SVG map; unknown names render text-only
 const ICONS = {
@@ -412,8 +444,9 @@ function withIcon(btn, name) {
 }
 
 // press-and-hold: the 5.221 onLongPressDown/onLongPressReleased events
-// (custom components only — embedded controls keep click-to-action)
-function wireLongPress(btn, deviceId, name) {
+// (custom components only — embedded controls keep click-to-action);
+// declarative deviceAction bindings fire as actions instead of UI events
+function wireLongPress(btn, deviceId, component) {
   let timer = null, longPressed = false;
   const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
   const start = () => {
@@ -422,14 +455,18 @@ function wireLongPress(btn, deviceId, name) {
     timer = setTimeout(() => {
       timer = null;
       longPressed = true;
-      uiEvent(deviceId, name, "onLongPressDown");
+      const ba = boundAction(component, "onLongPressDown");
+      if (ba) deviceActionArgs(deviceId, ba.name, resolveArgs(ba.args, undefined));
+      else uiEvent(deviceId, component.name, "onLongPressDown");
     }, 500);
   };
   const end = () => {
     cancel();
     if (longPressed) {
       longPressed = false;
-      uiEvent(deviceId, name, "onLongPressReleased");
+      const ba = boundAction(component, "onLongPressReleased");
+      if (ba) deviceActionArgs(deviceId, ba.name, resolveArgs(ba.args, undefined));
+      else uiEvent(deviceId, component.name, "onLongPressReleased");
     }
   };
   btn.addEventListener("pointerdown", start);
@@ -534,14 +571,17 @@ function renderComponent(device, component, row) {
     btn.textContent = text ?? component.name;
     withIcon(btn, component.image);
     if (component.disabled) btn.disabled = true;
-    if (!action && event) wireLongPress(btn, device.id, component.name);
+    if (!action && event) wireLongPress(btn, device.id, component);
     btn.onclick = () => {
       // a long press already sent onLongPressReleased — don't double-fire
       if (btn._longPressed && btn._longPressed()) return;
       // a fixed component value rides along as the action's single argument
       // (the embedded mute/unmute buttons pass 0/1 to setMute)
       if (action) deviceAction(device.id, action, component.value);
-      else if (event) uiEvent(device.id, component.name, event);
+      else if (boundAction(component, "onReleased")) {
+        const ba = boundAction(component, "onReleased");
+        deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, undefined));
+      } else if (event) uiEvent(device.id, component.name, event);
       // release the button's focus: the poll skips value refreshes while
       // the panel contains the active element, and a clicked button keeps
       // focus — a QA's updateView-driven label/button text changes would
@@ -600,6 +640,9 @@ function renderComponent(device, component, row) {
           ? { [component.argKey]: parseFloat(slider.value) }
           : slider.value;
         deviceAction(device.id, action, arg);
+      } else if (boundAction(component, "onChanged")) {
+        const ba = boundAction(component, "onChanged");
+        deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, slider.value));
       } else if (event) uiEvent(device.id, component.name, event, slider.value);
     };
     control.appendChild(slider);
@@ -621,14 +664,22 @@ function renderComponent(device, component, row) {
     btn.onclick = () => {
       const v = btn.classList.contains("on") ? "false" : "true";
       setComponentValue(device, component, v);
-      if (action) deviceAction(device.id, action, v);
-      // the 5.221 split toggle events REPLACE the legacy event when
-      // declared — send exactly one of them per flip
-      const eb = component.eventBinding || {};
-      if (!action && (eb.onToggleOn || eb.onToggleOff)) {
-        uiEvent(device.id, component.name, v === "true" ? "onToggleOn" : "onToggleOff", v);
-      } else if (event) {
-        uiEvent(device.id, component.name, event, v);
+      if (action) {
+        deviceAction(device.id, action, v);
+      } else {
+        // the 5.221 split toggle events REPLACE the legacy event when
+        // declared — send exactly one of them per flip
+        const eb = component.eventBinding || {};
+        const toggleEvent =
+          eb.onToggleOn || eb.onToggleOff
+            ? (v === "true" ? "onToggleOn" : "onToggleOff")
+            : event;
+        if (boundAction(component, toggleEvent)) {
+          const ba = boundAction(component, toggleEvent);
+          deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, v));
+        } else if (toggleEvent) {
+          uiEvent(device.id, component.name, toggleEvent, v);
+        }
       }
       paint();
       btn.blur();  // same as the button: don't hold the panel's value refresh hostage
@@ -699,7 +750,10 @@ function renderComponent(device, component, row) {
           field.blur();  // see hide(): a focused field blocks poll refreshes
           // send every selected value, comma-joined (the single callUIEvent
           // value param); the sim restores the list for the QA
-          if (event) uiEvent(device.id, component.name, event, chosen.join(","));
+          if (boundAction(component, "onToggled")) {
+            const ba = boundAction(component, "onToggled");
+            deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, chosen.join(",")));
+          } else if (event) uiEvent(device.id, component.name, event, chosen.join(","));
         } else {
           chosen.length = 0;
           chosen.push(opt.value);
@@ -707,7 +761,10 @@ function renderComponent(device, component, row) {
           paintField();
           paintMarks();
           hide();
-          if (event) uiEvent(device.id, component.name, event, opt.value);
+          if (boundAction(component, "onToggled")) {
+            const ba = boundAction(component, "onToggled");
+            deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, opt.value));
+          } else if (event) uiEvent(device.id, component.name, event, opt.value);
         }
       };
       panel.appendChild(row);
@@ -783,7 +840,9 @@ function renderComponent(device, component, row) {
         // (or server-side) activeTab — the flip-back bug. Then swap the
         // tabs and panels in place (panel order mirrors tab order).
         setComponentValue(device, component, tab.name);
-        if (eventFor(component) === "onTabChanged") {
+        const ba = boundAction(component, "onTabChanged");
+        if (ba) deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, tab.name));
+        else if (eventFor(component) === "onTabChanged") {
           uiEvent(device.id, component.name, "onTabChanged", tab.name);
         }
         bar.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b === header));
