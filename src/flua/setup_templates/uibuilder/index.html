@@ -171,6 +171,7 @@ function textInput(value, onInput, placeholder) {
 
 function optionsEditor(options, onChange) {
   const ta = document.createElement("textarea");
+  ta.placeholder = "one option per line: Text=value (or value alone)";
   ta.value = (options || []).map((o) => (o.text && o.text !== String(o.value) ? o.text + "=" + o.value : String(o.value))).join("\n");
   ta.oninput = () => {
     const opts = ta.value.split("\n").filter((l) => l.trim()).map((l) => {
