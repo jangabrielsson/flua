@@ -1,0 +1,71 @@
+<h2>Design your QuickApp UI in the browser — the uibuilder</h2>
+
+<p>The child-devices story had one rough edge left: the UIs themselves.
+Tabbed panels and collapsible sections are the modern view elements — and
+the one place the HC3's editor can't touch them is exactly where they're
+most useful, on child devices. Until now that meant writing
+<code>--%%u</code> rows by hand. flua's newest tool turns that into
+point-and-click.</p>
+
+<p><img src="uibuilder.png" alt="The uibuilder: element palette on the
+left, the row assembly and live preview in the middle, properties on the
+right"></p>
+
+<h3>The loop</h3>
+
+<p>Pick elements from the palette, they land in rows — several elements
+can share a row, up to ten (the HC3 editor stops at five). Select an
+element and edit its properties on the right: name, text, callbacks,
+slider ranges, options. The preview below is the <i>real</i> flua viewer
+rendering your work — what you see is what the controller will draw, down
+to the event bindings. When you're happy, copy the directives into your
+QA file:</p>
+
+<pre>
+flua --tool uibuilder
+-- http://127.0.0.1:&lt;port&gt;/
+</pre>
+
+<p>No save buttons, no files — the builder is stateless and the directives
+are the artifact. Paste them in, done. (Imported existing
+<code>--%%u</code>/<code>--%%rsrc</code> back? The import box parses them
+into the editor.)</p>
+
+<h3>Three targets, one builder</h3>
+
+<ul>
+<li><b>Main QA — v1.</b> The legacy layout: buttons, sliders, switches,
+labels — labels with HTML, the thing v1 is still good for.</li>
+<li><b>Main QA — v2.</b> The uiView format with the full element set —
+tabs, collapsibles, images — and the <code>--%%useUiView:true</code>
+reminder on export.</li>
+<li><b>Child device.</b> Children carry a uiView with child bindings (the
+method name <i>is</i> the binding); the builder exports a
+<code>--%%rsrc:name:{…}</code> block ready for
+<code>createChildDevice</code>.</li>
+</ul>
+
+<h3>Small things that save you from yourself</h3>
+
+<ul>
+<li><b>Click-to-select in the preview.</b> Click a button in the preview
+and the builder selects it — no hunting for the right row.</li>
+<li><b>Duplicate names get a warning.</b> UI events route by element
+name; two elements with the same name collide. The builder says so in
+red, live as you type.</li>
+<li><b>The row rules are enforced in the UI.</b> Full-width elements
+(tabs, collapsibles) sit alone on their row; anything else mixes freely
+up to ten per row.</li>
+<li><b>Mistakes surface, not silently break.</b> If the model can't
+compile, the error appears next to the export box.</li>
+</ul>
+
+<p>Everything the builder emits goes through the same compiler as the
+directives you'd write by hand — the export text is generated
+server-side from that compiler, so the builder can never drift from what
+flua ships.</p>
+
+<p><small>Run: <code>flua --tool uibuilder</code> · related posts:
+<a href="/docs/forum/36-child-ui-resources.html">Child UIs as resources</a>,
+<a href="/docs/forum/ui-events-explained.html">The button that did nothing</a>
+· flua: https://github.com/jangabrielsson/flua</small></p>
