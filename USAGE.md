@@ -685,6 +685,22 @@ elements, so it cannot edit them and an edit there can rewrite the view
 and drop them. Keep tabbed/collapsible QAs flua-authored and update them
 with `--tool updateQA`/`uploadQA`.
 
+**Child devices** are the exception that makes v2 elements safe on the
+HC3: `plugin.createChildDevice` accepts a `uiView` and child UIs are never
+rewritten by the editor. `flua --tool ui --as-lua script.lua` prints the
+compiled UI as paste-ready Lua locals (`uiView`, `viewLayout`,
+`uiCallbacks`) to drop into the createChildDevice call — declared
+elements only, exactly what the `.fqa` package ships: the stock
+(embedded, `__`-prefixed) elements the HC3 app adds per device type are
+never included (`--as-lua --device` strips them too).
+
+```lua
+-- pasted output: plugin.createChildDevice({
+--   name = "zone control", type = "com.fibaro.genericDevice",
+--   initialProperties = { uiView = uiView },
+-- })
+```
+
 An `image` shows a picture from its `url` (live-updatable via
 `updateView(elm, "url", …)`; the HC3's own legacy views carry them, e.g.
 russound's album art). It sits inline in a row like a button:

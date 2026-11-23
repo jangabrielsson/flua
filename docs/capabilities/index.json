@@ -529,7 +529,7 @@
       },
       {
         "name": "ui",
-        "help": "print a QA's DECLARED UI as text (elements, callbacks, options) — static, not live state; --device ID fetches an HC3 device's UI and renders it back to --%%u rows + the raw JSON; for post-init values and callback behavior see examples/ui-interaction-test.lua"
+        "help": "print a QA's DECLARED UI as text (elements, callbacks, options) — static, not live state; --as-lua prints paste-ready Lua tables (child-device uiView); --device ID fetches an HC3 device's UI and renders it back to --%%u rows + the raw JSON; for post-init values and callback behavior see examples/ui-interaction-test.lua"
       },
       {
         "name": "unpack",

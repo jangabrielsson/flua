@@ -85,6 +85,104 @@ def test_tool_listing(capsys) -> None:
         assert "flua --tool <name> --help" in out
 
 
+def test_tool_ui_as_lua_prints_paste_ready_literal(tmp_path, capsys) -> None:
+    # --tool ui --as-lua: the compiled UI as paste-ready Lua locals — the
+    # createChildDevice workflow (child devices are the one HC3 place the
+    # editor never rewrites, so v2 elements are safe there). The printed
+    # uiView is exactly the compiler's output and evaluates as Lua.
+    script = tmp_path / "tabs.lua"
+    script.write_text(
+        "--%%useUiView:true\n"
+        "--%%u:{tabView=\"mainTabs\",activeTab=\"a\",tabs={"
+        "{name=\"a\",text=\"A\",components={{{label=\"lbl\",text=\"Hi\"}}}}"
+        "}}\n"
+        "--%%u:{image=\"img\",url=\"https://x/y.png\"}\n"
+        "--%%u:{collapsible=\"c\",text=\"More\",components={{{button=\"b\",text=\"Go\",onReleased=\"go\"}}}}\n"
+    )
+    assert tools.run_tool("ui", [str(script), "--as-lua"]) == 0
+    out = capsys.readouterr().out
+    assert "local uiView = {" in out
+    assert "local viewLayout = {" in out
+    assert "local uiCallbacks = {" in out
+    assert "type='tabView'" in out and "type='image'" in out and "type='collapsible'" in out
+    # the printed literal IS the compiler's output (single source of truth)
+    from flua.config import parse_annotations
+    from flua.ui import compile_ui, lua_literal
+
+    rows = parse_annotations(script.read_text())["u"]
+    ui = compile_ui(rows, 5000)
+    assert f"local uiView = {lua_literal(ui['uiView'])}" in out
+    # and it evaluates as Lua: one row per directive, tabView first
+    from lupa import LuaRuntime
+
+    lua = LuaRuntime()
+    result = lua.execute(out.splitlines()[1] + "\nreturn #uiView, uiView[1].components[1].type")
+    assert result[0] == 3 and result[1] == "tabView"
+    # the printed uiView is exactly what the .fqa ships (no stock/embedded
+    # elements — those are type-level, the HC3 app adds them itself)
+    from flua.tools.common import build_fqa
+
+    fqa, _ = build_fqa(str(script))
+    assert f"local uiView = {lua_literal(fqa['initialProperties']['uiView'])}" in out
+
+
+def test_tool_ui_as_lua_strips_stock_elements_from_device_dump() -> None:
+    # --as-lua --device: the HC3 materializes its stock (embedded) UI into
+    # the device's stored view — '__'-prefixed ids. The paste-ready dump
+    # strips them (the app re-adds them), matching the package's contents.
+    from flua.tools.ui import _device_ui_for_lua
+
+    props = {
+        "uiView": [
+            {
+                "type": "horizontal",
+                "components": [
+                    {"type": "button", "name": "__turnOn", "text": "On"},
+                    {"type": "button", "name": "myBtn", "text": "Mine"},
+                ],
+            },
+            {
+                "type": "horizontal",
+                "components": [{"type": "button", "name": "__turnOff", "text": "Off"}],
+            },
+        ],
+        "viewLayout": {
+            "$jason": {
+                "body": {
+                    "sections": {
+                        "items": [
+                            {
+                                "type": "vertical",
+                                "components": [
+                                    {"type": "button", "name": "__on", "text": "On"},
+                                    {"type": "space"},
+                                ],
+                            },
+                            {
+                                "type": "vertical",
+                                "components": [
+                                    {"type": "button", "name": "mine", "text": "Mine"},
+                                    {"type": "space"},
+                                ],
+                            },
+                        ]
+                    }
+                }
+            }
+        },
+        "uiCallbacks": [
+            {"name": "__on", "eventType": "onReleased", "callback": ""},
+            {"name": "mine", "eventType": "onReleased", "callback": "doMine"},
+        ],
+    }
+    layout, ui_view, callbacks = _device_ui_for_lua(props)
+    assert [c["name"] for row in ui_view for c in row["components"]] == ["myBtn"]
+    items = layout["$jason"]["body"]["sections"]["items"]
+    assert len(items) == 1  # the stock-only row dropped
+    assert items[0]["components"][0]["name"] == "mine"
+    assert [c["name"] for c in callbacks] == ["mine"]
+
+
 class _MockHc3(BaseHTTPRequestHandler):
     """Serves the endpoints createDB/uploadFQA/downloadFQA/updateQA read."""
 
