@@ -1141,6 +1141,29 @@ local function startQaInEnv(env, qaId, config, args, loader, sourceName)
   -- onInit, so pump messages can arrive while only the stub exists).
   qaInstances[qaId] = { id = qaId, name = tostring(config.name), booting = true }
   installQaLibs(env)  -- class/quickapp/fibaro into this QA, before its code
+  -- --%%rsrc declarations: the engine compiled them into child uiViews and
+  -- put them on the config — inject as fibaro.RSRC so the QA code reads
+  -- fibaro.RSRC.<name> exactly like the packaged rsrc.lua provides on the
+  -- HC3 (no physical file is created for a run).
+  local rsrc = config.rsrc
+  if type(rsrc) == "table" and next(rsrc) ~= nil then
+    -- argless child bindings carry args=[] (the generated source uses
+    -- json.array()); the decoded config table holds them as unmarked
+    -- empties — mark them so json.encode round-trips [] and not {}
+    -- (the HC3 app silently drops object args).
+    local function markArrays(node)
+      if type(node) ~= "table" then return end
+      local args = rawget(node, "args")
+      if type(args) == "table" and not next(args) then
+        json.util.InitArray(args)
+      end
+      for k, v in pairs(node) do
+        if type(v) == "table" then markArrays(v) end
+      end
+    end
+    markArrays(rsrc)
+    env.fibaro.RSRC = rsrc
+  end
   local chunk, err = loader()
   if not chunk then
     print("Error loading " .. tostring(sourceName) .. ": " .. tostring(err))

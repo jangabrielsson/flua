@@ -149,3 +149,31 @@ def test_run_for_is_a_hard_wall_deadline() -> None:
     assert _keep_running(engine, 5.0, now, None) is True
     # past the wall deadline: hard stop, pending work or not
     assert _keep_running(engine, 5.0, now - 6.0, None) is False
+
+
+def test_rsrc_directive_parses_named_ui_rows() -> None:
+    from flua.config import parse_annotations
+
+    source = (
+        "--%%rsrc:guiChild1:{{button=\"b\",text=\"B\",onReleased=\"press\"}}\n"
+        "--%%rsrc:guiChild2:{slider=\"dim\",text=\"Dim\",min=\"0\",max=\"100\",\n"
+        "--   value=\"50\",onChanged=\"dim\"}\n"
+    )
+    annotations = parse_annotations(source)
+    assert [e["name"] for e in annotations["rsrc"]] == ["guiChild1", "guiChild2"]
+    # multi-line values join like --%%u rows; one directive is one row
+    # (a dict for a single element, a list for several)
+    assert annotations["rsrc"][1]["rows"] == [{
+        "slider": "dim", "text": "Dim", "min": "0", "max": "100", "value": "50", "onChanged": "dim"
+    }]  # the single-row convenience form wraps into a row list
+
+
+def test_rsrc_directive_rejects_bad_names() -> None:
+    import pytest
+
+    from flua.config import parse_annotations
+
+    with pytest.raises(ValueError, match="name"):
+        parse_annotations("--%%rsrc::{button=\"b\"}\n")
+    with pytest.raises(ValueError, match="identifier"):
+        parse_annotations("--%%rsrc:not-a-name:{button=\"b\"}\n")

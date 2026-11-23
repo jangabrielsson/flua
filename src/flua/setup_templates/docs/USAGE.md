@@ -713,6 +713,38 @@ flua's viewer executes both (UIAction via callUIEvent, direct actionNames
 as device actions). See `examples/child-ui.lua` for the child-class
 pattern (and *UI event dispatch on the HC3* below for the full model):
 
+### Child uiViews as resources (`--%%rsrc`)
+
+A `--%%rsrc:name:{rows}` directive declares a named child uiView — the
+rows are ordinary `--%%u` row shapes (one row per directive value; a bare
+element dict is the single-row convenience form; long values continue on
+following comment lines like `--%%u`). flua compiles each resource to a
+child-bound uiView (`actionName` = the method, `json.array()` for argless
+bindings) and makes it available as `fibaro.RSRC.name`:
+
+```lua
+--%%rsrc:uiA:{tabView="mainTabs",activeTab="control",onTabChanged="tabChanged",tabs={
+--  {name="control",text="Control",components={
+--    {{button="onBtn",text="Turn On",onReleased="turnOn"}}
+--  }}}}
+--%%rsrc:uiC:{{{button="b1",text="1",onReleased="press"},{button="b2",text="2",onReleased="press"}},
+--  {{image="art",url="https://host/art.png"}}}
+
+function QuickApp:onInit()
+  self:createChildDevice({ name = "A", type = "com.fibaro.floodSensor",
+    initialProperties = { uiView = fibaro.RSRC.uiA } }, Child)
+end
+```
+
+No `rsrc.lua` file is ever created for a run — the table is injected. When
+you package the QA, the export synthesizes one `rsrc.lua` (defining
+`fibaro.RSRC` with the compiled uiViews) and ships it as a normal
+`--%%file` extra, loaded before `main` — so the same code runs unchanged on
+the HC3. Resource names must be Lua identifiers (they become
+`fibaro.RSRC.<name>`); the directive is the future home of other resource
+kinds (icon bitmaps etc.). `examples/ui-3-children.lua` declares its three
+child UIs this way.
+
 ```lua
 -- pasted output: plugin.createChildDevice({
 --   name = "zone control", type = "com.fibaro.genericDevice",

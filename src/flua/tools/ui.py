@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config import expand_includes, parse_annotations
-from ..ui import JsonArray, compile_ui, lua_literal, ui_to_u_rows
+from ..ui import child_bindings, compile_ui, lua_literal, ui_to_u_rows
 from .common import build_fqa, hc3_engine
 
 NAME = "ui"
@@ -291,67 +291,6 @@ def _as_lua_block(source: str, view_layout: Any, ui_view: Any, ui_callbacks: Any
     return "\n".join(lines)
 
 
-# events whose binding carries the interaction's value
-_VALUE_EVENTS = {"onChanged", "onToggled", "onToggleOn", "onToggleOff", "onTabChanged"}
-
-
-def _child_bindings(ui_view: Any, ui_callbacks: Any) -> Any:
-    """Rewrite a compiled uiView into CHILD bindings — the live-verified
-    child model: each event's actionName IS the method on the child's
-    class, delivered via onAction with plain args (children never register
-    a uiCallbacks table of their own — each child resolves its own
-    methods). Same uiView format as the main QA, different binding target.
-    UIAction wrappers become direct method bindings (value-carrying events
-    get $event.value), events with no declared method drop their binding."""
-    import copy
-
-    cbs: dict[str, dict[str, str]] = {}
-    for entry in ui_callbacks or []:
-        if not isinstance(entry, dict):
-            continue
-        name, event, callback = (
-            entry.get("name"),
-            entry.get("eventType"),
-            entry.get("callback"),
-        )
-        if name and event and callback:
-            cbs.setdefault(str(name), {})[str(event)] = str(callback)
-
-    def transform(node: Any) -> Any:
-        if isinstance(node, dict):
-            out = {k: v for k, v in node.items()}
-            eb = node.get("eventBinding")
-            if isinstance(eb, dict):
-                name = str(node.get("name") or "")
-                rewritten: dict[str, Any] = {}
-                for event in eb:
-                    method = cbs.get(name, {}).get(event)
-                    if not method:
-                        continue
-                    args = ["$event.value"] if event in _VALUE_EVENTS else JsonArray()
-                    rewritten[event] = [
-                        {
-                            "type": "deviceAction",
-                            "params": {"actionName": method, "args": args},
-                        }
-                    ]
-                if rewritten:
-                    out["eventBinding"] = rewritten
-                else:
-                    out.pop("eventBinding", None)
-            for k in list(out):
-                out[k] = transform(out[k])
-            return out
-        if isinstance(node, list):
-            out = [transform(v) for v in node]
-            # preserve the marked empty array: a plain list rebuild would
-            # strip the JsonArray subclass back to a bare {} literal
-            if isinstance(node, JsonArray) and not out:
-                out = JsonArray()
-            return out
-        return node
-
-    return transform(copy.deepcopy(ui_view))
 
 
 def ui_dump(script: str) -> dict[str, Any]:
@@ -384,7 +323,7 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
             props = device.get("properties") or {}
             if args.child:
                 _, ui_view, ui_callbacks = _device_ui_for_lua(props)
-                ui_view = _child_bindings(ui_view, ui_callbacks)
+                ui_view = child_bindings(ui_view, ui_callbacks)
                 print(_as_lua_block(f"--device {args.device} --child", None, ui_view, None))
             else:
                 view_layout, ui_view, ui_callbacks = _device_ui_for_lua(props)
@@ -432,7 +371,7 @@ def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
             # on the HC3 for children), so only the uiView local prints
             print(
                 _as_lua_block(
-                    args.script, None, _child_bindings(ui["uiView"], ui["uiCallbacks"]), None
+                    args.script, None, child_bindings(ui["uiView"], ui["uiCallbacks"]), None
                 )
             )
             return 0

@@ -329,16 +329,17 @@ def _brace_balance(text: str) -> int:
 
 
 def _join_ui_continuations(source: str) -> str:
-    """Merge multi-line ``--%%u`` directives: while the directive's table is
-    brace-unbalanced, absorb the following plain comment lines
-    continuations like ``--      options={...}``) into the value."""
+    """Merge multi-line ``--%%u``/``--%%rsrc`` directives: while the
+    directive's table is brace-unbalanced, absorb the following plain
+    comment lines (continuations like ``--      options={...}``) into the
+    value."""
     lines = source.splitlines()
     out: list[str] = []
     i = 0
     while i < len(lines):
         line = lines[i]
         stripped = line.strip()
-        if stripped.startswith("--%%") and stripped[4:].lstrip().startswith("u:"):
+        if stripped.startswith("--%%") and stripped[4:].lstrip().startswith(("u:", "rsrc:")):
             merged = line
             depth = _brace_balance(stripped.split(":", 1)[1])
             while depth > 0 and i + 1 < len(lines):
@@ -555,6 +556,31 @@ def parse_annotations(source: str, warn_unknown: bool = True) -> dict[str, Any]:
                 rows = []
                 config["u"] = rows
             rows.append(parse_lua_literal(value))
+        elif name == "rsrc":
+            # --%%rsrc:guiChild1:{...} — a named resource (a child uiView
+            # table); the name becomes fibaro.RSRC.<name> in the running QA
+            # and a synthesized rsrc.lua ships in the .fqa. The value is a
+            # Lua table literal of --%%u rows.
+            rsrc_name, sep, rsrc_value = value.partition(":")
+            rsrc_name = rsrc_name.strip()
+            if not sep or not rsrc_name:
+                raise ValueError(f"--%%rsrc needs a name: --%%rsrc:name:{{...}} (got {value!r})")
+            if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", rsrc_name):
+                raise ValueError(
+                    f"--%%rsrc name must be a Lua identifier "
+                    f"(fibaro.RSRC.<name>): got {rsrc_name!r}"
+                )
+            entries = config.get("rsrc")
+            if not isinstance(entries, list):
+                entries = []
+                config["rsrc"] = entries
+            parsed = parse_lua_literal(rsrc_value.strip())
+            # the value is the WHOLE uiView: a list of rows (each row a
+            # dict for one element or a list for several). A bare dict is
+            # the single-row convenience form.
+            if isinstance(parsed, dict):
+                parsed = [parsed]
+            entries.append({"name": rsrc_name, "rows": parsed})
         elif name == "db":
             # --%%db:house.json — seed the sim from the file; --%%db:+house.json
             # additionally persists emulator state back to it (offline: the
@@ -697,6 +723,7 @@ KNOWN_DIRECTIVES = frozenset(
         "manufacturer",
         "keep-alive",
         "u",
+        "rsrc",
         "useUiView",
         "scene",  # --%%scene:true — run this QA as an HC3 Lua scene (COND + actions)
         DEVICE_ID_DIRECTIVE,  # --%%deviceId:123 — downloaded-file metadata (--tool uploadFile)
@@ -757,7 +784,7 @@ def merge_annotations(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, 
             sub = dict(merged.get(key) or {})
             sub.update(value or {})
             merged[key] = sub
-        elif key in ("u", "file"):
+        elif key in ("u", "file", "rsrc"):
             existing = merged.get(key)
             if not isinstance(existing, list):
                 existing = [existing] if existing is not None else []

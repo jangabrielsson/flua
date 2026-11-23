@@ -145,7 +145,7 @@ def test_tool_ui_as_lua_child_bindings(capsys) -> None:
     # events carry no args; --child without --as-lua is an error.
     import tempfile
 
-    from flua.tools.ui import _child_bindings
+    from flua.ui import child_bindings
 
     with tempfile.TemporaryDirectory() as d:
         script = Path(d) / "child.lua"
@@ -167,7 +167,7 @@ def test_tool_ui_as_lua_child_bindings(capsys) -> None:
 
         rows = parse_annotations(script.read_text())["u"]
         ui = compile_ui(rows, 5000)
-        child_view = _child_bindings(ui["uiView"], ui["uiCallbacks"])
+        child_view = child_bindings(ui["uiView"], ui["uiCallbacks"])
         btn = child_view[0]["components"][0]
         assert btn["eventBinding"]["onReleased"][0]["params"]["actionName"] == "turnOn"
         assert btn["eventBinding"]["onReleased"][0]["params"]["args"] == []
@@ -2486,3 +2486,26 @@ def test_test_tool_deadline_caps_hung_tests_only(monkeypatch, tmp_path, capsys) 
     out = capsys.readouterr().out
     assert "PASS  " in out and "FAIL  " in out
     assert "1 passed, 1 failed" in out
+
+
+def test_export_synthesizes_rsrc_file_from_rsrc_directives(tmp_path) -> None:
+    # --%%rsrc never creates a file at runtime; the .fqa package ships a
+    # synthesized rsrc.lua (loaded first) defining fibaro.RSRC with the
+    # compiled CHILD uiViews.
+    from flua.tools.common import build_fqa
+
+    script = tmp_path / "rsrc.lua"
+    script.write_text(
+        "--%%name:rsrcqa\n"
+        "--%%rsrc:guiChild1:{{button=\"b\",text=\"B\",onReleased=\"press\"}}\n"
+        "function QuickApp:onInit() end\n"
+    )
+    fqa, _ = build_fqa(str(script))
+    files = fqa["files"]
+    assert files[0]["name"] == "rsrc" and not files[0]["isMain"]
+    content = files[0]["content"]
+    assert "fibaro.RSRC = fibaro.RSRC or {}" in content
+    assert "fibaro.RSRC.guiChild1 = " in content
+    assert "actionName='press'" in content
+    # main still ships alongside
+    assert any(f["isMain"] for f in files)

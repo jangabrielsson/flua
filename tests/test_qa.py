@@ -415,6 +415,48 @@ async def test_example_ui3children_three_views_and_action_delivery(tmp_path, cap
 
 
 @pytest.mark.asyncio
+async def test_rsrc_directive_injects_fibaro_rsrc_and_child_ui(tmp_path) -> None:
+    # --%%rsrc:name:{rows} compiles to a CHILD uiView reachable as
+    # fibaro.RSRC.name in the running QA (no physical file), and a child
+    # created from it gets the child bindings.
+    script = tmp_path / "rsrc.lua"
+    script.write_text(
+        "--%%rsrc:guiChild1:{{button=\"b\",text=\"B\",onReleased=\"press\"}}\n"
+        "function QuickApp:onInit()\n"
+        "  self:createChildDevice({\n"
+        "    name = 'A', type = 'com.fibaro.floodSensor',\n"
+        "    initialProperties = { uiView = fibaro.RSRC.guiChild1 },\n"
+        "  })\n"
+        "end\n"
+        "function QuickApp:press() end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        qa_id = engine.load_qa_file(str(script))[0]
+
+        def child_ready() -> bool:
+            return any(
+                d.get("parentId") == qa_id and d.get("id", 0) >= 900000
+                for d in engine.api.state.devices.values()
+            )
+
+        await wait_until(child_ready)
+        child_id = next(
+            d["id"]
+            for d in engine.api.state.devices.values()
+            if d.get("parentId") == qa_id and d.get("id", 0) >= 900000
+        )
+        device, _ = engine.api.dispatch("GET", f"/devices/{child_id}")
+        btn = device["properties"]["uiView"][0]["components"][0]
+        # the child model: actionName IS the method, json.array() for argless
+        assert btn["eventBinding"]["onReleased"][0]["params"]["actionName"] == "press"
+        assert btn["eventBinding"]["onReleased"][0]["params"]["args"] == []
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
 async def test_example_child_ui_action_delivery(tmp_path, capsys) -> None:
     # examples/child-ui.lua — the HC3-verified child UI model: the child's
     # uiView binds the child class's methods as actionNames directly (no
