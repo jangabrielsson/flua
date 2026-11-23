@@ -69,5 +69,11 @@
   },
   "hint": {
     "enable": true
-  }
+  },
+    "diagnostics.disable": [
+        "duplicate-set-field",
+        "param-type-mismatch",
+        "lowercase-global",
+        "assign-type-mismatch"
+    ]
 }
