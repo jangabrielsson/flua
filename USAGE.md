@@ -749,7 +749,10 @@ Resources may be declared in `--%%file` extras too — flua scans every QA
 file for `--%%rsrc` (the resource belongs next to the file that defines
 the children), collecting extras first and the main file last, so a
 main-file name overrides an extra's. On the HC3 the directives are inert
-Lua comments; the synthesized `rsrc.lua` carries the table.
+Lua comments; the synthesized `rsrc.lua` carries the table. `unpack`/
+`downloadQA` materialize it: the unpacked project gets a real
+`<name>_rsrc.lua` declared as an extra, with the original directives
+below the EOH line.
 
 ```lua
 -- pasted output: plugin.createChildDevice({

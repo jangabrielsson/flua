@@ -439,15 +439,18 @@ def _ui_view_component(el: dict[str, Any], weight: str) -> dict[str, Any]:
         component["value"] = el["value"]
     if typ == "image":
         component["url"] = el["url"]
+        component.pop("text", None)  # the HC3's image components carry no text
         if el.get("useProxy"):
             component["useProxy"] = True
         if el.get("classes"):
             component["classes"] = list(el["classes"])
     # the 5.221 element properties the viewer renders: named icons,
-    # switch hints, disabled state, slider units
-    for key in ("image", "hint", "disabled"):
-        if el.get(key) is not None:
-            component[key] = el[key]
+    # switch hints, disabled state, slider units. Not for image elements —
+    # their "image" key holds the element NAME.
+    if typ != "image":
+        for key in ("image", "hint", "disabled"):
+            if el.get(key) is not None:
+                component[key] = el[key]
     if typ == "slider" and el.get("unit"):
         component["unit"] = el["unit"]
     return component

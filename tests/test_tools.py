@@ -2536,3 +2536,77 @@ def test_export_collects_rsrc_from_file_extras(tmp_path) -> None:
     # main-file names override extras
     assert "text='MainShared'" in rsrc["content"]
     assert "text='LibShared'" not in rsrc["content"]
+
+
+def test_rsrc_roundtrip_package_then_unpack(tmp_path) -> None:
+    # package -> unpack materializes the resources: the unpacked project has
+    # a <name>_rsrc.lua with the compiled defs, the regenerated main
+    # declares it as a --%%file extra, and the original --%%rsrc lines fall
+    # below the EOH (inert) — no double definition.
+    import asyncio
+
+    from flua.engine import LuaEngine
+    from flua.tools.common import build_fqa
+
+    script = tmp_path / "main.lua"
+    script.write_text(
+        "--%%name:rsrcqa\n"
+        "--%%rsrc:guiChild1:{{button=\"b\",text=\"B\",onReleased=\"press\"}}\n"
+        "function QuickApp:onInit()\n"
+        "  self:createChildDevice({ name = 'A', type = 'com.fibaro.floodSensor',\n"
+        "    initialProperties = { uiView = fibaro.RSRC.guiChild1 } })\n"
+        "end\n"
+        "function QuickApp:press() end\n"
+    )
+    fqa, _ = build_fqa(str(script))
+    fqa_path = tmp_path / "rsrcqa.fqa"
+    import json as _json
+
+    fqa_path.write_text(_json.dumps(fqa))
+    assert tools.run_tool("unpack", [str(fqa_path), "-d", str(tmp_path / "out")]) == 0
+    out = tmp_path / "out"
+    rsrc_file = out / "rsrcqa_rsrc.lua"
+    assert rsrc_file.is_file()
+    content = rsrc_file.read_text()
+    assert "fibaro.RSRC = fibaro.RSRC or {}" in content
+    assert "fibaro.RSRC.guiChild1 = " in content
+    assert "actionName='press'" in content
+    main_file = out / "rsrcqa_main.lua"
+    main_src = main_file.read_text()
+    assert "--%%file:rsrcqa_rsrc.lua,rsrc" in main_src
+    # the original --%%rsrc declarations sit below the EOH: inert
+    eoh = main_src.index("-- --------------- EOH ---------------")
+    assert "--%%rsrc" not in main_src[:eoh]
+    # the unpacked project runs: the child gets the uiView from the shipped file
+    async def _run():
+        engine = LuaEngine()
+        await engine.start()
+        try:
+            qa_id = engine.load_qa_file(str(main_file))[0]
+
+            def child_ready() -> bool:
+                return any(
+                    d.get("parentId") == qa_id and d.get("id", 0) >= 900000
+                    for d in engine.api.state.devices.values()
+                )
+
+            deadline = 3.0
+            import time as _time
+
+            start = _time.monotonic()
+            while not child_ready():
+                if _time.monotonic() - start > deadline:
+                    raise AssertionError("child not created")
+                await asyncio.sleep(0.05)
+            child_id = next(
+                d["id"]
+                for d in engine.api.state.devices.values()
+                if d.get("parentId") == qa_id and d.get("id", 0) >= 900000
+            )
+            device, _ = engine.api.dispatch("GET", f"/devices/{child_id}")
+            btn = device["properties"]["uiView"][0]["components"][0]
+            assert btn["eventBinding"]["onReleased"][0]["params"]["actionName"] == "press"
+        finally:
+            await engine.stop()
+
+    asyncio.run(_run())
