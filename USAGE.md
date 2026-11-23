@@ -1777,6 +1777,12 @@ How each format uses them:
   `json.array()` — a plain `{}` encodes as an object and the app silently
   drops the action.
 
+**One asymmetry worth knowing**: the same slider hands over its value
+differently — the main QA's method receives an event table
+(`dim(event)`, value in `event.values[1]`, v1 and v2 alike), while a
+child's method receives the value directly (`dim(value)`). Same uiView
+format, different signature.
+
 flua mirrors all of it: the viewer executes non-`UIAction` bindings as
 device actions and `UIAction` bindings via `callUIEvent`, and the sim's
 `onAction`/`onUIEvent` route the same way (`child:callAction`, the main's

@@ -69,6 +69,14 @@ function QuickApp:onInit()
 end
 </pre>
 
+<p>One asymmetry worth knowing, because it bites when you move a UI
+between the two: the <em>same</em> slider hands over its value differently.
+On the main QA the method receives an event table —
+<code>dim(event)</code>, value in <code>event.values[1]</code>, in v1 and v2
+alike (v2's <code>UIAction</code> keeps the v1 shape). On a child the
+method receives the value directly — <code>dim(value)</code>. Same view
+format, different signature.</p>
+
 <p>In short: main QA → phone book (v1 and v2 alike). Child → the view names
 the method. One uiView format, three cases.</p>
 
