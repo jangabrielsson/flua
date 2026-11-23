@@ -711,7 +711,7 @@ the MAIN QA (whose `uiCallbacks` table receives the child's events):
 
 flua's viewer executes both (UIAction via callUIEvent, direct actionNames
 as device actions). See `examples/child-ui.lua` for the child-class
-pattern:
+pattern (and *UI event dispatch on the HC3* below for the full model):
 
 ```lua
 -- pasted output: plugin.createChildDevice({
@@ -1742,6 +1742,51 @@ has none of them. Which one each loader uses:
   loaded file with QA globals, pass the QA's own `_G`:
   `loadfile(path, "bt", _G)`. (On the real HC3 all of these are nil; any
   use of them is flua-only.)
+
+### UI event dispatch on the HC3 (QA, children, v1, v2)
+
+How an interaction becomes a method call — live-verified on 5.221 plus the
+extracted runtime sources. Two channels exist:
+
+- **deviceAction execution**: the app executes each `eventBinding` entry
+  as a device action; the runtime's `onAction(deviceId, action)` calls
+  `callAction(action.actionName, action.args…)` on the main QA, or on the
+  child instance when the id is a child's.
+- **UIEvent resolution**: an event `{elementName, eventType, values,
+  deviceId}` feeds `onUIEvent`, which looks up
+  `uiCallbacks[elementName][eventType]` — the **main QA's** table,
+  registered at boot from `properties.uiCallbacks` (`--%%u` compiles it;
+  children never register one).
+
+How each format uses them:
+
+- **v1 viewLayout (main QA)**: `$jason` elements carry no event fields —
+  the event→method mapping lives only in `properties.uiCallbacks`. The app
+  delivers UI events on the UIEvent channel; the QA method receives the
+  event table (`e.values[1]`).
+- **v2 uiView (main QA)**: bindings carry `UIAction`
+  (`actionName='UIAction', args={eventType, elementName, [value]}`) — the
+  back-compat action on `QuickAppBase` that converts the call into a
+  UIEvent and feeds the same uiCallbacks resolution. Same delivery, newer
+  transport.
+- **v2 uiView (child)**: the binding's `actionName` **is** the method,
+  executed as an action on the child → `child:callAction(actionName,
+  args…)` → the method on the child's class (the `classRepresentation`
+  passed to `createChildDevice`), with plain args. `$event.value` templates
+  resolve to the interaction's value; an argless binding must use
+  `json.array()` — a plain `{}` encodes as an object and the app silently
+  drops the action.
+- **child reusing the MAIN QA's uiView** (the editor-copy workflow): the
+  `UIAction` bindings run on the child and convert to UIEvents, which
+  resolve through the MAIN QA's `uiCallbacks` — the main QA must declare
+  those elements (its own `--%%u`). A binding without a value arg comes out
+  `values=[]`.
+
+flua mirrors all of it: the viewer executes non-`UIAction` bindings as
+device actions and `UIAction` bindings via `callUIEvent`, and the sim's
+`onAction`/`onUIEvent` route the same way (`child:callAction`, the main's
+uiCallbacks lookup) — so a QA behaves identically in the sim and on the
+controller. The child recipe is `examples/ui-3-children.lua`.
 
 Or let flua talk to the HC3 directly with the `--tool` (alias `-t`)
 commands — they package/unpack for you, so you develop in the unpacked
