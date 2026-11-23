@@ -1,0 +1,85 @@
+<h2>Child UIs as resources — tabbed children, packaged automatically</h2>
+
+<p>The child-devices post covered the API. This one is about what the
+children <i>look like</i>. Because here's a happy accident of the HC3: the
+UI editor never touches a child device's view. Which means the modern view
+elements — tabbed panels, collapsible sections — that are off-limits in a
+QA you'd edit on the controller are completely safe on children. And with
+flua, declaring those child UIs got a whole lot easier.</p>
+
+<h3>The quick recap: how a child's UI talks back</h3>
+
+<p>A child device can carry its own <code>uiView</code> — passed to
+<code>createChildDevice</code> as <code>initialProperties.uiView</code>.
+When someone taps a control on a child, the controller calls the method
+named in the binding — <code>actionName = "turnOn"</code> means
+<code>turnOn</code> — on the child's class, with plain arguments. No
+callback table, no middleman: each child resolves its own methods, so two
+children can both have a "Turn On" button that does different things. (The
+full event model — main QA, children, old and new view format — is in the
+companion post, <a href="/docs/forum/ui-events-explained.html">The button
+that did nothing</a>.)</p>
+
+<p>So a tabbed child is a <code>uiView</code> table plus a class with the
+methods. The table is the annoying part to write by hand — it is the same
+shape flua's compiler produces. Which is exactly what
+<code>--as-lua</code> prints for you:</p>
+
+<pre>
+flua --tool ui --as-lua --child script.lua
+-- local uiView = {...}   # child bindings, paste-ready
+</pre>
+
+<h3>The main act: declare them, don't paste them</h3>
+
+<p>Pasting works, but pasted tables are a maintenance tax — the moment the
+UI changes, the paste goes stale. flua 0.1.182 added a better way: the
+<code>--%%rsrc</code> directive. Declare each child UI in the QA file
+itself, in the same row language as <code>--%%u</code>:</p>
+
+<pre>
+--%%rsrc:uiA:{tabView="mainTabs",activeTab="control",onTabChanged="tabChanged",tabs={
+--  {name="control",text="Control",components={
+--    {{button="onBtn",text="Turn On",onReleased="turnOn"}},
+--    {{slider="dim",text="Brightness",min="0",max="100",value="50",onChanged="dim"}}
+--  }}}}
+
+function QuickApp:onInit()
+  self:createChildDevice({ name = "A", type = "com.fibaro.floodSensor",
+    initialProperties = { uiView = fibaro.RSRC.uiA } }, Child)
+end
+</pre>
+
+<p>Each resource becomes <code>fibaro.RSRC.<i>name</i></code> — compiled to
+a child-style uiView, method names and all, ready for
+<code>createChildDevice</code>.</p>
+
+<ul>
+<li><b>No files at runtime.</b> flua compiles the resources and injects the
+table into the running QA. Nothing on disk, nothing to sync.</li>
+<li><b>Packaging does the sync for you.</b> When you export the QA, flua
+synthesizes one <code>rsrc.lua</code> file defining the table and ships it
+with the package, loaded before your main file — so the <i>same</i> code
+runs unchanged on the HC3. On the controller your directives are inert Lua
+comments; the file carries the table.</li>
+<li><b>Resources live next to their children.</b> Declarations in
+<code>--%%file</code> extras are collected too — the file that defines the
+children can carry their UIs. Main-file names win on collisions.</li>
+<li><b>The roundtrip is clean.</b> Package → unpack gives you a real
+<code>rsrc.lua</code> with the definitions; package again and nothing
+doubles — the file simply ships.</li>
+</ul>
+
+<p>One field note: an argless binding (a button) must carry
+<code>json.array()</code> for its arguments — a plain empty table encodes
+as an object and the HC3 app silently drops the press. flua emits the
+marked form automatically.</p>
+
+<p>Resource names are Lua identifiers (they become
+<code>fibaro.RSRC.<i>name</i></code>), and the directive is the future home
+of other resource kinds — icon bitmaps, config blobs, whatever needs to
+travel with the QA.</p>
+
+<p><small>Example: <code>flua --examples</code> → ui-3-children.lua (three
+children — tabbed, collapsible and a 6-button panel — all declared with
+<code>--%%rsrc</code>) · flua: https://github.com/jangabrielsson/flua</small></p>
