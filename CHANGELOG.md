@@ -4,6 +4,21 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.182] - 2026-11-23
+
+### Added
+- ui-3-children — tabbed, collapsible and 6-button child demos
+
+### Changed
+- fix
+- fix
+- soften the UI-events post — observations, not claimed source access
+- note the main-vs-child delivery asymmetry (event table vs raw value)
+- drop the debate-leftover sentences from the child-dispatch texts
+
+### Fixed
+- sync .luarc.json into the setup template
+
 ## [0.1.181] - 2026-11-23
 
 ### Changed
