@@ -1,6 +1,6 @@
 # 0016 — a web UI builder for `--%%u` / `--%%rsrc`
 
-- Status: **proposed** (draft for discussion)
+- Status: **accepted** (design settled, not yet built)
 - Date: 2026-11-23
 
 ## Context
@@ -17,25 +17,38 @@ authoring: a visual builder that emits the directives.
 
 ## The shape
 
-`flua --tool uibuilder [PORT]` serves a page in the same style as the UI
-viewer. The editor model is **the row JSON** the directives parse to —
-no new format.
+`flua --tool uibuilder [PORT]` serves a standalone page in the same style
+as the UI viewer. The editor model is **the row JSON** the directives
+parse to — no new format.
 
-- **Palette** — the element set with a v1/v2 toggle: v1 = label, button,
-  slider, switch, select, multi; v2 adds tabView, collapsible, image
-  (v2-only elements marked; adding one hints `--%%useUiView:true`).
+- **Target selector** (the top-level switch, replacing a naive v1/v2
+  toggle):
+  - **Main QA — v1**: the legacy format. Elements: label (HTML text
+    allowed — the v1 reason to exist), button, slider, switch, select,
+    multi. No v2-only elements. Export: `--%%u` lines (legacy package).
+  - **Main QA — v2**: the uiView format. Full element set (adds
+    `tabView`, `collapsible`, `image`), `UIAction` bindings. Export:
+    `--%%u` lines + the `--%%useUiView:true` hint.
+  - **Child device**: children carry a uiView only — the v1/viewLayout
+    question does not apply. Full element set, **child bindings**
+    (`actionName` = the method, `json.array()` for argless). Export:
+    `--%%rsrc:<name>:{…}` (the resource form; a name field in the UI).
+- **Palette** — the elements the selected target allows; v2-only elements
+  are marked and disabled for Main-v1.
 - **Properties** — one form per element: name, text, callbacks
   (`onReleased`, `onChanged`, `onToggled`, `onTabChanged`, …), min/max/
-  value, options, values, url — the fields the compiler understands.
+  value, options, values, url — the fields the compiler understands. For
+  the Child target, callbacks are the child class's method names.
 - **Row editor** — add/remove/reorder rows; several elements share a row;
   tabView/collapsible bodies edited as nested rows.
 - **Live preview** — the server compiles the rows through `compile_ui`
-  (and `child_bindings` for a child target) and the preview pane reuses
-  the viewer's `renderComponent`, so what you see is what the HC3
-  renders. Preview interactions are local/inert (no QA behind the page).
-- **Export pane** — copy buttons for the three target forms: `--%%u`
-  lines (main QA), `--%%rsrc:<name>:{…}` (child resource), and the raw
-  Lua table (`--as-lua` shape).
+  (plus `child_bindings` for the Child target) and the preview pane
+  reuses the viewer's `renderComponent`, so what you see is what the HC3
+  renders, bindings included. Preview interactions are local/inert (no QA
+  behind the page).
+- **Export pane** — copy buttons for the directive forms first
+  (`--%%u` and/or `--%%rsrc` per target); the raw Lua table
+  (`--as-lua` shape) later, behind a toggle.
 - **Import** — paste existing `--%%u`/`--%%rsrc` back into the model
   (the parser already exists).
 
@@ -54,11 +67,12 @@ no new format.
 - No file writing — copy-paste into source is the contract; the builder
   is stateless.
 
-## Open questions
+## Decisions
 
-1. Standalone `--tool uibuilder` vs. an edit mode inside `--ui`? (Leaning
-   standalone — separate page, same server machinery.)
-2. Export set: all three forms from the start, or `--%%u` + `--%%rsrc`
-   first and the Lua table behind a toggle?
-3. Should the child/mode target (child bindings vs. main-QA bindings) be
-   a top-level switch in the builder?
+1. Standalone `--tool uibuilder` (not a mode inside `--ui`).
+2. Export the directive forms first (`--%%u` / `--%%rsrc`); the raw Lua
+   table comes later behind a toggle.
+3. The binding/format choice is a three-way **target**, not a v1/v2
+   element toggle: the uiView format is the same everywhere; what differs
+   is the binding target (main QA `UIAction` vs. child `actionName`) and
+   the one format a child cannot have (viewLayout/v1).
