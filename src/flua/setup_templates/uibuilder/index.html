@@ -26,6 +26,8 @@
   .chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
   .chip { border:1px solid var(--line); border-radius:14px; padding:2px 10px; cursor:pointer; font-size:12px; background:#fafbfc; }
   .chip.sel { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .chipx { border:none; background:none; padding:0 0 0 6px; font:inherit; cursor:pointer; color:inherit; opacity:.7; }
+  .chipx:hover { opacity:1; }
   .nested { margin-left:16px; border-left:2px solid var(--line); padding-left:8px; }
   .field { display:flex; gap:6px; align-items:center; margin:4px 0; flex-wrap:wrap; }
   .field label { width:110px; font-size:12px; color:var(--muted); }
@@ -234,6 +236,17 @@ function rowStrip(container, rows, label, depth) {
       const kind = elOf(el);
       chip.textContent = ELEMENTS[kind].name + (el[kind] ? ": " + el[kind] : "");
       chip.onclick = () => { selection = el; render(); };
+      const x = document.createElement("button");
+      x.textContent = "✕";
+      x.className = "chipx";
+      x.title = "remove this element";
+      x.onclick = (e) => {
+        e.stopPropagation();
+        row.splice(row.indexOf(el), 1);
+        if (selection === el) selection = null;
+        render(); changed();
+      };
+      chip.appendChild(x);
       chips.appendChild(chip);
     });
     box.appendChild(chips);
