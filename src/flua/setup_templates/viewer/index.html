@@ -570,7 +570,7 @@ function renderComponent(device, component, row) {
     const btn = document.createElement("button");
     btn.className = "ctl";
     btn.dataset.cname = component.name;
-    btn.textContent = text ?? component.name;
+    btn.textContent = text || component.name || "\u00A0";  // keep full height
     withIcon(btn, component.image);
     if (component.disabled) btn.disabled = true;
     if (!action && event) wireLongPress(btn, device.id, component);
@@ -659,7 +659,7 @@ function renderComponent(device, component, row) {
     btn.type = "button";
     btn.className = "ctl toggle";
     btn.dataset.cname = component.name;
-    btn.textContent = text || component.name;
+    btn.textContent = text || component.name || "\u00A0";  // keep full height
     withIcon(btn, component.image);
     const paint = () => {
       btn.classList.toggle("on", String(componentValue(device, component)) === "true");
@@ -837,7 +837,7 @@ function renderComponent(device, component, row) {
       const header = document.createElement("button");
       header.type = "button";
       header.className = "tab" + (tab.name === active ? " active" : "");
-      header.textContent = tab.text || tab.name;
+      header.textContent = tab.text || tab.name || "\u00A0";  // keep full height
       withIcon(header, tab.image);
       header.onclick = () => {
         // remember locally AND stamp the panel through setComponentValue:

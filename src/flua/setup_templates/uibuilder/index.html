@@ -68,6 +68,7 @@
       <h3>Properties</h3>
       <p class="hint" id="noSel">select an element in the layout (or click it in the preview)</p>
       <div id="propsBody"></div>
+      <p class="hint" id="nameWarn" style="color:#b91c1c;display:none"></p>
     </section>
     <section>
       <h3>Directives <button id="copyBtn" class="primary" style="float:right">copy</button></h3>
@@ -298,7 +299,7 @@ function propsFor(el) {
   // property edits must NOT rebuild the properties panel — that would
   // destroy the focused input on every keystroke. Refresh only the layout
   // (chips reflect the new name) and recompile.
-  const bump = () => { renderLayout(); changed(); };
+  const bump = () => { renderLayout(); changed(); updateNameWarn(); };
   body.appendChild(fieldRow("name", textInput(el[kind], (v) => { el[kind] = v; bump(); }, "element name")));
   for (const f of meta.fields) {
     if (f === "tabs") {
@@ -363,6 +364,32 @@ function renderLayout() {
   }
 }
 
+function nameCounts() {
+  const counts = {};
+  const walk = (rows) => rows.forEach((row) => row.forEach((el) => {
+    const name = el[elOf(el)];
+    if (name) counts[name] = (counts[name] || 0) + 1;
+    if (elOf(el) === "tabView") (el.tabs || []).forEach((t) => walk(t.components || []));
+    if (elOf(el) === "collapsible") walk(el.components || []);
+  }));
+  walk(model.rows);
+  return counts;
+}
+
+function updateNameWarn() {
+  const warn = $("nameWarn");
+  if (!selection) { warn.style.display = "none"; return; }
+  const name = selection[elOf(selection)];
+  const counts = nameCounts();
+  if (name && (counts[name] || 0) > 1) {
+    warn.textContent = "duplicate element name '" + name
+      + "' — events route by name, they will collide";
+    warn.style.display = "";
+  } else {
+    warn.style.display = "none";
+  }
+}
+
 function renderProps() {
   const inModel = !!selection && (() => {
     const walk = (rows) => rows.some((row) => row.includes(selection) ||
@@ -373,6 +400,7 @@ function renderProps() {
   })();
   if (inModel) propsFor(selection);
   else { $("propsBody").innerHTML = ""; $("noSel").style.display = ""; }
+  updateNameWarn();
 }
 
 function render() {
