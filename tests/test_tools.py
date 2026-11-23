@@ -2509,3 +2509,30 @@ def test_export_synthesizes_rsrc_file_from_rsrc_directives(tmp_path) -> None:
     assert "actionName='press'" in content
     # main still ships alongside
     assert any(f["isMain"] for f in files)
+
+
+def test_export_collects_rsrc_from_file_extras(tmp_path) -> None:
+    # --%%rsrc declared in a --%%file extra (next to the child definitions)
+    # is collected into the synthesized rsrc.lua; the main file's same-named
+    # resource overrides the extra's.
+    from flua.tools.common import build_fqa
+
+    lib = tmp_path / "children.lua"
+    lib.write_text(
+        "--%%rsrc:fromLib:{{button=\"b\",text=\"Lib\",onReleased=\"press\"}}\n"
+        "--%%rsrc:shared:{{button=\"b\",text=\"LibShared\",onReleased=\"press\"}}\n"
+        "return {}\n"
+    )
+    main = tmp_path / "main.lua"
+    main.write_text(
+        "--%%name:rsrcqa\n"
+        "--%%file:children.lua,children\n"
+        "--%%rsrc:shared:{{button=\"b\",text=\"MainShared\",onReleased=\"press\"}}\n"
+        "function QuickApp:onInit() end\n"
+    )
+    fqa, _ = build_fqa(str(main))
+    rsrc = next(f for f in fqa["files"] if f["name"] == "rsrc")
+    assert "fibaro.RSRC.fromLib = " in rsrc["content"]
+    # main-file names override extras
+    assert "text='MainShared'" in rsrc["content"]
+    assert "text='LibShared'" not in rsrc["content"]

@@ -916,17 +916,6 @@ class LuaEngine:
             device_properties["uiCallbacks"] = ui["uiCallbacks"]
             device_properties["viewLayout"] = ui["viewLayout"]
             device_properties["uiView"] = ui["uiView"]
-        if qa_config.get("rsrc"):
-            # --%%rsrc:name:{rows} -> child uiViews reachable as
-            # fibaro.RSRC.name in the running QA (the Lua side injects the
-            # table into the QA env; the export synthesizes rsrc.lua). The
-            # compiled form replaces the parsed entries so config travels
-            # self-contained (restarts and exports rebuild from it).
-            compiled: dict[str, Any] = {}
-            for entry in qa_config["rsrc"]:
-                ui = compile_ui(entry["rows"], self._next_qa_id)
-                compiled[str(entry["name"])] = child_bindings(ui["uiView"], ui["uiCallbacks"])
-            qa_config["rsrc"] = compiled
         if qa_config.get("useUiView") is not None:
             device_properties["useUiView"] = bool(qa_config["useUiView"])
         else:
@@ -957,6 +946,33 @@ class LuaEngine:
                     entry["path"] = str(bundled)
                 elif not Path(entry_path).is_absolute():
                     entry["path"] = str(base / entry_path)
+        if qa_config.get("rsrc") or qa_config.get("files"):
+            # --%%rsrc:name:{rows} -> child uiViews reachable as
+            # fibaro.RSRC.name in the running QA (the Lua side injects the
+            # table into the QA env; the export synthesizes rsrc.lua). The
+            # compiled form replaces the parsed entries so config travels
+            # self-contained (restarts and exports rebuild from it).
+            #
+            # --%%rsrc declarations are also collected from the --%%file
+            # extras (resources belong with the file that defines the
+            # children, whose paths are now resolved) — extras first, main
+            # last, so a main-file name overrides an extra's.
+            rsrc_entries: list[dict[str, Any]] = []
+            for entry in qa_config.get("files") or []:
+                source = self._read_source(entry["path"]) if entry.get("path") else ""
+                if source:
+                    rsrc_entries.extend(
+                        parse_annotations(source, warn_unknown=False).get("rsrc") or []
+                    )
+            rsrc_entries.extend(qa_config.get("rsrc") or [])
+            if rsrc_entries:
+                compiled: dict[str, Any] = {}
+                for entry in rsrc_entries:
+                    ui = compile_ui(entry["rows"], self._next_qa_id)
+                    compiled[str(entry["name"])] = child_bindings(
+                        ui["uiView"], ui["uiCallbacks"]
+                    )
+                qa_config["rsrc"] = compiled
         # --%%icons:path — a LOCAL icon set folder for the web view: the QA
         # previews its custom icons without uploading them (a synthetic
         # Local<qaId> set serves the folder's icon*.png/svg files and the

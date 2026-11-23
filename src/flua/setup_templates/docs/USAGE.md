@@ -745,6 +745,12 @@ the HC3. Resource names must be Lua identifiers (they become
 kinds (icon bitmaps etc.). `examples/ui-3-children.lua` declares its three
 child UIs this way.
 
+Resources may be declared in `--%%file` extras too — flua scans every QA
+file for `--%%rsrc` (the resource belongs next to the file that defines
+the children), collecting extras first and the main file last, so a
+main-file name overrides an extra's. On the HC3 the directives are inert
+Lua comments; the synthesized `rsrc.lua` carries the table.
+
 ```lua
 -- pasted output: plugin.createChildDevice({
 --   name = "zone control", type = "com.fibaro.genericDevice",
