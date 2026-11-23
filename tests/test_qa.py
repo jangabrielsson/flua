@@ -360,6 +360,61 @@ async def test_example_label_svg_v1_route(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_example_ui3children_three_views_and_action_delivery(tmp_path, capsys) -> None:
+    # examples/ui-3-children.lua — three children, one shared Child class:
+    # A a tabbed uiView, B a collapsible, C a 6-button row + image; all
+    # child-bound (actionName = the method) and a device action on C
+    # delivers to the class (plain args).
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        qa_id = engine.load_qa_file(str(REPO_ROOT / "examples" / "ui-3-children.lua"))[0]
+
+        def three_children() -> bool:
+            return (
+                sum(
+                    1
+                    for d in engine.api.state.devices.values()
+                    if d.get("parentId") == qa_id and d.get("id", 0) >= 900000
+                )
+                == 3
+            )
+
+        await wait_until(three_children)
+        children = sorted(
+            (
+                d
+                for d in engine.api.state.devices.values()
+                if d.get("parentId") == qa_id and d.get("id", 0) >= 900000
+            ),
+            key=lambda d: d["name"],
+        )
+        assert [c["name"] for c in children] == ["A", "B", "C"]
+        a, b, c = (c["id"] for c in children)
+        dev_a, _ = engine.api.dispatch("GET", f"/devices/{a}")
+        tv = dev_a["properties"]["uiView"][0]["components"][0]
+        assert tv["type"] == "tabView"
+        assert tv["eventBinding"]["onTabChanged"][0]["params"]["actionName"] == "tabChanged"
+        dev_b, _ = engine.api.dispatch("GET", f"/devices/{b}")
+        col = dev_b["properties"]["uiView"][0]["components"][0]
+        assert col["type"] == "collapsible"
+        play = col["components"][1]["components"][0]
+        assert play["eventBinding"]["onReleased"][0]["params"]["actionName"] == "play"
+        dev_c, _ = engine.api.dispatch("GET", f"/devices/{c}")
+        row = dev_c["properties"]["uiView"][0]["components"]
+        assert len(row) == 6 and all(comp["type"] == "button" for comp in row)
+        assert row[0]["eventBinding"]["onReleased"][0]["params"]["actionName"] == "press"
+        assert dev_c["properties"]["uiView"][1]["components"][0]["type"] == "image"
+        # an action on C delivers to the shared Child class
+        status = engine.api.dispatch("POST", f"/devices/{c}/action/press", {"args": []})[1]
+        assert status == 202
+        await asyncio.sleep(0.4)
+        assert "C Button pressed" in capsys.readouterr().out
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
 async def test_example_child_ui_action_delivery(tmp_path, capsys) -> None:
     # examples/child-ui.lua — the HC3-verified child UI model: the child's
     # uiView binds the child class's methods as actionNames directly (no
