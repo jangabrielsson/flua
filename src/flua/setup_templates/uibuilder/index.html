@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>flua uibuilder</title>
+<style>
+  :root { --bg:#f4f5f7; --card:#fff; --ink:#1c2430; --muted:#6a7482; --line:#dde2e8; --accent:#2563eb; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 -apple-system, "Segoe UI", sans-serif; }
+  header { display:flex; gap:12px; align-items:center; padding:10px 16px; background:var(--card); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0 12px 0 0; }
+  select, input, textarea, button { font:inherit; }
+  select, input[type=text], input[type=number] { padding:5px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  button { padding:5px 12px; border:1px solid var(--line); border-radius:6px; background:#fff; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  main { display:flex; gap:12px; padding:12px 16px; align-items:flex-start; }
+  aside { width:180px; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px; position:sticky; top:12px; }
+  aside button { display:block; width:100%; margin:4px 0; text-align:left; }
+  aside button:disabled { opacity:.4; cursor:default; }
+  #rows { flex:1; min-width:0; }
+  .row { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:8px 10px; margin-bottom:10px; }
+  .row-head { display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+  .row-head .label { font-weight:600; font-size:12px; color:var(--muted); flex:1; }
+  .el { border:1px dashed var(--line); border-radius:8px; padding:8px; margin:6px 0; background:#fafbfc; }
+  .el-head { display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+  .el-head b { flex:1; font-size:13px; }
+  .field { display:flex; gap:6px; align-items:center; margin:4px 0; flex-wrap:wrap; }
+  .field label { width:110px; font-size:12px; color:var(--muted); }
+  .field input[type=text], .field input[type=number] { flex:1; min-width:80px; }
+  .field textarea { flex:1; min-width:200px; height:48px; }
+  .nested { margin-left:18px; border-left:2px solid var(--line); padding-left:8px; }
+  .panel { width:340px; display:flex; flex-direction:column; gap:10px; position:sticky; top:12px; }
+  .panel section { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px; }
+  .panel h3 { margin:0 0 6px; font-size:13px; }
+  #preview { width:100%; height:420px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+  textarea { width:100%; font-family:ui-monospace, monospace; font-size:12px; }
+  .hint { font-size:12px; color:var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>flua uibuilder</h1>
+  <select id="target">
+    <option value="main-v2">Main QA — v2 (uiView)</option>
+    <option value="main-v1">Main QA — v1 (legacy layout)</option>
+    <option value="child">Child device</option>
+  </select>
+  <span id="rsrcWrap" style="display:none">
+    <input id="rsrcName" type="text" size="12" value="ui" placeholder="resource name">
+  </span>
+  <span class="hint" id="targetHint"></span>
+</header>
+<main>
+  <aside id="palette"></aside>
+  <div id="rows"></div>
+  <div class="panel">
+    <section>
+      <h3>Preview</h3>
+      <iframe id="preview" src="/viewer"></iframe>
+      <p class="hint">rendered by the real viewer — interactions are local/inert</p>
+    </section>
+    <section>
+      <h3>Directives <button id="copyBtn" class="primary" style="float:right">copy</button></h3>
+      <textarea id="export" rows="8" placeholder="--%%u lines appear here"></textarea>
+      <p class="hint" id="exportHint"></p>
+    </section>
+    <section>
+      <h3>Import</h3>
+      <textarea id="import" rows="3" placeholder="paste --%%u or --%%rsrc lines"></textarea>
+      <button id="importBtn">load</button>
+      <p class="hint" id="importErr"></p>
+    </section>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+
+const ELEMENTS = {
+  label:      { name: "Label", fields: ["text"], v2: false, hint: "v1 labels may carry HTML" },
+  button:     { name: "Button", fields: ["text", "onReleased"], v2: false },
+  slider:     { name: "Slider", fields: ["text", "min", "max", "value", "onChanged"], v2: false },
+  switch:     { name: "Switch", fields: ["text", "value", "onReleased"], v2: false },
+  select:     { name: "Select", fields: ["text", "value", "onToggled", "options"], v2: false },
+  multi:      { name: "Multi select", fields: ["text", "values", "onToggled", "options"], v2: false },
+  image:      { name: "Image", fields: ["url"], v2: true },
+  tabView:    { name: "Tabs", fields: ["activeTab", "onTabChanged", "tabs"], v2: true },
+  collapsible:{ name: "Collapsible", fields: ["text", "collapsed"], v2: true },
+};
+
+const targetHints = {
+  "main-v1": "v1: legacy layout — HTML labels, no v2 elements. Exports --%%u.",
+  "main-v2": "v2: uiView, UIAction bindings. Add --%%useUiView:true to the QA.",
+  "child": "child: uiView with child bindings (actionName = the method). Exports --%%rsrc.",
+};
+
+let model = { target: "main-v2", resourceName: "ui", rows: [] };
+let timer = null;
+
+const elOf = (e) => Object.keys(e).find((k) => ELEMENTS[k]);
+
+function newElement(kind) {
+  const base = { text: "", visible: true };
+  if (kind === "slider") Object.assign(base, { min: "0", max: "100", value: "50" });
+  if (kind === "switch") base.value = "false";
+  if (kind === "select") base.value = "";
+  if (kind === "multi") base.values = [];
+  if (kind === "tabView") Object.assign(base, { activeTab: "", onTabChanged: "", tabs: [] });
+  if (kind === "collapsible") Object.assign(base, { collapsed: false });
+  if (kind === "image") base.url = "";
+  base[kind] = "";
+  return base;
+}
+
+function fieldRow(label, inputEl) {
+  const div = document.createElement("div");
+  div.className = "field";
+  const l = document.createElement("label");
+  l.textContent = label;
+  div.appendChild(l);
+  div.appendChild(inputEl);
+  return div;
+}
+
+function textInput(value, onInput, placeholder) {
+  const i = document.createElement("input");
+  i.type = "text";
+  i.value = value ?? "";
+  if (placeholder) i.placeholder = placeholder;
+  i.oninput = () => onInput(i.value);
+  return i;
+}
+
+function optionsEditor(options, onChange) {
+  const ta = document.createElement("textarea");
+  ta.value = (options || []).map((o) => (o.text && o.text !== String(o.value) ? o.text + "=" + o.value : String(o.value))).join("\n");
+  ta.oninput = () => {
+    const opts = ta.value.split("\n").filter((l) => l.trim()).map((l) => {
+      const [t, v] = l.includes("=") ? l.split(/=(.*)/s) : [l.trim(), l.trim()];
+      return { type: "option", text: t.trim(), value: (v || t).trim() };
+    });
+    onChange(opts);
+  };
+  return ta;
+}
+
+function elementCard(el, elPath) {
+  const kind = elOf(el);
+  const meta = ELEMENTS[kind];
+  const card = document.createElement("div");
+  card.className = "el";
+  const head = document.createElement("div");
+  head.className = "el-head";
+  const title = document.createElement("b");
+  title.textContent = meta.name;
+  head.appendChild(title);
+  head.appendChild(fieldRow("name", textInput(el[kind], (v) => { el[kind] = v; changed(); }, "element name")));
+  const rm = document.createElement("button");
+  rm.textContent = "✕";
+  rm.onclick = () => { elPath.splice(elPath.indexOf(el), 1); render(); changed(); };
+  head.appendChild(rm);
+  card.appendChild(head);
+
+  for (const f of meta.fields) {
+    if (f === "tabs") {
+      const tabs = el.tabs || [];
+      tabs.forEach((tab, ti) => {
+        const box = document.createElement("div");
+        box.className = "nested";
+        box.appendChild(fieldRow("tab name", textInput(tab.name, (v) => { tab.name = v; changed(); })));
+        box.appendChild(fieldRow("tab text", textInput(tab.text, (v) => { tab.text = v; changed(); })));
+        renderRows(box, tab.components, "tab " + tab.name);
+        card.appendChild(box);
+      });
+      const addTab = document.createElement("button");
+      addTab.textContent = "＋ tab";
+      addTab.onclick = () => {
+        el.tabs = el.tabs || [];
+        el.tabs.push({ name: "tab" + (el.tabs.length + 1), text: "", components: [] });
+        render(); changed();
+      };
+      card.appendChild(addTab);
+    } else if (f === "options") {
+      card.appendChild(fieldRow("options", optionsEditor(el.options, (o) => { el.options = o; changed(); })));
+    } else if (f === "onReleased" || f === "onChanged" || f === "onToggled" || f === "onTabChanged") {
+      card.appendChild(fieldRow(f, textInput(el[f], (v) => { el[f] = v; changed(); }, "method name")));
+    } else if (f === "collapsed") {
+      const s = document.createElement("select");
+      s.innerHTML = "<option value='false'>expanded</option><option value='true'>collapsed</option>";
+      s.value = String(el.collapsed ?? false);
+      s.onchange = () => { el.collapsed = s.value === "true"; changed(); };
+      card.appendChild(fieldRow("collapsed", s));
+    } else if (f === "values") {
+      card.appendChild(fieldRow("values", textInput((el.values || []).join(","), (v) => { el.values = v ? v.split(",") : []; changed(); })));
+    } else if (f === "components") {
+      const box = document.createElement("div");
+      box.className = "nested";
+      el.components = el.components || [];
+      renderRows(box, el.components, "body");
+      card.appendChild(box);
+    } else {
+      card.appendChild(fieldRow(f, textInput(el[f], (v) => { el[f] = v; changed(); })));
+    }
+  }
+  return card;
+}
+
+function renderRows(container, rows, label) {
+  const list = document.createElement("div");
+  rows.forEach((row, ri) => {
+    const box = document.createElement("div");
+    box.className = "row";
+    const head = document.createElement("div");
+    head.className = "row-head";
+    const rl = document.createElement("span");
+    rl.className = "label";
+    rl.textContent = (label ? label + " — " : "") + "row " + (ri + 1)
+      + (row.length ? " (" + row.length + " element(s))" : " (empty)");
+    head.appendChild(rl);
+    const rm = document.createElement("button");
+    rm.textContent = "✕";
+    rm.onclick = () => { rows.splice(ri, 1); render(); changed(); };
+    head.appendChild(rm);
+    const kindSel = document.createElement("select");
+    for (const [kind, meta] of Object.entries(ELEMENTS)) {
+      if ($("target").value === "main-v1" && meta.v2) continue;
+      const o = document.createElement("option");
+      o.value = kind;
+      o.textContent = meta.name;
+      kindSel.appendChild(o);
+    }
+    head.appendChild(kindSel);
+    const addEl = document.createElement("button");
+    addEl.textContent = "＋ element";
+    addEl.onclick = () => { row.push(newElement(kindSel.value)); render(); changed(); };
+    head.appendChild(addEl);
+    box.appendChild(head);
+    row.forEach((el) => box.appendChild(elementCard(el, row)));
+    list.appendChild(box);
+  });
+  const addRow = document.createElement("button");
+  addRow.textContent = "＋ row";
+  addRow.onclick = () => { rows.push([]); render(); changed(); };
+  list.appendChild(addRow);
+  container.appendChild(list);
+}
+
+function render() {
+  const palette = $("palette");
+  palette.innerHTML = "<b>" + ($("target").value === "main-v1" ? "v1 elements" : "elements") + "</b>";
+  for (const [kind, meta] of Object.entries(ELEMENTS)) {
+    const b = document.createElement("button");
+    b.textContent = meta.name;
+    b.disabled = $("target").value === "main-v1" && meta.v2;
+    b.onclick = () => { model.rows.push([newElement(kind)]); render(); changed(); };
+    palette.appendChild(b);
+  }
+  const addRow = document.createElement("button");
+  addRow.textContent = "＋ empty row";
+  addRow.onclick = () => { model.rows.push([]); render(); changed(); };
+  palette.appendChild(addRow);
+
+  const rowsDiv = $("rows");
+  rowsDiv.innerHTML = "";
+  renderRows(rowsDiv, model.rows, null);
+  if (!model.rows.length) {
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.textContent = "pick an element from the palette to start";
+    rowsDiv.appendChild(p);
+  }
+}
+
+function changed() {
+  model.target = $("target").value;
+  model.resourceName = $("rsrcName").value;
+  $("targetHint").textContent = targetHints[model.target];
+  $("rsrcWrap").style.display = model.target === "child" ? "" : "none";
+  clearTimeout(timer);
+  timer = setTimeout(compile, 300);
+}
+
+async function compile() {
+  try {
+    const res = await fetch("/flua/uibuilder/compile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target: model.target, rows: model.rows, resourceName: model.resourceName }),
+    });
+    const data = await res.json();
+    if (!res.ok) { $("exportHint").textContent = "error: " + data.error; return; }
+    $("export").value = (data.directives || []).join("\n");
+    $("exportHint").textContent =
+      model.target === "main-v2" ? "add --%%useUiView:true to the QA" :
+      model.target === "child" ? "paste into the QA that creates the child" :
+      "the QA renders this as the legacy layout";
+    $("preview").src = "/viewer?t=" + Date.now();
+  } catch (e) { $("exportHint").textContent = "compile failed: " + e; }
+}
+
+$("target").onchange = () => { changed(); render(); };
+$("rsrcName").oninput = changed;
+$("copyBtn").onclick = () => { navigator.clipboard.writeText($("export").value); };
+$("importBtn").onclick = async () => {
+  try {
+    const res = await fetch("/flua/uibuilder/parse", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: $("import").value }),
+    });
+    const data = await res.json();
+    if (!res.ok) { $("importErr").textContent = data.error; return; }
+    if (data.resources && data.resources.length) {
+      model.rows = data.resources[0].rows || [];
+      model.resourceName = data.resources[0].name || "ui";
+      model.target = "child";
+    } else {
+      model.rows = data.rows || [];
+      model.target = "main-v2";
+    }
+    $("target").value = model.target;
+    $("rsrcName").value = model.resourceName;
+    $("importErr").textContent = "";
+    render();
+    changed();
+  } catch (e) { $("importErr").textContent = String(e); }
+};
+
+$("preview").onload = () => {
+  const doc = $("preview").contentDocument;
+  if (!doc) return;
+  const base = doc.getElementById("base");
+  if (base && base.value !== location.origin) {
+    base.value = location.origin;
+    doc.getElementById("connect").click();
+  }
+};
+
+render();
+changed();
+</script>
+</body>
+</html>

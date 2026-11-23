@@ -1,6 +1,6 @@
 # 0016 — a web UI builder for `--%%u` / `--%%rsrc`
 
-- Status: **accepted** (design settled, not yet built)
+- Status: **active** (built as `--tool uibuilder`)
 - Date: 2026-11-23
 
 ## Context

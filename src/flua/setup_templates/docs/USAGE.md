@@ -754,6 +754,13 @@ Lua comments; the synthesized `rsrc.lua` carries the table. `unpack`/
 `<name>_rsrc.lua` declared as an extra, with the original directives
 below the EOH line.
 
+Building these UIs by hand is fine, but there is a visual path:
+`flua --tool uibuilder [PORT]` opens a web builder — a target switch
+(Main QA v1 / Main QA v2 / Child device), an element palette, a live
+preview rendered by the real viewer, and copy-out export to the
+`--%%u`/`--%%rsrc` directives (ADR 0016). Stateless: paste the result
+into your source.
+
 ```lua
 -- pasted output: plugin.createChildDevice({
 --   name = "zone control", type = "com.fibaro.genericDevice",

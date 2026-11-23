@@ -53,6 +53,7 @@ def test_registry_discovers_all_tools() -> None:
         "test",
         "typeinfo",
         "ui",
+        "uibuilder",
         "unpack",
         "updateQA",
         "uploadFQA",
@@ -2661,3 +2662,81 @@ def test_rsrc_declared_file_owns_the_name(tmp_path, caplog) -> None:
     assert len(rsrc_files) == 1
     assert rsrc_files[0]["content"] == "fibaro.RSRC = {}\n"
     assert any("owns the name" in r.message for r in caplog.records)
+
+
+def test_uibuilder_compile_and_parse(tmp_path) -> None:
+    from flua.tools.uibuilder import compile_target, parse_directives
+
+    rows = [
+        {"tabView": "mainTabs", "activeTab": "a", "onTabChanged": "tabChanged", "tabs": [
+            {"name": "a", "text": "A", "components": [
+                [{"button": "onBtn", "text": "On", "onReleased": "turnOn"}]
+            ]}
+        ]},
+        [{"image": "art", "url": "https://x/y.png"}],
+    ]
+    # child target: child bindings, --%%rsrc export
+    child = compile_target("child", rows, "uiA")
+    tv = child["uiView"][0]["components"][0]
+    assert tv["eventBinding"]["onTabChanged"][0]["params"]["actionName"] == "tabChanged"
+    btn = tv["tabs"][0]["components"][0]["components"][0]
+    assert btn["eventBinding"]["onReleased"][0]["params"]["actionName"] == "turnOn"
+    assert len(child["directives"]) == 1
+    assert child["directives"][0].startswith("--%%rsrc:uiA:{")
+    # main targets: UIAction bindings, --%%u lines
+    main = compile_target("main-v2", rows)
+    assert main["uiView"][0]["components"][0]["eventBinding"]["onTabChanged"][0]["params"][
+        "actionName"
+    ] == "UIAction"
+    assert len(main["directives"]) == 2 and main["directives"][0].startswith("--%%u:{")
+    v1 = compile_target("main-v1", [{"label": "lbl", "text": "<b>Hi</b>"}])
+    assert v1["viewLayout"]["$jason"]["body"]["sections"]["items"][0]["type"] == "vertical"
+    # parse: pasted directives come back as the row model
+    parsed = parse_directives(
+        "--%%u:{button=\"b\",text=\"B\",onReleased=\"press\"}\n"
+        "--%%rsrc:uiA:{{image=\"art\",url=\"https://x/y.png\"}}\n"
+    )
+    assert parsed["rows"] == [{"button": "b", "text": "B", "onReleased": "press"}]
+    assert parsed["resources"] == [
+        {"name": "uiA", "rows": [{"image": "art", "url": "https://x/y.png"}]}
+    ]
+
+
+def test_uibuilder_server_serves_page_and_compiles(tmp_path) -> None:
+    import threading
+    import urllib.request
+    from http.server import ThreadingHTTPServer
+
+    from flua.tools import uibuilder
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), uibuilder._Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        page = urllib.request.urlopen(base + "/", timeout=5).read()
+        assert b"flua uibuilder" in page
+        viewer = urllib.request.urlopen(base + "/viewer", timeout=5).read()
+        assert b"UI viewer" in viewer or b"<html" in viewer
+        import json as _json
+
+        req = urllib.request.Request(
+            base + "/flua/uibuilder/compile",
+            data=_json.dumps(
+                {
+                    "target": "child",
+                    "rows": [{"button": "b", "text": "B", "onReleased": "press"}],
+                    "resourceName": "uiA",
+                }
+            ).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        out = _json.loads(urllib.request.urlopen(req, timeout=5).read())
+        assert out["directives"][0].startswith("--%%rsrc:uiA:{")
+        # the preview device reflects the compile
+        devices = _json.loads(urllib.request.urlopen(base + "/flua/devices", timeout=5).read())
+        assert devices[0]["name"] == "preview"
+        assert devices[0]["properties"]["uiView"][0]["components"][0]["name"] == "b"
+    finally:
+        server.shutdown()
+        server.server_close()

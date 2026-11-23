@@ -21,4 +21,4 @@ decision changes.
 | [0013](0013-no-wizard-app.md) | no wizard app; the agent loop is the product surface — elicitation and verification instead | active, amended by 0015 |
 | [0014](0014-device-schemas.md) | device structures and interface semantics derive from the distilled type/interface schema | active |
 | [0015](0015-recipe-builder-tool.md) | the recipe builder is a tool on top of flua (engine-first, CLI/JSON), parked as a PoC | active |
-| [0016](0016-uibuilder.md) | a web UI builder for `--%%u`/`--%%rsrc` — target switch, palette, live preview, export to directives | accepted |
+| [0016](0016-uibuilder.md) | a web UI builder for `--%%u`/`--%%rsrc` — target switch, palette, live preview, export to directives | active |

@@ -532,6 +532,10 @@
         "help": "print a QA's DECLARED UI as text (elements, callbacks, options) — static, not live state; --as-lua prints paste-ready Lua tables (child-device uiView); --device ID fetches an HC3 device's UI and renders it back to --%%u rows + the raw JSON; for post-init values and callback behavior see examples/ui-interaction-test.lua"
       },
       {
+        "name": "uibuilder",
+        "help": "open the visual UI builder in a browser — build a QuickApp UI (main QA v1/v2 or a child device) and copy out the --%%u/--%%rsrc directives"
+      },
+      {
         "name": "unpack",
         "help": "unpack a .fqa file into a flua project (<QA-name>_main.lua + one file per QA file)"
       },
