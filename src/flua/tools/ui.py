@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config import expand_includes, parse_annotations
-from ..ui import compile_ui, lua_literal, ui_to_u_rows
+from ..ui import JsonArray, compile_ui, lua_literal, ui_to_u_rows
 from .common import build_fqa, hc3_engine
 
 NAME = "ui"
@@ -333,7 +333,7 @@ def _child_bindings(ui_view: Any, ui_callbacks: Any) -> Any:
                     method = cbs.get(name, {}).get(event)
                     if not method:
                         continue
-                    args = ["$event.value"] if event in _VALUE_EVENTS else []
+                    args = ["$event.value"] if event in _VALUE_EVENTS else JsonArray()
                     rewritten[event] = [
                         {
                             "type": "deviceAction",
@@ -348,7 +348,12 @@ def _child_bindings(ui_view: Any, ui_callbacks: Any) -> Any:
                 out[k] = transform(out[k])
             return out
         if isinstance(node, list):
-            return [transform(v) for v in node]
+            out = [transform(v) for v in node]
+            # preserve the marked empty array: a plain list rebuild would
+            # strip the JsonArray subclass back to a bare {} literal
+            if isinstance(node, JsonArray) and not out:
+                out = JsonArray()
+            return out
         return node
 
     return transform(copy.deepcopy(ui_view))

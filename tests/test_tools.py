@@ -155,7 +155,9 @@ def test_tool_ui_as_lua_child_bindings(capsys) -> None:
         )
         assert tools.run_tool("ui", [str(script), "--as-lua", "--child"]) == 0
         out = capsys.readouterr().out
-        assert "actionName='turnOn',args={}" in out
+        # argless bindings emit the marked empty array: a plain {} encodes as
+        # an object and the HC3 app silently drops the action (live-verified)
+        assert "actionName='turnOn',args=json.array()" in out
         assert "actionName='dim',args={'$event.value'}" in out
         assert "local viewLayout" not in out and "local uiCallbacks" not in out
         assert "UIAction" not in out

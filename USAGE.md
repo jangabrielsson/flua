@@ -704,7 +704,10 @@ the MAIN QA (whose `uiCallbacks` table receives the child's events):
   resolves through the main QA's `uiCallbacks` and runs the MAIN's method.
 - optionally, direct `actionName` bindings (`--as-lua --child`) deliver to
   the CHILD class's methods with plain args instead — a hand-authored
-  style the HC3 also supports, not a different format.
+  style the HC3 also supports, not a different format. Argless bindings
+  (buttons) emit `args=json.array()` — the marked empty array: a plain
+  `{}` JSON-encodes as an object and the HC3 app silently drops the
+  action (live-verified).
 
 flua's viewer executes both (UIAction via callUIEvent, direct actionNames
 as device actions). See `examples/child-ui.lua` for the child-class

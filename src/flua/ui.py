@@ -34,6 +34,13 @@ _LUA_KEYWORDS = {
     "repeat", "return", "then", "true", "until", "while",
 }
 
+
+class JsonArray(list):
+    """A marked empty Lua array: lua_literal renders it as ``json.array()``
+    so the JSON round-trip produces ``[]`` — a plain ``{}`` encodes as an
+    object, which the HC3 app silently drops (the argless child-button
+    bindings, live-verified)."""
+
 # Per-element weight by row size in the uiView format (the exact table).
 _UI_VIEW_WEIGHTS = {1: "1.0", 2: "0.5", 3: "0.25", 4: "0.33", 5: "0.20"}
 
@@ -537,6 +544,8 @@ def lua_literal(value: Any) -> str:
         escaped = value.replace("\\", "\\\\").replace("'", "\\'")
         return f"'{escaped}'"
     if isinstance(value, list):
+        if isinstance(value, JsonArray) and not value:
+            return "json.array()"  # the marked empty array: encodes as []
         return "{" + ",".join(lua_literal(item) for item in value) + "}"
     if isinstance(value, dict):
         return "{" + ",".join(
