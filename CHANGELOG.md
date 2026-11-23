@@ -4,6 +4,27 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.184] - 2026-11-23
+
+### Added
+- uibuilder — options box documents its one-per-line Text=value format
+- uibuilder — per-chip element removal
+- uibuilder — assembly-in-the-middle, properties-on-the-right, click-to-select preview
+- rows allow up to 10 elements; the builder enforces the row rules
+- --tool uibuilder — the visual UI builder (ADR 0016)
+
+### Changed
+- ADR 0016 accepted — three-way target, directives-first export
+- ADR 0016 — a web UI builder for --%%u/--%%rsrc (proposal)
+- post 36 — drop the --child flag mention
+- examples: keep the inline-literal ui-3-children as ui-3-children_old.lua
+- forum post 36 — child UIs as resources, packaged automatically
+- forum post — What's new in flua 0.1.174 through 0.1.183
+
+### Fixed
+- uibuilder duplicate-name warning; viewer keeps empty-text controls full-height
+- uibuilder — typing in the properties panel keeps focus
+
 ## [0.1.183] - 2026-11-23
 
 ### Added
