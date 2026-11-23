@@ -4,6 +4,16 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.183] - 2026-11-23
+
+### Added
+- --%%rsrc scans --%%file extras too
+- --%%rsrc — named child uiViews as resources, packaged as rsrc.lua
+
+### Fixed
+- --%%rsrc re-packaging stays idempotent; declared rsrc files own the name
+- image components carry no text/icon passthrough + rsrc unpack roundtrip test
+
 ## [0.1.182] - 2026-11-23
 
 ### Added
