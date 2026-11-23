@@ -1,0 +1,139 @@
+<h2>The button that did nothing — how QuickApp UI events really work on the HC3</h2>
+
+<p>It started as a mystery. A QuickApp with a child device — a small sensor
+with its own little UI: a button, a slider, a tabbed panel. In flua's web
+viewer everything worked. On the real HC3 the slider worked, the select
+worked, but the button did <em>absolutely nothing</em>. No log line, no
+error, no warning. Just silence.</p>
+
+<p>Two evenings later, the button's secret was out, and the whole UI event
+system of the HC3 finally made sense. This post is the version I wish I'd
+read at the start.</p>
+
+<h3>The two UI formats, in ten seconds</h3>
+
+<p>The HC3 has two ways to describe a QuickApp's interface:</p>
+
+<ul>
+  <li><strong>The old one (v1)</strong> — two separate parts: the "layout"
+  (a tree of rows with buttons and sliders) plus a <strong>callback
+  table</strong> (<code>uiCallbacks</code>) that maps "element + event" to
+  the QA method.</li>
+  <li><strong>The new one (v2)</strong> — the "uiView": a <strong>single
+  tree</strong> where the layout AND the callback events live inside each
+  element (the <code>eventBinding</code>), plus the modern stuff:
+  <code>tabView</code> (tabbed panels) and <code>collapsible</code>
+  (expandable sections).</li>
+</ul>
+
+<p>You choose with <code>--%%useUiView:true</code>. Tabs and collapsibles
+<em>only exist in v2</em> — declare them without it and the app shows you a
+blank view. (flua's <code>--check</code> now warns you about exactly
+that.)</p>
+
+<h3>How a press becomes a method call</h3>
+
+<p>When someone taps a control, exactly one thing happens: the controller
+calls a method. What differs is <em>how the view names that method</em> —
+and that depends on the format and who owns the view. Three cases:</p>
+
+<p><strong>The old layout (v1), main QA.</strong> The layout carries no
+method names at all. The app sends a UI event — "the element
+<code>onBtn</code> got the event <code>onReleased</code>" — and the
+controller looks it up in the QA's phone book (the <code>uiCallbacks</code>
+table, built from your <code>--%%u:</code> declarations). The method runs,
+receiving the event table (<code>event.values[1]</code> is the value).</p>
+
+<p><strong>The new view (v2), main QA.</strong> The binding says
+<code>UIAction</code> with the element and event names. The controller
+turns that right back into the same phone-book lookup — v2 kept v1's
+behavior, just wrapped in an action. Same delivery, newer transport.</p>
+
+<p><strong>The new view (v2), child.</strong> The binding <em>is</em> the
+method: <code>actionName = "turnOn"</code> means call <code>turnOn</code>.
+The controller does exactly that, on the child's own class (the one you
+pass to <code>createChildDevice</code> as the second argument), with the
+values as plain arguments. No phone book anywhere — and because each child
+names its own methods, two children can both have a "Turn On" button that
+calls their <em>own</em> <code>turnOn</code>.</p>
+
+<pre>
+Child = {}
+class "Child"(QuickAppChild)
+function Child:__init(dev) QuickAppChild.__init(self, dev) end
+function Child:turnOn() print(self.name, "pressed") end   -- ← this runs
+
+function QuickApp:onInit()
+  self:createChildDevice({
+    name = "Tabs child", type = "com.fibaro.floodSensor",
+    initialProperties = { uiView = uiView },   -- bindings name turnOn directly
+  }, Child)
+end
+</pre>
+
+<p>In short: main QA → phone book (v1 and v2 alike). Child → the view names
+the method. One uiView format, three cases.</p>
+
+<h3>The four gotchas (all caught in the wild)</h3>
+
+<p><strong>1. Tabs and collapsibles are v2-only.</strong> A tabbed QA must
+declare <code>--%%useUiView:true</code>, or the app's old renderer shows
+nothing at all. (flua's web viewer renders them either way — the rule is
+about the app.)</p>
+
+<p><strong>2. Never edit a v2 QA in the HC3's UI editor.</strong> The editor
+doesn't know <code>tabView</code>/<code>collapsible</code> — it can't edit
+them, and an edit there can rewrite the view and drop them. Keep tabbed QAs
+flua-authored and update them with <code>--tool updateQA</code>/<code>uploadQA</code>.
+Child devices are the happy exception: the editor never touches their
+views, so tabs on children are completely safe.</p>
+
+<p><strong>3. The silent button — <code>{}</code> vs <code>[]</code>.</strong>
+This was the actual bug. An argless child-button binding carried
+<code>args = {}</code> — an empty Lua table. When the controller
+JSON-encodes that, <code>{}</code> becomes an <em>object</em>, and the app —
+expecting an <em>array</em> — silently drops the action. No log, no error.
+Just the silence from the opening. The fix is one idiom:</p>
+
+<pre>
+-- argless binding: mark the empty array, or the app drops the action
+eventBinding = { onReleased = {{ type="deviceAction",
+  params = { actionName = "turnOn", args = json.array() } }} }
+</pre>
+
+<p><strong>4. One view, one owner.</strong> A child's uiView names the
+child's methods — per child, so two children can both have a "Turn On"
+button calling their own <code>turnOn</code>. Don't reuse a binding that
+targets a method that doesn't exist on that child's class: the action
+simply won't resolve.</p>
+
+<h3>Where flua fits</h3>
+
+<p>flua's viewer plays the exact same game as the app: non-<code>UIAction</code>
+bindings fire as device actions, <code>UIAction</code> bindings go through
+the phone book, and the simulated <code>onAction</code>/<code>onUIEvent</code>
+route identically — so the QA you debug in the viewer behaves the same once
+uploaded (all of the above is live-verified on 5.221). And when you want a
+child with a tabbed UI, <code>flua --tool ui --as-lua</code> prints the
+compiled view as a paste-ready Lua table for <code>createChildDevice</code> —
+same format, with the bindings naming your methods directly, the way a
+child's view needs them.</p>
+
+<h3>TL;DR</h3>
+
+<ul>
+  <li>v1 = old layout, no event fields — everything resolves through the
+  main QA's <code>uiCallbacks</code>.</li>
+  <li>v2 = uiView. Main QA: <code>UIAction</code> bindings → phone book.
+  Child: <code>actionName</code> = the method on the child's class.</li>
+  <li>Tabs/collapsibles: v2 only, <code>useUiView:true</code>, never edit
+  them in the HC3 editor.</li>
+  <li>Argless child bindings need <code>json.array()</code> — the plain
+  <code>{}</code> button press dies silently.</li>
+  <li>flua's viewer and sim mirror all three cases — develop offline,
+  upload with confidence.</li>
+</ul>
+
+<p><small>Example: <code>examples/ui-3-children.lua</code> (a tabbed child
+with button, slider, switch and select, identical offline and on the
+controller) · flua: https://github.com/jangabrielsson/flua</small></p>
