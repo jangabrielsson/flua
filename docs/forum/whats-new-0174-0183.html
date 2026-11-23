@@ -1,0 +1,68 @@
+<h2>What's new in flua — 0.1.174 through 0.1.183</h2>
+
+<p>Ten releases in a few days, and one theme dominates: <b>QuickApp user
+interfaces grew up in flua</b> — the modern elements, a paste-ready UI
+printer, and a proper model of how button presses actually become method
+calls on the controller. As usual, most of it exists because someone hit a
+wall first. (The button that did nothing — that story gets its own post,
+linked below.)</p>
+
+<h3>QuickApp UIs got modern</h3>
+
+<ul>
+<li><b>Tabs, collapsibles and images.</b> The HC3's newer view format
+brings <code>tabView</code> (tabbed panels) and <code>collapsible</code>
+(expandable sections) — both now declared in plain
+<code>--%%u:</code> directives and rendered by flua's web viewer. Images
+join the classic buttons/sliders/switches, url or inline SVG (in the
+viewer — the HC3 app prefers plain http(s) art).</li>
+<li><b>Live-verified on real controllers.</b> Tabs and collapsibles were
+uploaded and exercised on actual HC3s: they render, they click, the
+callbacks fire. Two rules came back from the field: declare
+<code>--%%useUiView:true</code> (the old renderer shows a blank view), and
+never edit such a QA in the HC3's UI editor — it doesn't know the
+elements. flua's <code>--check</code> now warns about the first one.</li>
+</ul>
+
+<h3>How button presses actually work</h3>
+
+<p>Building the above forced the question: what <i>exactly</i> happens
+between a tap and your method running? The answer turned out to be a small
+three-case model — and one silent, maddening bug. The whole story, in
+plain language, is in the companion post <a
+href="/docs/forum/ui-events-explained.html">The button that did nothing</a>.
+The short version: the main QA has a callback table, children don't — their
+views name the method directly — and an empty argument list must be
+<code>json.array()</code> or the controller silently drops the press.</p>
+
+<h3>Paste-ready UIs for child devices</h3>
+
+<p>Child devices are the one place the HC3's editor never rewrites a UI —
+which makes them the natural home for tabbed panels. flua now prints any
+declared UI as a paste-ready Lua table
+(<code>flua --tool ui --as-lua</code>) that drops straight into
+<code>createChildDevice</code>, with the child-style bindings baked in.
+And a new <code>--%%rsrc</code> directive lets a QA declare its child UIs
+as named resources that flua injects at runtime and packages into a file
+automatically — we'll give that its own post soon, it deserves one.</p>
+
+<h3>Under the hood (for the tinkerers)</h3>
+
+<ul>
+<li><b>Loaded files see your QA's world.</b> <code>dofile</code> now runs
+in the QA's own environment like <code>require</code> always did, and
+<code>_FLUA.loadFile(path)</code> is the sanctioned loader for test
+harnesses that drive a QA's real files at runtime — born from a field
+report by an agent building a test harness.</li>
+<li><b><code>class()</code> is documented.</b> The return value is the
+parent-setter, the class object lives in the global, and every class needs
+its own <code>__init__</code> — the HC3's actual contract, now written
+down instead of source-dive territory.</li>
+<li><b>Smaller fixes that matter.</b> The test runner's deadline is now
+its own wall clock; luacheck leftovers swept; the uploadable examples no
+longer crash a real HC3 on their keep-alive call.</li>
+</ul>
+
+<p><small>flua: https://github.com/jangabrielsson/flua · the UI-events
+companion post: <a href="/docs/forum/ui-events-explained.html">The button
+that did nothing</a></small></p>
