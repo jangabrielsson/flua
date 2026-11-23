@@ -4,6 +4,17 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.180] - 2026-11-23
+
+### Added
+- child-UI delivery — --as-lua --child bindings + declarative action execution
+
+### Changed
+- ui child test
+
+### Fixed
+- --as-lua emits valid Lua for $jason and separates the locals
+
 ## [0.1.179] - 2026-11-23
 
 ### Added
