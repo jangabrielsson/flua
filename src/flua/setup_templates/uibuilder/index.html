@@ -232,7 +232,16 @@ function renderRows(container, rows, label) {
     head.appendChild(kindSel);
     const addEl = document.createElement("button");
     addEl.textContent = "＋ element";
-    addEl.onclick = () => { row.push(newElement(kindSel.value)); render(); changed(); };
+    const fullWidth = row.some((el) => ["tabView", "collapsible"].includes(elOf(el)));
+    if (row.length >= 10) {
+      addEl.disabled = true;
+      addEl.title = "max 10 elements per row (the HC3 editor allows 5, flua 10)";
+    } else if (fullWidth) {
+      addEl.disabled = true;
+      addEl.title = "tabView/collapsible sit alone on their row";
+    } else {
+      addEl.onclick = () => { row.push(newElement(kindSel.value)); render(); changed(); };
+    }
     head.appendChild(addEl);
     box.appendChild(head);
     row.forEach((el) => box.appendChild(elementCard(el, row)));

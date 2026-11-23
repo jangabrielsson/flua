@@ -41,9 +41,13 @@ class JsonArray(list):
     object, which the HC3 app silently drops (the argless child-button
     bindings, live-verified)."""
 
-# Per-element weight by row size in the uiView format (the exact table;
-# extended past the HC3's own five so a 6-button row gets a sane weight).
-_UI_VIEW_WEIGHTS = {1: "1.0", 2: "0.5", 3: "0.25", 4: "0.33", 5: "0.20", 6: "0.16"}
+# Per-element weight by row size in the uiView format (the HC3's own
+# table tops out at 5 — flua extends it to 10: the HC3 editor stops at 5
+# elements per row, flua allows 10).
+_UI_VIEW_WEIGHTS = {
+    1: "1.0", 2: "0.5", 3: "0.25", 4: "0.33", 5: "0.20",
+    6: "0.16", 7: "0.14", 8: "0.12", 9: "0.11", 10: "0.10",
+}
 
 _ELEMENT_KEYS = (
     "button",

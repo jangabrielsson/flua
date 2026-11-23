@@ -887,3 +887,16 @@ def test_device_ui_renders_from_an_hc3_device() -> None:
     assert len(rows) == 1
     assert "button='B1'" in rows[0] and "onReleased='tap'" in rows[0]
     assert raw == device["properties"]["uiView"]
+
+
+def test_ten_element_row_gets_weights() -> None:
+    # the HC3 editor stops at 5 elements per row; flua allows 10 — rows of
+    # 6-10 get a sane weight instead of nil (which would emit weight=nil)
+    rows = [[{"button": f"b{i}", "text": str(i)} for i in range(1, 11)]]
+    ui = compile_ui(rows, 5000)
+    components = ui["uiView"][0]["components"]
+    assert [c["style"]["weight"] for c in components] == ["0.10"] * 10  # uniform per row
+    assert all(c["style"]["weight"] for c in components)  # never nil
+    # the legacy $jason row keeps its horizontal + space shape
+    items = ui["viewLayout"]["$jason"]["body"]["sections"]["items"]
+    assert items[0]["components"][0]["type"] == "horizontal"
