@@ -63,7 +63,7 @@ eventBinding = { onReleased = {{ type="deviceAction",
   params = { actionName = "turnOn", args = json.array() } }} }
 ```
 
-**4. Copying the MAIN QA's view onto a child.** The editor's copy button hands you the main QA's uiView, `UIAction` bindings and all. Put that view on a child and `UIAction` runs *on the child* — it converts the call into a UI event and looks the method up in the MAIN QA's phone book. So a copied view only works when the main QA declares the same elements (and the method that runs is the main's). For a child's own UI, skip the middleman: name the method directly in the binding, and the child's class answers.
+**4. One view, one owner.** A child's uiView names the child's methods — per child, so two children can both have a "Turn On" button calling their own `turnOn`. Don't reuse a binding that targets a method that doesn't exist on that child's class: the action simply won't resolve.
 
 ## Where flua fits
 

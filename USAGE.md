@@ -697,17 +697,18 @@ never included (`--as-lua --device` strips them too).
 The uiView format is ONE and the same for the main QA and children — the
 HC3's UI editor can copy a QA's uiView as JSON and that JSON feeds
 `createChildDevice` directly, and `flua --tool ui --as-lua` prints exactly
-that format. Paste it into a child and keep the `--%%u` declarations on
-the MAIN QA (whose `uiCallbacks` table receives the child's events):
+that format. Where a pressed button's method lives depends on which QA
+owns the view:
 
-- `UIAction` bindings (the standard form, editor-copy workflow): the event
-  resolves through the main QA's `uiCallbacks` and runs the MAIN's method.
-- optionally, direct `actionName` bindings (`--as-lua --child`) deliver to
-  the CHILD class's methods with plain args instead — a hand-authored
-  style the HC3 also supports, not a different format. Argless bindings
-  (buttons) emit `args=json.array()` — the marked empty array: a plain
-  `{}` JSON-encodes as an object and the HC3 app silently drops the
-  action (live-verified).
+- on the **main QA**, the `UIAction` bindings resolve through its own
+  `uiCallbacks` (compiled from its `--%%u` declarations);
+- on a **child**, the binding's `actionName` **is** the method, delivered
+  via `onAction` to the child's class (the `classRepresentation` passed to
+  `createChildDevice`) with plain args — each child resolves its own
+  methods, so same-named buttons on several children call their own
+  actions. `--as-lua --child` emits these child bindings; argless bindings
+  (buttons) must use `json.array()` — a plain `{}` JSON-encodes as an
+  object and the HC3 app silently drops the action (live-verified).
 
 flua's viewer executes both (UIAction via callUIEvent, direct actionNames
 as device actions). See `examples/child-ui.lua` for the child-class
@@ -1776,11 +1777,6 @@ How each format uses them:
   resolve to the interaction's value; an argless binding must use
   `json.array()` — a plain `{}` encodes as an object and the app silently
   drops the action.
-- **child reusing the MAIN QA's uiView** (the editor-copy workflow): the
-  `UIAction` bindings run on the child and convert to UIEvents, which
-  resolve through the MAIN QA's `uiCallbacks` — the main QA must declare
-  those elements (its own `--%%u`). A binding without a value arg comes out
-  `values=[]`.
 
 flua mirrors all of it: the viewer executes non-`UIAction` bindings as
 device actions and `UIAction` bindings via `callUIEvent`, and the sim's

@@ -43,12 +43,10 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--child",
         action="store_true",
-        help="with --as-lua: OPTIONAL delivery choice, not a format difference "
-        "— emit direct actionName bindings that run the CHILD class's methods "
-        "with plain args (hand-authored HC3 style). The default output is the "
-        "one uiView format for both: pasted into a child it keeps UIAction "
-        "bindings and runs the MAIN QA's methods via its uiCallbacks "
-        "(the editor-copy workflow)",
+        help="with --as-lua: emit CHILD bindings — each event's actionName IS "
+        "the method on the child's class (delivered via onAction with plain "
+        "args; the live-verified child model — each child resolves its own "
+        "methods). Same uiView format as the main QA, different binding target",
     )
     parser.add_argument(
         "--device",
@@ -298,16 +296,14 @@ _VALUE_EVENTS = {"onChanged", "onToggled", "onToggleOn", "onToggleOff", "onTabCh
 
 
 def _child_bindings(ui_view: Any, ui_callbacks: Any) -> Any:
-    """Rewrite a compiled uiView for the OPTIONAL child-class delivery
-    route — a delivery choice, not a format difference: the uiView format
-    is the same for the main QA and children. In the default (editor-copy)
-    route a child reuses the main QA's uiView with UIAction bindings and
-    runs the MAIN's methods via its uiCallbacks; this transform instead
-    emits direct actionName bindings that run the CHILD class's method
-    with plain args (children never register a uiCallbacks table of their
-    own — live-verified 5.221). UIAction wrappers become direct method
-    bindings (value-carrying events get $event.value), events with no
-    declared method drop their binding."""
+    """Rewrite a compiled uiView into CHILD bindings — the live-verified
+    child model: each event's actionName IS the method on the child's
+    class, delivered via onAction with plain args (children never register
+    a uiCallbacks table of their own — each child resolves its own
+    methods, so same-named buttons on several children call their own
+    actions). Same uiView format as the main QA, different binding target.
+    UIAction wrappers become direct method bindings (value-carrying events
+    get $event.value), events with no declared method drop their binding."""
     import copy
 
     cbs: dict[str, dict[str, str]] = {}

@@ -408,11 +408,11 @@ async def test_example_child_ui_action_delivery(tmp_path, capsys) -> None:
 async def test_child_reusing_main_uiaction_ui_view_routes_to_main_callbacks(
     tmp_path, capsys
 ) -> None:
-    # the HC3 editor-copy workflow: the uiView format is the SAME for the
-    # main QA and children — a child given the main QA's uiView (UIAction
-    # bindings) delivers its events through the main QA's uiCallbacks, so
-    # the MAIN's methods run. flua matches: callUIEvent on the child's
-    # element resolves in the main QA's table.
+    # flua's sim routing for main-QA-style (UIAction) bindings on a child:
+    # they resolve through the main QA's uiCallbacks, so the MAIN's method
+    # runs. (The live-verified child model is direct actionName bindings
+    # -> the child class's method; this pins the degenerate copy case's
+    # sim behavior, not an HC3 contract.)
     script = tmp_path / "main.lua"
     script.write_text(
         '--%%u:{button="onBtn",text="On",onReleased="turnOn"}\n'
