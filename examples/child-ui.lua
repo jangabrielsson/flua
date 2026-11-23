@@ -28,7 +28,7 @@ function Child:handleSelect(v) print(self.name, "Mode", v) end
 function Child:play() print(self.name, "Play pressed") end
 
 function QuickApp:onInit()
-  _FLUA.keepAlive()
+  if _FLUA then _FLUA.keepAlive() end
   self:debug("child ui demo ready")
   for _, c in ipairs(self.childDevices) do
     if c.type == "com.fibaro.floodSensor" then return end  -- already created

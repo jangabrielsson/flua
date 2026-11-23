@@ -44,7 +44,7 @@ local function encodeBase64(data)
 end
 
 function QuickApp:onInit()
-  _FLUA.keepAlive()
+  if _FLUA then _FLUA.keepAlive() end
   self:debug("ui probe ready")
   -- 1. the SVG (must include the xmlns attribute)
   local svg = [[

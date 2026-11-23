@@ -24,7 +24,7 @@ local function encodeBase64(data)
 end
 
 function QuickApp:onInit()
-  _FLUA.keepAlive()
+  if _FLUA then _FLUA.keepAlive() end
   self:debug("label svg demo ready")
   -- the SVG (must include the xmlns attribute), base64-encoded, wrapped in
   -- an <img> tag, and set as the label's HTML text
