@@ -12,8 +12,8 @@ Two evenings later, the button's secret was out, and the whole UI event system o
 
 The HC3 has two ways to describe a QuickApp's interface:
 
-- **The old one (v1)** — the "layout". A tree of rows with buttons and sliders. Solid, everywhere, but nothing fancy.
-- **The new one (v2)** — the "uiView". Same elements, plus the modern stuff: `tabView` (tabbed panels) and `collapsible` (expandable sections).
+- **The old one (v1)** — two separate parts: the "layout" (a tree of rows with buttons and sliders) plus a **callback table** (`uiCallbacks`) that maps "element + event" to the QA method.
+- **The new one (v2)** — the "uiView": a **single tree** where the layout AND the callback events live inside each element (the `eventBinding`), plus the modern stuff: `tabView` (tabbed panels) and `collapsible` (expandable sections).
 
 You choose with `--%%useUiView:true`. Tabs and collapsibles *only exist in v2* — declare them without it and the app shows you a blank view. (flua's `--check` now warns you about exactly that.)
 
