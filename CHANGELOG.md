@@ -4,6 +4,20 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.188] - 2026-11-24
+
+### Added
+- uibuilder — reorder rows with per-row up/down arrows
+- examples/list.lua — the data-bound list demo
+- the list element — the HC3's data-bound list (the last view element)
+
+### Changed
+- fix
+- list element live verdict — HC3 renders lists only from plugin views
+
+### Fixed
+- child_bindings keeps direct-action bindings verbatim + list-child probe
+
 ## [0.1.187] - 2026-11-24
 
 ### Changed
