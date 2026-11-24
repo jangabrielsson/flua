@@ -205,6 +205,24 @@ function rowStrip(container, rows, label, depth) {
     rm.textContent = "✕";
     rm.onclick = () => { rows.splice(ri, 1); selection = null; render(); changed(); };
     head.appendChild(rm);
+    const up = document.createElement("button");
+    up.textContent = "↑";
+    up.title = "move this row up";
+    up.disabled = ri === 0;
+    up.onclick = () => {
+      [rows[ri - 1], rows[ri]] = [rows[ri], rows[ri - 1]];
+      render(); changed();
+    };
+    head.appendChild(up);
+    const down = document.createElement("button");
+    down.textContent = "↓";
+    down.title = "move this row down";
+    down.disabled = ri === rows.length - 1;
+    down.onclick = () => {
+      [rows[ri], rows[ri + 1]] = [rows[ri + 1], rows[ri]];
+      render(); changed();
+    };
+    head.appendChild(down);
     const kindSel = document.createElement("select");
     for (const [kind, meta] of Object.entries(ELEMENTS)) {
       if ($("target").value === "main-v1" && meta.v2) continue;
