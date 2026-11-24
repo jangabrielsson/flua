@@ -570,6 +570,10 @@ def parse_annotations(source: str, warn_unknown: bool = True) -> dict[str, Any]:
                     f"--%%rsrc name must be a Lua identifier "
                     f"(fibaro.RSRC.<name>): got {rsrc_name!r}"
                 )
+            if rsrc_value.strip().startswith("u:"):
+                # --%%rsrc:name:u:{...} — the explicit kind marker; the uiView
+                # is the only kind today, so the plain form is its shorthand
+                rsrc_value = rsrc_value.strip()[2:]
             entries = config.get("rsrc")
             if not isinstance(entries, list):
                 entries = []

@@ -717,7 +717,9 @@ pattern (and *UI event dispatch on the HC3* below for the full model):
 ### Child uiViews as resources (`--%%rsrc`)
 
 A `--%%rsrc:name:{rows}` directive declares a named child uiView — the
-rows are ordinary `--%%u` row shapes (one row per directive value; a bare
+rows are ordinary `--%%u` row shapes (the kind is implicit; the explicit
+`--%%rsrc:name:u:{rows}` spelling is accepted for when future kinds
+arrive) (one row per directive value; a bare
 element dict is the single-row convenience form; long values continue on
 following comment lines like `--%%u`). flua compiles each resource to a
 child-bound uiView (`actionName` = the method, `json.array()` for argless

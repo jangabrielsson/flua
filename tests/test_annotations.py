@@ -177,3 +177,15 @@ def test_rsrc_directive_rejects_bad_names() -> None:
         parse_annotations("--%%rsrc::{button=\"b\"}\n")
     with pytest.raises(ValueError, match="identifier"):
         parse_annotations("--%%rsrc:not-a-name:{button=\"b\"}\n")
+
+
+def test_rsrc_explicit_u_kind_marker() -> None:
+    # --%%rsrc:name:u:{...} (the explicit kind marker) parses like the
+    # implicit plain form — the uiView is the only kind today
+    from flua.config import parse_annotations
+
+    a = parse_annotations('--%%rsrc:guiChild1:u:{{button="b",text="B"}}\n')
+    b = parse_annotations('--%%rsrc:guiChild1:{{button="b",text="B"}}\n')
+    assert a["rsrc"] == b["rsrc"] == [
+        {"name": "guiChild1", "rows": [{"button": "b", "text": "B"}]}
+    ]
