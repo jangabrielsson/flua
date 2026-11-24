@@ -2,6 +2,9 @@
 --%%type:com.fibaro.genericDevice
 --%%useUiView:true
 -- (the list element is v2-only — the --check guard warns without this)
+-- (live-verified 5.22x: the HC3 app renders lists only from a plugin's
+--  packaged view file, NOT from a QA's uiView — this demo is for the
+--  flua viewer; an HC3-bound QA needs the plugin-view route)
 
 -- The HC3's data-bound list (the sonosGroup speaker rows). The element's
 -- components is the ITEM TEMPLATE in the raw uiView dialect:

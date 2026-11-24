@@ -820,8 +820,12 @@ with `{{data.<field>}}` placeholders wherever an item's value goes
 item's fields resolved (`args={"{{data.playerId}}", "$event.value"}`).
 The QA feeds plain rows at runtime: `self:updateView(name, "data",
 { {playerId=…, playerName=…, …}, … })` — no view structure in the data.
-V2-only (the `--check` guard covers it); see `examples/`-style usage in
-the Sonos QA's `speakersVolumeList`.
+V2-only (the `--check` guard covers it); see `examples/list.lua`.
+Live-verified 5.22x: the HC3 app renders lists only from a plugin's
+packaged view file (sonosGroup's `json/v2/view.json`), NOT from a QA's
+(or child's) `uiView` — both blank there. flua's viewer renders them
+fully, so lists are a sim/dev surface; HC3-bound QAs need the plugin-view
+route.
 
 A `tabView` groups rows under named tabs. It is full-width — it must sit
 alone on its row. Tabs take `name` and `text` plus their own list of rows
