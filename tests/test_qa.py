@@ -2478,6 +2478,8 @@ async def test_child_inherits_parent_use_ui_view(tmp_path) -> None:
         "  self:createChildDevice({ name = 'A', type = 'com.fibaro.floodSensor' })\n"
         "  self:createChildDevice({ name = 'B', type = 'com.fibaro.floodSensor',\n"
         "    initialProperties = { useUiView = false } })\n"
+        "  self:createChildDevice({ name = 'C', type = 'com.fibaro.windowSensor',\n"
+        "    initialProperties = { uiView = {{{label=\"lbl\"}}} } })\n"
         "end\n"
     )
     engine = LuaEngine()
@@ -2485,17 +2487,17 @@ async def test_child_inherits_parent_use_ui_view(tmp_path) -> None:
     try:
         qa_id = engine.load_qa_file(str(script))[0]
 
-        def two_children() -> bool:
+        def three_children() -> bool:
             return (
                 sum(
                     1
                     for d in engine.api.state.devices.values()
                     if d.get("parentId") == qa_id and d.get("id", 0) >= 900000
                 )
-                == 2
+                == 3
             )
 
-        await wait_until(two_children)
+        await wait_until(three_children)
         children = {
             d["name"]: d
             for d in engine.api.state.devices.values()
@@ -2503,5 +2505,6 @@ async def test_child_inherits_parent_use_ui_view(tmp_path) -> None:
         }
         assert children["A"]["properties"]["useUiView"] is True  # inherited
         assert children["B"]["properties"]["useUiView"] is False  # explicit wins
+        assert children["C"]["properties"]["useUiView"] is True  # uiView-bearing => v2
     finally:
         await engine.stop()
