@@ -4,6 +4,17 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.187] - 2026-11-24
+
+### Changed
+- test: harden the --ui keepalive pin against parallel-load hiccups
+- the useUiView skeleton default's scope (children override at creation)
+- quickapp-ui skill covers the new elements
+
+### Fixed
+- a uiView-bearing child is implicitly v2, whatever the parent's format
+- children inherit the parent QA's useUiView
+
 ## [0.1.186] - 2026-11-24
 
 ### Added
