@@ -2508,3 +2508,38 @@ async def test_child_inherits_parent_use_ui_view(tmp_path) -> None:
         assert children["C"]["properties"]["useUiView"] is True  # uiView-bearing => v2
     finally:
         await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_example_list_data_push_and_item_action(tmp_path, capsys) -> None:
+    # examples/list.lua — the data-bound list fixture: the template passes
+    # through verbatim, updateView("data", rows) lands in device.view, and
+    # a per-item action resolves the item's fields into the args.
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        qa_id = engine.load_qa_file(str(REPO_ROOT / "examples" / "list.lua"))[0]
+
+        def data_pushed() -> bool:
+            view = engine.api.state.devices[qa_id].get("view") or {}
+            return len((view.get("speakersVolumeList") or {}).get("data") or []) == 2
+
+        await wait_until(data_pushed)
+        device, _ = engine.api.dispatch("GET", f"/devices/{qa_id}")
+        lst = device["properties"]["uiView"][0]["components"][0]
+        assert lst["type"] == "list" and lst["name"] == "speakersVolumeList"
+        # the template is verbatim: {{data.field}} intact
+        template = lst["components"][0]["components"]
+        assert template[0]["text"] == "{{data.playerName}}"
+        assert template[1]["eventBinding"]["onReleased"][0]["params"]["args"] == [
+            "{{data.playerId}}"
+        ]
+        # a per-item action: the QA method receives the plain args
+        status = engine.api.dispatch(
+            "POST", f"/devices/{qa_id}/action/setPlayerVolume", {"args": ["player2", "80"]}
+        )[1]
+        assert status == 202
+        await asyncio.sleep(0.4)
+        assert "VOL player2 80" in capsys.readouterr().out
+    finally:
+        await engine.stop()
