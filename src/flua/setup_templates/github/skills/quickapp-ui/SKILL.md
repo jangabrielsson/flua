@@ -1,6 +1,6 @@
 ---
 name: quickapp-ui
-description: HC3 QuickApp UI at runtime: self:updateView(...) for every element type (label, button, slider, switch, select, multi) — which properties and values each accepts (text, value, visible, disabled, image, min/max/step, color, options, selectedItem/selectedItems/values), the value rules (strings, select matching by option value, not text), the UI event contract (onReleased/onLongPress*/onToggleOn/onToggleOff/onChanged/onToggled and their event.values shapes), and how to assert or drive UI state in tests (self:getView(), _FLUA.uiEvent, /plugins/callUIEvent). USE FOR: changing UI elements at runtime, updating a label/slider/select from QA code, debugging why an updateView call does not show in the viewer, wiring UI callbacks.
+description: HC3 QuickApp UI at runtime: self:updateView(...) for every element type (label, button, slider, switch, select, multi, tabView, collapsible, image, colorPicker, colorTemperaturePicker) — which properties and values each accepts (text, value, visible, disabled, image, min/max/step, color, options, selectedItem/selectedItems/values), the value rules (strings, select matching by option value, not text), the UI event contract (onReleased/onLongPress*/onToggleOn/onToggleOff/onChanged/onToggled and their event.values shapes), and how to assert or drive UI state in tests (self:getView(), _FLUA.uiEvent, /plugins/callUIEvent). USE FOR: changing UI elements at runtime, updating a label/slider/select from QA code, debugging why an updateView call does not show in the viewer, wiring UI callbacks.
 ---
 
 # QuickApp UI at Runtime: updateView, Events, Viewer Semantics
@@ -35,6 +35,13 @@ UI state with it.
   the option list), `values` (list; the 5.221 schema reads the first entry),
   `text` (the placeholder shown when nothing matches)
 - **multi** — `selectedItems` (list of values), `options`, `values`, `text`
+- **tabView** — `activeTab` (string, the tab name: the viewer switches panels;
+  a tab click fires `onTabChanged`, an updateView switch does not)
+- **collapsible** — `collapsed` (bool), `text` (string), `disabled` (bool)
+- **image** — `url` (string; the viewer swaps the picture live)
+- **colorPicker** — `value` (a `#rrggbb` string)
+- **colorTemperaturePicker** — `colorTemperature` (string; `minTemperature` /
+  `maxTemperature` are static declarations)
 - **every element** — `visible` (bool; `false` hides the element — it takes no
   row space)
 
@@ -89,6 +96,11 @@ the event table.
 - **multi** — `onToggled`. `event.values[1]` is the **list** of picked values
   (flua restores the list; on the real HC3 they arrive comma-joined in the
   single value parameter).
+- **tabView** — `onTabChanged`. `event.values[1]` is the new tab name
+  (string).
+- **colorPicker / colorTemperaturePicker** — `onChanged`. `event.values[1]`
+  is the color hex / temperature (string).
+- **collapsible / image** — no events (client-side state / static art).
 
 ```lua
 function QuickApp:modeToggled(event)
@@ -107,6 +119,14 @@ pack writes it) and re-creating through the JSON API — or re-import the
 package, which preserves it verbatim regardless: via the HC3 web UI's
 Import button or flua's `--tool uploadFQA`/`uploadQA` (both use
 `POST /quickApp/import` — see the hc3-rest-api skill).
+
+## Authoring the elements (vs. runtime updates)
+
+This skill is the runtime half; the declaration half — `--%%u:` rows, the
+v2 elements (tabView/collapsible need `--%%useUiView:true` on the HC3),
+child-bound uiViews and the `--%%rsrc` resources, and the visual
+`flua --tool uibuilder` — lives in USAGE.md (QuickApp UI section) and the
+forum posts 36/37.
 
 ## Asserting and driving UI state in tests
 
