@@ -945,3 +945,58 @@ def test_color_pickers_compile_and_roundtrip() -> None:
     assert parsed[0]["onChanged"] == "setColor"
     assert parsed[1]["colorTemperaturePicker"] == "tempPicker"
     assert parsed[1]["onChanged"] == "setTemp"
+
+
+def test_list_element_passthrough_and_roundtrip() -> None:
+    # the data-bound list: the components are the item TEMPLATE in the raw
+    # uiView dialect — passed through verbatim, {{data.field}} and all
+    template = [
+        {
+            "type": "horizontal",
+            "components": [
+                {
+                    "type": "label",
+                    "name": "speakerName_Label",
+                    "text": "{{data.playerName}}",
+                },
+                {
+                    "type": "button",
+                    "name": "toggleMute_Button",
+                    "text": "Mute",
+                    "eventBinding": {
+                        "onReleased": [
+                            {
+                                "type": "deviceAction",
+                                "params": {
+                                    "actionName": "togglePlayerMute",
+                                    "args": ["{{data.playerId}}"],
+                                },
+                            }
+                        ]
+                    },
+                },
+            ],
+        }
+    ]
+    ui = compile_ui([{"list": "speakersVolumeList", "data": [], "components": template}], 5000)
+    lst = ui["uiView"][0]["components"][0]
+    assert lst["type"] == "list" and lst["name"] == "speakersVolumeList"
+    assert lst["components"] == template  # verbatim: no normalization
+    assert lst["data"] == []
+    # no uiCallbacks entries (the template's bindings are raw deviceActions)
+    assert ui["uiCallbacks"] == []
+    # roundtrip
+    from flua.config import parse_lua_literal
+
+    out = ui_to_u_rows(ui_view=ui["uiView"], ui_callbacks=ui["uiCallbacks"])
+    parsed = parse_lua_literal(out[0])
+    assert parsed["list"] == "speakersVolumeList"
+    assert parsed["components"] == template
+
+
+def test_list_must_sit_alone_on_row() -> None:
+    import pytest
+
+    rows = [[{"list": "l", "components": []}, {"button": "b", "text": "x"}]]
+    with pytest.raises(ValueError, match="alone"):
+        compile_ui(rows, 5000)

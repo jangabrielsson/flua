@@ -247,7 +247,7 @@ def check_source(
     # default legacy layout ships no uiView — the view comes out blank.
     # (flua's own viewer renders them either way.)
     if not bool(annotations.get("useUiView")):
-        for key in ("tabView", "collapsible", "colorPicker", "colorTemperaturePicker"):
+        for key in ("tabView", "collapsible", "colorPicker", "colorTemperaturePicker", "list"):
             pattern = rf"^--%%u:[^\n]*\b{key}\s*="
             for match in re.finditer(pattern, source, re.MULTILINE):
                 line, column = _line_col(source, match.start())

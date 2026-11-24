@@ -61,6 +61,7 @@ _ELEMENT_KEYS = (
     "collapsible",
     "colorPicker",
     "colorTemperaturePicker",
+    "list",
 )
 
 
@@ -92,7 +93,9 @@ def _apply_defaults(rows: list[list[dict[str, Any]]]) -> None:
     """extendUI port: normalize every element (type/id/text/visible defaults,
     stringified slider bounds, switch value)."""
     for row in rows:
-        if len(row) > 1 and any(k in el for el in row for k in ("tabView", "collapsible")):
+        if len(row) > 1 and any(
+            k in el for el in row for k in ("tabView", "collapsible", "list")
+        ):
             raise ValueError(
                 "a tabView/collapsible must sit alone on its --%%u row (it is full-width)"
             )
@@ -168,6 +171,13 @@ def _apply_defaults(rows: list[list[dict[str, Any]]]) -> None:
                 el.setdefault("maxTemperature", "100")
                 el.setdefault("colorTemperature", "50")
                 el.setdefault("visible", True)
+            elif typ == "list":
+                # the HC3's data-bound list (sonosGroup): components is the
+                # ITEM TEMPLATE in the raw uiView dialect ({{data.field}}
+                # placeholders) — passed through verbatim, not compiled
+                el.setdefault("data", [])
+                el.setdefault("visible", True)
+                el.setdefault("components", [])
             elif typ == "collapsible":
                 # a collapsible section holds rows exactly like a tab does
                 el.setdefault("collapsed", False)
@@ -381,6 +391,17 @@ def _layout_tabview(el: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _layout_list(el: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "type": "list",
+        "name": el["id"],
+        "data": list(el.get("data") or []),
+        "visible": el.get("visible", True),
+        "style": {"weight": "1"},
+        "components": el.get("components") or [],
+    }
+
+
 def _layout_collapsible(el: dict[str, Any]) -> dict[str, Any]:
     """One legacy viewLayout collapsible item (the sonosGroup v2 shape,
     minus event fields — the legacy convention, see _layout_element)."""
@@ -406,6 +427,8 @@ def _view_layout(rows: list[list[dict[str, Any]]], device_id: int) -> dict[str, 
                 return _layout_tabview(row[0])
             if row[0]["type"] == "collapsible":
                 return _layout_collapsible(row[0])
+            if row[0]["type"] == "list":
+                return _layout_list(row[0])
         return _layout_row(row)
 
     items = [_item(row) for row in rows]
@@ -551,16 +574,35 @@ def _ui_view_collapsible(el: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _ui_view_list(el: dict[str, Any]) -> dict[str, Any]:
+    """One uiView list component: the data-bound list (sonosGroup's
+    speakersVolumeList). components is the item template, verbatim."""
+    return {
+        "type": "list",
+        "name": el["id"],
+        "data": list(el.get("data") or []),
+        "visible": el.get("visible", True),
+        "style": {"weight": "1"},
+        "components": el.get("components") or [],
+    }
+
+
 def _ui_view(rows: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
     """UI2NewUiView port: the new component format."""
     out: list[dict[str, Any]] = []
     for row in rows:
-        if len(row) == 1 and row[0]["type"] in ("tabView", "collapsible"):
+        if len(row) == 1 and row[0]["type"] in ("tabView", "collapsible", "list"):
             # full-width elements: alone on their row (the compile raises
             # otherwise) — still wrapped in a row so every uiView entry
             # keeps the uniform row shape (the viewer and the inverse both
             # iterate row.components)
-            builder = _ui_view_tabview if row[0]["type"] == "tabView" else _ui_view_collapsible
+            builder = (
+                _ui_view_tabview
+                if row[0]["type"] == "tabView"
+                else _ui_view_collapsible
+                if row[0]["type"] == "collapsible"
+                else _ui_view_list
+            )
             out.append(
                 {
                     "style": {"weight": "1.0"},
@@ -698,6 +740,12 @@ def _element(component: dict[str, Any], callbacks: dict[str, dict[str, str]]) ->
         }
         if event_target("onChanged"):
             element["onChanged"] = event_target("onChanged")
+    elif typ == "list":
+        element = {
+            "list": name,
+            "data": list(component.get("data") or []),
+            "components": component.get("components") or [],
+        }
     elif typ == "image":
         element = {"image": name, "url": str(component.get("url") or "")}
         if component.get("useProxy") is True:

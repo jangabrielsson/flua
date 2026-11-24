@@ -812,6 +812,17 @@ warm-temperature wheel (`minTemperature`/`maxTemperature`/
 renders them as a color input and a warm-gradient slider (approximations
 of the app's wheels); both are v2 elements.
 
+A `list` is the HC3's data-bound list (the sonosGroup speaker rows): the
+element's `components` is the **item template** in the raw uiView dialect,
+with `{{data.<field>}}` placeholders wherever an item's value goes
+(`text`, button `image`, slider `value`, per-item `visible`, and event
+`args`) and direct `actionName` bindings that fire per item with the
+item's fields resolved (`args={"{{data.playerId}}", "$event.value"}`).
+The QA feeds plain rows at runtime: `self:updateView(name, "data",
+{ {playerId=…, playerName=…, …}, … })` — no view structure in the data.
+V2-only (the `--check` guard covers it); see `examples/`-style usage in
+the Sonos QA's `speakersVolumeList`.
+
 A `tabView` groups rows under named tabs. It is full-width — it must sit
 alone on its row. Tabs take `name` and `text` plus their own list of rows
 (the same row shapes as top-level directives); the tabView itself takes

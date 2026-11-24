@@ -384,8 +384,25 @@ function boundAction(component, eventName) {
   return { name, args: Array.isArray(rawArgs) ? rawArgs : [] };
 }
 
-function resolveArgs(args, value) {
-  return (args || []).map((a) => (a === "$event.value" ? value : a));
+function resolveArgs(args, value, item) {
+  // "$event.value" -> the interaction's value; "{{data.field}}" -> the
+  // list item's field (the sonosGroup template contract)
+  return (args || []).map((a) => {
+    if (a === "$event.value") return value;
+    if (typeof a === "string" && a.startsWith("{{data.")) {
+      const field = a.slice("{{data.".length, -2);
+      return item && item[field] !== undefined ? item[field] : a;
+    }
+    return a;
+  });
+}
+
+// substitute {{data.field}} in a template string, or return the raw
+// (non-template) value unchanged
+function tpl(value, item) {
+  if (typeof value !== "string") return value;
+  return value.replace(/\{\{data\.([^}]+)\}\}/g, (_, field) =>
+    item && item[field] !== undefined ? String(item[field]) : "");
 }
 
 async function deviceActionArgs(deviceId, actionName, args) {
@@ -446,7 +463,7 @@ function withIcon(btn, name) {
 // press-and-hold: the 5.221 onLongPressDown/onLongPressReleased events
 // (custom components only — embedded controls keep click-to-action);
 // declarative deviceAction bindings fire as actions instead of UI events
-function wireLongPress(btn, deviceId, component) {
+function wireLongPress(btn, deviceId, component, item) {
   let timer = null, longPressed = false;
   const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
   const start = () => {
@@ -456,7 +473,7 @@ function wireLongPress(btn, deviceId, component) {
       timer = null;
       longPressed = true;
       const ba = boundAction(component, "onLongPressDown");
-      if (ba) deviceActionArgs(deviceId, ba.name, resolveArgs(ba.args, undefined));
+      if (ba) deviceActionArgs(deviceId, ba.name, resolveArgs(ba.args, undefined, item));
       else uiEvent(deviceId, component.name, "onLongPressDown");
     }, 500);
   };
@@ -465,7 +482,7 @@ function wireLongPress(btn, deviceId, component) {
     if (longPressed) {
       longPressed = false;
       const ba = boundAction(component, "onLongPressReleased");
-      if (ba) deviceActionArgs(deviceId, ba.name, resolveArgs(ba.args, undefined));
+      if (ba) deviceActionArgs(deviceId, ba.name, resolveArgs(ba.args, undefined, item));
       else uiEvent(deviceId, component.name, "onLongPressReleased");
     }
   };
@@ -537,6 +554,9 @@ function setComponentValue(device, component, value) {
 }
 
 function renderComponent(device, component, row) {
+  const item = row.dataset && row.dataset.listItem
+    ? JSON.parse(row.dataset.listItem)
+    : null;
   const name = document.createElement("span");
   name.className = "component-label";
   name.textContent = component.text ?? component.name;
@@ -573,7 +593,7 @@ function renderComponent(device, component, row) {
     btn.textContent = text || component.name || "\u00A0";  // keep full height
     withIcon(btn, component.image);
     if (component.disabled) btn.disabled = true;
-    if (!action && event) wireLongPress(btn, device.id, component);
+    if (!action && event) wireLongPress(btn, device.id, component, item);
     btn.onclick = () => {
       // a long press already sent onLongPressReleased — don't double-fire
       if (btn._longPressed && btn._longPressed()) return;
@@ -582,7 +602,7 @@ function renderComponent(device, component, row) {
       if (action) deviceAction(device.id, action, component.value);
       else if (boundAction(component, "onReleased")) {
         const ba = boundAction(component, "onReleased");
-        deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, undefined));
+        deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, undefined, item));
       } else if (event) uiEvent(device.id, component.name, event);
       // release the button's focus: the poll skips value refreshes while
       // the panel contains the active element, and a clicked button keeps
@@ -645,7 +665,7 @@ function renderComponent(device, component, row) {
         deviceAction(device.id, action, arg);
       } else if (boundAction(component, "onChanged")) {
         const ba = boundAction(component, "onChanged");
-        deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, slider.value));
+        deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, slider.value, item));
       } else if (event) uiEvent(device.id, component.name, event, slider.value);
     };
     control.appendChild(slider);
@@ -680,7 +700,7 @@ function renderComponent(device, component, row) {
             : event;
         if (boundAction(component, toggleEvent)) {
           const ba = boundAction(component, toggleEvent);
-          deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, v));
+          deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, v, item));
         } else if (toggleEvent) {
           uiEvent(device.id, component.name, toggleEvent, v);
         }
@@ -757,7 +777,7 @@ function renderComponent(device, component, row) {
           // value param); the sim restores the list for the QA
           if (boundAction(component, "onToggled")) {
             const ba = boundAction(component, "onToggled");
-            deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, chosen.join(",")));
+            deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, chosen.join(","), item));
           } else if (event) uiEvent(device.id, component.name, event, chosen.join(","));
         } else {
           chosen.length = 0;
@@ -768,7 +788,7 @@ function renderComponent(device, component, row) {
           hide();
           if (boundAction(component, "onToggled")) {
             const ba = boundAction(component, "onToggled");
-            deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, opt.value));
+            deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, opt.value, item));
           } else if (event) uiEvent(device.id, component.name, event, opt.value);
         }
       };
@@ -847,7 +867,7 @@ function renderComponent(device, component, row) {
         // tabs and panels in place (panel order mirrors tab order).
         setComponentValue(device, component, tab.name);
         const ba = boundAction(component, "onTabChanged");
-        if (ba) deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, tab.name));
+        if (ba) deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, tab.name, item));
         else if (eventFor(component) === "onTabChanged") {
           uiEvent(device.id, component.name, "onTabChanged", tab.name);
         }
@@ -878,7 +898,7 @@ function renderComponent(device, component, row) {
       setComponentValue(device, component, input.value);
       if (boundAction(component, "onChanged")) {
         const ba = boundAction(component, "onChanged");
-        deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, input.value));
+        deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, input.value, item));
       } else if (event) uiEvent(device.id, component.name, event, input.value);
     };
     row.appendChild(input);
@@ -901,11 +921,52 @@ function renderComponent(device, component, row) {
       setComponentValue(device, component, input.value);
       if (boundAction(component, "onChanged")) {
         const ba = boundAction(component, "onChanged");
-        deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, input.value));
+        deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, input.value, item));
       } else if (event) uiEvent(device.id, component.name, event, input.value);
     };
     control.appendChild(input);
     row.appendChild(control);
+  } else if (t === "list") {
+    // the data-bound list (sonosGroup's speakersVolumeList): the QA pushes
+    // rows via updateView(name, "data", rows); each row renders through the
+    // item template with {{data.field}} substituted, and the template's
+    // bindings fire with the item's fields resolved into their args
+    name.remove();
+    const items = Array.isArray(live.data) ? live.data : component.data || [];
+    const holder = document.createElement("div");
+    holder.className = "list";
+    holder.dataset.cname = component.name;
+    for (const item of items) {
+      const box = document.createElement("div");
+      box.className = "list-item";
+      for (const trow of component.components || []) {
+        const row = document.createElement("div");
+        row.className = "row";
+        row.dataset.listItem = JSON.stringify(item);
+        const template = JSON.parse(JSON.stringify(trow));
+        const walk = (node) => {
+          if (Array.isArray(node)) { node.forEach(walk); return; }
+          if (!node || typeof node !== "object") return;
+          for (const key of ["text", "image", "url", "value"]) {
+            if (typeof node[key] === "string" && node[key].includes("{{data.")) {
+              node[key] = tpl(node[key], item);
+            }
+          }
+          if (typeof node.visible === "string" && node.visible.includes("{{data.")) {
+            node.visible = tpl(node.visible, item) !== "false";
+          }
+          for (const child of node.components || []) walk(child);
+          for (const tab of node.tabs || []) walk(tab);
+        };
+        walk(template);
+        for (const tc of template.components || []) {
+          renderComponent(device, tc, row);
+        }
+        box.appendChild(row);
+      }
+      holder.appendChild(box);
+    }
+    row.appendChild(holder);
   } else if (t === "image") {
     // an <img> from the url property (live-updatable via updateView "url");
     // templated {{device.properties.x}} urls are resolved by the HC3
