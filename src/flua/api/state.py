@@ -731,6 +731,18 @@ class SimState:
             dev["interfaces"] = list(interfaces)
         else:
             dev["interfaces"] = ["quickAppChild"]
+        # the view-format flag flows from the parent: a child that does not
+        # declare its own useUiView inherits the parent QA's choice (the
+        # skeleton's captured value would silently disagree with the QA it
+        # belongs to). Explicit initialProperties still wins (merged above).
+        if not (isinstance(initial_properties, dict) and "useUiView" in initial_properties):
+            parent = self.devices.get(int(parent_id))
+            if (
+                isinstance(parent, dict)
+                and isinstance(parent.get("properties"), dict)
+                and "useUiView" in parent["properties"]
+            ):
+                dev["properties"]["useUiView"] = parent["properties"]["useUiView"]
         self.devices[dev["id"]] = dev
         return public(dev)
 

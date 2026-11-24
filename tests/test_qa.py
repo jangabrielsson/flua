@@ -2465,3 +2465,43 @@ async def test_sim_device_sensor_ui(capsys) -> None:
     assert "TDEFAULT 0" in out  # boot value is a number, not the skeleton's ""
     assert "BREACHUI true" in out  # the button breaches the sensor
     assert "SLIDERUI 21.5" in out  # the slider sets the value
+
+
+@pytest.mark.asyncio
+async def test_child_inherits_parent_use_ui_view(tmp_path) -> None:
+    # the main QA's --%%useUiView flows to children it creates (the skeleton
+    # would silently disagree); an explicit initialProperties value wins.
+    script = tmp_path / "uv.lua"
+    script.write_text(
+        "--%%useUiView:true\n"
+        "function QuickApp:onInit()\n"
+        "  self:createChildDevice({ name = 'A', type = 'com.fibaro.floodSensor' })\n"
+        "  self:createChildDevice({ name = 'B', type = 'com.fibaro.floodSensor',\n"
+        "    initialProperties = { useUiView = false } })\n"
+        "end\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        qa_id = engine.load_qa_file(str(script))[0]
+
+        def two_children() -> bool:
+            return (
+                sum(
+                    1
+                    for d in engine.api.state.devices.values()
+                    if d.get("parentId") == qa_id and d.get("id", 0) >= 900000
+                )
+                == 2
+            )
+
+        await wait_until(two_children)
+        children = {
+            d["name"]: d
+            for d in engine.api.state.devices.values()
+            if d.get("parentId") == qa_id and d.get("id", 0) >= 900000
+        }
+        assert children["A"]["properties"]["useUiView"] is True  # inherited
+        assert children["B"]["properties"]["useUiView"] is False  # explicit wins
+    finally:
+        await engine.stop()
