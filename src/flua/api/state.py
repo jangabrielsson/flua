@@ -95,7 +95,9 @@ def _device_skeleton(device_id: int, name: str, device_type: str | None) -> dict
             apply_interface(base, interface, "add")
         # the schema declares useUiView=true (the HC3 default); flua keeps
         # the legacy layout as the skeleton default (the capture path's
-        # behavior) — a QA opts in with --%%useUiView:true
+        # behavior) — a QA opts in with --%%useUiView:true. Children are
+        # the exception: create_child_device overrides this per child
+        # (uiView-bearing => v2, else the parent's choice).
         base["properties"]["useUiView"] = False
         # the quickApp interface declares mainFunction, but the live HC3
         # does not serve it on the QA create/read device shapes (the
