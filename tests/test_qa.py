@@ -2543,3 +2543,50 @@ async def test_example_list_data_push_and_item_action(tmp_path, capsys) -> None:
         assert "VOL player2 80" in capsys.readouterr().out
     finally:
         await engine.stop()
+
+
+@pytest.mark.asyncio
+async def test_example_list_child_bindings_and_data(tmp_path, capsys) -> None:
+    # examples/list-child.lua — the list hosted on a CHILD: the template's
+    # direct-action bindings survive the --%%rsrc child transform, the data
+    # push lands on the child's view, and a per-item action delivers to the
+    # child class with the resolved item id.
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        qa_id = engine.load_qa_file(str(REPO_ROOT / "examples" / "list-child.lua"))[0]
+
+        def child_ready() -> bool:
+            return any(
+                d.get("parentId") == qa_id and d.get("id", 0) >= 900000
+                for d in engine.api.state.devices.values()
+            )
+
+        await wait_until(child_ready)
+        child_id = next(
+            d["id"]
+            for d in engine.api.state.devices.values()
+            if d.get("parentId") == qa_id and d.get("id", 0) >= 900000
+        )
+
+        def data_pushed() -> bool:
+            view = engine.api.state.devices[child_id].get("view") or {}
+            return len((view.get("speakersVolumeList") or {}).get("data") or []) == 2
+
+        await wait_until(data_pushed)
+        device, _ = engine.api.dispatch("GET", f"/devices/{child_id}")
+        lst = device["properties"]["uiView"][0]["components"][0]
+        assert lst["type"] == "list"
+        # the child transform kept the template's direct bindings verbatim
+        btn = lst["components"][0]["components"][1]
+        assert btn["eventBinding"]["onReleased"][0]["params"]["actionName"] == "togglePlayerMute"
+        assert btn["eventBinding"]["onReleased"][0]["params"]["args"] == ["{{data.playerId}}"]
+        # a per-item action on the child delivers to the Child class
+        status = engine.api.dispatch(
+            "POST", f"/devices/{child_id}/action/togglePlayerMute", {"args": ["player1"]}
+        )[1]
+        assert status == 202
+        await asyncio.sleep(0.4)
+        assert "Speakers MUTE player1" in capsys.readouterr().out
+    finally:
+        await engine.stop()

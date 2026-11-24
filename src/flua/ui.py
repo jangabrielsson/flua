@@ -898,7 +898,18 @@ def child_bindings(ui_view: Any, ui_callbacks: Any) -> Any:
             if isinstance(eb, dict):
                 name = str(node.get("name") or "")
                 rewritten: dict[str, Any] = {}
-                for event in eb:
+                for event, bindings in eb.items():
+                    existing = bindings[0] if isinstance(bindings, list) and bindings else None
+                    if (
+                        isinstance(existing, dict)
+                        and existing.get("type") == "deviceAction"
+                        and (existing.get("params") or {}).get("actionName")
+                        not in (None, "UIAction")
+                    ):
+                        # already a direct method binding (the list template's)
+                        # — pass through untouched, only UIAction gets rewritten
+                        rewritten[event] = bindings
+                        continue
                     method = cbs.get(name, {}).get(event)
                     if not method:
                         continue
