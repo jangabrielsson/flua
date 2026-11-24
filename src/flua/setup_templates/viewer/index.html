@@ -865,6 +865,47 @@ function renderComponent(device, component, row) {
       panels.appendChild(panelDiv);
     });
     row.appendChild(holder);
+  } else if (t === "colorPicker") {
+    // the HC3's RGB wheel, approximated with a native color input; the
+    // value is a #rrggbb string, onChanged carries it
+    name.remove();
+    const input = document.createElement("input");
+    input.type = "color";
+    input.dataset.cname = component.name;
+    input.value = typeof value === "string" && value.startsWith("#") ? value : "#ffffff";
+    input.oninput = () => setComponentValue(device, component, input.value);
+    input.onchange = () => {
+      setComponentValue(device, component, input.value);
+      if (boundAction(component, "onChanged")) {
+        const ba = boundAction(component, "onChanged");
+        deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, input.value));
+      } else if (event) uiEvent(device.id, component.name, event, input.value);
+    };
+    row.appendChild(input);
+  } else if (t === "colorTemperaturePicker") {
+    // the warm-color temperature wheel, approximated with a range over
+    // min/maxTemperature on a yellow gradient
+    name.remove();
+    const control = document.createElement("div");
+    control.className = "control";
+    control.dataset.cname = component.name;
+    const input = document.createElement("input");
+    input.type = "range";
+    input.min = component.minTemperature ?? "0";
+    input.max = component.maxTemperature ?? "100";
+    input.step = "1";
+    input.value = value ?? component.colorTemperature ?? input.min;
+    input.style.background =
+      "linear-gradient(to right, #ffd5a1, #ffb347, #ff8c00)";
+    input.onchange = () => {
+      setComponentValue(device, component, input.value);
+      if (boundAction(component, "onChanged")) {
+        const ba = boundAction(component, "onChanged");
+        deviceActionArgs(device.id, ba.name, resolveArgs(ba.args, input.value));
+      } else if (event) uiEvent(device.id, component.name, event, input.value);
+    };
+    control.appendChild(input);
+    row.appendChild(control);
   } else if (t === "image") {
     // an <img> from the url property (live-updatable via updateView "url");
     // templated {{device.properties.x}} urls are resolved by the HC3

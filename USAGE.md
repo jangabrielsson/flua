@@ -673,7 +673,8 @@ device's `properties.viewLayout`, `properties.uiView`, and
 `properties.uiCallbacks` hold the generated structures, and
 `self:updateView(elm, prop, value)` updates them.
 
-`tabView` and `collapsible` are **v2 elements**. On the real HC3 the app
+`tabView`, `collapsible`, `colorPicker` and
+`colorTemperaturePicker` are **v2 elements**. On the real HC3 the app
 renders them only from the `uiView` format — a QA using either must
 declare `--%%useUiView:true` (live-verified on 5.221 for both; the legacy
 `$jason` renderer draws neither, leaving a full-width-only view blank).
@@ -801,6 +802,13 @@ the viewer toggles it on click (no event — it is client-side state, like
 on the HC3). A v2 element — on the real HC3 it needs `--%%useUiView:true`
 like `tabView` (see the note above). See `examples/ui-extras.lua` for a
 runnable demo of both.
+
+A `colorPicker` is the HC3's RGB color wheel (`colorSpace`, optional
+`channels` templates for red/green/blue) and `colorTemperaturePicker` its
+warm-temperature wheel (`minTemperature`/`maxTemperature`/
+`colorTemperature`) — both fire `onChanged` with the value. flua's viewer
+renders them as a color input and a warm-gradient slider (approximations
+of the app's wheels); both are v2 elements.
 
 A `tabView` groups rows under named tabs. It is full-width — it must sit
 alone on its row. Tabs take `name` and `text` plus their own list of rows

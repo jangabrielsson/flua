@@ -98,6 +98,8 @@ const ELEMENTS = {
   image:       { name: "Image", fields: ["url"], v2: true },
   tabView:     { name: "Tabs", fields: ["activeTab", "onTabChanged", "tabs"], v2: true },
   collapsible: { name: "Collapsible", fields: ["text", "collapsed"], v2: true },
+  colorPicker: { name: "Color picker", fields: ["colorSpace", "onChanged"], v2: true },
+  colorTemperaturePicker: { name: "Temperature picker", fields: ["minTemperature", "maxTemperature", "colorTemperature", "onChanged"], v2: true },
 };
 
 const targetHints = {
@@ -120,6 +122,8 @@ function newElement(kind) {
   if (kind === "tabView") Object.assign(base, { activeTab: "", onTabChanged: "", tabs: [] });
   if (kind === "collapsible") Object.assign(base, { collapsed: false });
   if (kind === "image") base.url = "";
+  if (kind === "colorPicker") base.colorSpace = "RGB";
+  if (kind === "colorTemperaturePicker") Object.assign(base, { minTemperature: "0", maxTemperature: "100", colorTemperature: "50" });
   base[kind] = "";
   return base;
 }

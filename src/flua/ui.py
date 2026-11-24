@@ -59,6 +59,8 @@ _ELEMENT_KEYS = (
     "tabView",
     "image",
     "collapsible",
+    "colorPicker",
+    "colorTemperaturePicker",
 )
 
 
@@ -155,6 +157,17 @@ def _apply_defaults(rows: list[list[dict[str, Any]]]) -> None:
             elif typ == "image":
                 el.setdefault("url", "")
                 el.setdefault("visible", True)
+            elif typ == "colorPicker":
+                el.setdefault("onChanged", "")
+                el.setdefault("colorSpace", "RGB")
+                el.setdefault("channels", {})
+                el.setdefault("visible", True)
+            elif typ == "colorTemperaturePicker":
+                el.setdefault("onChanged", "")
+                el.setdefault("minTemperature", "0")
+                el.setdefault("maxTemperature", "100")
+                el.setdefault("colorTemperature", "50")
+                el.setdefault("visible", True)
             elif typ == "collapsible":
                 # a collapsible section holds rows exactly like a tab does
                 el.setdefault("collapsed", False)
@@ -196,7 +209,7 @@ def _callbacks(rows: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
                     callbacks.append(
                         {"callback": el.get(event, ""), "eventType": event, "name": name}
                     )
-            elif typ == "slider":
+            elif typ in ("slider", "colorPicker", "colorTemperaturePicker"):
                 callbacks.append(
                     {"callback": el.get("onChanged", ""), "eventType": "onChanged", "name": name}
                 )
@@ -286,6 +299,25 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
         if el.get("unit"):
             element["unit"] = el["unit"]
         return element
+    if typ == "colorPicker":
+        return {
+            "name": name,
+            "visible": el.get("visible", True),
+            "colorSpace": el["colorSpace"],
+            "channels": dict(el.get("channels") or {}),
+            "style": {"weight": style_weight},
+            "type": "colorPicker",
+        }
+    if typ == "colorTemperaturePicker":
+        return {
+            "name": name,
+            "visible": el.get("visible", True),
+            "minTemperature": el["minTemperature"],
+            "maxTemperature": el["maxTemperature"],
+            "colorTemperature": el["colorTemperature"],
+            "style": {"weight": style_weight},
+            "type": "colorTemperaturePicker",
+        }
     if typ == "image":
         # the HC3's own legacy views carry image elements (russound's
         # album art in json/view.json): url + useProxy, no events
@@ -404,7 +436,8 @@ def _binding(event_type: str, name: str, value: str | None) -> list[dict[str, An
 def _ui_view_component(el: dict[str, Any], weight: str) -> dict[str, Any]:
     """One uiView component for a non-tabView element."""
     typ, name = el["type"], el["id"]
-    binding_value = "$event.value" if typ in ("switch", "select", "multi", "slider") else None
+    value_types = ("switch", "select", "multi", "slider", "colorPicker", "colorTemperaturePicker")
+    binding_value = "$event.value" if typ in value_types else None
     event_binding: dict[str, Any] = {}
     if typ in ("button", "switch"):
         for event in ("onReleased", "onLongPressDown", "onLongPressReleased"):
@@ -414,7 +447,7 @@ def _ui_view_component(el: dict[str, Any], weight: str) -> dict[str, Any]:
             event_binding["onToggleOff"] = _binding("onToggleOff", name, "$event.value")
     elif typ in ("select", "multi"):
         event_binding["onToggled"] = _binding("onToggled", name, binding_value)
-    elif typ == "slider":
+    elif typ in ("slider", "colorPicker", "colorTemperaturePicker"):
         event_binding["onChanged"] = _binding("onChanged", name, binding_value)
     component: dict[str, Any] = {
         "eventBinding": event_binding,
@@ -441,6 +474,13 @@ def _ui_view_component(el: dict[str, Any], weight: str) -> dict[str, Any]:
         component["selectionType"] = "single" if typ == "select" else "multi"
     if typ == "switch":
         component["value"] = el["value"]
+    if typ == "colorPicker":
+        component["colorSpace"] = el["colorSpace"]
+        component["channels"] = dict(el.get("channels") or {})
+    if typ == "colorTemperaturePicker":
+        component["minTemperature"] = el["minTemperature"]
+        component["maxTemperature"] = el["maxTemperature"]
+        component["colorTemperature"] = el["colorTemperature"]
     if typ == "image":
         component["url"] = el["url"]
         component.pop("text", None)  # the HC3's image components carry no text
@@ -643,6 +683,21 @@ def _element(component: dict[str, Any], callbacks: dict[str, dict[str, str]]) ->
             element["value"] = component["values"][0]
         if event_target("onToggled"):
             element["onToggled"] = event_target("onToggled")
+    elif typ == "colorPicker":
+        element = {"colorPicker": name, "colorSpace": str(component.get("colorSpace") or "RGB")}
+        if isinstance(component.get("channels"), dict) and component["channels"]:
+            element["channels"] = dict(component["channels"])
+        if event_target("onChanged"):
+            element["onChanged"] = event_target("onChanged")
+    elif typ == "colorTemperaturePicker":
+        element = {
+            "colorTemperaturePicker": name,
+            "minTemperature": str(component.get("minTemperature", "0")),
+            "maxTemperature": str(component.get("maxTemperature", "100")),
+            "colorTemperature": str(component.get("colorTemperature", "50")),
+        }
+        if event_target("onChanged"):
+            element["onChanged"] = event_target("onChanged")
     elif typ == "image":
         element = {"image": name, "url": str(component.get("url") or "")}
         if component.get("useProxy") is True:

@@ -900,3 +900,48 @@ def test_ten_element_row_gets_weights() -> None:
     # the legacy $jason row keeps its horizontal + space shape
     items = ui["viewLayout"]["$jason"]["body"]["sections"]["items"]
     assert items[0]["components"][0]["type"] == "horizontal"
+
+
+def test_color_pickers_compile_and_roundtrip() -> None:
+    rows = [
+        {
+            "colorPicker": "rgbPicker",
+            "colorSpace": "RGB",
+            "onChanged": "setColor",
+            "channels": {
+                "red": "{{device.properties.colorComponents.red}}",
+                "green": "{{device.properties.colorComponents.green}}",
+                "blue": "{{device.properties.colorComponents.blue}}",
+            },
+        },
+        {
+            "colorTemperaturePicker": "tempPicker",
+            "minTemperature": "2200",
+            "maxTemperature": "6500",
+            "colorTemperature": "4000",
+            "onChanged": "setTemp",
+        },
+    ]
+    ui = compile_ui(rows, 5000)
+    rgb = ui["uiView"][0]["components"][0]
+    assert rgb["type"] == "colorPicker" and rgb["colorSpace"] == "RGB"
+    assert rgb["channels"]["red"].startswith("{{device.properties")
+    assert rgb["eventBinding"]["onChanged"][0]["params"]["args"] == [
+        "onChanged", "rgbPicker", "$event.value",
+    ]
+    temp = ui["uiView"][1]["components"][0]
+    assert temp["type"] == "colorTemperaturePicker"
+    assert temp["minTemperature"] == "2200" and temp["maxTemperature"] == "6500"
+    # uiCallbacks carry onChanged for both
+    callbacks = {(c["eventType"], c["name"]): c["callback"] for c in ui["uiCallbacks"]}
+    assert callbacks[("onChanged", "rgbPicker")] == "setColor"
+    assert callbacks[("onChanged", "tempPicker")] == "setTemp"
+    # roundtrip
+    from flua.config import parse_lua_literal
+
+    out = ui_to_u_rows(ui_view=ui["uiView"], ui_callbacks=ui["uiCallbacks"])
+    parsed = [parse_lua_literal(row) for row in out]
+    assert parsed[0]["colorPicker"] == "rgbPicker"
+    assert parsed[0]["onChanged"] == "setColor"
+    assert parsed[1]["colorTemperaturePicker"] == "tempPicker"
+    assert parsed[1]["onChanged"] == "setTemp"
