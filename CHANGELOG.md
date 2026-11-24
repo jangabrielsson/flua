@@ -4,6 +4,14 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.185] - 2026-11-24
+
+### Added
+- colorPicker + colorTemperaturePicker — the last two view elements
+
+### Changed
+- forum post 37 — the uibuilder
+
 ## [0.1.184] - 2026-11-23
 
 ### Added
