@@ -470,11 +470,28 @@ def test_ui_flag_keeps_api_alive_after_qa_drains(tmp_path) -> None:
         assert proc.poll() is None, "flua --ui exited before serving the API: " + "".join(drained)
         assert saw_button, "UI API never served the QA device: " + "".join(drained)
         # the QA has no timers — a plain run would have drained and exited by
-        # now; the UI session must still be alive and answering
+        # now; the UI session must still be alive and answering. The process
+        # exiting is an immediate failure (with its output); a transient
+        # connect hiccup under parallel load gets a few retries.
         time.sleep(1.0)
-        assert proc.poll() is None, "flua --ui exited after the QA drained"
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/devices", timeout=2) as res:
-            assert json.loads(res.read())
+        assert proc.poll() is None, "flua --ui exited after the QA drained: " + "".join(drained)
+        answered = False
+        last_error: Exception | None = None
+        for _ in range(5):
+            assert proc.poll() is None, (
+                "flua --ui exited during the final check: " + "".join(drained)
+            )
+            try:
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/devices", timeout=2
+                ) as res:
+                    assert json.loads(res.read())
+                answered = True
+                break
+            except (OSError, ValueError) as exc:
+                last_error = exc
+                time.sleep(0.2)
+        assert answered, "UI API stopped answering after the QA drained: " + str(last_error)
     finally:
         proc.terminate()
         try:
