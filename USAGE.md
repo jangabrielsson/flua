@@ -835,7 +835,10 @@ on the HC3.
 
 A `space` element is a blank gap; with `classes={'borderTop'}` it renders
 the HC3's grey horizontal divider line (the dialog view's `.spacer-line`,
-which the app draws for exactly that spacer class):
+which the app draws for exactly that spacer class). The divider is a v2
+(uiView) feature — with `--%%useUiView:false` the legacy renderer draws no
+line (live-verified 5.221), so a main QA using it must declare
+`--%%useUiView:true` (children are always v2):
 
 ```lua
 --%%rsrc:childUI:{space="div1",classes={"borderTop"}}

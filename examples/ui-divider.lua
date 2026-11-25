@@ -1,11 +1,18 @@
 --%%name:ui divider
 --%%type:com.fibaro.genericDevice
---%%useUiView:true
+--%%useUiView:false
 
 -- The HC3's horizontal divider: a space element with classes={'borderTop'}
--- renders the app's grey .spacer-line in the uiView. A space without the
--- class is a blank gap. Live-tested 5.221. Run it and open the viewer:
--- the child's UI shows the labels, two divider lines, and a tinted button.
+-- renders the app's grey .spacer-line — a v2 (uiView) feature: with
+-- useUiView:false the legacy renderer draws no line (live-tested 5.221).
+-- The main QA's --%%u rows show it inline; the child's --%%rsrc uiView
+-- shows it in the dialog, plus a tinted button and a blank gap.
+
+--%%u:{label='topLbl',text='Above the line',textAlign='center'}
+--%%u:{space='div1',classes={'borderTop'}}
+--%%u:{label='midLbl',text='Between two lines',textAlign='center'}
+--%%u:{space='div2',classes={'borderTop'}}
+--%%u:{label='bottomLbl',text='Below the line',textAlign='center'}
 
 --%%rsrc:uiDivider:{{label='topLbl',text='Above the line',textAlign='center'}}
 --%%rsrc:uiDivider:{space='div1',classes={'borderTop'}}

@@ -899,7 +899,10 @@ so a QA that updates images with <code>"url"</code> works in flua but silently n
 on the HC3.</p>
 <p>A <code>space</code> element is a blank gap; with <code>classes={'borderTop'}</code> it renders
 the HC3's grey horizontal divider line (the dialog view's <code>.spacer-line</code>,
-which the app draws for exactly that spacer class):</p>
+which the app draws for exactly that spacer class). The divider is a v2
+(uiView) feature — with <code>--%%useUiView:false</code> the legacy renderer draws no
+line (live-verified 5.221), so a main QA using it must declare
+<code>--%%useUiView:true</code> (children are always v2):</p>
 <pre><code class="language-lua">--%%rsrc:childUI:{space=&quot;div1&quot;,classes={&quot;borderTop&quot;}}
 </code></pre>
 <p>On the real HC3, <code>{{device.properties.x}}</code> templated urls and <code>useProxy</code>
