@@ -791,6 +791,48 @@ def test_upload_fqa_uses_the_web_import_endpoint(tmp_path, monkeypatch, capsys) 
         server.server_close()
 
 
+def test_upload_qa_accepts_a_ready_fqa(tmp_path, monkeypatch, capsys) -> None:
+    # uploadQA's target is an unpacked project; a ready .fqa delegates to the
+    # uploadFQA path (same web-import new-QA upload) — one tool for both file
+    # kinds, so the VS Code menu needs a single upload entry
+    _MockHc3.fqas = {}
+    _MockHc3.next_id = 100
+    _MockHc3.requests = []
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _MockHc3)
+    threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
+    try:
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("HC3_URL", f"http://127.0.0.1:{server.server_port}")
+        monkeypatch.setenv("HC3_USER", "admin")
+        monkeypatch.setenv("HC3_PASSWORD", "secret")
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "qa.lua").write_text(
+            "--%%name:onestep\n--%%type:com.fibaro.binarySwitch\nfunction QuickApp:onInit() end\n"
+        )
+        pack = tools._TOOLS["pack"]
+        parser = argparse.ArgumentParser()
+        pack.add_arguments(parser)
+        assert pack.run(parser, parser.parse_args(["qa.lua", "-o", "qa.fqa"])) == 0
+        capsys.readouterr()
+        upload = tools._TOOLS["uploadQA"]
+        parser = argparse.ArgumentParser()
+        upload.add_arguments(parser)
+        assert upload.run(parser, parser.parse_args(["qa.fqa", "--room", "7"])) == 0
+        out = capsys.readouterr().out
+        assert "uploaded onestep — HC3 device id 100" in out
+        posts = [
+            r for r in _MockHc3.requests if r[0] == "POST" and r[1] == "/api/quickApp/import"
+        ]
+        assert len(posts) == 1
+        assert posts[0][2]["roomId"] == "7"
+        assert posts[0][2]["filename"] == "onestep.fqa"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
 def test_pack_proxy_mode_qa_is_silent_and_keeps_the_directive(
     tmp_path, capsys, monkeypatch, caplog
 ) -> None:

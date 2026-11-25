@@ -1,8 +1,12 @@
-"""uploadQA: package an unpacked QA project and upload it to the HC3.
+"""uploadQA: package an unpacked QA project (or take a ready .fqa) and
+upload it to the HC3.
 
 The target is one of:
 
-- a main file (``main.lua`` or anything) — uploaded as a NEW QuickApp;
+- a main file (``main.lua`` or anything) — packaged and uploaded as a NEW
+  QuickApp;
+- a ready-made ``.fqa`` package — uploaded as a NEW QuickApp (the
+  uploadFQA path, package verbatim);
 - a downloaded ``<Name>_main_<id>.lua`` — updates THAT QA on the HC3:
   files, name, the standard properties (UI structures, description) and
   interfaces, each only when it changed;
@@ -40,8 +44,8 @@ def _upload_body(fqa: dict[str, Any], room: int | None = None) -> dict[str, Any]
         body["roomId"] = room
     return body
 HELP = (
-    "package an unpacked QA project and upload it to the HC3 "
-    "(new QA, or the id in a downloaded <Name>_main_<id>.lua)"
+    "package an unpacked QA project (or take a ready .fqa) and upload it "
+    "to the HC3 (new QA, or the id in a downloaded <Name>_main_<id>.lua)"
 )
 
 _MAIN_RE = re.compile(r"^(.*)_main_(\d+)\.lua$")
@@ -65,9 +69,9 @@ _UPDATE_PROPERTIES = (
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "target",
-        help="the QA main file, a downloaded <Name>_main_<id>.lua (updates "
-        "that QA), or a QA name whose project files live in the current "
-        "directory",
+        help="the QA main file, a ready .fqa (new QA), a downloaded "
+        "<Name>_main_<id>.lua (updates that QA), or a QA name whose "
+        "project files live in the current directory",
     )
     parser.add_argument(
         "--room", type=int, default=None, metavar="ID", help="place the QA in this room"
@@ -154,6 +158,14 @@ def _update_existing(
 
 
 def run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
+    if Path(args.target).suffix.lower() == ".fqa":
+        # a ready package: the uploadFQA path, package verbatim. One tool
+        # for both file kinds, so the VS Code menu needs a single entry.
+        from . import upload_fqa
+
+        return upload_fqa.run(
+            parser, argparse.Namespace(package=args.target, room=args.room)
+        )
     engine = hc3_engine(parser)
     main_path, qa_id = _resolve_target(parser, args.target)
     try:

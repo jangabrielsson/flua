@@ -125,6 +125,10 @@
         "title": "Flua: Upload file to HC3 QA"
       },
       {
+        "command": "flua.uploadQa",
+        "title": "Flua: Upload as new QA"
+      },
+      {
         "command": "flua.uploadFqa",
         "title": "Flua: Upload .fqa as new QA"
       },
@@ -287,9 +291,14 @@
           "group": "1_package@2"
         },
         {
+          "command": "flua.uploadQa",
+          "when": "resourceExtname == .lua || resourceExtname == .fqa",
+          "group": "2_hc3@1"
+        },
+        {
           "command": "flua.uploadFile",
           "when": "resourceExtname == .lua",
-          "group": "2_hc3@1"
+          "group": "2_hc3@2"
         },
         {
           "command": "flua.uploadFqa",

@@ -1869,7 +1869,8 @@ commands — they package/unpack for you, so you develop in the unpacked
 format (individual `.lua` files) and only the HC3 sees `.fqa`:
 
 ```bash
-# upload an unpacked project (main file + --%%file extras) as a new QA
+# upload an unpacked project (main file + --%%file extras) as a new QA;
+# a ready .fqa takes the same path (the uploadFQA upload, package verbatim)
 .venv/bin/flua --tool uploadQA script.lua            # --room ID to place it
 
 # update an existing QA's files from the unpacked project
@@ -2015,7 +2016,7 @@ rows (translated from `uiView`/`viewLayout`/`uiCallbacks`), variables as
 dropped, since they may be outdated. `uploadQA` then takes either the QA
 name (it finds the project in the current directory) or the fully qualified
 `<QA-name>_main_<id>.lua` and updates that QA on the HC3; a plain
-`<QA-name>_main.lua` (from `unpack`) uploads as a new QA.
+`<QA-name>_main.lua` (from `unpack`) or a ready `.fqa` uploads as a new QA.
 
 `downloadQA` also stamps every unpacked file with two metadata directives —
 `--%%deviceId:123` (the HC3 device id) and `--%%qaFile:lib` (the QA file

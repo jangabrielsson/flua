@@ -53,6 +53,10 @@ export function activate(context: vscode.ExtensionContext) {
       runFluaTool(["--tool", "uploadFile", uri.fsPath])
     ),
 
+    vscode.commands.registerCommand("flua.uploadQa", (uri: vscode.Uri) =>
+      runFluaTool(["--tool", "uploadQA", uri.fsPath])
+    ),
+
     vscode.commands.registerCommand("flua.uploadFqa", (uri: vscode.Uri) =>
       runFluaTool(["--tool", "uploadFQA", uri.fsPath])
     ),

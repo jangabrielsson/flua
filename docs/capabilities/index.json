@@ -553,7 +553,7 @@
       },
       {
         "name": "uploadQA",
-        "help": "package an unpacked QA project and upload it to the HC3 (new QA, or the id in a downloaded <Name>_main_<id>.lua)"
+        "help": "package an unpacked QA project (or take a ready .fqa) and upload it to the HC3 (new QA, or the id in a downloaded <Name>_main_<id>.lua)"
       },
       {
         "name": "ws",

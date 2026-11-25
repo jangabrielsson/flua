@@ -1,9 +1,9 @@
 """uploadFQA: upload a .fqa package to the HC3 as a NEW QuickApp.
 
-Unlike uploadQA (which packages an unpacked project first), this tool takes
-a ready-made package — your own, or one another HC3 exported — and creates
-a new QA from it. Offline (no HC3 credentials) the same call creates the QA
-in the simulated HC3.
+uploadQA (which packages an unpacked project first) delegates ready .fqa
+targets here; this tool takes a ready-made package — your own, or one
+another HC3 exported — and creates a new QA from it. Offline (no HC3
+credentials) the same call creates the QA in the simulated HC3.
 """
 
 from __future__ import annotations
