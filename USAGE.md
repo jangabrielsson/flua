@@ -690,8 +690,9 @@ HC3 app only applies the split inside FIXED-height layouts; a QA's
 (auto-height) UI ignores weights vertically. An `image` element renders at
 its natural aspect, width-capped by its container (`max-width:100%`,
 `height:auto` on the HC3) — to make it taller use a portrait source image
-or give it a wider container. flua's viewer scales images by weight (40px
-per unit, ratio kept) and tints buttons by color.
+or give it a wider container. flua's viewer renders images the same way
+(natural aspect, width-capped — the weight is not a size) and tints
+buttons by color.
 
 Neither is editable on the HC3: the web UI editor doesn't know the
 elements, so it cannot edit them and an edit there can rewrite the view

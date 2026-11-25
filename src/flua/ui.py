@@ -537,12 +537,14 @@ def _ui_view_component(el: dict[str, Any], weight: str) -> dict[str, Any]:
 def _ui_view_row(row: list[dict[str, Any]]) -> dict[str, Any]:
     """One uiView row: a horizontal container of components.
 
-    A lone element's declared weight means its HEIGHT on the HC3: the app
-    splits the vertical space by the ROW weights (an element's own weight
+    A lone element's declared weight means its HEIGHT intent on the HC3: the
+    app splits the vertical space by the ROW weights (an element's own weight
     only splits the row's WIDTH among siblings — on a real 5.221 HC3 a
     weight=7 image on a weight-1.0 row rendered unchanged). Hoist the lone
     element's weight onto the row so the declared intent survives; the
-    element keeps its own weight too (the flua viewer sizes images by it)."""
+    element keeps its own weight too (side-by-side width shares still read
+    it). The HC3 only applies the split in fixed-height layouts — in an
+    auto-height QA UI the weight has no visible effect on a lone image."""
     weight = _UI_VIEW_WEIGHTS.get(len(row))
     row_weight = "1.0"
     if len(row) == 1 and row[0].get("weight") is not None:
