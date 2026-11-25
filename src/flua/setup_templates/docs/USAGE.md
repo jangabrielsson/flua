@@ -683,12 +683,15 @@ requirement is about the HC3 app.
 
 Every element takes `weight=` and `color=`, carried into the generated
 `style` (`style.weight`/`style.color` — the HC3's own views use both).
-`weight` is the element's share of the row: side-by-side elements split
-the row by their weights, and a lone element's weight scales its height
-(flua hoists a lone element's weight onto its row — the HC3 splits the
-vertical space by ROW weights, an element's own weight only shares the
-row's width). flua's viewer mirrors both: images scale by weight (40px per
-unit, ratio kept), buttons tint by color.
+`weight` is the element's share of its container: side-by-side elements
+split the row width by their weights, and rows split the vertical space by
+their weights (flua hoists a lone element's weight onto its row) — but the
+HC3 app only applies the split inside FIXED-height layouts; a QA's
+(auto-height) UI ignores weights vertically. An `image` element renders at
+its natural aspect, width-capped by its container (`max-width:100%`,
+`height:auto` on the HC3) — to make it taller use a portrait source image
+or give it a wider container. flua's viewer scales images by weight (40px
+per unit, ratio kept) and tints buttons by color.
 
 Neither is editable on the HC3: the web UI editor doesn't know the
 elements, so it cannot edit them and an edit there can rewrite the view
@@ -697,7 +700,9 @@ with `--tool updateQA`/`uploadQA`.
 
 **Child devices** are the exception that makes v2 elements safe on the
 HC3: `plugin.createChildDevice` accepts a `uiView` and child UIs are never
-rewritten by the editor. `flua --tool ui --as-lua script.lua` prints the
+rewritten by the editor. A child created with a `uiView` initial property
+automatically gets `useUiView = true` (an explicit initialProperties value
+wins), so the controller renders the child from its uiView. `flua --tool ui --as-lua script.lua` prints the
 compiled UI as paste-ready Lua locals (`uiView`, `viewLayout`,
 `uiCallbacks`) to drop into the createChildDevice call — declared
 elements only, exactly what the `.fqa` package ships: the stock

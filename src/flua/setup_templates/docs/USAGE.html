@@ -765,19 +765,24 @@ flua's own viewer renders them regardless of <code>useUiView</code> — the
 requirement is about the HC3 app.</p>
 <p>Every element takes <code>weight=</code> and <code>color=</code>, carried into the generated
 <code>style</code> (<code>style.weight</code>/<code>style.color</code> — the HC3's own views use both).
-<code>weight</code> is the element's share of the row: side-by-side elements split
-the row by their weights, and a lone element's weight scales its height
-(flua hoists a lone element's weight onto its row — the HC3 splits the
-vertical space by ROW weights, an element's own weight only shares the
-row's width). flua's viewer mirrors both: images scale by weight (40px per
-unit, ratio kept), buttons tint by color.</p>
+<code>weight</code> is the element's share of its container: side-by-side elements
+split the row width by their weights, and rows split the vertical space by
+their weights (flua hoists a lone element's weight onto its row) — but the
+HC3 app only applies the split inside FIXED-height layouts; a QA's
+(auto-height) UI ignores weights vertically. An <code>image</code> element renders at
+its natural aspect, width-capped by its container (<code>max-width:100%</code>,
+<code>height:auto</code> on the HC3) — to make it taller use a portrait source image
+or give it a wider container. flua's viewer scales images by weight (40px
+per unit, ratio kept) and tints buttons by color.</p>
 <p>Neither is editable on the HC3: the web UI editor doesn't know the
 elements, so it cannot edit them and an edit there can rewrite the view
 and drop them. Keep tabbed/collapsible QAs flua-authored and update them
 with <code>--tool updateQA</code>/<code>uploadQA</code>.</p>
 <p><strong>Child devices</strong> are the exception that makes v2 elements safe on the
 HC3: <code>plugin.createChildDevice</code> accepts a <code>uiView</code> and child UIs are never
-rewritten by the editor. <code>flua --tool ui --as-lua script.lua</code> prints the
+rewritten by the editor. A child created with a <code>uiView</code> initial property
+automatically gets <code>useUiView = true</code> (an explicit initialProperties value
+wins), so the controller renders the child from its uiView. <code>flua --tool ui --as-lua script.lua</code> prints the
 compiled UI as paste-ready Lua locals (<code>uiView</code>, <code>viewLayout</code>,
 <code>uiCallbacks</code>) to drop into the createChildDevice call — declared
 elements only, exactly what the <code>.fqa</code> package ships: the stock

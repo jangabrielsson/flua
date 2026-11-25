@@ -383,6 +383,12 @@ function QuickApp:createChildDevice(options, classRepresentation)
   end
   if options.initialProperties then
     __assert_type(options.initialProperties, "table")
+    -- a child carrying a v2 uiView is implicitly v2 (children have no
+    -- legacy view to render): set useUiView unless the caller declared a
+    -- choice — the same rule the sim applies (test pins it)
+    if options.initialProperties.useUiView == nil and options.initialProperties.uiView ~= nil then
+      options.initialProperties.useUiView = true
+    end
   end
   local child = api.post("/plugins/createChildDevice", options)
   if classRepresentation == nil then
