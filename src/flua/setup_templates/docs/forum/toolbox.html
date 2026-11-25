@@ -4,7 +4,7 @@
 The VS Code extension's buttons are these commands with a GUI on top, the
 MCP server exposes them to agents, and a bare <code>flua --tool</code>
 lists them all (each with <code>--help</code>). This post is the tour —
-all 24 tools, grouped by what they do, as of flua 0.1.142.</p>
+all 31 tools, grouped by what they do, as of flua 0.1.188.</p>
 
 <h3>Scaffold and understand your devices</h3>
 
@@ -22,6 +22,14 @@ flua --tool newQA binarySwitch "Demo switch"   # -> binarySwitch.lua
 </pre>
 
 <ul>
+<li><b><code>build</code></b> — the QA builder: a browser page that turns
+a recipe into a complete QA (pick your devices, generate, simulate, view
+the UI, upload).</li>
+<li><b><code>uibuilder</code></b> — the visual UI builder: design a
+QuickApp UI (main QA v1/v2 or a child device) in the browser and copy out
+the <code>--%%u</code>/<code>--%%rsrc</code> directives — see the post
+<a href="/docs/forum/37-uibuilder.html">Design your QuickApp UI in the
+browser</a>.</li>
 <li><b><code>catalog</code></b> — list the 190 device types the sim
 supports (the <code>--%%type</code> catalog); <code>--json</code> for the
 machine shape.</li>
@@ -32,6 +40,7 @@ carries, and the actions a QA should implement as
 comes from (the type, a base type, an interface).</li>
 <li><b><code>ui</code></b> — print a QA's declared UI as text (elements,
 callbacks, options); <code>--json</code> for the structured payload,
+<code>--as-lua</code> for paste-ready child-device uiView tables,
 <code>--device ID</code> to fetch a real HC3 device's UI and render it
 back to <code>--%%u</code> rows.</li>
 </ul>
@@ -73,7 +82,10 @@ sim serves.</li>
 
 <ul>
 <li><b><code>pack</code></b> — package a QA project (main file +
-<code>--%%file</code> extras) into a <code>.fqa</code> file on disk:</li>
+<code>--%%file</code> extras, and <code>--%%rsrc</code> resources like
+child UIs) into a <code>.fqa</code> file on disk — see the post
+<a href="/docs/forum/36-child-ui-resources.html">Child UIs as
+resources</a>:</li>
 </ul>
 
 <pre>
@@ -91,8 +103,10 @@ flua --tool unpack Demo_switch.fqa -d unpacked   # -> unpacked/Demo_switch_main.
 </pre>
 
 <ul>
-<li><b><code>uploadQA</code></b> — package an unpacked project and upload
-it (new QA, or the id in a downloaded <code>&lt;Name&gt;_main_&lt;id&gt;.lua</code>).</li>
+<li><b><code>uploadQA</code></b> — package an unpacked project (or take a
+ready <code>.fqa</code>) and upload it as a new QA, or update the QA whose
+id sits in a downloaded <code>&lt;Name&gt;_main_&lt;id&gt;.lua</code> —
+the one-step upload.</li>
 <li><b><code>updateQA</code></b> — update an existing QA on the HC3 from
 an unpacked project (all files at once).</li>
 <li><b><code>uploadFile</code></b> — push one QA file (reads
@@ -106,11 +120,18 @@ loop).</li>
 <code>.fqa</code> file.</li>
 <li><b><code>installHelper</code></b> — deploy the FluaHelper QA to the
 HC3 and point it at this machine (the controller-local API bridge).</li>
+<li><b><code>inspectFQA</code></b> — inspect a packed <code>.fqa</code>:
+metadata, file inventory, variables, leak scan.</li>
 </ul>
 
 <h3>Inspect and diagnose</h3>
 
 <ul>
+<li><b><code>test</code></b> — run a project's <code>test_*.lua</code>
+suite — one summary, nonzero exit, <code>--json</code> for CI/agents.</li>
+<li><b><code>luacheck</code></b> — run the luacheck linter over a QA's
+file closure (needs luacheck on PATH; a project <code>.luacheckrc</code>
+replaces the generated config).</li>
 <li><b><code>migrate</code></b> — scan a project for plua leftovers and
 migration hazards (the checklist when a QA moves from the old tooling).</li>
 <li><b><code>ws</code></b> — probe a WebSocket endpoint: handshake, send
@@ -118,6 +139,11 @@ frames, soak with pings — debugging socket QAs without a second tool.</li>
 <li><b><code>parityCapture</code></b> / <b><code>parityCleanup</code></b> —
 capture REST shape fixtures from a real HC3 for offline parity replay,
 and list/remove the <code>flua_p_*</code> artifacts afterwards.</li>
+<li><b><code>feedback</code></b> — agent feedback: scaffold and list
+experience reports (<code>docs/feedback/</code>).</li>
+<li><b><code>caps</code></b> — the flua capabilities index: curated,
+pinned knowledge (<code>list</code>/<code>show</code>/<code>search</code>,
+<code>--json</code>).</li>
 </ul>
 
 <p>Two commands cover the rest of the surface: a bare
