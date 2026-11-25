@@ -766,9 +766,9 @@ is implicit; the explicit `--%%rsrc:name:u:{rows}` spelling is accepted
 for when future kinds arrive) (long values continue on following comment
 lines like `--%%u`). flua compiles each resource to a child-bound uiView
 (`actionName` = the method, `json.array()` for argless bindings) and
-makes it available as `fibaro.RSRC.name`. The OLD whole-view form (one
-directive holding a list of ROWS, e.g. `{{{a},{b}}}`) still parses for
-compatibility — with a deprecation warning.
+makes it available as `fibaro.RSRC.name`. The old whole-view form (one
+directive holding a list of ROWS) fails with a migration hint — a row
+holds elements, not rows.
 
 ```lua
 --%%rsrc:uiA:{tabView="mainTabs",activeTab="control",onTabChanged="tabChanged",tabs={

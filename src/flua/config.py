@@ -577,33 +577,26 @@ def parse_annotations(source: str, warn_unknown: bool = True) -> dict[str, Any]:
                 # is the only kind today, so the plain form is its shorthand
                 rsrc_value = rsrc_value.strip()[2:]
             parsed = parse_lua_literal(rsrc_value.strip())
-            entries = config.get("rsrc")
-            if not isinstance(entries, list):
-                entries = []
-                config["rsrc"] = entries
             if isinstance(parsed, list) and any(isinstance(el, list) for el in parsed):
-                # the OLD whole-view form (a list of ROWS, one directive = the
-                # whole child UI): accepted for compatibility with QAs written
-                # before the one-directive-per-row semantics — each item is one
-                # row (a dict for one element, a list for several side by side)
-                logger.warning(
-                    "--%%rsrc:%s: the whole-view value (a list of rows) is "
-                    "deprecated — write one directive per row instead",
-                    rsrc_name,
+                # a list containing a LIST: the old whole-view form (one
+                # directive = several rows) — or a mix of the two forms.
+                # One directive is ONE row now; a row holds ELEMENTS.
+                raise ValueError(
+                    f"--%%rsrc:{rsrc_name}: a row holds ELEMENTS, not rows — "
+                    f"this looks like the old whole-view form. Write one "
+                    f"directive per row instead: --%%rsrc:{rsrc_name}:{{a}} for "
+                    f"one element, --%%rsrc:{rsrc_name}:{{{{a}},{{b}}}} for two "
+                    f"side by side, and repeat the directive for more rows"
                 )
-                old_rows: list[list[dict[str, Any]]] = []
-                for item in parsed:
-                    if isinstance(item, dict):
-                        old_rows.append([dict(item)])
-                    elif isinstance(item, list):
-                        old_rows.append([dict(e) for e in item])
-                entries.append({"name": rsrc_name, "rows": old_rows})
-                continue
             if not isinstance(parsed, (dict, list)):
                 raise ValueError(
                     f"--%%rsrc:{rsrc_name}: value must be an element dict or a "
                     f"list of elements (got {parsed!r})"
                 )
+            entries = config.get("rsrc")
+            if not isinstance(entries, list):
+                entries = []
+                config["rsrc"] = entries
             entries.append({"name": rsrc_name, "rows": [parsed]})
         elif name == "db":
             # --%%db:house.json — seed the sim from the file; --%%db:+house.json
