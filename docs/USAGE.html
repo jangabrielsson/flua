@@ -776,12 +776,15 @@ in v1 and v2. flua's viewer mirrors all of it.</p>
 <p>Every element also takes <code>classes={"a","b"}</code> — a list of class names the
 HC3 app applies to the rendered component (and switches behavior on). The
 known classes, from the app's own code: layouts take <code>glued</code>/<code>panel</code>/
-<code>dividers</code>; buttons <code>circle</code>/<code>squircle</code>/<code>textPositionBelow</code>/<code>toggle</code>;
-sliders <code>thick</code>/<code>minMaxWords</code>/<code>vertical</code>/<code>invertFill</code>/<code>iconsMinusPlus</code>/
-<code>slatsAngle</code>/<code>timer</code>; labels <code>title</code>/<code>labelXXL</code>; images
-<code>imageS</code>/<code>imageM</code>/<code>imageL</code> (32/40/48px squares). flua passes them through
-verbatim (no validation — a class the app doesn't know is ignored there),
-and its viewer honors the image and label size classes. <code>weight</code> is the element's share of its container:
+<code>dividers</code>; buttons <code>textPositionBelow</code>/<code>toggle</code> (<code>circle</code>/<code>squircle</code> sit
+in the app's button-sizing code but did NOT change a child-dialog button
+on 5.221 — likely icon buttons only); sliders <code>thick</code>/<code>minMaxWords</code>/
+<code>vertical</code>/<code>invertFill</code>/<code>iconsMinusPlus</code>/<code>slatsAngle</code>/<code>timer</code> (renders the
+time above the slider — live-verified); labels <code>title</code>/<code>labelXXL</code> (bigger,
+bold — live-verified); images <code>imageS</code>/<code>imageM</code>/<code>imageL</code> (32/40/48px
+squares). flua passes them through verbatim (no validation — a class the
+app doesn't know is ignored there), and its viewer honors the image and
+label size classes. <code>weight</code> is the element's share of its container:
 side-by-side elements split the row width by their weights, and rows split
 the vertical space by their weights (flua hoists a lone element's weight
 onto its row) — but the HC3 app only applies the split inside FIXED-height
