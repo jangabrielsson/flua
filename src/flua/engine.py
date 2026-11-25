@@ -955,23 +955,35 @@ class LuaEngine:
             #
             # --%%rsrc declarations are also collected from the --%%file
             # extras (resources belong with the file that defines the
-            # children, whose paths are now resolved) — extras first, main
-            # last, so a main-file name overrides an extra's.
-            rsrc_entries: list[dict[str, Any]] = []
+            # children, whose paths are now resolved). Repeated directives
+            # with the same name EXTEND the resource's rows (--%%u style),
+            # but a name re-declared by a later FILE replaces the earlier
+            # file's rows (the main overrides an extra's — the pinned
+            # contract). The loop variable must not shadow ``name`` — the
+            # QA's name below.
+            rsrc_entries: list[tuple[str, dict[str, Any]]] = []
             for entry in qa_config.get("files") or []:
                 source = self._read_source(entry["path"]) if entry.get("path") else ""
                 if source:
-                    rsrc_entries.extend(
-                        parse_annotations(source, warn_unknown=False).get("rsrc") or []
-                    )
-            rsrc_entries.extend(qa_config.get("rsrc") or [])
+                    for rsrc in parse_annotations(source, warn_unknown=False).get("rsrc") or []:
+                        rsrc_entries.append((str(entry["name"]), rsrc))
+            for rsrc in qa_config.get("rsrc") or []:
+                rsrc_entries.append(("main", rsrc))
             if rsrc_entries:
-                compiled: dict[str, Any] = {}
-                for entry in rsrc_entries:
-                    ui = compile_ui(entry["rows"], self._next_qa_id)
-                    compiled[str(entry["name"])] = child_bindings(
-                        ui["uiView"], ui["uiCallbacks"]
-                    )
+                by_name: dict[str, list[Any]] = {}
+                owner: dict[str, str] = {}  # the file that last declared the name
+                for owner_tag, rsrc in rsrc_entries:
+                    rsrc_name = str(rsrc["name"])
+                    if owner.get(rsrc_name, owner_tag) != owner_tag:
+                        # a later file re-declares the name: its rows replace
+                        by_name[rsrc_name] = list(rsrc["rows"])
+                    else:
+                        by_name.setdefault(rsrc_name, []).extend(rsrc["rows"])
+                    owner[rsrc_name] = owner_tag
+                compiled = {}
+                for rsrc_name, rows in by_name.items():
+                    ui = compile_ui(rows, self._next_qa_id)
+                    compiled[rsrc_name] = child_bindings(ui["uiView"], ui["uiCallbacks"])
                 qa_config["rsrc"] = compiled
         # --%%icons:path — a LOCAL icon set folder for the web view: the QA
         # previews its custom icons without uploading them (a synthetic

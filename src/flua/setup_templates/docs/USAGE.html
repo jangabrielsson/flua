@@ -813,9 +813,11 @@ rows are ordinary <code>--%%u</code> row shapes (the kind is implicit; the expli
 <code>--%%rsrc:name:u:{rows}</code> spelling is accepted for when future kinds
 arrive) (one row per directive value; a bare
 element dict is the single-row convenience form; long values continue on
-following comment lines like <code>--%%u</code>). flua compiles each resource to a
-child-bound uiView (<code>actionName</code> = the method, <code>json.array()</code> for argless
-bindings) and makes it available as <code>fibaro.RSRC.name</code>:</p>
+following comment lines like <code>--%%u</code>). Repeated directives with the same
+name accumulate rows under the resource, like <code>--%%u</code> collects rows. flua
+compiles each resource to a child-bound uiView (<code>actionName</code> = the method,
+<code>json.array()</code> for argless bindings) and makes it available as
+<code>fibaro.RSRC.name</code>:</p>
 <pre><code class="language-lua">--%%rsrc:uiA:{tabView=&quot;mainTabs&quot;,activeTab=&quot;control&quot;,onTabChanged=&quot;tabChanged&quot;,tabs={
 --  {name=&quot;control&quot;,text=&quot;Control&quot;,components={
 --    {{button=&quot;onBtn&quot;,text=&quot;Turn On&quot;,onReleased=&quot;turnOn&quot;}}
