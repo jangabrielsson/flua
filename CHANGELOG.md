@@ -4,6 +4,15 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.196] - 2026-11-25
+
+### Changed
+- rsrc: reject the old whole-view form again — Christb mixed the two forms
+- test: node --check guards the viewer's inline script
+
+### Fixed
+- viewer JS parse error; accept the old whole-view --%%rsrc form
+
 ## [0.1.195] - 2026-11-25
 
 ### Changed
