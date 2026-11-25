@@ -823,11 +823,16 @@ button:
 --%%u:{image="albumArt",url="http://host/art.png"}
 ```
 
-Changing the picture at runtime: on the HC3 use
-`updateView(elm, "source", url)` — `source` is the image element's legacy
-property name, which the HC3 remaps to the url (live-verified 5.221).
-flua's sim/viewer accept both spellings (`"source"` remaps to the url the
-viewer reads).
+Changing the picture at runtime: on the HC3 only
+`updateView(elm, "source", url)` works — `source` is the image element's
+legacy property name, which the HC3 remaps to the url (`"url"` does
+NOTHING there, live-verified 5.221). The update is live state only: the
+device's uiView struct keeps the original url (no trace of the new one) —
+the app overlays the update at render, exactly like flua's
+`device.view`/`uiView` split. flua's sim accepts both spellings
+(`"source"` remaps to the url the viewer reads) — a deliberate superset,
+so a QA that updates images with `"url"` works in flua but silently not
+on the HC3.
 
 On the real HC3, `{{device.properties.x}}` templated urls and `useProxy`
 are resolved by the app client; flua's viewer renders the raw url. The

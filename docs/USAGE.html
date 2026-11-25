@@ -888,11 +888,16 @@ carry them, e.g. russound's album art). It sits inline in a row like a
 button:</p>
 <pre><code class="language-lua">--%%u:{image=&quot;albumArt&quot;,url=&quot;http://host/art.png&quot;}
 </code></pre>
-<p>Changing the picture at runtime: on the HC3 use
-<code>updateView(elm, "source", url)</code> — <code>source</code> is the image element's legacy
-property name, which the HC3 remaps to the url (live-verified 5.221).
-flua's sim/viewer accept both spellings (<code>"source"</code> remaps to the url the
-viewer reads).</p>
+<p>Changing the picture at runtime: on the HC3 only
+<code>updateView(elm, "source", url)</code> works — <code>source</code> is the image element's
+legacy property name, which the HC3 remaps to the url (<code>"url"</code> does
+NOTHING there, live-verified 5.221). The update is live state only: the
+device's uiView struct keeps the original url (no trace of the new one) —
+the app overlays the update at render, exactly like flua's
+<code>device.view</code>/<code>uiView</code> split. flua's sim accepts both spellings
+(<code>"source"</code> remaps to the url the viewer reads) — a deliberate superset,
+so a QA that updates images with <code>"url"</code> works in flua but silently not
+on the HC3.</p>
 <p>On the real HC3, <code>{{device.properties.x}}</code> templated urls and <code>useProxy</code>
 are resolved by the app client; flua's viewer renders the raw url. The
 viewer loads whatever a browser <code>&lt;img&gt;</code> can — including <code>data:</code> URIs, so
