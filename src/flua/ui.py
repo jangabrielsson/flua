@@ -59,6 +59,7 @@ _ELEMENT_KEYS = (
     "tabView",
     "image",
     "space",
+    "vertical",
     "collapsible",
     "colorPicker",
     "colorTemperaturePicker",
@@ -158,6 +159,18 @@ def _apply_defaults(rows: list[list[dict[str, Any]]]) -> None:
                 el["tabs"] = tabs
                 el.setdefault("activeTab", tabs[0]["name"] if tabs else "")
                 el["weight"] = "1.0"
+            elif typ == "vertical":
+                # a column: rows nested like a collapsible body, but shareable
+                # in a row (the sonos view pairs an image with a vertical)
+                el.setdefault("visible", True)
+                el.setdefault("text", "")
+                body_rows: list[list[dict[str, Any]]] = []
+                for raw_row in el.get("components") or []:
+                    if isinstance(raw_row, list):
+                        body_rows.append([dict(e) for e in raw_row])
+                    else:
+                        body_rows.append([dict(raw_row)])
+                el["rows"] = body_rows
             elif typ == "image":
                 el.setdefault("url", "")
                 el.setdefault("visible", True)
@@ -204,7 +217,7 @@ def _apply_defaults(rows: list[list[dict[str, Any]]]) -> None:
             if el["type"] == "tabView":
                 for tab in el["tabs"]:
                     _apply_defaults(tab["rows"])
-            elif el["type"] == "collapsible":
+            elif el["type"] in ("collapsible", "vertical"):
                 _apply_defaults(el["rows"])
 
 
@@ -242,8 +255,8 @@ def _callbacks(rows: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
                 )
                 for tab in el["tabs"]:
                     callbacks.extend(_callbacks(tab["rows"]))
-            elif typ == "collapsible":
-                # no events of its own: elements inside it route like
+            elif typ in ("collapsible", "vertical"):
+                # no events of their own: elements inside route like
                 # top-level ones
                 callbacks.extend(_callbacks(el["rows"]))
     return callbacks
@@ -375,6 +388,18 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
         # row); classes={'borderTop'} becomes the dialog's divider line
         return _with_classes(
             {"name": name, "visible": el.get("visible", True), "style": style, "type": "space"},
+            el,
+        )
+    if typ == "vertical":
+        # a column of legacy rows (the sonos view's vertical container)
+        return _with_classes(
+            {
+                "name": name,
+                "visible": el.get("visible", True),
+                "style": style,
+                "type": "vertical",
+                "components": [_layout_row(row) for row in el["rows"]],
+            },
             el,
         )
     # label
@@ -546,6 +571,12 @@ def _ui_view_component(el: dict[str, Any], weight: str) -> dict[str, Any]:
     if typ == "space":
         # the HC3's spacer: with classes={'borderTop'} the dialog view
         # renders its grey divider line (.spacer-line)
+        component.pop("text", None)
+        component.pop("eventBinding", None)
+    if typ == "vertical":
+        # a column: rows nested like a collapsible body, shareable in a row
+        # (the sonos view pairs an image with a vertical container)
+        component["components"] = [_ui_view_row(row) for row in el["rows"]]
         component.pop("text", None)
         component.pop("eventBinding", None)
     # the 5.221 element properties the viewer renders: named icons,
@@ -821,6 +852,20 @@ def _element(component: dict[str, Any], callbacks: dict[str, dict[str, str]]) ->
             "disabled": component.get("disabled") is True,
             "components": body_rows,
         }
+    elif typ == "vertical":
+        # a column: its rows come back re-mapped through _element
+        col_rows: list[list[dict[str, Any]]] = []
+        for row in component.get("components") or []:
+            if not isinstance(row, dict):
+                continue
+            elements = [
+                _element(inner, callbacks)
+                for inner in row.get("components") or []
+                if isinstance(inner, dict)
+            ]
+            if elements:
+                col_rows.append(elements)
+        element = {"vertical": name, "components": col_rows}
     elif typ == "tabView":
         # tabs come back with their rows re-mapped through _element (a tab's
         # components are uiView/legacy rows, not flat elements)

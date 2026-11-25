@@ -97,6 +97,7 @@ const ELEMENTS = {
   multi:       { name: "Multi select", fields: ["text", "values", "onToggled", "options"], v2: false },
   image:       { name: "Image", fields: ["url"], v2: true },
   space:       { name: "Divider", fields: [], v2: true, hint: "grey line (classes borderTop)" },
+  vertical:    { name: "Column", fields: [], v2: true, hint: "nested rows, shareable in a row" },
   tabView:     { name: "Tabs", fields: ["activeTab", "onTabChanged", "tabs"], v2: true },
   collapsible: { name: "Collapsible", fields: ["text", "collapsed"], v2: true },
   colorPicker: { name: "Color picker", fields: ["colorSpace", "onChanged"], v2: true },
@@ -124,6 +125,7 @@ function newElement(kind) {
   if (kind === "collapsible") Object.assign(base, { collapsed: false });
   if (kind === "image") base.url = "";
   if (kind === "space") base.classes = ["borderTop"];
+  if (kind === "vertical") base.components = [];
   if (kind === "colorPicker") base.colorSpace = "RGB";
   if (kind === "colorTemperaturePicker") Object.assign(base, { minTemperature: "0", maxTemperature: "100", colorTemperature: "50" });
   base[kind] = "";
@@ -298,6 +300,17 @@ function rowStrip(container, rows, label, depth) {
         el.components = el.components || [];
         rowStrip(sub, el.components, "body", depth + 1);
         box.appendChild(sub);
+      } else if (kind === "vertical") {
+        const sub = document.createElement("div");
+        sub.className = "nested";
+        sub.style.marginTop = "6px";
+        const h = document.createElement("span");
+        h.className = "label";
+        h.textContent = "column rows";
+        sub.appendChild(h);
+        el.components = el.components || [];
+        rowStrip(sub, el.components, "body", depth + 1);
+        box.appendChild(sub);
       }
     });
     list.appendChild(box);
@@ -327,7 +340,7 @@ function propsFor(el) {
       if (i >= 0) { row.splice(i, 1); return true; }
       return row.some((e) =>
         (elOf(e) === "tabView" && (e.tabs || []).some((t) => walk(t.components || []))) ||
-        (elOf(e) === "collapsible" && walk(e.components || [])));
+        ((elOf(e) === "collapsible" || elOf(e) === "vertical") && walk(e.components || [])));
     });
     walk(model.rows);
     selection = null;

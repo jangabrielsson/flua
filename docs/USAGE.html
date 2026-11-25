@@ -905,6 +905,14 @@ line (live-verified 5.221), so a main QA using it must declare
 <code>--%%useUiView:true</code> (children are always v2):</p>
 <pre><code class="language-lua">--%%rsrc:childUI:{space=&quot;div1&quot;,classes={&quot;borderTop&quot;}}
 </code></pre>
+<p>A <code>vertical</code> element is a COLUMN: nested rows stacked inside it, and it
+can share its row (the HC3's own sonos view pairs an album-art image with
+a vertical container of controls):</p>
+<pre><code class="language-lua">--%%u:{{image=&quot;art&quot;,url=&quot;https://host/art.png&quot;},
+--  {vertical=&quot;col&quot;,components={
+--    {{label=&quot;a&quot;,text=&quot;Row A&quot;}},
+--    {{button=&quot;b&quot;,text=&quot;B&quot;,onReleased=&quot;go&quot;}}}}}
+</code></pre>
 <p>On the real HC3, <code>{{device.properties.x}}</code> templated urls and <code>useProxy</code>
 are resolved by the app client; flua's viewer renders the raw url. The
 viewer loads whatever a browser <code>&lt;img&gt;</code> can — including <code>data:</code> URIs, so

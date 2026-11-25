@@ -844,6 +844,17 @@ line (live-verified 5.221), so a main QA using it must declare
 --%%rsrc:childUI:{space="div1",classes={"borderTop"}}
 ```
 
+A `vertical` element is a COLUMN: nested rows stacked inside it, and it
+can share its row (the HC3's own sonos view pairs an album-art image with
+a vertical container of controls):
+
+```lua
+--%%u:{{image="art",url="https://host/art.png"},
+--  {vertical="col",components={
+--    {{label="a",text="Row A"}},
+--    {{button="b",text="B",onReleased="go"}}}}}
+```
+
 On the real HC3, `{{device.properties.x}}` templated urls and `useProxy`
 are resolved by the app client; flua's viewer renders the raw url. The
 viewer loads whatever a browser `<img>` can — including `data:` URIs, so

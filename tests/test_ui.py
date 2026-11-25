@@ -306,6 +306,44 @@ def test_space_element_and_divider() -> None:
     assert legacy["type"] == "space" and legacy["classes"] == ["borderTop"]
 
 
+def test_vertical_column_shares_a_row() -> None:
+    # the HC3's vertical container = a column of nested rows, shareable in
+    # a row (the sonos view pairs an image with one)
+    rows = [
+        [
+            {"image": "art", "url": "x"},
+            {
+                "vertical": "col",
+                "components": [
+                    [{"label": "a", "text": "A"}],
+                    [{"button": "b", "text": "B", "onReleased": "go"}],
+                ],
+            },
+        ]
+    ]
+    ui = compile_ui(rows, 5000)
+    kinds = [c["type"] for c in ui["uiView"][0]["components"]]
+    assert kinds == ["image", "vertical"]
+    col = ui["uiView"][0]["components"][1]
+    assert [r["components"][0]["type"] for r in col["components"]] == ["label", "button"]
+    # the button inside routes through uiCallbacks and a UIAction binding
+    assert any(
+        c["name"] == "b" and c["eventType"] == "onReleased" for c in ui["uiCallbacks"]
+    )
+    btn = col["components"][1]["components"][0]
+    assert btn["eventBinding"]["onReleased"][0]["params"]["actionName"] == "UIAction"
+    # legacy: a horizontal row of [image, vertical] (+ the trailing space)
+    horizontal = ui["viewLayout"]["$jason"]["body"]["sections"]["items"][0]["components"][0]
+    assert [c["type"] for c in horizontal["components"]] == ["image", "vertical"]
+    assert [c["components"][0]["type"] for c in horizontal["components"][1]["components"]] == [
+        "label",
+        "button",
+    ]
+    # the inverse returns the column as a def element with its rows
+    lua = ui_to_u_rows(ui["uiView"], ui["viewLayout"], ui["uiCallbacks"])
+    assert "vertical=" in lua[0]
+
+
 def test_tabview_compiles_to_uiview_and_legacy() -> None:
     # a tabView is full-width (alone on its row): tabs hold rows, elements
     # inside tabs normalize like top-level ones, onTabChanged routes through

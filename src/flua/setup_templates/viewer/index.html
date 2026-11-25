@@ -56,6 +56,7 @@
   /* tabView/collapsible holders: the row is a flex line — the wrapper
      stacks its children vertically so the bar/header sits ABOVE the body */
   .tabview, .collapsible { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
+  .vcolumn { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
   .tab-panels { flex: 1 1 auto; min-width: 0; }
   .tab-panel.hidden { display: none; }
   /* image: the HC3's picture elements (album art, intercom frames) */
@@ -1015,6 +1016,14 @@ function renderComponent(device, component, row) {
     const div = document.createElement("div");
     div.className = "spacer" + ((component.classes || []).includes("borderTop") ? " divider-line" : "");
     row.appendChild(div);
+  } else if (t === "vertical") {
+    // a column: rows nested (the HC3's vertical container, shareable in a
+    // row — the sonos view pairs an image with one)
+    name.remove();
+    const col = document.createElement("div");
+    col.className = "vcolumn";
+    appendRows(col, component.components || [], device);
+    row.appendChild(col);
   } else if (t === "collapsible") {
     // a header toggling a body of rows. State: updateView "collapsed"
     // first, then the local viewer choice, then the declared default —
