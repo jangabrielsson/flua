@@ -4,6 +4,16 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.194] - 2026-11-25
+
+### Changed
+- docs/example: the divider is v2-only (no line in the legacy renderer)
+- examples: ui-divider — the HC3's divider line on a child uiView
+- ui: space elements — the HC3's divider (classes borderTop)
+- quote --tool api paths with ? (the shell globs them)
+- tests: the api tool joins the registry's pinned list
+- tools: flua --tool api — probe the HC3 without curl
+
 ## [0.1.193] - 2026-11-25
 
 ### Changed
