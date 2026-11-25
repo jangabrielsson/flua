@@ -688,13 +688,11 @@ value (`'left'`/`'center'`/`'right'`): it positions a label's text across
 the row (the HC3's labels carry it). `color` is any CSS color string
 (`'red'`, `'#ff0000'`, `'rgb(255,0,0)'`): the HC3 applies it as a button's
 BACKGROUND — on a label it does nothing (the skin CSS owns the label text
-color; live-verified 5.221). Labels render HTML in both formats: v1
-renders it unsanitized (inline `style` attributes work), while the HC3's
-v2 renderer passes the text through Angular's sanitizer — safe tags
-(`<b>`, `<i>`, `<table>`, `<font>`, ...) survive, `style` attributes are
-stripped. Colored v2 text: `<font color="red">Hi</font>` (the app's
-whitelist keeps font's color attribute). flua's viewer renders label HTML
-as-is.
+color; live-verified 5.221). Label HTML: v1 renders it (unsanitized,
+inline `style` attributes included); v2 labels render PLAIN TEXT on the
+HC3 (live-verified 5.221 — HTML tags show literally), so colored v2 text
+is not possible through labels — the v1 label is the rich-text route.
+flua's viewer renders v2 label HTML as-is (a preview convenience only).
 
 Every element also takes `classes={"a","b"}` — a list of class names the
 HC3 app applies to the rendered component (and switches behavior on). The
