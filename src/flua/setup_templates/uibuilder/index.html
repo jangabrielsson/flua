@@ -89,8 +89,8 @@
 const $ = (id) => document.getElementById(id);
 
 const ELEMENTS = {
-  label:       { name: "Label", fields: ["text"], v2: false, hint: "v1 labels may carry HTML" },
-  button:      { name: "Button", fields: ["text", "onReleased"], v2: false },
+  label:       { name: "Label", fields: ["text", "textAlign"], v2: false, hint: "v1 labels may carry HTML" },
+  button:      { name: "Button", fields: ["text", "onReleased", "color"], v2: false },
   slider:      { name: "Slider", fields: ["text", "min", "max", "value", "onChanged"], v2: false },
   switch:      { name: "Switch", fields: ["text", "value", "onReleased"], v2: false },
   select:      { name: "Select", fields: ["text", "value", "onToggled", "options"], v2: false },
@@ -361,6 +361,20 @@ function propsFor(el) {
       s.value = String(el.collapsed ?? false);
       s.onchange = () => { el.collapsed = s.value === "true"; bump(); };
       body.appendChild(fieldRow("collapsed", s));
+    } else if (f === "textAlign") {
+      // the HC3's labels carry style.textAlign (verified on 5.221); the
+      // label color cannot be set — the skin CSS owns it (use HTML)
+      const s = document.createElement("select");
+      s.innerHTML = "<option value='left'>left</option>" +
+        "<option value='center'>center</option>" +
+        "<option value='right'>right</option>";
+      s.value = String(el.textAlign ?? "left");
+      s.onchange = () => { el.textAlign = s.value; bump(); };
+      body.appendChild(fieldRow("textAlign", s));
+    } else if (f === "color") {
+      // a button's background tint (any CSS color) — the HC3 applies
+      // style.color as the button background
+      body.appendChild(fieldRow("color", textInput(el.color, (v) => { el.color = v; bump(); }, "CSS color, e.g. #d44444")));
     } else if (f === "values") {
       body.appendChild(fieldRow("values", textInput((el.values || []).join(","), (v) => { el.values = v ? v.split(",") : []; bump(); })));
     } else {

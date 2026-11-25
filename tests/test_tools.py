@@ -2748,6 +2748,18 @@ def test_uibuilder_compile_and_parse(tmp_path) -> None:
     assert len(main["directives"]) == 2 and main["directives"][0].startswith("--%%u:{")
     v1 = compile_target("main-v1", [{"label": "lbl", "text": "<b>Hi</b>"}])
     assert v1["viewLayout"]["$jason"]["body"]["sections"]["items"][0]["type"] == "vertical"
+    # style fields: label textAlign and button color ride through the compile
+    styled = compile_target(
+        "child",
+        [
+            [{"label": "lbl", "text": "L", "textAlign": "right"}],
+            [{"button": "btn", "text": "B", "onReleased": "go", "color": "#d44444"}],
+        ],
+        "uiB",
+    )
+    styles = [c["style"] for row in styled["uiView"] for c in row["components"]]
+    assert {"weight": "1.0", "textAlign": "right"} in styles
+    assert {"weight": "1.0", "color": "#d44444"} in styles
     # parse: pasted directives come back as the row model
     parsed = parse_directives(
         "--%%u:{button=\"b\",text=\"B\",onReleased=\"press\"}\n"
