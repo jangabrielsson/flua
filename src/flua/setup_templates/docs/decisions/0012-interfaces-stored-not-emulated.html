@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>0012 — device interfaces are stored, not emulated</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="0012--device-interfaces-are-stored-not-emulated">0012 — device interfaces are stored, not emulated</h1>
+<ul>
+<li><strong>Status:</strong> active, <strong>amended by ADR 0014</strong> (known interfaces now carry
+  schema-derived semantics; this decision governs unknown interface
+  names only)</li>
+<li><strong>Date:</strong> 2026-10-23</li>
+</ul>
+<h2 id="context">Context</h2>
+<p>HC3 devices (QuickApps included) carry a top-level <code>interfaces</code> array.
+Recognized interfaces <em>extend</em> the device in Fibaro's closed-source engine:
+some add properties (e.g. <code>autoTurnOff</code> → <code>autoOffTimestamp</code>,
+<code>autoOffDefaultTime</code>), some add actions (→ <code>setAutoOff</code>), some alter the web
+UI (the auto-turn-off timer on the tile). The semantics are engine-internal
+and largely undocumented — the official swagger documents the generic
+delayed-action REST mechanism behind auto-turn-off (<code>delay</code> on
+<code>POST /devices/{id}/action/{name}</code>, <code>DELETE /devices/action/{timestamp}/{id}</code>)
+but not the interface's own action or properties. A real-HC3 device dump
+(<code>src/flua/devices/devices.json</code>) shows 22 devices carrying <code>autoTurnOff</code>
+with <code>setAutoOff</code> and the two auto-off properties; none of that behavior is
+specified anywhere public.</p>
+<p>Emulating interfaces would therefore mean guessing at undocumented behavior
+per interface, with no way to verify against the real controller except
+manual probing.</p>
+<h2 id="decision">Decision</h2>
+<p>flua keeps the interface <strong>plumbing</strong> but assigns <strong>no semantics</strong> to any
+interface:</p>
+<ul>
+<li>Devices store <code>interfaces</code> as a plain field, including real data in the
+  device catalog (<code>src/flua/devices/devices.json</code>).</li>
+<li>The HC3 QuickApp Lua API surface stays: <code>hasInterface</code>, <code>addInterfaces</code>,
+  <code>deleteInterfaces</code> (→ <code>POST /plugins/interfaces</code>) in
+  <code>src/flua/lua/quickapp.lua</code>.</li>
+<li>The sim route <code>plugin_update_interfaces</code>
+  (<code>src/flua/api/routes/plugins.py</code>) mirrors the endpoint and the HC3's
+  plugin-restart-on-interface-change behavior. It does not validate
+  interface names against any list.</li>
+</ul>
+<p>Adding an interface stores it and restarts the plugin; it adds <strong>no
+properties, no actions, no UI effects</strong>. That is intentional and is not a
+bug.</p>
+<h2 id="consequences">Consequences</h2>
+<ul>
+<li>A QA that calls <code>self:addInterfaces({"autoTurnOff"})</code> gets the interface
+  stored on its device object and nothing else — it must not be relied on
+  to enable any behavior in the sim.</li>
+<li><code>tests/test_api.py::test_update_interfaces</code> pins the storage/removal
+  round-trip; <code>tests/test_sleep.py</code> pins that an interface add restarts the
+  plugin (BOOT counter). Neither asserts semantic side effects — by design.</li>
+<li>The action route (<code>src/flua/api/routes/devices.py::action_device</code>)
+  ignores the <code>delay</code> body field; delayed actions and <code>autoOffTimestamp</code>
+  bookkeeping stay unimplemented for the same reason.</li>
+<li>If a specific interface is ever emulated, do it per interface: document
+  the guessed semantics, add a pinning test, and record it as a new
+  decision or an amendment to this one. The plumbing is ready; only the
+  semantics are deferred.</li>
+</ul>
+</body>
+</html>

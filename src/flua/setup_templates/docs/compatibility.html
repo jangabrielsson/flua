@@ -1,0 +1,79 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Runtime compatibility</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="runtime-compatibility">Runtime compatibility</h1>
+<p>The one place that states what flua runs on and what it targets. For a
+running install, <code>flua --version --machine</code> prints one JSON line with the
+authoritative facts (<code>version</code>, <code>lupa</code>, <code>lua</code>, <code>python</code>, <code>integerBytes</code>,
+<code>locale</code>) — when in doubt, check that, not a transcript.</p>
+<h2 id="python">Python</h2>
+<ul>
+<li><strong>Supported</strong>: 3.11 and newer (<code>requires-python = "&gt;=3.11"</code> in
+  <code>pyproject.toml</code>).</li>
+<li><strong>Tested in CI</strong> (Ubuntu, every push): 3.11, 3.12, 3.13, 3.14, 3.15 —
+  the matrix in <code>.github/workflows/tests.yml</code> is the contract; the wheel
+  smoke test runs on 3.12.</li>
+<li><strong>The wheel smoke also runs on Windows</strong> (<code>windows-latest</code>) — the pip
+  user's commands in a clean venv. macOS is the author's daily driver (and
+  therefore continuously exercised); the Windows smoke exists because CI
+  catches what daily development cannot.</li>
+<li><strong>lupa</strong>: pinned to <code>lupa&gt;=2.6,&lt;2.7</code>. 2.6 ships binary wheels for
+  cp311–cp314 on the common platforms; cp315 — and exotic platforms — build
+  lupa from source and need a C compiler. A source-build failure on install
+  is a lupa/platform issue, not a flua one.</li>
+</ul>
+<h2 id="lua">Lua</h2>
+<ul>
+<li><strong>flua runs Lua 5.4</strong> — bundled with lupa 2.6. lupa 2.7+ bundles Lua 5.5,
+  whose <code>const</code> for-loop variables break HC3 QA code; that is exactly why
+  the pin is strict.</li>
+<li><strong>The HC3 controller runs Lua 5.3</strong> (its own <code>lua_engine</code>). QAs that must
+  run on both flua and a real controller stick to the <strong>common subset</strong> —
+  avoid 5.4-only syntax and 5.4-changed semantics in QA code.</li>
+<li>The LuaLS setup (<code>.luarc.json</code> + <code>.luals/</code>) targets <strong>Lua 5.4</strong> — it
+  documents the flua development loop, not the controller runtime.</li>
+</ul>
+<h2 id="hc3-target">HC3 target</h2>
+<ul>
+<li><strong>Reference firmware: 5.221</strong> — <code>docs/specs/hc3-api.json</code> (the distilled
+  REST reference) and the device catalog are extracted from a 5.221 rootfs.</li>
+<li>flua tracks the HC3's current behavior; where it intentionally differs,
+  the difference is called out in <code>USAGE.md</code> / <code>docs/invariants.md</code> and
+  pinned by a test.</li>
+</ul>
+<h2 id="transcript-convention">Transcript convention</h2>
+<p>Tutorial and README transcripts use placeholders (<code>flua 0.1.x (Lua 5.4,
+Python 3.x)</code>) so release bumps never rot the docs. Real runs print the
+installed versions.</p>
+</body>
+</html>

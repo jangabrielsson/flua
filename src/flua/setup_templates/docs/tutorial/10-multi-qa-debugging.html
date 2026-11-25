@@ -1,0 +1,152 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>10 · Debugging multi-QA runs</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="10--debugging-multi-qa-runs">10 · Debugging multi-QA runs</h1>
+<p>A real smart home isn't one QuickApp — it's several, talking to each other:
+a sensor notices motion, a lamp switches on, a scene dims the room. This
+final chapter runs two QAs together and shows how to debug the ensemble.</p>
+<h2 id="the-trigger-pair">The trigger pair</h2>
+<p>The repo ships a small cast for this chapter: <code>examples/trigger_sensor.lua</code>
+(the motion sensor) and <code>examples/trigger_lamp.lua</code> (the lamp). The sensor
+looks the lamp up <strong>by name</strong> and calls its <code>toggle</code> action every 600 ms —
+the same find-and-call pattern real HC3 QAs use, because ids are assigned at
+runtime:</p>
+<pre><code class="language-lua">--%%name:motion-sensor
+
+local function findLamp()
+  for _, d in ipairs(api.get(&quot;/devices?interface=quickApp&quot;)) do
+    if d.name == &quot;trigger-lamp&quot; then return d.id end
+  end
+  return nil
+end
+
+function QuickApp:onInit()
+  self:debug(&quot;sensor online&quot;)
+  local n = 0
+  setInterval(function()
+    n = n + 1
+    local lamp = findLamp()
+    if lamp then fibaro.call(lamp, &quot;toggle&quot;) end
+    if n &gt;= 3 then os.exit() end
+  end, 600)
+end
+</code></pre>
+<pre><code class="language-lua">--%%name:trigger-lamp
+--%%type:com.fibaro.binarySwitch
+
+function QuickApp:onInit()
+  self:debug(&quot;lamp online&quot;)
+end
+
+function QuickApp:toggle()
+  local on = not self.properties.value
+  self:updateProperty(&quot;value&quot;, on)
+  print(&quot;lamp now&quot;, on and &quot;ON&quot; or &quot;OFF&quot;)
+end
+</code></pre>
+<h2 id="running-two-qas-at-once">Running two QAs at once</h2>
+<p>flua runs every file you give it — each in its own isolated world, with its
+own id, timers and state:</p>
+<pre><code class="language-bash">flua --api local examples/trigger_sensor.lua examples/trigger_lamp.lua
+</code></pre>
+<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+[05.10.2026][10:34:26][DEBUG  ][motion-sensor5000]: sensor online
+[05.10.2026][10:34:26][DEBUG  ][trigger-lamp5001]: lamp online
+[05.10.2026][10:34:27][DEBUG  ][trigger-lamp5001]: lamp now ON
+[05.10.2026][10:34:28][DEBUG  ][trigger-lamp5001]: lamp now OFF
+[05.10.2026][10:34:28][DEBUG  ][trigger-lamp5001]: lamp now ON
+</code></pre>
+<p>Read the <strong>tags</strong>: <code>motion-sensor5000</code> speaks first, then <code>trigger-lamp5001</code>
+answers — the sensor's <code>fibaro.call</code> reached the lamp, three times, and the
+sensor's <code>os.exit()</code> ended the show. With several QAs, the tag is your map:
+every log line already tells you <em>who</em> said it.</p>
+<blockquote>
+<p>✅ <strong>You should see</strong> the sensor announce itself, the lamp answer ON, OFF,
+ON — and the run end by itself.</p>
+</blockquote>
+<p>Run the same pair with the viewer (<code>flua --api local --ui 8090 …</code>): both
+devices get their own panel, and you can click the lamp's Turn On/Off while
+the sensor keeps toggling — two QAs, one UI page.</p>
+<h2 id="the-map-for-ensembles">The map for ensembles</h2>
+<p>Three things keep a multi-QA run legible:</p>
+<ul>
+<li><strong>Tags.</strong> <code>motion-sensor5000</code> vs <code>trigger-lamp5001</code> — if a line confuses
+  you, read its tag first.</li>
+<li><strong>Levels.</strong> The sensor's "not found yet" is a <code>self:warning</code>, the lamp's
+  normal chatter is <code>print</code> (debug) — reserve <code>warning</code>/<code>error</code> for things
+  that are <em>wrong</em>, so they stand out in a busy log.</li>
+<li><strong>Names over ids.</strong> QAs find each other by name through the API — ids
+  change per run (5000, 5001, …), names don't.</li>
+</ul>
+<h2 id="debugging-the-whole-run">Debugging the whole run</h2>
+<ul>
+<li><strong>Watch mode takes several files</strong>: <code>flua --api local --watch a.lua b.lua</code>
+  — save either, and only that QA restarts while the other keeps running.</li>
+<li><strong>mobdebug sees everything.</strong> All QAs share one Lua state, so a
+  breakpoint in the lamp's <code>toggle</code> stops the whole run — including the
+  sensor mid-call — and the debugger shows every QA's variables. Launch a
+  multi-file run under the debugger from the terminal:</li>
+</ul>
+<p><code>bash
+  flua --api local --debugger=8172 examples/trigger_sensor.lua examples/trigger_lamp.lua</code></p>
+<p>(The F5 configurations run the <em>current file</em>; for an ensemble, use the
+  command line or add the second file to the launch configuration's
+  arguments.)</p>
+<ul>
+<li><strong>The run timeline.</strong> With tracing on, <code>--ui</code> draws the whole run as a
+  picture: one lane per QA, virtual time on the x-axis, every api call,
+  UI event, and timer a colored mark.</li>
+</ul>
+<p><code>bash
+  flua --ui 8091 --trace all examples/trigger_sensor.lua examples/trigger_lamp.lua
+  # open http://127.0.0.1:8091/timeline</code></p>
+<p>Hover a mark for its time, its QA, and the full details — events stacked
+  at the same instant list together, timers get their own lane so they
+  don't drown the calls, and a <strong>clear</strong> button drops the history without
+  squeezing the rest. It is the ensemble, legible — especially under
+  <code>--instant</code>, where the whole run draws itself at once.</p>
+<ul>
+<li><strong>Shrink the cast.</strong> When the ensemble misbehaves, chapter 07's rule
+  applies doubly: run the suspect QA <em>alone</em>, then add the others back one
+  at a time. Most "multi-QA bugs" are single-QA bugs with a chatty
+  audience.</li>
+</ul>
+<h2 id="where-you-are-now">Where you are now</h2>
+<p>That's the whole loop, from <code>Hello HC3!</code> to a sensor and a lamp arguing in
+your terminal. You can write QuickApps, run and test them offline, debug
+them, give them real UIs, grow them into libraries, mirror them onto the
+HC3, and — from chapter 06 — deploy them for keeps.</p>
+<p>One chapter remains: making sure the lamp <em>stays</em> right, long after this
+tutorial ends.</p>
+</body>
+</html>

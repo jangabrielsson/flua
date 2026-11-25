@@ -1,0 +1,116 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Note: making flua even easier for agents</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="note-making-flua-even-easier-for-agents">Note: making flua even easier for agents</h1>
+<p>Status: tier 1 and 2 implemented (2026-10-13); tier 3 (MCP) deferred.</p>
+<h2 id="context">Context</h2>
+<p>A user with a bare <code>pip install fibaro-flua</code> + <code>--tool setup</code> already has a
+working agent loop: self-asserting QA → <code>flua --api local --instant qa.lua</code>
+→ grep stdout → exit code. The loop leaned on three fragile things:
+hand-rolled <code>expect()</code> boilerplate, human-formatted log text, and
+curl/browser for anything UI-related.</p>
+<h2 id="shipped-2026-10-13">Shipped (2026-10-13)</h2>
+<ul>
+<li><strong><code>require("flua-test")</code></strong> — built-in assertions library (expect,
+  assert_eq deep compare, assert_json, finish with exit code). Provided by
+  the runtime per QA (env-bound: correct log tag and exit attribution in
+  multi-QA runs); never travels in the .fqa. Plain Lua, so
+  <code>--%%file:$flua-test.lua,test</code> ships the same assertions to a real HC3.
+  Tests: <code>tests/test_agent_dx.py</code>.</li>
+<li><strong><code>--log json</code></strong> — JSON-lines QA logs (<code>{time, level, tag, qaid, msg}</code>),
+  stdout pure JSON, flua notices + the final verdict on stderr. <code>--logfile
+  FILE</code> appends a copy (ANSI stripped; JSON with <code>--log json</code>).</li>
+<li><strong>UI helpers</strong> — <code>_FLUA.uiEvent(element, eventType[, value])</code> injects UI
+  events from Lua (HC3 UI delivery semantics, values as strings, async
+  callback); <code>self:getView()</code> reads the rendered viewLayout incl.
+  updateView changes (HC3-compatible API).</li>
+<li><strong><code>--tool ui script.lua</code></strong> — the QA's UI as text (elements, callbacks,
+  options, values; both viewLayout and uiView formats).</li>
+<li><strong>Multi-QA exit aggregation</strong> pinned by a regression test, plus a final
+  verdict line on stderr (<code>flua: QA &lt;name&gt; (&lt;id&gt;) exited with code N</code>).</li>
+<li>Docs: USAGE.md ("Self-testing a QA"), <code>quickapp-test</code> and <code>flua-setup</code>
+  skills.</li>
+</ul>
+<h2 id="verified-facts-probed-2026-10-13">Verified facts (probed 2026-10-13)</h2>
+<ul>
+<li><strong>Multi-QA exit aggregation works.</strong> <code>flua ok.lua failing.lua</code> exits
+  nonzero when any QA fails ("last failing QA wins", <code>_handle_exit</code>).</li>
+<li><strong>UI events can be injected from inside a QA</strong>: <code>api.get("/plugins/
+  callUIEvent?deviceID=" .. self.id .. "&amp;elementName=B1&amp;eventType=onReleased")</code>
+  returns 200 and the QA's callback fires (async — after the call returns).
+  <code>examples/ui.lua</code> comments already document this pattern.</li>
+<li><strong>The rendered view is readable from Lua</strong>: <code>api.get("/plugins/getView?
+  id=" .. self.id)</code> returns the <code>$jason</code> viewLayout including <code>updateView</code>
+  changes.</li>
+<li>UI event values arrive as <strong>strings</strong> (like the real HC3 UI).</li>
+</ul>
+<h2 id="ideas-ranked">Ideas, ranked</h2>
+<h3 id="tier-1--the-loop-itself--done">Tier 1 — the loop itself — DONE</h3>
+<ol>
+<li>Built-in test library via <code>require</code> — <code>require("flua-test")</code>.</li>
+<li>Machine-readable output — <code>--log json</code> / <code>--logfile FILE</code>.</li>
+<li>UI helpers in Lua — <code>_FLUA.uiEvent</code> + <code>self:getView()</code>.</li>
+<li>Text rendering of the UI — <code>flua --tool ui</code>.</li>
+</ol>
+<h3 id="tier-2--loop-robustness--done">Tier 2 — loop robustness — DONE</h3>
+<ol start="5">
+<li>Multi-QA exit aggregation regression test.</li>
+<li>Per-run log file — <code>--logfile FILE</code>.</li>
+<li>Final verdict line — stderr, every failing QA, any log mode.</li>
+</ol>
+<h3 id="tier-3--the-long-game--drafted">Tier 3 — the long game — DRAFTED</h3>
+<ol start="8">
+<li><strong>MCP server</strong> exposing run/check/inspect as tools — the agent-ecosystem
+   direction (Claude/Copilot hosts). Real project; not a quick win. First
+   design draft: <code>docs/notes/notes-mcp.md</code>.</li>
+</ol>
+<p>Benefit analysis (2026-10-13): skills = knowledge, <code>--tool</code>/CLI = the
+   engine's manual interface, MCP = a machine interface for hosts that
+   prefer one. Four deltas: (1) typed tool schemas instead of
+   arg-string/parse-text friction; (2) hosts with no/unreliable shell
+   (Claude Desktop etc.) get flua at all; (3) live stateful sessions — a
+   running engine across tool calls (inspect, inject events, poke) vs
+   one-shot runs; (4) one standard surface for every host. V1 scope
+   suggestion: stdio JSON-RPC, dependency-free, 4-6 tools (check, run with
+   instant/json, ui_text, inject_ui_event, devices) wrapping the existing
+   engine/tools.</p>
+<h2 id="known-gaps-found-while-shipping">Known gaps (found while shipping)</h2>
+<ul>
+<li>A single <code>select</code>'s initial <code>value</code> is dropped from the legacy
+  viewLayout export (<code>ui.py</code> <code>_layout_element</code> maps only <code>values</code>) — the
+  <code>--tool ui</code> renderer shows it empty. The uiView format carries it.
+  Probably worth fixing in compile_ui, with a test. Full analysis:
+  <code>docs/notes-select-value.md</code>.</li>
+</ul>
+</body>
+</html>

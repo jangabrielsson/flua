@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>The mobdebug debugger — VS Code attach over --debugger</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: debugger
+topic: debugging
+title: The mobdebug debugger — VS Code attach over --debugger
+pins:
+  - tests/test_qa.py::test_mobdebug_e_bootstrap_does_not_consume_qa_id
+verified: flua 0.1.170</p>
+<hr />
+<h1 id="the-mobdebug-debugger--vs-code-attach-over---debugger">The mobdebug debugger — VS Code attach over --debugger</h1>
+<p>flua embeds the mobdebug debugger (<code>--debugger</code> / the VS Code
+extension's attach flow): breakpoints, step, and Lua state inspection
+against a running QA.</p>
+<ul>
+<li>The <code>mobdebug_e</code> bootstrap is a <em>plain library</em>, not a QA — it never
+  consumes a QA id or hides the main script's mode (pinned), so the
+  debugger's scaffolding stays invisible to the device tree.</li>
+<li>A debugger pause does <strong>not advance virtual time</strong> (the clock
+  freezes during the pause) — os.time()-relative logic stays coherent
+  across stepping.</li>
+<li>The VS Code extension wires check-on-save diagnostics, explorer tool
+  menus, and the debugger attach.</li>
+</ul>
+<p>For "the bridge dropped something" instead, see <code>bridge-debug</code>; for
+run history, <code>syslog-and-tracing</code>.</p>
+</body>
+</html>

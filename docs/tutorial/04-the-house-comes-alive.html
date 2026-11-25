@@ -1,0 +1,173 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>04 · The house comes alive</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="04--the-house-comes-alive">04 · The house comes alive</h1>
+<p>The lamp switches when <em>you</em> press the button. This chapter makes it switch
+<strong>by itself</strong>: every minute it asks "is the sun down yet?" and turns on when
+the answer changes to yes. Along the way you meet the two ideas that make
+QuickApps feel alive — <strong>timers</strong> and <strong>time</strong>.</p>
+<h2 id="the-lamp-that-checks-the-sun">The lamp that checks the sun</h2>
+<p>Save this as <code>sunset_lamp_auto.lua</code> (or use the repo's copy at
+<code>examples/sunset_lamp_auto.lua</code>):</p>
+<pre><code class="language-lua">--%%name:SunsetLamp
+--%%type:com.fibaro.binarySwitch
+
+function QuickApp:onInit()
+  self:debug(&quot;Sunset lamp ready&quot;)
+  self:checkSun()
+  setInterval(function() self:checkSun() end, 60 * 1000) -- once a minute
+end
+
+function QuickApp:turnOn()
+  self:updateProperty(&quot;value&quot;, true)
+  print(&quot;Lamp on&quot;)
+end
+
+function QuickApp:turnOff()
+  self:updateProperty(&quot;value&quot;, false)
+  print(&quot;Lamp off&quot;)
+end
+
+function QuickApp:checkSun()
+  local now = os.date(&quot;*t&quot;)
+  local h, m = fibaro.getValue(1, &quot;sunsetHour&quot;):match(&quot;(%d+):(%d+)&quot;)
+  local sunsetMin = tonumber(h) * 60 + tonumber(m)
+  local nowMin = now.hour * 60 + now.min
+  if nowMin &gt;= sunsetMin and not self.properties.value then
+    self:turnOn()
+  elseif nowMin &lt; sunsetMin and self.properties.value then
+    self:turnOff()
+  end
+end
+</code></pre>
+<p>Four new ideas, each worth a moment:</p>
+<p><strong>1. Timers.</strong> <code>setInterval(function() … end, 60 * 1000)</code> runs the block
+every 60 000 milliseconds — one minute. This is how a QuickApp "does
+nothing, most of the time": it's just waiting for its timers.</p>
+<p><strong>2. The HC3 knows the sun.</strong> <code>fibaro.getValue(1, "sunsetHour")</code> — device
+number <strong>1 is the HC3 itself</strong>, and the HC3 can answer questions about your
+house: when the sun sets (<code>"18:13"</code>), when it rises, your location. Your
+QuickApp asks the controller instead of doing astronomy.</p>
+<p><strong>3. The clock.</strong> <code>os.date("*t")</code> returns the current date and time as a
+small table: <code>now.hour</code>, <code>now.min</code>, … The lamp turns both times into
+"minutes since midnight" (<code>hour * 60 + min</code>) so it can compare them with a
+plain <code>&gt;=</code>.</p>
+<p><strong>4. Only change things when they must change.</strong> The two <code>if</code>s make sure the
+lamp only acts when the state is wrong — otherwise it would call <code>turnOn</code>
+every single minute, forever. QuickApps should be gentle like this; the
+HC3 logs everything.</p>
+<p>The two actions from last chapter are still there, unchanged — the lamp can
+now be switched <strong>by the sun and by hand</strong>, because both paths go through
+the same two functions.</p>
+<h2 id="run-it-after-sunset">Run it after sunset</h2>
+<pre><code class="language-bash">flua --api local --start '2026/10/4 18:30:00' sunset_lamp_auto.lua
+</code></pre>
+<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+[04.10.2026][18:30:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready
+[04.10.2026][18:30:00][DEBUG  ][SunsetLamp5000]: Lamp on
+</code></pre>
+<blockquote>
+<p>✅ <strong>You should see</strong> the lamp turn itself on at boot — 18:30 is after
+sunset (18:13), so <code>checkSun</code> finds the lamp off and switches it on.</p>
+</blockquote>
+<p>Press <code>Ctrl-C</code> to stop it. (Without <code>Ctrl-C</code> the lamp would run until you
+stop it — it's waiting for its next minute, after all.)</p>
+<p><strong>What's <code>--start</code>?</strong> flua keeps its own clock — the <strong>virtual clock</strong> —
+separate from your computer's. <code>--start</code> sets it: the QuickApp above truly
+believes it is October 4th 2026, 18:30, and every log line is stamped with
+<em>that</em> time. That's how you test winter darkness in July, New Year's Eve in
+March, or — as we're about to do — a whole evening in seconds.</p>
+<h2 id="fast-forward-to-the-sunset">Fast-forward to the sunset</h2>
+<p>Here's the magic for the impatient. Start the lamp at 18:00, <strong>before</strong>
+sunset, and let flua fast-forward time for you:</p>
+<pre><code class="language-bash">flua --api local --start '2026/10/4 18:00:00' --instant --max-hours 1 sunset_lamp_auto.lua
+</code></pre>
+<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+[04.10.2026][18:00:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready
+[04.10.2026][18:13:00][DEBUG  ][SunsetLamp5000]: Lamp on
+flua: virtual time limit reached (1.0h)
+</code></pre>
+<p>Read the timestamps: the lamp started at 18:00 — correctly decided <em>not</em> to
+turn on — and then time <strong>jumped minute by minute</strong> until 18:13, when it
+turned itself on at exactly the sunset the HC3 had calculated. A whole
+evening of lamp logic, tested in under a second.</p>
+<p>The two flags:</p>
+<ul>
+<li><code>--instant</code> — <strong>deadline-ordered fast-forward</strong>: the clock jumps to each
+  timer's deadline before its callback runs, one at a time. A one-minute
+  interval becomes "check the sun, jump a minute, check again…" — and
+  <code>os.time()</code> inside the callbacks is correct at every step.</li>
+<li><code>--max-hours 1</code> — a safety leash: stop after 1 virtual hour. Without it,
+  an instant lamp would check minutes until the end of time (instantly).</li>
+</ul>
+<p>There's also <code>--speed 60</code> for "60 times faster than real life" — same idea,
+but you watch it run — and <code>--step</code>, the same deadline-ordered discipline
+under its plua <code>speedTime</code> name. <code>--instant</code> and <code>--step</code> are equivalent
+for the QA (<code>--instant</code> used to collapse the whole timer heap into one
+pass, which broke <code>os.time()</code>-relative scheduling; that is fixed) — either
+one suits event engines that compute their next delay from <code>os.time()</code>.</p>
+<blockquote>
+<p>✅ <strong>You should see</strong> <code>Lamp on</code> stamped <code>18:13:00</code> — the sunset from the
+<code>sunsetHour</code> calculation, to the minute.</p>
+</blockquote>
+<h3 id="the-same-knobs-as-directives--so-f5-works-too">The same knobs as directives — so F5 works too</h3>
+<p>Every flag from this chapter can live in the QuickApp's <strong>header</strong> instead,
+so an F5 run (chapter 02's launch configurations pass no flags) behaves the
+same as the terminal command:</p>
+<pre><code class="language-lua">--%%time:2026/10/4 18:30:00   -- start the virtual clock at 18:30
+--%%speed:60                  -- run 60x faster (optional)
+--%%name:SunsetLamp
+--%%type:com.fibaro.binarySwitch
+</code></pre>
+<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+[04.10.2026][18:30:01][DEBUG  ][dtime5000]: NOW 18:30
+</code></pre>
+<p>The directives mirror the flags: <code>--%%time:…</code> is <code>--start</code>,
+<code>--%%speed:60</code> is <code>--speed</code>, <code>--%%instant:true</code> is <code>--instant</code>,
+<code>--%%step:true</code> is <code>--step</code>, and <code>--%%maxhours:1</code> is <code>--max-hours</code>. A
+terminal flag beats a directive, so the same file can pin the time in its
+header <em>and</em> be overridden from the command line when you want a different
+date.</p>
+<h2 id="what-did-we-just-learn">What did we just learn?</h2>
+<ul>
+<li><strong>Timers</strong> are how a QuickApp wakes itself up: <code>setInterval(fn, ms)</code>.</li>
+<li><strong>The HC3 is a device too</strong> — device 1 — and it answers questions like
+  "when is sunset?" through <code>fibaro.getValue(1, …)</code>.</li>
+<li><strong>flua's virtual clock</strong> lets you test <em>any</em> time instantly: <code>--start</code>
+  sets it, <code>--instant</code>/<code>--step</code>/<code>--speed</code> fast-forward it, <code>--max-hours</code>
+  bounds it.</li>
+</ul>
+<p>Next: the lamp grows a control panel of its own — a switch that turns the
+automatic mode on and off, right next to the On/Off buttons.</p>
+</body>
+</html>

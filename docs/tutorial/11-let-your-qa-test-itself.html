@@ -1,0 +1,169 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>11 · Let your QuickApp test itself</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="11--let-your-quickapp-test-itself">11 · Let your QuickApp test itself</h1>
+<p>Every chapter so far ended the same way: run the QA, look at the log, nod.
+That loop is perfect while you're learning — and it quietly falls apart the
+moment the QA grows. Change one line in a hundred-line file, and the log
+looks <em>almost</em> the same. Did the lamp still turn on at sunset? You'd have to
+watch it to know.</p>
+<p>This chapter teaches the lamp to check <strong>itself</strong>. A small test file sits
+next to it, runs the same offline sim you already know, and answers with one
+word: pass or fail.</p>
+<h2 id="step-1--the-test-file">Step 1 — the test file</h2>
+<p>Create <code>sunset_test.lua</code> in your project folder:</p>
+<pre><code class="language-lua">--%%name:sunset_test
+local Test = require(&quot;flua-test&quot;)
+local t = Test.new()
+
+-- the lamp's own logic: turnOn must light it
+function QuickApp:turnOn()
+  self:updateProperty(&quot;value&quot;, true)
+end
+
+function QuickApp:onInit()
+  -- 1. the sim is honest: the device exists, under the id the QA sees
+  local dev = api.get(&quot;/devices/&quot; .. _FLUA.qaId)
+  t:expect(dev.name == &quot;sunset_test&quot;, &quot;the device answers by name&quot;)
+  t:assert_eq(dev.id, _FLUA.qaId, &quot;the id matches&quot;)
+
+  -- 2. our own logic, checked against the sim
+  self:turnOn()
+  t:expect(self.properties.value == true, &quot;turnOn lights the lamp&quot;)
+
+  t:finish()
+end
+</code></pre>
+<p>Three new names, all from flua's built-in test library:</p>
+<ul>
+<li><code>require("flua-test")</code> loads it — no download, nothing to install.</li>
+<li><code>t:expect(condition, "message")</code> checks one thing and prints <code>PASS:</code> or
+  <code>FAIL:</code>.</li>
+<li><code>t:finish()</code> prints the failure count and ends the run with it — so the
+  <em>exit code</em> says pass or fail, not your eyes.</li>
+</ul>
+<p>You already know the rest: <code>api.get</code> is the sim (chapter 02),
+<code>updateProperty</code> is how the lamp changes its own state (chapter 03), and
+<code>function QuickApp:turnOn()</code> is the lamp's action (chapter 03 again).</p>
+<h2 id="step-2--run-the-suite">Step 2 — run the suite</h2>
+<p>One command runs every <code>*_test.lua</code> file in the folder:</p>
+<pre><code class="language-bash">flua test
+</code></pre>
+<pre><code class="language-text">  PASS  sunset_test.lua
+flua test: 1 passed, 0 failed, 0 timed out
+</code></pre>
+<blockquote>
+<p>✅ <strong>You should see</strong> <code>PASS  sunset_test.lua</code>.</p>
+</blockquote>
+<p><code>flua test</code> finds the test files by name (anything ending in <code>_test.lua</code>),
+runs each in its own fresh sim — so tests can't trip over each other — and
+exits 0 only when everything passes. That last part matters more than it
+looks: chapter 07's agents, and any computer, can now check your lamp
+without reading a single log line.</p>
+<h2 id="step-3--break-it-on-purpose">Step 3 — break it, on purpose</h2>
+<p>Make the lamp's check wrong:</p>
+<pre><code class="language-lua">t:expect(self.properties.value == false, &quot;turnOn lights the lamp&quot;)
+</code></pre>
+<p>Run the suite again:</p>
+<pre><code class="language-text">  FAIL  sunset_test.lua  (failures: 1)
+flua test: 0 passed, 1 failed, 0 timed out
+</code></pre>
+<blockquote>
+<p>✅ <strong>You should see</strong> <code>FAIL</code> and <code>failures: 1</code>.</p>
+</blockquote>
+<p>Put the line back. This is the whole point: the test catches the mistake
+<em>now</em>, while you're two minutes from it — not after it has lived on your
+HC3 for a week.</p>
+<h2 id="step-4--the-test-that-never-ends">Step 4 — the test that never ends</h2>
+<p>A test QA must end itself with <code>t:finish()</code>. Forget that — say you delete
+<code>t:finish()</code> and leave a repeating timer running — and the runner doesn't
+hang your machine: it waits a while, then reports:</p>
+<pre><code class="language-text">  TIME  sunset_test.lua  (no exit within 5s — does the test end with t:finish()/exit(...)?)
+</code></pre>
+<p>(To see it: delete the <code>t:finish()</code> line and add
+<code>setInterval(function() end, 1000)</code> somewhere, run <code>flua test --timeout 5</code>,
+then put both back.)</p>
+<h2 id="step-5--mock-the-outside-world">Step 5 — mock the outside world</h2>
+<p>Real QAs talk to real services — the lamp may grow a cloud API, a broker,
+a player. The sim can <strong>host</strong> those services so the test stays offline:
+the <code>net.*Server</code> family (a flua extension, no HC3 counterpart) runs inside
+a QA and answers the client code:</p>
+<pre><code class="language-lua">local http = net.HTTPServer()
+http:listen(0, function(req) return {status = 200, body = &quot;ok&quot;} end)
+
+local ws = net.WebSocketServer()
+ws:listen(0, function(message, isBinary, conn)
+  if message == &quot;subscribe&quot; then
+    setTimeout(function() ws:send(conn, &quot;event:on&quot;) end, 50)  -- push!
+    return &quot;subscribed&quot;
+  end
+end)
+</code></pre>
+<ul>
+<li>HTTP/TCP/UDP servers answer request → reply; the WebSocket server also
+  <strong>talks first</strong> (<code>ws:send</code> / <code>ws:broadcast</code>), closes connections
+  (<code>ws:disconnect</code>), and reports <code>connected</code>/<code>disconnected</code> events — the
+  shape of event-driven services (subscribe, then pushed events).</li>
+<li>The mock can be a sibling file loaded with <code>require("mocklib")</code> — it runs
+  in the QA's own environment and is never packaged into the <code>.fqa</code>.</li>
+</ul>
+<p>One trap when tests meet the network: <strong>socket round-trips run in wall
+time, timers in virtual time.</strong> At <code>--speed 50</code> a 300 ms virtual delay is
+~6 ms wall — shorter than a localhost reply — so never wait for network
+effects with fixed delays; poll the condition with a generous timeout
+(scaled with <code>--speed</code>).</p>
+<h2 id="what-did-we-just-learn">What did we just learn?</h2>
+<ul>
+<li><code>require("flua-test")</code> + <code>t:expect</code>/<code>t:assert_eq</code>/<code>t:finish()</code> — a test
+  file is just a QA that checks things and exits with the failure count.</li>
+<li><code>flua test</code> finds <code>*_test.lua</code> files, runs them isolated, and reports
+  <code>PASS</code>/<code>FAIL</code>/<code>TIME</code> — exit code 0 means everything holds.</li>
+<li>Tests run offline against the sim, so they are fast, free, and safe to
+  run constantly.</li>
+<li>The assertions can even travel to the real HC3 — declare the library as a
+  QA file (<code>--%%file:$flua-test.lua,flua_test</code>, the chapter-09 move) and the
+  same test code turns into no-ops on the controller.</li>
+<li><code>net.*Server</code> mocks the outside world inside the sim — HTTP/TCP/UDP
+  request→reply, and WebSocket servers that push events and drop
+  connections like the real services do.</li>
+</ul>
+<h2 id="where-you-are-now">Where you are now</h2>
+<p>That's the whole loop: write, run, look — and now <em>prove</em>. The lamp checks
+itself, the suite says so in one line, and every future change gets checked
+for free.</p>
+<p>The rest is practice, the flua thread on the Fibaro forum, and the manual
+(<code>USAGE.md</code>) for everything this tutorial deliberately skipped — record and
+replay of your real house, the coverage audit, the VS Code extension's
+toolbox. Happy automating — and mind the sunset.</p>
+</body>
+</html>

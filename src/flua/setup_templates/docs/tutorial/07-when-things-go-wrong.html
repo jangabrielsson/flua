@@ -1,0 +1,174 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>07 · When things go wrong</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="07--when-things-go-wrong">07 · When things go wrong</h1>
+<p>Something will go wrong. That's not bad luck — it's the normal state of
+programming. The difference between people who give up and people with
+working smart homes is mostly <em>how they read the situation</em>. This chapter
+is that skill: the log, the checker, the debugger, and where to ask.</p>
+<h2 id="read-the-log">Read the log</h2>
+<p>Every QuickApp writes a log, and flua shows it in the terminal. The lamp
+already logs with <code>print(...)</code> — and every line has a shape worth reading:</p>
+<pre><code class="language-text">[04.10.2026][18:30:00][DEBUG  ][SunsetLamp5000]: Lamp on
+</code></pre>
+<ul>
+<li><code>04.10.2026 18:30:00</code> — <em>when</em> it happened (virtual time — remember
+  <code>--start</code> from chapter 04).</li>
+<li><code>DEBUG</code> — the log <strong>level</strong>, how loud the line is.</li>
+<li><code>SunsetLamp5000</code> — <em>which</em> QuickApp said it (name + id).</li>
+<li><code>Lamp on</code> — the message.</li>
+</ul>
+<p>There are four levels, in order of loudness:</p>
+<pre><code class="language-text">[TRACE  ]   quiet details, mostly for your future self
+[DEBUG  ]   the normal level — print(...) writes here
+[WARNING]   &quot;this is odd, but I'll keep going&quot;
+[ERROR  ]   &quot;something failed&quot;
+</code></pre>
+<p><code>print("Lamp on")</code> is shorthand for <code>fibaro.debug</code> with the QA's own tag —
+and you can pick a level explicitly: <code>fibaro.trace</code>, <code>fibaro.debug</code>,
+<code>fibaro.warning</code>, <code>fibaro.error</code>. Most QuickApps live on <code>debug</code> and reach
+for <code>warning</code>/<code>error</code> when something genuinely failed. When in doubt, log
+<em>more</em> — you can delete lines later; you can't read a log you never wrote.</p>
+<h2 id="read-the-error">Read the error</h2>
+<p>Errors come in two flavors. You've met both:</p>
+<p><strong>At startup</strong> (the file never really ran):</p>
+<pre><code class="language-text">Error:  hello.lua:4: attempt to perform arithmetic on a nil value (global 'nn')
+</code></pre>
+<p>flua names the <strong>file</strong>, the <strong>line</strong>, and the problem — here, arithmetic on
+<code>nn</code>, which doesn't exist. The fix lives on exactly that line. (When the
+message says <code>bootstrap</code>, it means "while starting your QuickApp".)</p>
+<p><strong>At runtime</strong> (the QuickApp started, then something broke while it was
+doing its job). Same shape — file, line, reason — but the QuickApp may keep
+running. Watch for the last <code>[DEBUG]</code> line before the error: that's the
+last thing that <em>worked</em>, and usually the best clue.</p>
+<p>A minute of disciplined reading beats an hour of guessing: read the line
+number, look at that line, read the reason, and only then change something.</p>
+<h2 id="check-before-you-run---check">Check before you run: <code>--check</code></h2>
+<p>flua can check your work <strong>without running it</strong> — syntax, <code>--%%</code> typos, and
+APIs the HC3 no longer wants:</p>
+<pre><code class="language-bash">flua --check sunset_lamp_ui.lua
+</code></pre>
+<pre><code class="language-text">ok
+</code></pre>
+<p>Three useful outcomes:</p>
+<ul>
+<li><code>ok</code> — nothing wrong that a static check can see. Good, but it doesn't
+  <em>run</em> the code; runtime surprises are still possible.</li>
+<li>A syntax error (try deleting one <code>end</code>) — named file and line, exit code
+  1. Exactly what a missing <code>end</code> looks like, before you waste a run:</li>
+</ul>
+<p><code>text
+  lamp.lua: error: syntax: lamp.lua:12: 'end' expected (to close 'function' at line 8) near &lt;eof&gt;</code></p>
+<ul>
+<li>A warning, like a misspelled directive (<code>--%%instnat:true</code>):</li>
+</ul>
+<p><code>text
+  lamp.lua: warning: unknown directive --%%instnat</code></p>
+<p>Warnings don't stop anything — a misspelled directive is silently ignored
+  at runtime, which is precisely why <code>--check</code> exists.</p>
+<p>Make <code>flua --check</code> a habit before long runs; it catches the cheap mistakes
+for free.</p>
+<h2 id="debug-like-a-grown-up-mobdebug">Debug like a grown-up: mobdebug</h2>
+<p>Logging gets you far. When you need to <em>watch the code run line by line</em>,
+flua has a debugger, and chapter 01's setup already installed the pieces:
+the <strong>Lua MobDebug</strong> extension and the launch configuration
+<strong>Flua: Debug Current File (mobdebug)</strong>. Like all the F5 configurations it
+runs your QA in the offline playground (<code>--api local</code>) — the same code you
+were already running.</p>
+<p>The flow:</p>
+<ol>
+<li>Open your QuickApp in VS Code and press <code>F5</code> (choose the <strong>mobdebug</strong>
+   configuration the first time — it starts flua and waits).</li>
+<li>Click once in the left margin of a line, next to the line number — a red
+   dot appears. That's a <strong>breakpoint</strong>: "pause here".</li>
+<li>The QuickApp starts and <strong>stops at your dot</strong>. The panel on the left
+   shows every variable and its value.</li>
+<li>Step through the code with the small toolbar (or <code>F10</code>), line by line,
+   watching <code>n</code> count up, <code>sunsetMin</code> appear, the <code>if</code> decide.</li>
+</ol>
+<p>The same launch configuration has a sibling, <strong>Flua: Debug Current File
+(UI+mobdebug)</strong> — same debugger, plus the viewer on port 8090, so you can
+debug <em>while clicking</em> the UI.</p>
+<p>If no debugger answers, flua shrugs and runs the QA anyway:</p>
+<pre><code class="language-text">Could not connect to localhost:8172: Connection refused
+</code></pre>
+<p>so a stray <code>--debugger</code> never hangs you.</p>
+<h2 id="shrink-the-problem">Shrink the problem</h2>
+<p>The one trick that beats everything else: when something misbehaves, <strong>make
+it smaller</strong> until it works, then add pieces back.</p>
+<ul>
+<li>Two hundred lines misbehave? Copy the suspect twenty into a new file.</li>
+<li>A timer never fires? Replace the inside with <code>print("fired")</code>.</li>
+<li>A <code>fibaro.getValue</code> returns the wrong thing? Print it, and everything
+  around it:</li>
+</ul>
+<p><code>lua
+  self:debug("sunset hour is", fibaro.getValue(1, "sunsetHour"))
+  self:debug("auto is", tostring(self.properties.auto))</code></p>
+<p>Programmers call this "the smallest case that fails" — and half the time,
+the act of shrinking finds the bug before the bug finds you.</p>
+<h2 id="ask-for-help">Ask for help</h2>
+<p>When you've read the log, checked the file, and shrunk the problem — and
+it's still wrong — ask. Two places work well:</p>
+<ul>
+<li><strong>An AI agent.</strong> Paste the three things below into Claude Code, Copilot,
+  DeepSeek, ChatGPT — whatever you already have open. AI assistants are
+  surprisingly good at reading QuickApp code, and flua is built to be
+  agent-friendly: the log lines have one fixed shape, <code>flua --check</code> reports
+  problems with file and line, and the flua repository ships <code>AGENTS.md</code>
+  plus Copilot instructions — so an agent working <em>inside</em> the project
+  already knows the house rules. Let the agent run <code>flua --check</code> and the
+  QA itself: it can read the errors faster than you can copy them.</li>
+<li><strong>The Fibaro forum.</strong> flua has a thread there, and the community of HC3
+  owners has seen most of it before.</li>
+</ul>
+<p>Whatever you ask and wherever — run this first and paste the block:</p>
+<pre><code class="language-bash">flua doctor
+</code></pre>
+<p>It prints your setup as one ready-made block (which flua, which Python,
+whether your HC3 credentials are found and reachable, which editor pieces
+are in place). It never prints your passwords — only <em>where</em> it found
+things. "Here is my flua doctor" beats three paragraphs of setup prose,
+and often the ✗ lines in it <em>are</em> the answer.</p>
+<p>A question that gets answered — by a human <em>or</em> an agent — includes three
+things:</p>
+<ol>
+<li><strong>What you expected</strong> — "the lamp should turn on after 18:13".</li>
+<li><strong>What happened</strong> — the exact log lines or error, copied as text.</li>
+<li><strong>The smallest version of the code</strong> — the file (or the suspect part),
+   with your real password and address removed.</li>
+</ol>
+<p>That's it. You now have the whole loop: write, run, read, fix — and a lamp
+that has been on your real HC3 since last chapter. The rest is practice.</p>
+</body>
+</html>

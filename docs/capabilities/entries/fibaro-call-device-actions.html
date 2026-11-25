@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Device actions go through fibaro.call, not raw api.post</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: fibaro-call-device-actions
+topic: hc3-api
+title: Device actions go through fibaro.call, not raw api.post
+pins:
+  - tests/test_recipes.py::test_recipes_use_fibaro_call_for_device_actions
+verified: flua 0.1.168</p>
+<hr />
+<h1 id="device-actions-go-through-fibarocall-not-raw-apipost">Device actions go through fibaro.call, not raw api.post</h1>
+<p>The HC3-idiomatic way to act on a device:</p>
+<pre><code class="language-lua">fibaro.call(lightId, &quot;turnOn&quot;)        -- -&gt; POST /devices/&lt;id&gt;/action/turnOn, {args={}}
+fibaro.call(tempId, &quot;setValue&quot;, 21.5, &quot;C&quot;)  -- extra args ride in the args table
+</code></pre>
+<ul>
+<li>Accepts a table of ids to fan out the same action.</li>
+<li>flua's <code>fibaro.call</code> asserts the action name is a string and ids are
+  numbers — a QA using it here behaves identically on the controller.</li>
+<li>The recipe library bans raw <code>api.post("/devices/…/action/…")</code> by test;
+  new templates keep the idiom.</li>
+<li><code>fibaro.callhc3</code> forces the direct-HC3 channel (like <code>api.hc3.*</code>);
+  <code>fibaro.callGroupAction(name, args)</code> hits the group-action endpoint
+  (note: <code>--%%mode:readonly+call</code> unlocks single-device actions only).</li>
+</ul>
+</body>
+</html>

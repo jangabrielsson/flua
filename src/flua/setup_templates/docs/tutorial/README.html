@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>The flua tutorial — QuickApps for the rest of us</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="the-flua-tutorial--quickapps-for-the-rest-of-us">The flua tutorial — QuickApps for the rest of us</h1>
+<p>You bought a Fibaro HC3 to automate your home. You discovered that the really
+good ideas need a <em>QuickApp</em> — a small program that lives on the controller.
+And you have never programmed anything.</p>
+<p>This tutorial is written for you. No programming background is assumed. You
+only need to know how to use a computer and be willing to try things.</p>
+<h2 id="what-you-will-build">What you will build</h2>
+<p>One project runs through the whole tutorial: <strong>the Sunset Lamp</strong> — a QuickApp
+that turns a light on when the sun goes down. Along the way you will:</p>
+<ol>
+<li>install the two tools you need (VS Code and flua),</li>
+<li>run your first QuickApp on your own computer,</li>
+<li>learn what a QuickApp <em>is</em> — and click its buttons in a browser,</li>
+<li>teach the lamp when the sun sets,</li>
+<li>move it onto your real HC3,</li>
+<li>and teach the lamp to check itself, so future changes can't break it
+   silently.</li>
+</ol>
+<p>Each chapter ends with a working result. If a chapter feels like it takes
+forever, skip to the next one — you can always come back.</p>
+<h2 id="the-chapters">The chapters</h2>
+<ul>
+<li><strong><a href="01-install.html">01 · Install</a></strong> — Python, VS Code, flua, one command to check it all works.</li>
+<li><strong><a href="02-your-first-qa.html">02 · Your first QuickApp</a></strong> — write a dozen lines, run them, see them tick.</li>
+<li><strong><a href="03-qa-anatomy.html">03 · QuickApp anatomy</a></strong> — onInit, actions, properties — and the Sunset Lamp gets its On/Off buttons.</li>
+<li><strong><a href="04-the-house-comes-alive.html">04 · The house comes alive</a></strong> — timers, sunset, and flua's virtual clock: a whole evening tested in a second.</li>
+<li><strong><a href="05-make-it-yours.html">05 · Make it yours</a></strong> — your own control panel (a switch and a label) and your first quickApp variable.</li>
+<li><strong><a href="06-on-the-real-hc3.html">06 · On the real HC3</a></strong> — a dress rehearsal against your real house, then uploading, updating and downloading QAs.</li>
+<li><strong><a href="07-when-things-go-wrong.html">07 · When things go wrong</a></strong> — the log, <code>--check</code>, breakpoints, and how to ask for help.</li>
+<li><strong><a href="08-proxy-mode.html">08 · Proxy mode</a></strong> — the real HC3 UI driving your code: mirror your QA onto the controller (and leave its HC3-edited UI alone with <code>noUI</code>).</li>
+<li><strong><a href="09-multi-file-qas.html">09 · Multi-file QAs</a></strong> — your own libraries with <code>--%%file</code>, packed and deployed as one device.</li>
+<li><strong><a href="10-multi-qa-debugging.html">10 · Debugging multi-QA runs</a></strong> — several QAs talking to each other, and how to keep the ensemble legible.</li>
+<li><strong><a href="11-let-your-qa-test-itself.html">11 · Let your QuickApp test itself</a></strong> — <code>flua-test</code> + <code>flua test</code>: the lamp checks its own behavior, and the suite says pass or fail in one line.</li>
+</ul>
+<h2 id="how-to-read-this-tutorial">How to read this tutorial</h2>
+<ul>
+<li><strong>Commands</strong> look like this — type them into a terminal, then press Enter:</li>
+</ul>
+<p><code>bash
+  flua --version</code></p>
+<p>In VS Code, open a terminal with <strong>Terminal → New Terminal</strong> in the menu.</p>
+<ul>
+<li>
+<p><strong>Output</strong> shown after a command is what you should actually see on your
+  screen (we removed the colors to keep it readable). Don't worry if the
+  version numbers differ slightly.</p>
+</li>
+<li>
+<p><strong>Checkpoints</strong> mark the moments that matter:</p>
+</li>
+</ul>
+<blockquote>
+<p>✅ <strong>You should see</strong> — your name in the log. If you don't, re-read the
+previous steps; the answer is usually one line above.</p>
+</blockquote>
+<ul>
+<li>
+<p>Words in <code>&lt;angle brackets&gt;</code> are placeholders — replace them with <em>your</em>
+  values (your HC3's address, your password, …).</p>
+</li>
+<li>
+<p><strong>PDF edition.</strong> The whole tutorial as one PDF with a chapter index:
+  <code>./scripts/build-tutorial-pdf.sh</code> (needs pandoc and Chrome; writes
+  <code>docs/tutorial/flua-tutorial.pdf</code>, diagrams included).</p>
+</li>
+<li>
+<p>The examples live in the <code>examples/</code> directory of the flua repository and
+  are executed by flua's own test suite — the code in this tutorial is the
+  same code that is tested with every release, so it always runs.</p>
+</li>
+<li>The diagrams are drawn with Mermaid. VS Code renders them in the markdown
+  preview once you accept the recommended <strong>Markdown Preview Mermaid</strong>
+extension (it's in the <code>.vscode/extensions.json</code> that <code>--tool setup</code>
+  installs); on GitHub they render on the page automatically.</li>
+</ul>
+<p>One promise before we start: <strong>you will not need to understand everything.</strong>
+QuickApps are small. The whole trick is a handful of ideas — this tutorial
+introduces them one at a time, exactly when the lamp needs them.</p>
+</body>
+</html>

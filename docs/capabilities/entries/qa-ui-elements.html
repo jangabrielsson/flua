@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>QA UI — --%%u rows, updateView, and how taps arrive</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: qa-ui-elements
+topic: ui
+title: QA UI — --%%u rows, updateView, and how taps arrive
+pins:
+  - tests/test_ui_server.py::test_update_view_visible_over_http
+  - tests/test_qa.py::test_sim_device_sensor_ui
+verified: flua 0.1.168</p>
+<hr />
+<h1 id="qa-ui----u-rows-updateview-and-how-taps-arrive">QA UI — --%%u rows, updateView, and how taps arrive</h1>
+<p>A QA declares its UI with <code>--%%u</code> rows in the header (repeatable, order
+kept; they travel in the .fqa as uiCallbacks/viewLayout):</p>
+<pre><code>--%%u:{slider='thresholdSlider',text='Start above (%)',min=20,max=100,unit='%',onChanged='_setThreshold'}
+--%%u:{{button='btnBreach',text='Breach / on',onReleased='breach'},{button='btnClear',text='Clear / off',onReleased='clearBreach'}}
+</code></pre>
+<ul>
+<li>A callback name (<code>onReleased='breach'</code>) routes the tap to
+  <code>QuickApp:breach(event)</code>; <code>onChanged</code> handlers read the value from
+  <code>event.values[1]</code> (a string — <code>tonumber</code> it).</li>
+<li><code>self:updateView(elm, prop, value)</code> patches live state at runtime;
+  boot-sync the slider from the variable and write the variable back in
+  the handler so the UI and the logic stay one state.</li>
+<li>The viewer merges <code>updateView</code> state over the layout
+  (<code>/plugins/getView</code> serves the merged tree); <code>--%%useUiView:true</code>
+  opts into the new uiView component format.</li>
+<li><code>self:UIAction(eventType, elementName, arg)</code> fires a UI event
+  programmatically (test code, dry-runs).</li>
+</ul>
+</body>
+</html>

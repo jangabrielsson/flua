@@ -102,6 +102,29 @@ def _docs_file(subpath: str) -> tuple[bytes, str] | None:
     return body, content_type
 
 
+def _docs_listing(subpath: str) -> bytes | None:
+    """A generated index of a docs directory (subdirectories and the
+    rendered .html pages inside), so directory links like ``decisions/``
+    resolve; None when the path is missing or escapes the tree."""
+    root = _DOCS_PATH.resolve()
+    candidate = (root / subpath).resolve()
+    if not candidate.is_relative_to(root) or not candidate.is_dir():
+        return None
+    entries: list[str] = []
+    for child in sorted(candidate.iterdir(), key=lambda p: p.name):
+        if child.name.startswith("."):
+            continue
+        if child.is_dir():
+            entries.append(f'<li><a href="{child.name}/">{child.name}/</a></li>')
+        elif child.suffix == ".html":
+            entries.append(f'<li><a href="{child.name}">{child.name}</a></li>')
+    if not entries:
+        return None
+    title = subpath.rstrip("/").split("/")[-1] or "docs"
+    listing = f"<h1>{title}/</h1>\n<ul>\n" + "\n".join(entries) + "\n</ul>\n"
+    return listing.encode()
+
+
 class ApiServer:
     """Serve an :class:`~flua.api.Api` over HTTP (loopback by default)."""
 
@@ -171,26 +194,38 @@ class ApiServer:
                     subpath = "forum/index.html"
                 else:
                     subpath = urllib.parse.unquote(path[len("/docs/") :])
-                    if subpath.endswith("/"):
-                        subpath += "index.html"
-                # the core reference docs render as .html (the .md source is
-                # not a page); old links and bookmarks to the .md form land
-                # on the rendered page
-                if subpath.endswith(".md") and _docs_file(subpath[: -3] + ".html") is not None:
-                    target = "/docs/" + subpath[: -3] + ".html"
-                    link = (
-                        f'<a href="{target}">'
-                        f"{target}</a>"
-                    ).encode()
-                    _write(
-                        writer,
-                        301,
-                        "text/html",
-                        link,
-                        {**_CORS, "Location": target},
-                    )
-                    return
-                hit = _docs_file(subpath)
+                if subpath.endswith("/"):
+                    # a directory: its index.html if it has one, else a
+                    # generated listing of the rendered pages inside (so
+                    # ``decisions/``-style links resolve)
+                    index_hit = _docs_file(subpath + "index.html")
+                    if index_hit is None:
+                        listing = _docs_listing(subpath)
+                        if listing is not None:
+                            _write(writer, 200, "text/html", _DOCS_THEME + listing, extra=_CORS)
+                            return
+                        _respond(writer, 404, {"error": "not found"}, extra=_CORS)
+                        return
+                    hit = index_hit
+                else:
+                    # the core reference docs render as .html (the .md source is
+                    # not a page); old links and bookmarks to the .md form land
+                    # on the rendered page
+                    if subpath.endswith(".md") and _docs_file(subpath[: -3] + ".html") is not None:
+                        target = "/docs/" + subpath[: -3] + ".html"
+                        link = (
+                            f'<a href="{target}">'
+                            f"{target}</a>"
+                        ).encode()
+                        _write(
+                            writer,
+                            301,
+                            "text/html",
+                            link,
+                            {**_CORS, "Location": target},
+                        )
+                        return
+                    hit = _docs_file(subpath)
                 if hit is None:
                     _respond(writer, 404, {"error": "not found"}, extra=_CORS)
                     return

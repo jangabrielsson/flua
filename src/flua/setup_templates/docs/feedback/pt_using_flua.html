@@ -1,0 +1,352 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Using Flua to test and debug Fibaro QuickApps</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="using-flua-to-test-and-debug-fibaro-quickapps">Using Flua to test and debug Fibaro QuickApps</h1>
+<p>Experience report for the Flua maintainer, prepared 31 October 2026.</p>
+<h2 id="summary">Summary</h2>
+<p>Flua is useful as a fast, local feedback loop for QuickApp development. It lets us
+check Lua code, exercise a simulated QA lifecycle, run existing regression tests,
+test HTTP handling against a local fixture server, and inspect development FQA
+exports without repeatedly installing code on a physical HC3.</p>
+<p>The most important improvement would be making automated test outcomes reliable:
+an unhandled timer callback error should fail the process, and accelerated time
+should preserve what each callback observes. Both currently require precautions
+in our external runner. Better isolation controls and an explicit HC3 compatibility
+matrix would also substantially increase confidence and reduce setup effort.</p>
+<p>This report describes our actual tests, not a complete review of Flua. We did not
+qualify interactive breakpoint debugging, live proxy mode, or physical device
+control in this pilot. Suggestions below are requests, not claims that every
+related feature is absent from the current project.</p>
+<h2 id="environment-and-evidence">Environment and evidence</h2>
+<p>Latest run:</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Flua package</td>
+<td><code>fibaro-flua==0.1.110</code></td>
+</tr>
+<tr>
+<td>Python</td>
+<td>3.12.10 on Windows</td>
+</tr>
+<tr>
+<td>Lupa</td>
+<td>2.6</td>
+</tr>
+<tr>
+<td>Reported Lua runtime</td>
+<td>5.4</td>
+</tr>
+<tr>
+<td>Lua integer width observed</td>
+<td>8 bytes</td>
+</tr>
+<tr>
+<td>Locale used by our runner</td>
+<td>C</td>
+</tr>
+<tr>
+<td>Test date</td>
+<td>31 October 2026</td>
+</tr>
+<tr>
+<td>Result</td>
+<td>29 of 30 checks passed</td>
+</tr>
+<tr>
+<td>Dependency consistency</td>
+<td><code>pip check</code> passed</td>
+</tr>
+<tr>
+<td>Real controller access</td>
+<td>None</td>
+</tr>
+</tbody>
+</table>
+<p>The suite consists of 13 simulator/tooling checks and 17 application-level
+regression fixtures. All 17 application-level fixtures passed. These fixtures
+contain their own mocks/stubs; that is useful regression coverage but is <strong>not</strong>
+proof of complete native API compatibility or physical-device behaviour.
+Application names, implementations and deployment details are intentionally omitted.</p>
+<p>We also have earlier results for 0.1.23, 0.1.33 and 0.1.93. The current 0.1.110
+run still shows the instant-mode timer issue and zero exit status after an
+unhandled callback error. A variable-default export problem observed in an older
+version is no longer reproduced by our current probe.</p>
+<p>The local evidence includes versioned outcomes, captured output, execution times,
+input hashes, a bounded runner, an isolation wrapper and synthetic probes.
+Private workspace paths and application-specific evidence are not included.
+Reproduction examples below are self-contained and require no private data.
+Concrete optional changes are specified separately in
+<a href="using_flua_proposed_changes.html">using_flua_proposed_changes.md</a>.</p>
+<h2 id="what-worked-well">What worked well</h2>
+<h3 id="fast-feedback-without-a-controller-deployment">Fast feedback without a controller deployment</h3>
+<p>The current simple checks and application-level fixtures typically completed in
+about 0.6-1.7 seconds each; the realtime timer probe took about 2.7 seconds.
+That is a useful development loop for checking a change before any live test.
+<code>--check</code>, short QA fixtures and ordinary Lua assertions are easy to combine.</p>
+<h3 id="reuse-of-existing-regression-tests">Reuse of existing regression tests</h3>
+<p>Existing Lua fixtures could execute inside the Flua process rather than
+needing to be rewritten for another framework. Their coverage includes configuration,
+capability mapping, false/zero preservation, command confirmation, stale callback
+fencing, authentication handling, bounded queues, UI contracts and lifecycle
+cleanup. Much of that behaviour is tested with project-provided mocks, so the
+main benefit here is convenient execution and regression feedback.</p>
+<h3 id="useful-simulator-integration-surface">Useful simulator integration surface</h3>
+<p>Our small integration fixture passed checks around parent/child behaviour,
+properties, variables, storage and simulated UI callbacks. The local REST child
+deletion route worked in the pilot even though the corresponding convenience
+method was absent in the separate capability probe.</p>
+<h3 id="http-tests-without-contacting-real-devices">HTTP tests without contacting real devices</h3>
+<p>A separate loopback HTTP server let us exercise 200, 401 and 429 responses. This
+is more representative than making every HTTP callback return synchronously.
+It also allows deliberately invalid responses without touching production.</p>
+<h3 id="accelerated-scenarios-and-development-exports">Accelerated scenarios and development exports</h3>
+<p>A virtual-day scenario completed in roughly one second. This is useful for
+scheduled behaviour, provided clock-ordering limitations are respected; it is
+not evidence of a real 24-hour memory or stability test.</p>
+<p>Development export/unpack passed. Our current metadata check preserved the
+<code>Language=en</code> QA variable and a button callback. This is a narrow round-trip
+check, not complete FQA fidelity or permission to replace our release tooling.</p>
+<h3 id="discoverable-guidance">Discoverable guidance</h3>
+<p>The upstream skills covering QA APIs, patterns, testing, setup and REST safety
+are valuable starting points. The test helper approach and structured logging
+are promising for both human and agent-driven workflows. Keeping that guidance
+next to the implementation makes it easier to discover than scattered examples.</p>
+<h2 id="reproduced-issues">Reproduced issues</h2>
+<h3 id="1-unhandled-timer-errors-can-return-exit-code-zero">1. Unhandled timer errors can return exit code zero</h3>
+<p>Minimal fixture:</p>
+<pre><code class="language-lua">--%%mode:offline
+function QuickApp:onInit()
+  setTimeout(function()
+    error(&quot;EXPECTED_CALLBACK_FAILURE&quot;)
+  end, 10)
+end
+</code></pre>
+<p>Run with the equivalent of:</p>
+<pre><code class="language-text">flua --api local --color never --instant --run-for -1 negative.lua
+</code></pre>
+<p>In our guarded 0.1.110 run, the callback error and <code>stack traceback:</code> were printed,
+but the native process returned <strong>0</strong>. Our negative-control test passed because
+our wrapper expected and detected the error, not because Flua returned failure.</p>
+<p><strong>Impact:</strong> CI that checks only the process status can report broken code as
+successful. A later success marker does not solve this either: another callback
+can print it after an earlier callback has failed.</p>
+<p><strong>Suggested improvement:</strong> a documented strict test mode with a sticky failure
+state and nonzero final status for unhandled callback errors, including timer,
+UI and network callbacks. A later successful callback or <code>_FLUA.exit(0)</code> should
+not silently clear that state. Also provide a machine-readable final summary.</p>
+<h3 id="2-instant-mode-callbacks-can-observe-a-later-timers-time">2. Instant-mode callbacks can observe a later timer's time</h3>
+<p>Our actual regression fixture:</p>
+<pre><code class="language-lua">--%%mode:offline
+function QuickApp:onInit()
+  local start = os.time()
+  setTimeout(function()
+    assert(os.time() - start == 1, &quot;FIRST_TIMER_TIME_JUMPED&quot;)
+  end, 1000)
+  setTimeout(function()
+    assert(os.time() - start == 2)
+    print(&quot;TIMER_TEST_COMPLETE&quot;)
+    _FLUA.exit(0)
+  end, 2000)
+end
+</code></pre>
+<p>With <code>--instant --run-for -3</code>, the first assertion failed. The second callback
+still printed the completion marker and the process returned 0. With the same
+fixture in realtime mode, omitting <code>--instant</code>, the test passed.</p>
+<p>This establishes an observable clock problem; it does not by itself establish
+that the callbacks were executed in reverse order or identify the internal cause.</p>
+<p><strong>Impact:</strong> timeout, debounce, retry, freshness and expiry tests may give
+misleading results under accelerated time.</p>
+<p><strong>Suggested improvement:</strong> advance the virtual clock to the next due callback,
+deliver eligible work with documented ordering, then advance again. Document
+ordering for equal deadlines, nested timers, zero-delay work and asynchronous
+completions. Add regressions for cancellation and restarting a QA with pending
+callbacks as well.</p>
+<h3 id="3-child-deletion-api-parity-is-incomplete-in-our-probe">3. Child deletion API parity is incomplete in our probe</h3>
+<p>On 0.1.110, <code>type(self.removeChildDevice)</code> printed <code>nil</code>. The simulated REST
+deletion route worked in the integration pilot.</p>
+<p><strong>Impact:</strong> code using an HC3 convenience method may fail even when the underlying
+simulated operation exists. Adding emulator-specific fallbacks to production QA
+code would conceal the compatibility gap rather than fix it.</p>
+<p><strong>Suggested improvement:</strong> implement the method with documented semantics, or
+explicitly list it as unsupported in a versioned capability table. Include child
+object/reference behaviour after removal, not just removal from the inventory.</p>
+<h2 id="safety-and-reproducibility-improvements">Safety and reproducibility improvements</h2>
+<h3 id="offline-should-have-an-explicit-network-policy">Offline should have an explicit network policy</h3>
+<p>The startup banner correctly says <code>sim HC3, real network</code>. Simulating HC3 is not
+the same as preventing a QA from sending requests to real vendor devices.</p>
+<p>We added an external Python audit-hook guard that blocks non-loopback socket
+access and DNS, rejects remote/tool invocation for this pilot, and disables
+inherited secret/config lookup. This is accident prevention, not a hostile-code
+sandbox, and our wrapper uses internal Flua APIs that may change.</p>
+<p>Useful first-class options would be:</p>
+<ul>
+<li>Network disabled, loopback-only, and explicit host allowlist profiles.</li>
+<li>No inherited home/project configuration or secrets for reproducible tests.</li>
+<li>Separate, explicit authorization for upload, proxy and other live operations.</li>
+<li>A clear error when a test attempts an unexpected external request.</li>
+</ul>
+<p>These should protect both direct requests and background reconnect/retry paths.</p>
+<h3 id="bound-both-virtual-time-and-wall-time">Bound both virtual time and wall time</h3>
+<p>We use <code>--run-for</code> plus an independent wall-clock timeout. On Windows our runner
+also has to terminate only the process tree it started if that timeout expires.
+Virtual limits alone cannot protect against a blocked native call or runaway
+execution that stops advancing simulated time.</p>
+<p>A supported bounded test command could combine those limits, guaranteed cleanup,
+failure status and result export without every user writing a wrapper.</p>
+<h3 id="make-export-behaviour-around-secrets-explicit">Make export behaviour around secrets explicit</h3>
+<p>Configuration outside the Lua source is not automatically outside the exported
+FQA. Resolved variable values can become package defaults. We use synthetic
+configuration and inspect exports rather than assuming external secrets stay out.</p>
+<p>A documented export policy, dry-run manifest and optional fail-on-sensitive-value
+check would help. Do not silently replace valid user defaults or claim that a
+heuristic secret scan guarantees a safe package.</p>
+<h2 id="missing-information-and-skills-that-would-help">Missing information and skills that would help</h2>
+<ol>
+<li><strong>A versioned HC3 compatibility matrix.</strong> Distinguish implemented, partial,
+   unsupported and verified-against-hardware APIs. Include callbacks, storage,
+   child lifecycle, JSON null/arrays, UI formats and errors, not just method names.</li>
+<li><strong>An authoritative scheduling contract.</strong> Explain virtual versus wall time,
+   <code>os.time</code>, equal-deadline ordering, asynchronous UI dispatch and HTTP completion.
+   Include executable examples and tests for the promised behaviour.</li>
+<li><strong>A CI/agent testing skill.</strong> Show negative controls, sticky failures,
+   completion markers, bounded execution and structured results. Explicitly warn
+   that exit 0 alone is not sufficient with the currently observed behaviour.</li>
+<li><strong>An isolation and mock-transport skill.</strong> Provide HTTP/WebSocket fixtures for
+   latency, disconnects, late callbacks, 401/429 and retries, with no fallback to
+   a real endpoint. Distinguish mocks supplied by the QA project from native
+   simulator coverage.</li>
+<li><strong>A numeric-runtime guide.</strong> Our runtime reports 8-byte integers; that does not
+   qualify HC3 numeric behaviour. Explain supported profiles and limitations for
+   integer overflow, floating-point timestamps and bit operations. A numeric32
+   test profile would be useful where technically feasible; it is not necessarily
+   a faithful emulation of every controller firmware.</li>
+<li><strong>A Windows/locale guide.</strong> We pin C locale after earlier UTF-8 name/pattern
+   problems. The current guarded name probe passes; we have not established that
+   unguarded 0.1.110 still reproduces the original issue. Document Lua byte-pattern
+   classification, encoding and interpreter/locale details in diagnostic output.</li>
+<li><strong>A UI/export fidelity guide.</strong> Explain simulated UI events, string values,
+   legacy versus newer UI export, select defaults and what the local preview
+   cannot establish about actual HC3/browser/mobile rendering.</li>
+<li><strong>Safe setup and skill maintenance.</strong> Keep root guidance and packaged skill
+   copies synchronized. Clearly separate old examples from current commands.
+   Setup should preserve existing AGENTS files, tasks, settings and local work;
+   offer a merge preview rather than requiring force overwrite.</li>
+<li><strong>A lifecycle and observability skill.</strong> Show pending timers, owned HTTP
+   requests, subscriptions, queue lengths and references before/after stop or
+   restart. This would help investigate leaks and late callbacks more directly.</li>
+</ol>
+<p>Some of this may already exist in pieces. The improvement is a tested, coherent
+entry point that says which guarantees apply to the installed release.</p>
+<h2 id="debugging-experience-and-limitations">Debugging experience and limitations</h2>
+<p>Our strongest experience is assertion-driven debugging: small reproductions,
+captured logs, comparison of realtime and accelerated execution, and inspection
+of state after simulated actions. That workflow is productive.</p>
+<p>We have not measured the quality of breakpoint stepping, variable inspection,
+debugger attachment, or live proxy debugging in this pilot. We therefore cannot
+fairly label those features good, broken or missing.</p>
+<p>For deeper asynchronous debugging, an optional event trace would be valuable:
+timer scheduled/due/delivered/cancelled times, request and callback correlation,
+QA generation/restart identifiers and callback failures. Payloads and credentials
+should be redacted by default. A documented run/inspect/step interface could
+then help tooling without requiring access to internal Python classes.</p>
+<h2 id="suggested-upstream-priorities">Suggested upstream priorities</h2>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Work</th>
+<th>Acceptance test</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P0</td>
+<td>Reliable callback failure status</td>
+<td>Deliberate timer error ends nonzero, even if a later callback exits 0</td>
+</tr>
+<tr>
+<td>P0</td>
+<td>Correct accelerated clock semantics</td>
+<td>Both callbacks in the timer example observe their own deadlines</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>First-class isolated test execution</td>
+<td>External requests are denied; loopback fixtures work; no inherited secrets</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>Capability matrix and child deletion parity</td>
+<td>Unsupported APIs are explicit; implemented methods have lifecycle tests</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>Structured test results and bounded execution</td>
+<td>CI needs no traceback regex; wall and virtual limits are independently enforced</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>Runtime profiles, event tracing and lifecycle diagnostics</td>
+<td>Numeric limitations and pending resources are inspectable</td>
+</tr>
+<tr>
+<td>P2</td>
+<td>Consolidated executable skills and export guidance</td>
+<td>Examples are tested against the release and preserve existing workspace files</td>
+</tr>
+</tbody>
+</table>
+<h2 id="how-we-would-use-flua-going-forward">How we would use Flua going forward</h2>
+<p>Keep Flua as a fast layer between pure unit tests and physical-controller tests:</p>
+<ol>
+<li>Static checks and pure Lua regression tests.</li>
+<li>Isolated Flua integration tests with explicit inputs and mocked transports.</li>
+<li>Realtime tests for ordering-sensitive cases until instant mode is qualified.</li>
+<li>Independent numeric32 checks where required.</li>
+<li>Physical HC3 installation, upgrade, UI, event-delivery and stability checks.</li>
+</ol>
+<p>Flua should not have to reproduce every physical device to be valuable. Clear
+boundaries, reliable failures and deterministic scheduling would make it much
+easier to trust precisely the parts it does simulate.</p>
+<p>Our overall assessment is positive: it already saves development time. The
+largest remaining cost is not writing QA tests; it is ensuring that a green
+simulator run really means the tests ran correctly and failed when they should.</p>
+</body>
+</html>

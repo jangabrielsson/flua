@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>RefreshStateSubscriber — the HC3 event feed, simulated by flua</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: refreshstate-subscriber
+topic: events
+title: RefreshStateSubscriber — the HC3 event feed, simulated by flua
+pins:
+  - tests/test_recipes.py::test_motion_lights_reacts_to_the_breach_event
+verified: flua 0.1.168</p>
+<hr />
+<h1 id="refreshstatesubscriber--the-hc3-event-feed-simulated-by-flua">RefreshStateSubscriber — the HC3 event feed, simulated by flua</h1>
+<p>The mechanism for <em>reactive</em> QAs (motion → light instantly, not on a
+poll) — the HC3's refreshStates feed, which flua simulates offline:</p>
+<pre><code class="language-lua">local events = RefreshStateSubscriber()
+events:subscribe(
+  function(event)                          -- predicate: which events
+    return event.type == &quot;DevicePropertyUpdatedEvent&quot;
+      and event.data and event.data.id == MOTION
+      and event.data.property == &quot;value&quot;
+  end,
+  function(event) self:checkMotion() end)  -- handler
+events:run()
+</code></pre>
+<ul>
+<li>The envelope: <code>{type, data, created}</code>; a property change carries
+  <code>data = {id, property, oldValue, newValue}</code>. Edge-trigger on the
+  old/new pair for open/close semantics (no cooldown timers needed).</li>
+<li>Events are emitted only when the value actually <em>changes</em> (Lua
+  equality) — re-setting the same value is silent.</li>
+<li>In flua, a QA with no pending work drains: event-driven QAs keep a
+  slow reconcile poll (the recipes use a 5-minute one) that also
+  self-heals missed events.</li>
+<li>See <code>docs/forum/11-refreshstate.html</code> for the event shapes.</li>
+</ul>
+</body>
+</html>

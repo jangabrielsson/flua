@@ -31,13 +31,13 @@
 </style>
 </head>
 <body>
-<h1>flua invariants &amp; contracts</h1>
+<h1 id="flua-invariants--contracts">flua invariants &amp; contracts</h1>
 <p>The behavioral contracts that define "flua works". Each invariant names the
 test(s) that pin it — if you change the behavior, the pin is the test to
 update (deliberately), and if you want to know what a piece of code must not
 break, the pin is the test to run. Companion to concurrency.md (execution
 model) and ARCHITECTURE.md (components).</p>
-<h2>Identity &amp; ids</h2>
+<h2 id="identity--ids">Identity &amp; ids</h2>
 <ul>
 <li><strong>Engine-assigned QA ids start at 5000</strong> and increment, skipping ids the
   sim already has. Lower ids belong to the HC3's namespace.
@@ -56,7 +56,7 @@ model) and ARCHITECTURE.md (components).</p>
   <em>Pinned by:</em> <code>tests/test_api.py::test_device_created_and_removed_events</code>,
   <code>tests/test_qa.py::test_dynamic_load_from_file</code></li>
 </ul>
-<h2>API routing &amp; dispatch</h2>
+<h2 id="api-routing--dispatch">API routing &amp; dispatch</h2>
 <ul>
 <li><strong>Handlers are pure</strong>: <code>(SimState, ApiRequest) -&gt; (data, status)</code>. Side
   effects go through <code>req.emit</code> / <code>req.remote</code> / <code>forward_to_proxy</code>; handlers
@@ -84,7 +84,7 @@ model) and ARCHITECTURE.md (components).</p>
   <code>tests/test_hc3.py::test_readonly_mode_reads_online_but_never_writes</code>,
   <code>tests/test_hc3.py::test_readonly_plus_call_runs_actions_but_blocks_writes</code></li>
 </ul>
-<h2>refreshStates feed &amp; events</h2>
+<h2 id="refreshstates-feed--events">refreshStates feed &amp; events</h2>
 <ul>
 <li><strong>State updates are EVENTS; configuration edits are CHANGES.</strong> Property
   changes → <code>DevicePropertyUpdatedEvent</code>; name/room edits → the <code>changes</code>
@@ -111,7 +111,7 @@ model) and ARCHITECTURE.md (components).</p>
   <em>Pinned by:</em> <code>tests/test_proxy.py::test_proxy_update_property_forwarded_event_comes_from_hc3</code>
   (plus the created/removed no-duplicate assertions in the child tests)</li>
 </ul>
-<h2>Virtual clock &amp; timers</h2>
+<h2 id="virtual-clock--timers">Virtual clock &amp; timers</h2>
 <ul>
 <li><strong>All timers schedule against the virtual clock</strong>; the pump advances it by
   real elapsed time (<code>--speed</code> multiplies, <code>--instant</code> jumps deadline to
@@ -129,7 +129,7 @@ model) and ARCHITECTURE.md (components).</p>
   after it.
   <em>Pinned by:</em> <code>tests/test_sleep.py</code> (the whole file)</li>
 </ul>
-<h2>QA boot</h2>
+<h2 id="qa-boot">QA boot</h2>
 <ul>
 <li><strong><code>--%%var</code> values are served as <code>quickAppVariables</code> on the QA's device
   before <code>onInit</code> runs</strong> — like the HC3 creating the device with its
@@ -159,7 +159,7 @@ model) and ARCHITECTURE.md (components).</p>
   <code>string.ends</code> behave like the HC3's.
   <em>Pinned by:</em> <code>tests/test_modbus_mock.py::test_string_starts_and_ends</code></li>
 </ul>
-<h2>Restart &amp; state survival</h2>
+<h2 id="restart--state-survival">Restart &amp; state survival</h2>
 <ul>
 <li><strong><code>plugin.restart</code> re-runs the QA's code</strong> (onInit again) while the device
   struct survives: <code>quickAppVariables</code> and runtime property changes carry
@@ -169,7 +169,7 @@ model) and ARCHITECTURE.md (components).</p>
   a dead QA's timer registrations are dropped.
   <em>Pinned by:</em> <code>tests/test_qa.py::test_exited_qa_restart_runs_timers_again</code></li>
 </ul>
-<h2>Graceful exit &amp; keep-alive</h2>
+<h2 id="graceful-exit--keep-alive">Graceful exit &amp; keep-alive</h2>
 <ul>
 <li><strong>A run ends when pending work drains</strong> — timers, queues, in-flight
   requests/connections, and suspended QAs' remote calls all count (see
@@ -192,7 +192,7 @@ model) and ARCHITECTURE.md (components).</p>
   counts as pending work, the session does.
   <em>Pinned by:</em> <code>tests/test_ui_server.py::test_ui_flag_keeps_api_alive_after_qa_drains</code></li>
 </ul>
-<h2>Lua bridge &amp; runtime</h2>
+<h2 id="lua-bridge--runtime">Lua bridge &amp; runtime</h2>
 <ul>
 <li><strong>Single-entry</strong>: Lua is entered only from <code>_FLUA.dispatch(batch)</code>; all
   bridge messages are JSON-compatible dicts (<code>messages.py</code>). Never cross a
@@ -213,7 +213,7 @@ model) and ARCHITECTURE.md (components).</p>
   every assertion is a no-op and <code>finish()</code> returns 0.
   <em>Pinned by:</em> <code>tests/test_agent_dx.py::test_flua_test_noop_without_flua_runtime</code></li>
 </ul>
-<h2>Compatibility surfaces (do not change silently)</h2>
+<h2 id="compatibility-surfaces-do-not-change-silently">Compatibility surfaces (do not change silently)</h2>
 <ul>
 <li><code>--%%</code> directives, CLI flags, public Python APIs (<code>LuaEngine</code>, <code>Api</code>,
   <code>SimState</code>), and the Lua runtime APIs (<code>api.*</code>, <code>fibaro.*</code>,
@@ -234,7 +234,7 @@ model) and ARCHITECTURE.md (components).</p>
   keep terminating unless their purpose is to run forever.
   <em>Pinned by:</em> <code>tests/test_sleep.py::test_example_*</code>, <code>tests/test_qa.py::test_example_*</code></li>
 </ul>
-<h2>Testing conventions (the suite's own contracts)</h2>
+<h2 id="testing-conventions-the-suites-own-contracts">Testing conventions (the suite's own contracts)</h2>
 <ul>
 <li><strong>Never hit a real HC3.</strong> Online/proxy tests run against local mock HC3
   servers; live suites (<code>test_hc3_live.py</code>, <code>test_hc3_compat.py</code>) are opt-in

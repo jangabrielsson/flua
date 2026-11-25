@@ -1,0 +1,228 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>flua feedback — migration of EventRunner7 from plua</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="flua-feedback--migration-of-eventrunner7-from-plua">flua feedback — migration of EventRunner7 from plua</h1>
+<p>Report on the plua → flua migration of EventRunner7 (findings against
+flua 0.1.90; #1 and #2 resolved by flua 0.1.91 — noted inline; remaining
+items open as of 0.1.91). Covers where flua behavior cost time, where it
+could be more helpful, and gaps in the agent docs/skills that made things
+harder than they needed to be. Everything below was observed first-hand
+during the migration; probes were run to confirm the claims.</p>
+<h2 id="1-path-resolution-inconsistency-fixed-in-0191--half-of-it-remains">1. Path resolution inconsistency (fixed in 0.1.91 — half of it remains)</h2>
+<p><code>--%%file</code>/<code>--%%include</code> now resolve <strong>relative to the file that declared
+them</strong> (main QA's dir for main-declared, the include file's own dir for
+include-declared) — fixed in flua 0.1.91. <code>io.open</code>/<code>dofile</code> inside a QA
+still resolve <strong>relative to the process cwd</strong>, so the two mechanisms still
+disagree, but the QA-file side is now sane.</p>
+<p>What 0.1.90 forced, and what 0.1.91 changed:</p>
+<ul>
+<li>Under 0.1.90 a QA in <code>tests/</code> could not <code>--%%file</code> the repo-root
+  <code>EventRunner.inc</code> (paths resolved against <code>tests/</code>). The project shipped
+  <code>er-load.lua</code> — a boot-time module loader that walked up from the QA
+  directory to find the repo root and loaded every module
+  <code>EventRunner.inc</code> lists — purely to work around the resolution rule.</li>
+<li>With 0.1.91, a nested test QA just declares
+  <code>--%%include:../EventRunner.inc</code> and the <code>.inc</code>'s own <code>--%%file:src/…</code>
+  entries anchor to the <code>.inc</code>'s directory. Verified: ER boots, Sim devices
+  load, <code>er.eval</code> works with no loader. All 46 test files were migrated to
+  <code>--%%include:&lt;depth&gt;/EventRunner.inc</code> and <code>er-load.lua</code> deleted.</li>
+<li><code>scripts/er</code> no longer needs its <code>cd</code>-to-repo-root workaround (verified
+  running from <code>/tmp</code>).</li>
+<li><code>test/_diag.lua</code> (at <code>test/</code>) had a wrong-depth <code>--%%file:../../er-load.lua</code>
+  from a mechanical header rewrite; only <code>flua --check</code> caught it (see #9).
+  The depth trap is gone with the new scheme (each file's depth is correct
+  relative to <em>itself</em>, and <code>--check</code> still verifies it).</li>
+<li>Remaining inconsistency: <code>io.open</code> is still cwd-relative, so QA code that
+  reads project files (e.g. <code>src/Sim.lua</code> loading <code>tests/stdQAs/*.lua</code>) only
+  works when flua is started from the repo root. Suggest: set cwd to the QA
+  file's directory so both mechanisms agree, or document that QAs with
+  relative <code>io.open</code> must be run from the project root.</li>
+</ul>
+<h2 id="2-pluas---headers--solved-by-0191s---include">2. plua's <code>--%%headers:</code> — solved by 0.1.91's <code>--%%include</code></h2>
+<p><code>--%%headers:EventRunner.inc</code> (plua: inline a header file's directives into
+every QA) was an <strong>unknown directive</strong> in flua 0.1.90 — it warned and
+ignored it (verified: <code>WARNING flua.config: unknown --%% directive</code>). This
+was the single biggest structural migration issue: every one of the 28
+regression QAs and all <code>tests/*.lua</code> suites used it, and there was no
+drop-in replacement.</p>
+<p>flua 0.1.91 fixes it: <code>--%%include:FILE</code> is the equivalent, and its
+<code>--%%file</code> entries anchor to the include file's own directory, so
+<code>--%%include:../EventRunner.inc</code> from a nested test QA just works (nested
+includes anchor per level). The whole <code>er-load.lua</code> mechanism from #1 was
+deleted in favor of a one-line include. The flua-setup skill should now
+simply say: plua <code>--%%headers:X</code> → flua <code>--%%include:X</code>, with paths
+relative to the declaring file.</p>
+<h2 id="3---instant-breaks-er-style-event-engines">3. <code>--instant</code> breaks ER-style event engines</h2>
+<p><code>--instant</code> (recommended by AGENTS.md for "timers fire immediately") collapses
+the whole timer heap into one pass. ER computes delays against
+<code>os.time()</code>, so this corrupts its event engine. Reproduced with a minimal
+probe (<code>@@00:00:05 =&gt; log(...)</code> plus <code>wait(3); log(...)</code>):</p>
+<ul>
+<li><code>--speed 60</code>: interval fires at 12:00:02, :07, :12, :17; <code>wait(3)</code> fires 3 s
+  later. Correct.</li>
+<li><code>--instant</code>: the interval <strong>never fires</strong> in 30 simulated seconds, and
+  <code>wait(3)</code> fires 27 s late at the moment the run ends (12:00:30).</li>
+</ul>
+<p>This cost a full debugging detour during the migration (the runner was first
+converted to <code>--instant</code> because it looked like the fast option; the verdict
+only emerged from diagnosing the <code>@@</code> interval behavior). The workaround is
+<code>--speed 3600 --max-hours 24</code> in <code>test/run-tests.sh</code>.</p>
+<p>Suggestion: document that <code>--instant</code> is only safe for QAs that never compute
+delays from the clock (pure <code>setTimeout</code> chains), and that engines using
+<code>os.time()</code>-relative logic (ER, and anything with <code>@@</code>/daily timers) need
+<code>--speed</code>. AGENTS.md currently recommends <code>--instant</code> unconditionally for
+timer logic — for this project that advice is actively harmful.</p>
+<h2 id="4---speed-runs-the-virtual-clock-continuously-drift-everywhere">4. <code>--speed</code> runs the virtual clock continuously (drift everywhere)</h2>
+<p>plua's <code>speedTime</code> fast-forwarded <strong>deterministically</strong> (advance to the next
+timer deadline). flua's <code>--speed N</code> runs the virtual clock continuously at
+N× wall speed, so virtual time passes <em>while your code executes</em>:</p>
+<ul>
+<li>ER boot takes ~30 ms wall → ~100 virtual seconds of drift at <code>--speed
+  3600</code> before <code>main()</code> even runs. Host-side captures like
+  <code>os.time()</code>/<code>os.date()</code> in a test body land ~1–2 s away from the value
+  <code>now</code>/<code>ostime()</code> computes inside the expression — pure flakiness.</li>
+<li>Tight now-relative windows (<code>now..now</code>, <code>now+1..now+2</code>) flake because each
+  <code>now</code> read inside one expression can land in a different virtual second
+  (1 virtual s = 278 µs wall at 3600×).</li>
+<li>Fixes required in <code>test/expr/time.lua</code> (exact 12:00:00 assertions → range/
+  pattern assertions) and <code>tests/eventrunner_test.lua</code> (compare against a
+  pinned boot epoch, ≥60 s between-windows, <code>wait(4)</code> → "≥ 4 s"). Two test
+  files had to become drift-agnostic; that is mechanical but easy to miss,
+  because the failures are intermittent (a suite can pass 2/3 runs).</li>
+</ul>
+<p>Suggestion: offer a deterministic deadline-ordered fast-forward mode (plua
+<code>speedTime</code> semantics) — <code>--speed</code> plus "pause the clock while Lua runs" —
+or document the continuous-clock behavior and recommend range assertions for
+time-sensitive tests.</p>
+<h2 id="5-no-auto-termination---run-for-masks-hangs-with-exit-0">5. No auto-termination; <code>--run-for</code> masks hangs with exit 0</h2>
+<p>flua QAs do not terminate when the event queue drains; a test that forgets
+<code>os.exit</code> hangs forever. <code>--run-for N</code> caps the run but <strong>exits 0 when it
+kills the QA</strong> (verified: a QA that only prints "started, never exits"
+returned exit 0 after <code>--run-for 3</code>). For CI this means a hung/incomplete
+suite looks green unless you also grep the log for the completion line —
+exactly the class of false pass the migration almost shipped (<code>--run-for</code>
+capped runs of suites that never finished).</p>
+<p>Suggestion: exit non-zero when <code>--run-for</code> expires, and/or emit a
+"run-for expired" marker in <code>--log json</code> so runners can detect it.</p>
+<h2 id="6-jsonencode-output-differs-from-hc3plua">6. <code>json.encode</code> output differs from HC3/plua</h2>
+<p>flua's <code>json.encode</code> pads arrays with spaces (<code>[2, 4, 6]</code>); plua and the real
+HC3 encoder emit <code>[2,4,6]</code>. String-exact assertions written for plua fail
+under flua even though the data is identical (this was the last red test in
+the regression suite, <code>test/expr/listcomp.lua</code>). The tests now normalize
+whitespace before comparing — meaning the tests no longer pin the encoder
+format at all.</p>
+<p>Suggestion: match the HC3 encoder's compact output (tests should run
+identically against flua and the real controller), or document the difference
+prominently.</p>
+<h2 id="7-what-worked-well-worth-keeping">7. What worked well (worth keeping)</h2>
+<ul>
+<li><strong><code>flua --check</code></strong> caught the wrong-depth <code>--%%file</code> in <code>test/_diag.lua</code>
+  with an exact "no such file" message — the static check is genuinely useful
+  and was the safety net for the mechanical header rewrite.</li>
+<li><strong>plua-style directive warning</strong> (<code>-- %%save</code>, space before <code>%%</code>) flagged
+  every stale plua directive in the codebase.</li>
+<li><strong>Unknown device type error</strong> listed valid alternatives
+  ("did you mean 'com.fibaro.device'?").</li>
+<li><strong><code>_FLUA.loadQAfromFile</code>/<code>loadFQAfromFile</code></strong> are documented in USAGE.md and
+  replaced plua's <code>loadQAString</code>/<code>loadFQA</code> cleanly (<code>src/Sim.lua</code>,
+  <code>tests/fqa_test.lua</code>).</li>
+<li><strong><code>flua-test</code></strong> assertions library exists and works as AGENTS.md claims
+  (verified with a probe). Note: the repo kept its own plua-era
+  <code>test/harness.lua</code> instead; a note in the skills about "migrate an existing
+  plua harness → keep it or switch to flua-test" would have removed the
+  decision.</li>
+<li><strong><code>--nogreet</code>, <code>--color never</code>, <code>--log json</code></strong> made machine-readable runs
+  easy.</li>
+</ul>
+<h2 id="8-agent-doc--skill-gaps">8. Agent doc / skill gaps</h2>
+<ul>
+<li>AGENTS.md: "<code>flua --api local --instant qa.lua # timers fire immediately</code>"
+  — harmful for ER (see #3). Needs a caveat: only for QAs without
+  os.time()-relative delay logic.</li>
+<li>AGENTS.md documents <code>flua-test</code> but the repo's own harness does the same
+  job; no guidance on which to use when migrating an existing plua test
+  harness.</li>
+<li>No skill or doc covers the one costly behavior that remains:
+  <code>--speed</code> continuous-clock drift (#4). The path-resolution (#1) and
+  <code>--%%headers:</code> (#2) gaps are now solved by 0.1.91; the flua-setup skill
+  should document the direct mapping (<code>--%%headers:X</code> → <code>--%%include:X</code>,
+  declaring-file-relative paths).</li>
+<li><code>--run-for</code> exit semantics (#5) and <code>json.encode</code> spacing (#6) are
+  undocumented traps for CI.</li>
+</ul>
+<h2 id="summary-of-the-asks">Summary of the asks</h2>
+<p>Items #1 (declaring-file path anchoring) and #2 (<code>--%%headers:</code> equivalent)
+are <strong>done</strong> in flua 0.1.91. The rest remain open as of 0.1.91:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Ask</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>--%%root</code>/cwd-consistent path resolution</td>
+<td>done (declaring-file anchor; <code>io.open</code> cwd caveat remains)</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>--%%headers:</code> equivalent</td>
+<td>done (<code>--%%include</code> with declaring-file anchor)</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Document <code>--instant</code> safety limits (or warn)</td>
+<td>open — doc</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Deterministic clock-advance mode (plua speedTime semantics)</td>
+<td>open — medium</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Non-zero exit / marker when <code>--run-for</code> expires</td>
+<td>open — small</td>
+</tr>
+<tr>
+<td>6</td>
+<td>HC3-compatible compact <code>json.encode</code></td>
+<td>open — small</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>

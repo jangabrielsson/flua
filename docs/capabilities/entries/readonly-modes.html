@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>--%%mode:readonly[+call] — explore the live HC3 without mutating it</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: readonly-modes
+topic: safety
+title: --%%mode:readonly[+call] — explore the live HC3 without mutating it
+pins:
+  - tests/test_api.py::test_readonly_mode_refuses_remote_writes_at_the_gate
+  - tests/test_api.py::test_readonly_plus_call_unlocks_device_actions_only
+  - tests/test_hc3.py::test_readonly_mode_reads_online_but_never_writes
+  - tests/test_hc3.py::test_readonly_plus_call_runs_actions_but_blocks_writes
+verified: flua 0.1.169</p>
+<hr />
+<h1 id="--modereadonlycall--explore-the-live-hc3-without-mutating-it">--%%mode:readonly[+call] — explore the live HC3 without mutating it</h1>
+<p>The safety posture for agents and test code against a real controller:</p>
+<ul>
+<li><code>--%%mode:readonly</code> — reads behave exactly like online mode; any
+  mutating verb (POST/PUT/DELETE) that would reach the HC3 is refused
+  with <strong>403</strong> before dispatch. Writes the <em>sim</em> owns still work (they
+  never touch the controller). No HC3 configured → plain offline.</li>
+<li><code>--%%mode:readonly+call</code> — one unlock: <code>POST /devices/{id}/action/...</code>
+  (the <code>fibaro.call</code> channel) passes through, so test code can flip a
+  light on and off to see it work. Creating/deleting resources (and
+  every other write) stays blocked. Group actions are <em>not</em> unlocked.</li>
+</ul>
+<p>The refusal logs a warning (<code>readonly QA 5000: PUT /devices/45 refused</code>),
+so a silent no-op is always explainable. The gate covers the remote
+hook, the helper bridge, and both 404 fallbacks.</p>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>The migrate tool — one-pass plua-leftover scan</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: migrate-tool
+topic: tooling
+title: The migrate tool — one-pass plua-leftover scan
+pins:
+  - tests/test_tools.py::test_migrate_tool_scans_a_project
+verified: flua 0.1.170</p>
+<hr />
+<h1 id="the-migrate-tool--one-pass-plua-leftover-scan">The migrate tool — one-pass plua-leftover scan</h1>
+<p><code>flua --tool migrate &lt;project&gt;</code> scans a project for plua leftovers —
+the migration gate for the ex-plua crowd:</p>
+<ul>
+<li>Flags legacy spellings (the <code>--%%headers:X</code>/file-colon forms and
+  friends), exit 1 on findings, <code>--json</code> for agents.</li>
+<li>A clean project exits zero — CI can gate on it.</li>
+</ul>
+<p>flua accepts the legacy spellings at runtime (old QAs run with their
+intended settings), so the tool is the <em>carrot</em> for cleaning them up,
+not the stick. The hard-core audience's existing plua projects are the
+canonical input; new QAs should start clean.</p>
+</body>
+</html>

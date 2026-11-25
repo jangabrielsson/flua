@@ -31,24 +31,24 @@
 </style>
 </head>
 <body>
-<h1>flua — architecture</h1>
+<h1 id="flua--architecture">flua — architecture</h1>
 <p>This file explains how flua works under the hood. The user guide is
-<a href="USAGE.md">USAGE.md</a>; this is the machinery. Diagrams are ASCII so they
+<a href="USAGE.html">USAGE.md</a>; this is the machinery. Diagrams are ASCII so they
 render everywhere (GitHub, VS Code, terminal).</p>
 <p>Deeper dives, kept out of this file on purpose:</p>
 <ul>
-<li><strong><a href="docs/concurrency.md">concurrency.md</a></strong> — the execution model: the pump,
+<li><strong><a href="concurrency.html">concurrency.md</a></strong> — the execution model: the pump,
   the bridge queues, per-QA coroutines, worker threads, blocking rules,
   graceful exit, and the two race lessons.</li>
-<li><strong><a href="docs/walkthroughs.md">walkthroughs.md</a></strong> — guided traces through the
+<li><strong><a href="walkthroughs.html">walkthroughs.md</a></strong> — guided traces through the
   key flows (QA boot, sleep, remote API suspension, event delivery, proxy
   shadowing).</li>
-<li><strong><a href="docs/invariants.md">invariants.md</a></strong> — the behavioral contracts, each with
+<li><strong><a href="invariants.html">invariants.md</a></strong> — the behavioral contracts, each with
   the test that pins it (the traceability companion to §13 below).</li>
-<li><strong><a href="docs/decisions/">decisions/</a></strong> — ADR-lite: the <em>why</em> behind deliberate
+<li><strong><a href="decisions/">decisions/</a></strong> — ADR-lite: the <em>why</em> behind deliberate
   choices.</li>
 </ul>
-<h2>1. Overview</h2>
+<h2 id="1-overview">1. Overview</h2>
 <p>flua runs real Fibaro QuickApps offline. One Python process hosts a lupa
 runtime (Lua 5.x) and an asyncio event loop:</p>
 <ul>
@@ -78,7 +78,7 @@ runtime (Lua 5.x) and an asyncio event loop:</p>
                  |                                                                       |
                  +-----------------------------------------------------------------------+
 </code></pre>
-<h2>2. The single-entry discipline</h2>
+<h2 id="2-the-single-entry-discipline">2. The single-entry discipline</h2>
 <p>The one rule everything else follows: <strong>the pump is the only code that
 enters the Lua VM, and it never does so while Lua is on the stack.</strong></p>
 <ul>
@@ -100,7 +100,7 @@ enters the Lua VM, and it never does so while Lua is on the stack.</strong></p>
 <li><strong>The debugger's sockets block the main thread</strong> — that is what makes a
    mobdebug pause freeze the pump and the virtual clock.</li>
 </ol>
-<h2>3. Message flow</h2>
+<h2 id="3-message-flow">3. Message flow</h2>
 <pre><code>  Lua code                     Python engine                       Lua runtime
   ---------                    --------------                      ------------
 
@@ -121,7 +121,7 @@ enters the Lua VM, and it never does so while Lua is on the stack.</strong></p>
 cross the bridge — callbacks are registered Lua-side by integer id. The
 full type list lives in <code>src/flua/messages.py</code>; adding one means a handler
 in <code>engine.py</code> (inbound) and/or <code>lua/init.lua</code> (outbound).</p>
-<h2>4. Layers</h2>
+<h2 id="4-layers">4. Layers</h2>
 <pre><code>src/flua/
   cli.py           argument parsing, --%% config assembly, mode peek (--%%offline),
                    --run-for / --watch / --check / export / unpack
@@ -151,7 +151,7 @@ in <code>engine.py</code> (inbound) and/or <code>lua/init.lua</code> (outbound).
   lua/net.lua      HTTPClient, TCPSocket, UDPSocket, WebSocketClient(+Tls)
   lua/mqtt.lua     mqtt.Client, mqtt.QoS, the documented event API
 </code></pre>
-<h2>5. The Lua runtime (<code>lua/init.lua</code>)</h2>
+<h2 id="5-the-lua-runtime-luainitlua">5. The Lua runtime (<code>lua/init.lua</code>)</h2>
 <ul>
 <li><strong>Sanitizer.</strong> Every <code>_PY.post</code> payload passes through a UTF-8 sanitizer:
   invalid bytes are hex-escaped, so binary strings (like <code>utf8.charpattern</code>)
@@ -169,7 +169,7 @@ in <code>engine.py</code> (inbound) and/or <code>lua/init.lua</code> (outbound).
 <li><strong>Dispatch.</strong> <code>handlers.*</code> deliver timers, actions, net/mqtt results,
   refreshStates events, QA restarts, and <code>-e</code> preambles.</li>
 </ul>
-<h2>6. The REST dispatcher (<code>api/</code>)</h2>
+<h2 id="6-the-rest-dispatcher-api">6. The REST dispatcher (<code>api/</code>)</h2>
 <p>One dispatcher, three outcomes:</p>
 <pre><code>  api.get(path) -&gt; Api.dispatch
     |-- /quickApp/*      engine-backed QA file management (local only)
@@ -214,10 +214,10 @@ in <code>engine.py</code> (inbound) and/or <code>lua/init.lua</code> (outbound).
   only, with no online union (a controller can carry hundreds of QAs that
   the viewer should not render).</li>
 </ul>
-<h2>7. Worker threads</h2>
+<h2 id="7-worker-threads">7. Worker threads</h2>
 <p>The full threading model — who may block what, what counts as pending work,
 and the races that bit us — lives in
-<a href="docs/concurrency.md">concurrency.md</a>. This section is the tour version.</p>
+<a href="concurrency.html">concurrency.md</a>. This section is the tour version.</p>
 <p>All blocking network I/O runs in worker threads; the pump never blocks:</p>
 <pre><code>  Lua post {httpRequest|tcp*|udp*|ws*|mqtt*}
     -&gt; handler spawns an asyncio task
@@ -245,7 +245,7 @@ message into the pump; the QA handler runs there, and its return value
 comes back through the synchronous <code>net_server_reply</code> bridge call (the pump
 runs on the loop thread), resolving the connection's future. Servers die
 with their QA (exit/restart) and on engine stop.</p>
-<h2>8. Virtual time</h2>
+<h2 id="8-virtual-time">8. Virtual time</h2>
 <p>Timers run on <code>VirtualClock</code> (virtual seconds, epoch-aligned). Modes:
 realtime, <code>--speed N</code> accelerated, <code>--instant</code> (timers fire now, time jumps
 to each deadline). <code>os.time()</code>/<code>os.date()</code> read the virtual clock (whole
@@ -254,7 +254,7 @@ is virtual milliseconds. <code>--start "2027/12/31 23:59:50"</code> sets the ori
 so date logic can be tested at New Year, leap days, DST changes — and the
 debugger pause freezes the clock (the freeze is noted around the blocking
 receive).</p>
-<h2>9. Config pipeline</h2>
+<h2 id="9-config-pipeline">9. Config pipeline</h2>
 <pre><code>  raw file header   -&gt;  parse_annotations()  (--%% directives, EOH header)
   --%%include:...   -&gt;  expand_includes(): the included files' directives
                        become defaults (QA header wins, files append, nested
@@ -266,7 +266,7 @@ receive).</p>
 </code></pre>
 <p>The <code>.fqa</code> export/import round-trip reuses the pipeline: unpacked files
 carry generated <code>--%%</code> headers, so imports load like any other QA.</p>
-<h2>10. Online mode (<code>--api remote</code>)</h2>
+<h2 id="10-online-mode---api-remote">10. Online mode (<code>--api remote</code>)</h2>
 <p><code>Hc3Remote</code> (stdlib urllib) speaks basic auth and the <strong>raw-body import
 transport</strong> (<code>POST /quickApp/</code> with the fqa JSON string — the swagger's
 multipart description is misleading; the real transport was verified against a
@@ -286,7 +286,7 @@ Two safety rules:</p>
 <p>Mode selection: explicit <code>--api</code> &gt; the main QA's <code>--%%offline:true</code> (peeked
 before the engine starts) &gt; online if HC3 credentials exist in the env
 chain &gt; offline.</p>
-<h2>11. The device catalog</h2>
+<h2 id="11-the-device-catalog">11. The device catalog</h2>
 <p>QA devices are built from the distilled type schema
 (<code>src/flua/devices/type_schemas.json</code>, generated by
 <code>scripts/extract_device_schemas.py</code>): typed properties at their declared
@@ -296,7 +296,7 @@ identity/secrets) is the demoted LAST-RESORT fallback for types the
 schema does not know, and the hierarchy resolves unknown types to their
 nearest known ancestor. The compat suite (§12) exists to catch exactly
 this class of drift.</p>
-<h2>12. Testing map</h2>
+<h2 id="12-testing-map">12. Testing map</h2>
 <ul>
 <li><strong>Unit</strong> — pure Python: clock, timers, config parsing, route handlers.</li>
 <li><strong>Engine</strong> — real lupa VM: message round-trips, QA lifecycle, network
@@ -311,7 +311,7 @@ this class of drift.</p>
   <code>~/.env</code> can never flip plain tests into online mode. (Online is opt-in
   anyway: <code>--%%mode:online</code> or <code>--api remote</code>.)</li>
 </ul>
-<h2>13. The invariants, in one place</h2>
+<h2 id="13-the-invariants-in-one-place">13. The invariants, in one place</h2>
 <ol>
 <li>Only the pump enters Lua; never with Lua on the stack.</li>
 <li>Logs print directly (<code>_PY.log</code>), never queue.</li>
@@ -325,6 +325,6 @@ this class of drift.</p>
 <li>Tests never touch a production HC3 unless <code>HC3_TEST=1</code>.</li>
 </ol>
 <p>Each of these (plus the identity/routing/event/exit contracts around them)
-is expanded with its pinning test in <a href="docs/invariants.md">invariants.md</a>.</p>
+is expanded with its pinning test in <a href="invariants.html">invariants.md</a>.</p>
 </body>
 </html>

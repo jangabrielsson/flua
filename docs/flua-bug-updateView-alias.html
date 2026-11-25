@@ -1,0 +1,191 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>flua bug: `updateView` aliases one object into `view` and `properties.uiView` → lupa "lost reference"</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="flua-bug-updateview-aliases-one-object-into-view-and-propertiesuiview--lupa-lost-reference">flua bug: <code>updateView</code> aliases one object into <code>view</code> and <code>properties.uiView</code> → lupa "lost reference"</h1>
+<ul>
+<li><strong>flua</strong>: 0.1.86 (bug present)</li>
+<li><strong>lupa</strong>: 2.6</li>
+<li><strong>Where</strong>: simulator only (offline mode). The real HC3 never converts Python→Lua
+  tables this way, so this cannot happen on hardware.</li>
+<li><strong>Severity</strong>: a whole <code>QuickApp</code> callback dies at startup. In HassQA it kills
+  <code>getChildrenUidMap()</code> inside <code>authenticated</code>, so <code>populatePopup</code> never runs and
+  child popups stay empty. Websocket flow itself is unaffected (that was the
+  0.1.86 handshake fix — unrelated).</li>
+</ul>
+<h2 id="symptom">Symptom</h2>
+<pre><code>Error in bootstrap: lost reference
+    .../flua/lua/init.lua:1003
+</code></pre>
+<p>or, mid-run:</p>
+<pre><code>Callback error: lost reference
+</code></pre>
+<h2 id="minimal-repro-standalone-qa">Minimal repro (standalone QA)</h2>
+<pre><code class="language-lua">--%%name:upv-repro
+--%%type:com.fibaro.binarySwitch
+function QuickApp:onInit()
+  local child = api.post(&quot;/plugins/createChildDevice&quot;, {
+    parentId = self.id, name = &quot;child&quot;, type = &quot;com.fibaro.binarySwitch&quot;,
+    initialProperties = {uiView = {
+      {label='row', components={
+        {select='presetSelector', name='presetSelector', text='Preset',
+         options={{text='a'},{text='b'}}, values={}, onToggled='cb'}
+      }}
+    }}, initialInterfaces = {},
+  })
+  api.post(&quot;/plugins/updateView&quot;, {
+    deviceId = child.id, componentName = &quot;presetSelector&quot;,
+    propertyName = &quot;options&quot;, newValue = {{text='x'},{text='y'}},
+  })
+  api.get(&quot;/devices?parentId=&quot; .. self.id)   -- &quot;Error in bootstrap: lost reference&quot;
+end
+</code></pre>
+<p>Run: <code>flua --api local --instant upv-repro.lua</code></p>
+<p>The trigger is: a child device whose <code>uiView</code> contains a component with
+<code>name == componentName</code>, followed by <code>updateView</code> on that component, followed
+by any <code>GET /devices</code> that returns that child.</p>
+<h2 id="root-cause">Root cause</h2>
+<p>Every step below was verified in isolation:</p>
+<ol>
+<li><strong><code>updateView</code> stores the same object twice.</strong>
+   <code>QuickAppBase:updateView</code> (<code>flua/lua/quickapp.lua:149</code>) posts
+   <code>/plugins/updateView</code> with <code>newValue</code>. The route
+   <code>plugin_update_view</code> (<code>flua/api/routes/plugins.py</code>) writes
+   <code>new_value = req.body.get("newValue")</code> into <strong>two</strong> places of the device
+   state:
+   - <code>view[component_name][property_name]</code> (<code>plugins.py:270</code>), and
+   - the matching component of the stored <code>properties.uiView</code>
+     (<code>plugins.py:274-279</code>):</li>
+</ol>
+<p><code>python
+   ui_view = (dev.get("properties") or {}).get("uiView")
+   if isinstance(ui_view, list):
+       for row in ui_view:
+           for comp in row.get("components") or []:
+               if comp.get("name") == component_name:
+                   comp[property_name] = new_value   # same object again
+                   break</code></p>
+<p>The <strong>same Python list object</strong> is now reachable from two paths in the
+   device state:
+   <code>properties.uiView[1].components[0].options</code> and
+   <code>view.presetSelector.options</code>.</p>
+<ol start="2">
+<li>
+<p><strong><code>public()</code> preserves the aliasing.</strong>
+   <code>GET /devices?parentId=…</code> serves via <code>public()</code> = <code>copy.deepcopy</code>
+   (<code>flua/api/state.py:77-79</code>). <code>deepcopy</code>'s memo keeps shared objects
+   shared, so the response payload still contains one list reachable via two
+   paths. Verified: <code>view.presetSelector.options is properties.uiView[1]
+   .components[0].options</code> is <code>True</code> in the served payload.</p>
+</li>
+<li>
+<p><strong>lupa's <code>table_from(recursive=True)</code> wraps a stale stack slot.</strong>
+   <code>bindings.api_call</code> (<code>flua/bindings.py:235</code>) converts the response with
+   <code>lua.table_from(data, recursive=True)</code>. lupa 2.6's <code>py_to_lua_table</code>
+   (<code>lua54.pyx:1718-1724</code>) keeps an identity-dedup map
+   <code>mapped_tables[id(obj)] = lua_table_ref</code>, where <code>lua_table_ref</code> is the
+   <strong>stack index</strong> of the table being filled at first encounter. On the
+   second encounter it does <code>new_lua_table(runtime, L, idx)</code> →
+   <code>lua_pushvalue(L, idx)</code>.</p>
+</li>
+</ol>
+<p>The first occurrence of the shared list is <em>deep</em> in the tree
+   (<code>properties</code> → <code>uiView[1]</code> → <code>components[0]</code> → <code>options</code>), the second is
+   <em>shallow</em> (<code>view</code> → <code>presetSelector</code> → <code>options</code>). <code>properties</code> precedes
+   <code>view</code> in the device dict (skeleton key order), so by the time the shallow
+   copy is converted the cached stack index lies <strong>above the current stack
+   top</strong>. <code>lua_pushvalue(idx)</code> then pushes <strong>nil</strong> → <code>luaL_ref</code> →
+   <code>LUA_REFNIL</code> → <code>push_lua_object</code> sees nil → <code>LuaError("lost reference")</code>
+   (<code>lua54.pyx:904/908</code>).</p>
+<p>Same-depth aliasing does <em>not</em> fail (the stale slot still holds the
+   original table by luck), which is why naive aliasing tests pass and this
+   looked flaky.</p>
+<p>Minimal lupa-only repro (no flua needed):</p>
+<pre><code class="language-python">from lupa import LuaRuntime
+shared = [{&quot;text&quot;: &quot;none&quot;}, {&quot;text&quot;: &quot;away&quot;}]
+payload = {
+    &quot;properties&quot;: {&quot;uiView&quot;: [{&quot;components&quot;: [{&quot;options&quot;: shared}]}]},  # deep
+    &quot;view&quot;: {&quot;presetSelector&quot;: {&quot;options&quot;: shared}},                    # shallow
+}
+lua = LuaRuntime(unpack_returned_tuples=True, encoding=&quot;UTF-8&quot;)
+lua.table_from(payload, recursive=True)   # LuaError: lost reference
+# control: same depth both times -&gt; OK
+lua.table_from({&quot;x&quot;: {&quot;options&quot;: shared}, &quot;y&quot;: {&quot;options&quot;: shared}}, recursive=True)
+</code></pre>
+<h2 id="why-the-0186-sanitization-doesnt-catch-it">Why the 0.1.86 sanitization doesn't catch it</h2>
+<p>The <code>_plain_key</code>/<code>_plain_value</code> sanitization added in 0.1.86
+(<code>flua/bindings.py</code>) removes <strong>lupa proxy objects</strong> from bridge data. This
+data is 100% plain Python — the problem is <strong>object identity</strong> (one object
+reachable twice), not object type. The sanitizer can't see it.</p>
+<h2 id="suggested-fix-flua-side">Suggested fix (flua-side)</h2>
+<p>Two independent layers, both cheap:</p>
+<ol>
+<li>
+<p><strong>Root fix — don't share the object in <code>plugin_update_view</code>.</strong>
+   <code>view</code> and <code>properties.uiView</code> are two parallel representations; patching
+   both with the same mutable object couples them. Store a copy in the
+   second write, e.g. <code>comp[property_name] = copy.deepcopy(new_value)</code>, or
+   copy when writing to <code>view</code> instead. (Also worth a scan for other routes
+   that write one <code>req.body</code> value into two state locations.)</p>
+</li>
+<li>
+<p><strong>Bridge guard — guarantee tree-shaped data before <code>table_from</code>.</strong>
+   In <code>bindings.api_call</code> (and the other <code>table_from</code> sites), round-trip the
+   payload before conversion:
+   <code>data = json.loads(json.dumps(data))</code> — the data is already
+   JSON-shaped, so this is safe and O(n). It turns aliased structures into
+   duplicated ones, making lupa's dedup path unreachable for <em>any</em> aliasing
+   source, now and in the future.</p>
+</li>
+</ol>
+<p>Fixing lupa itself (registry refs instead of stack indices in
+<code>py_to_lua_table</code>) would also work, but that's a third-party change and
+arguably lupa's behavior for tree-shaped input is fine — flua should not be
+feeding it aliased structures.</p>
+<h2 id="evidence-trail">Evidence trail</h2>
+<ul>
+<li>Instrumented sim state shows the shared object is already in the store
+  (not introduced by <code>deepcopy</code>):
+  <code>STORE-DUP device=900028 paths=[('.properties.uiView[1].components[0].options', 2), …]</code></li>
+<li>Aliased paths in the failing response payload:
+  <code>[0].properties.uiView[1].components[0].options</code> ↔
+  <code>[0].view.presetSelector.options</code> (plus <code>options[0..6]</code>)</li>
+<li>The captured failing payload raises in a <strong>fresh</strong> <code>LuaRuntime</code>; the same
+  payload after <code>json.loads(json.dumps(...))</code> converts cleanly.</li>
+<li>Python-level chain replay (create child → updateView → public → table_from)
+  reproduces: alias in store <code>True</code> → alias after <code>public()</code> <code>True</code> →
+  <code>table_from</code> raises.</li>
+<li>End-to-end QA repro above: <code>Error in bootstrap: lost reference</code> with
+  pristine flua 0.1.86.</li>
+</ul>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>The QA builder — recipes to QAs, parked as a PoC</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: builder-tool
+topic: tooling
+title: The QA builder — recipes to QAs, parked as a PoC
+pins:
+  - tests/test_builder.py::test_builder_serves_the_page_and_index
+verified: flua 0.1.170</p>
+<hr />
+<h1 id="the-qa-builder--recipes-to-qas-parked-as-a-poc">The QA builder — recipes to QAs, parked as a PoC</h1>
+<p><code>flua --tool build</code> serves a browser page that turns the recipe library
+into finished QAs: pick a recipe (categories, live from GitHub — one
+merge, no release), pick the devices (HC3 pickers filtered by
+<code>isTypeOf</code>, or simulated-device picks offline), generate → simulate →
+view UI → upload. The generated code is editable Lua the user owns.</p>
+<ul>
+<li>Simulate runs the QA in the sim on a 600x clock; View UI serves the
+  HC3-style viewer with the picked devices seeded as sim devices.</li>
+<li>Every recipe carries a declarative verify scenario
+  (<code>recipe-verify-scenarios</code>); <code>build --verify-all</code> is the CI gate on
+  template changes.</li>
+<li>Status: a <strong>parked proof of concept</strong> — ADR 0015 delimits it against
+  the no-wizard decision (ADR 0013): it is a tool on top of flua, and
+  any page capability must arrive as a CLI/JSON surface first.</li>
+</ul>
+<p>The recipe manifest schema (params/filters/categories/simDevices/verify)
+is documented in USAGE.md; the recipe library itself lives in
+<code>recipes/</code>.</p>
+</body>
+</html>

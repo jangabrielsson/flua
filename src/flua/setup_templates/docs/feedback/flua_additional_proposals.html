@@ -1,0 +1,410 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Additional Flua proposals: testing asynchronous and long-lived QuickApps</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="additional-flua-proposals-testing-asynchronous-and-long-lived-quickapps">Additional Flua proposals: testing asynchronous and long-lived QuickApps</h1>
+<p>Prepared for the Flua maintainer, 31 October 2026.</p>
+<h2 id="scope">Scope</h2>
+<p>These are optional, independently reviewable proposals, not newly reproduced
+Flua defects or claims that the related functionality is entirely absent.
+Accept, adapt, defer or reject each proposal separately. Reuse existing tracing,
+transport fixtures and test helpers rather than creating a parallel framework.</p>
+<p>All examples are synthetic. They require no production application, private
+configuration, controller export, credentials or physical device. No proposed
+helper should silently fall back to a real controller or network endpoint.</p>
+<p>The scenarios below are specifications, not executed tests or implemented APIs.
+The illustrative configuration is not current Flua syntax. Keep application
+correctness assertions separate from the simulator's own acceptance criteria:
+a test should detect a deliberately incorrect application, not make it correct
+by silently repairing its behaviour.</p>
+<h2 id="priority-overview">Priority overview</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Priority</th>
+<th>Proposal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A01</td>
+<td>P1</td>
+<td>Slow-controller and constrained-dispatch profiles</td>
+</tr>
+<tr>
+<td>A02</td>
+<td>P1</td>
+<td>Scripted transport completion and ambiguous outcomes</td>
+</tr>
+<tr>
+<td>A03</td>
+<td>P1</td>
+<td>Restart injection and persistence boundaries</td>
+</tr>
+<tr>
+<td>A04</td>
+<td>P1</td>
+<td>Write-volume and redundant-update diagnostics</td>
+</tr>
+<tr>
+<td>A05</td>
+<td>P1</td>
+<td>Existing-installation migration fixtures</td>
+</tr>
+<tr>
+<td>A06</td>
+<td>P2</td>
+<td>Correlated, stage-by-stage latency measurements</td>
+</tr>
+<tr>
+<td>A07</td>
+<td>P2</td>
+<td>Lifecycle resource and retention diagnostics</td>
+</tr>
+<tr>
+<td>A08</td>
+<td>P2</td>
+<td>Seeded asynchronous scenarios and replay</td>
+</tr>
+<tr>
+<td>A09</td>
+<td>P2</td>
+<td>Source-versus-package differential testing</td>
+</tr>
+<tr>
+<td>A10</td>
+<td>P2</td>
+<td>Structural UI validation and update budgets</td>
+</tr>
+</tbody>
+</table>
+<h2 id="a01-slow-controller-and-constrained-dispatch-profiles">A01: Slow-controller and constrained-dispatch profiles</h2>
+<p><strong>Goal:</strong> expose timing and queueing problems that disappear on a fast development
+machine. Model explicit constraints, not an unverified claim to reproduce HC3 CPU.</p>
+<h3 id="proposed-changes">Proposed changes</h3>
+<ul>
+<li>Named synthetic profiles with configurable simulated HC3 REST latency,
+  completion throughput, queue capacity and dispatch delay.</li>
+<li>Separate controller API latency from vendor transport latency and Lua execution
+  cost. Do not confuse delayed completion with a blocking Lua callback.</li>
+<li>Expose queue depth, enqueue/delivery timestamps and the policy used when full.</li>
+<li>Make overload visible; never silently discard work without a documented event.</li>
+<li>Support virtual-time execution where deterministic and bounded realtime tests
+  for actual event-loop interaction.</li>
+</ul>
+<h3 id="concrete-scenario">Concrete scenario</h3>
+<p>A synthetic application maintains 24 children. Background work enqueues 48
+low-priority updates. A button event arrives while that queue is occupied.
+The fixture configures 40 ms completion latency, eight completions per virtual
+second and a queue capacity of 64. An application with a priority queue should
+dispatch the button's command before its remaining background work.</p>
+<h3 id="acceptance-tests">Acceptance tests</h3>
+<ol>
+<li>Recorded service times, queue depth and completion rate match the configured
+   synthetic profile within a declared scheduling tolerance.</li>
+<li>Input delivery remains observable while background requests are outstanding.</li>
+<li>A correctly prioritized fixture meets its declared latency budget; a deliberately
+   FIFO-only negative fixture violates that budget and fails the assertion.</li>
+<li>Exceeding capacity produces the documented overload result; request accounting
+   proves there was no invisible loss or duplicate completion.</li>
+<li>The default profile retains existing behaviour. Profiles are labelled synthetic,
+   not measurements of a particular controller model or firmware.</li>
+</ol>
+<h2 id="a02-scripted-transport-completion-and-ambiguous-outcomes">A02: Scripted transport completion and ambiguous outcomes</h2>
+<p><strong>Goal:</strong> test stale responses, disconnects and uncertain command execution without
+real hardware. Extend existing mock transports if possible.</p>
+<h3 id="proposed-changes-1">Proposed changes</h3>
+<ul>
+<li>Script requests by method, endpoint and synthetic operation ID.</li>
+<li>Control acceptance, response delivery, delay, disconnect and duplicate notification
+  independently. A connection failure does not necessarily mean a command was rejected.</li>
+<li>Keep a request ledger and a separate synthetic remote-state ledger.</li>
+<li>Fail unmatched requests instead of forwarding them to a real endpoint.</li>
+<li>Cover HTTP and event transports; define the clock used by each fixture.</li>
+</ul>
+<p>Illustrative scenario, not a proposed stable schema:</p>
+<pre><code class="language-yaml">steps:
+  - accept: {id: old_read, method: GET, path: /state}
+    snapshot: {value: false}
+    deliver_at_ms: 1500
+  - accept: {id: command, method: POST, path: /state, body: {value: true}}
+    apply_at_ms: 100
+    response: disconnect_after_apply
+  - emit_at_ms: 200
+    event: {value: true, sequence: 12}
+</code></pre>
+<h3 id="acceptance-tests-1">Acceptance tests</h3>
+<ol>
+<li>The older GET returns its captured <code>false</code> snapshot after the newer event.
+   A correctly fenced application retains the newer confirmed <code>true</code> state.</li>
+<li>The POST is applied exactly once despite its missing response. Assert against
+   both ledgers; a negative fixture that retries the write is detected.</li>
+<li>Duplicate notifications do not duplicate application side effects; two distinct
+   rapid notifications remain distinguishable and are not accidentally merged.</li>
+<li>A scripted read retry after 401/429 follows the fixture's schedule without
+   requiring or permitting an automatic write replay.</li>
+<li>An unexpected request fails locally and records a sanitized mismatch.</li>
+</ol>
+<h2 id="a03-restart-injection-and-persistence-boundaries">A03: Restart injection and persistence boundaries</h2>
+<p><strong>Goal:</strong> verify recovery in the middle of an operation without treating all Lua
+memory as persistent or replaying physical commands automatically.</p>
+<h3 id="proposed-changes-2">Proposed changes</h3>
+<ul>
+<li>Inject a simulated QA restart at named checkpoints or event sequence numbers.</li>
+<li>Preserve only explicitly persisted state; discard the old instance's Lua globals.</li>
+<li>Tag owned callbacks and timers with an instance generation and expose late
+  completions for testing. Document whether the engine drops or delivers them.</li>
+<li>Distinguish QA restart from complete simulator restart and controller reboot.
+  Do not claim all three have the same persistence semantics.</li>
+<li>Keep external fixture state separate from application state.</li>
+</ul>
+<h3 id="concrete-scenario-1">Concrete scenario</h3>
+<p>A synthetic command journal records intent. The remote fixture accepts a command,
+but the response is delayed. Restart the QA before confirmation, then deliver the
+old response. The replacement instance reconciles remote state through a read.</p>
+<h3 id="acceptance-tests-2">Acceptance tests</h3>
+<ol>
+<li>Persisted intent survives; an unpersisted local variable does not.</li>
+<li>The old generation's completion cannot mutate the new instance's state.</li>
+<li>The fixture records exactly one original write. Recovery reads do not cause
+   an unconditional resend of an uncertain command.</li>
+<li>Interruptions before intent persistence, after persistence and after confirmation
+   produce separately asserted outcomes.</li>
+<li>Repeated restart tests leave no growing population of old timers/subscriptions.</li>
+<li>A deliberately unfenced negative fixture fails, demonstrating that the harness
+   is not simply suppressing every event needed to expose the bug.</li>
+</ol>
+<h2 id="a04-write-volume-and-redundant-update-diagnostics">A04: Write-volume and redundant-update diagnostics</h2>
+<p><strong>Goal:</strong> identify unnecessary controller traffic, history generation and UI work.
+This is observation, not a request to change application semantics automatically.</p>
+<h3 id="proposed-changes-3">Proposed changes</h3>
+<ul>
+<li>Count writes by QA, target, operation and time window: variable updates,
+  property updates, UI updates, storage writes and action invocations.</li>
+<li>Optionally flag equal-value writes using operation-specific comparison rules.</li>
+<li>Distinguish state-setting writes from meaningful repeated events/actions;
+  never deduplicate event delivery or actuator commands automatically.</li>
+<li>Track attempts separately from successful changes and expose configurable
+  test budgets. Do not print secrets or whole request bodies by default.</li>
+</ul>
+<h3 id="concrete-scenario-2">Concrete scenario</h3>
+<p>Feed 1,000 identical telemetry samples into a synthetic sensor fixture, followed
+by one genuine value change and two distinct button presses with the same value.</p>
+<h3 id="acceptance-tests-3">Acceptance tests</h3>
+<ol>
+<li>The ledger distinguishes all attempted writes from actual value changes.</li>
+<li>An application designed to publish changes only performs one initialization
+   update and one changed-value update, subject to its explicitly stated contract.</li>
+<li>Both button presses remain separate observable events.</li>
+<li>Repeated attempts to create an existing variable are visible as attempts, even
+   when the simulated controller rejects them.</li>
+<li>A deliberately unconditional-update fixture exceeds its budget and fails.</li>
+<li>These counters are not presented as measurements of actual controller database
+   growth, CPU load or flash wear.</li>
+</ol>
+<h2 id="a05-existing-installation-migration-fixtures">A05: Existing-installation migration fixtures</h2>
+<p><strong>Goal:</strong> qualify an update against a populated installation, not only a clean boot.</p>
+<h3 id="proposed-changes-4">Proposed changes</h3>
+<ul>
+<li>Synthetic inventory builder with stable parent/child IDs, custom names, rooms,
+  interfaces, typed properties, variables and persisted storage.</li>
+<li>Snapshot and compare before/after migration using explicit allowlisted changes.</li>
+<li>Model write errors and partial migration progress; make restart/resume repeatable.</li>
+<li>Preserve unknown configuration fields unless the migration explicitly removes
+  them under its declared contract.</li>
+</ul>
+<h3 id="concrete-scenario-3">Concrete scenario</h3>
+<p>Seed a parent and six children. Include custom names and rooms, an unknown
+variable, <code>false</code>, zero, empty strings and synthetic connection settings.
+Run a version migration that adds one variable and updates one UI definition.
+Repeat it, then inject a write failure halfway through a fresh run.</p>
+<h3 id="acceptance-tests-4">Acceptance tests</h3>
+<ol>
+<li>IDs, bindings, custom names, rooms and synthetic connection settings remain
+   unchanged unless listed as intended changes.</li>
+<li>Unknown variables and metadata survive read-modify-write operations.</li>
+<li>False, zero, missing and empty values are not silently conflated.</li>
+<li>Re-running the migration is idempotent: no duplicate children or repeated
+   creation of already existing variables.</li>
+<li>Failure does not produce a successful-migration marker. Resume completes the
+   declared changes without deleting unrelated state.</li>
+<li>Compare behaviour with relevant controller contracts before claiming firmware
+   parity; a simulator fixture alone cannot establish that parity.</li>
+</ol>
+<h2 id="a06-correlated-latency-measurements">A06: Correlated latency measurements</h2>
+<p><strong>Goal:</strong> show where delay occurs instead of reporting one ambiguous duration.</p>
+<h3 id="proposed-changes-5">Proposed changes</h3>
+<ul>
+<li>Correlate source event, enqueue, dispatch, transport response, state confirmation
+  and UI publication with one operation ID.</li>
+<li>Record wall/virtual clock domains, clock resolution and generation ID.</li>
+<li>Keep optimistic UI publication separate from confirmed remote state.</li>
+<li>Support per-stage assertions and percentiles for repeated synthetic operations.</li>
+</ul>
+<h3 id="concrete-scenario-4">Concrete scenario</h3>
+<p>A fixture schedules input at t=0 ms, dispatch at t=100 ms, response at t=300 ms,
+confirmation at t=450 ms and final UI publication at t=500 ms, all in one virtual
+clock domain. A second variant publishes optimistic UI before confirmation.</p>
+<h3 id="acceptance-tests-5">Acceptance tests</h3>
+<ol>
+<li>Reported input-to-dispatch, response, confirmation and final UI durations agree
+   with the synthetic schedule within documented resolution.</li>
+<li>Optimistic UI is not labelled confirmation or physical completion.</li>
+<li>Missing confirmation is reported as incomplete/timeout, not zero latency.</li>
+<li>Wall and virtual timestamps are never subtracted as though they shared a clock.</li>
+<li>A run with a deliberately delayed background queue attributes the added delay
+   to queueing rather than transport.</li>
+<li>Realtime measurements use a monotonic clock and declared tolerances; do not
+   describe <code>os.time()*1000</code> as millisecond-resolution instrumentation.</li>
+</ol>
+<h2 id="a07-lifecycle-resource-and-retention-diagnostics">A07: Lifecycle resource and retention diagnostics</h2>
+<p><strong>Goal:</strong> make retained timers, callbacks, subscriptions and buffers inspectable.
+Build on the earlier resource-summary proposal rather than introducing a second
+independent ownership system.</p>
+<h3 id="proposed-changes-6">Proposed changes</h3>
+<ul>
+<li>Record resource owner, generation, allocation/completion and cancellation status.</li>
+<li>Summarize pending requests, timers, listeners, queues and bounded payload caches.</li>
+<li>Where practical, show diagnostic retention paths maintained by the simulator;
+  do not promise full cross-language heap analysis.</li>
+<li>Separate Lua heap, Python allocation data and process RSS. Compare equivalent
+  idle checkpoints, not arbitrary samples during active work.</li>
+</ul>
+<h3 id="concrete-scenario-5">Concrete scenario</h3>
+<p>Run 100 start/stop cycles of a synthetic instance with timers, one subscription,
+delayed local requests and a bounded cache. Include a variant intentionally leaving
+one listener registered per cycle.</p>
+<h3 id="acceptance-tests-6">Acceptance tests</h3>
+<ol>
+<li>The correctly cleaned fixture returns to its declared baseline of owned active
+   resources after each cycle and does not retain earlier generations' payloads
+   through simulator-owned references.</li>
+<li>The intentionally leaked listener is attributed to its owner/generation.</li>
+<li>A late request completion cannot revive stopped application work.</li>
+<li>Diagnostic tracing is itself bounded and does not become the apparent leak.</li>
+<li>Memory trend assertions use a documented warm-up and tolerance; a single RSS
+   increase or a forced GC is not claimed to prove a leak or its absence.</li>
+</ol>
+<h2 id="a08-seeded-asynchronous-scenarios-and-replay">A08: Seeded asynchronous scenarios and replay</h2>
+<p><strong>Goal:</strong> reproduce rare interleavings without long manual trial and error.</p>
+<h3 id="proposed-changes-7">Proposed changes</h3>
+<ul>
+<li>Generate bounded event schedules from a fixed seed and versioned generator.</li>
+<li>Include disconnect/reconnect, 401/429, delayed reads, rapid input events and restarts.</li>
+<li>Save the seed, profile, runtime versions and sanitized event schedule on failure.</li>
+<li>Replay an explicit recorded schedule independently of later generator changes.</li>
+<li>Optionally minimize a failing schedule while retaining the failing assertion.</li>
+</ul>
+<h3 id="concrete-scenario-6">Concrete scenario</h3>
+<p>Generate 10,000 events over seven virtual days. Assert bounded queues, distinct
+button-event preservation, generation fencing and no duplicate uncertain writes.
+Run a smaller deliberate negative fixture with a stale-response bug.</p>
+<h3 id="acceptance-tests-7">Acceptance tests</h3>
+<ol>
+<li>The same seed and generator version produce the same scheduled input sequence.</li>
+<li>Replaying a saved schedule reproduces the failure in the supported deterministic
+   environment, or explicitly identifies an unsupported source of nondeterminism.</li>
+<li>A reduced reproduction still fails for the same checked invariant.</li>
+<li>Work and trace sizes remain bounded; the suite has an independent wall limit.</li>
+<li>Seven simulated days are labelled as virtual coverage, never as a real seven-day
+   stability, hardware or memory qualification.</li>
+</ol>
+<h2 id="a09-source-versus-package-differential-testing">A09: Source-versus-package differential testing</h2>
+<p><strong>Goal:</strong> detect behavioural changes introduced by packaging/minification without
+requiring Flua to implement or understand every packaging tool.</p>
+<h3 id="proposed-changes-8">Proposed changes</h3>
+<ul>
+<li>Run a source form and an unpacked development artifact against the same
+  synthetic inputs, runtime profile and fixture state.</li>
+<li>Compare observable actions, state transitions, callback bindings and metadata.</li>
+<li>Normalize only explicitly allowed nondeterminism, such as generated run IDs.</li>
+<li>Record source/artifact hashes and the normalization policy.</li>
+<li>Allow adapters for packaging-specific source maps or entry points without
+  bypassing integrity controls or silently modifying the tested artifact.</li>
+</ul>
+<h3 id="concrete-scenario-7">Concrete scenario</h3>
+<p>Package a synthetic multi-file application with one child, one button callback,
+one variable default and one local transport request. Test an unchanged package
+and a deliberately broken package with a renamed callback.</p>
+<h3 id="acceptance-tests-8">Acceptance tests</h3>
+<ol>
+<li>The valid package and source produce equivalent declared observations.</li>
+<li>The broken callback binding is detected and attributed to the artifact form.</li>
+<li>Defaults, file inclusion/order where significant, and callback metadata are
+   checked separately from runtime actions.</li>
+<li>Normalization cannot hide missing events, reordered commands or changed values.</li>
+<li>Inputs are synthetic and no resolved credentials enter the exported artifact.</li>
+<li>Passing this comparison is not presented as signing, licensing, firmware or
+   public-release qualification.</li>
+</ol>
+<h2 id="a10-structural-ui-checks-and-publication-budgets">A10: Structural UI checks and publication budgets</h2>
+<p><strong>Goal:</strong> find invalid callback bindings and excessive UI updates before deployment.</p>
+<h3 id="proposed-changes-9">Proposed changes</h3>
+<ul>
+<li>Validate unique element names within the relevant device scope, callback targets,
+  selectable values and expected event-value shapes.</li>
+<li>Identify updates to nonexistent elements and distinguish hidden from missing UI.</li>
+<li>Count update frequency and payload volume per element without automatically
+  suppressing meaningful repeated events.</li>
+<li>Optionally snapshot normalized UI structures for supported export formats.</li>
+</ul>
+<h3 id="concrete-scenario-8">Concrete scenario</h3>
+<p>A synthetic UI contains a button, a single select and a label. Variants introduce
+a missing button callback, duplicate element name and invalid selected value.
+One telemetry stream repeats the same label text 1,000 times; another changes it.</p>
+<h3 id="acceptance-tests-9">Acceptance tests</h3>
+<ol>
+<li>Each invalid variant reports the exact device/element and validation rule.</li>
+<li>Identical element names on different children are permitted where the contract
+   scopes names per device; no false global-uniqueness rule is imposed.</li>
+<li>Event values preserve the documented string/list wrapping and asynchronous
+   delivery semantics, including empty selections.</li>
+<li>A change-only UI fixture stays within its declared update budget; an intentionally
+   unconditional renderer exceeds it and fails.</li>
+<li>Supported export round trips preserve callback bindings and selected defaults,
+   or report a documented format limitation instead of silently claiming fidelity.</li>
+<li>Structural validation is explicitly not proof of actual browser/mobile layout,
+   text clipping, scrolling or physical controller rendering.</li>
+</ol>
+<h2 id="suggested-delivery-approach">Suggested delivery approach</h2>
+<p>Start with small extensions to existing fixture and trace APIs. A01-A04 offer
+the strongest immediate value for asynchronous failures and excessive workload;
+A05 adds migration safety. The remaining items can build on those foundations.</p>
+<p>For each accepted proposal, publish one positive fixture, one deliberately faulty
+negative fixture and the exact guarantees being tested. Keep strict-mode failure
+and structured-result handling consistent across all helpers. Preserve independent
+wall-time supervision and clear incomplete-run reporting.</p>
+<p>No feature should require a private application, automatic controller access,
+production data or physical output changes to demonstrate its usefulness.</p>
+</body>
+</html>

@@ -1,0 +1,237 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Note: flua as an MCP server</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="note-flua-as-an-mcp-server">Note: flua as an MCP server</h1>
+<p>Status: V1 + sessions + resources + prompts + HTTP + devices implemented
+(2026-10-17) — stdio transport, JSON-RPC core, one-shot tools
+(<code>qa_check</code>/<code>qa_run</code>/<code>qa_ui</code>/<code>devices</code> — the last runs to completion and
+returns the final device list), the session tier (<code>qa_start</code>/<code>qa_probe</code>/
+<code>qa_action</code>/<code>qa_sessions</code>/<code>qa_stop</code> on in-process engines, <code>qa_probe</code>
+carries the refreshStates feed as a cursor delta), dual-era protocol
+(2026-07-28 modern + 2025-06-18 legacy), the resource tier
+(<code>flua://docs/*</code> from the packaged docs), the prompt tier
+(<code>qa_debug</code>/<code>qa_skeleton</code>), and the Streamable HTTP transport (stateless,
+opt-in <code>flua-mcp --http</code>).</p>
+<h2 id="context">Context</h2>
+<p>Agents already get a full verify loop out of the box: self-asserting QA →
+<code>flua --api local --instant qa.lua</code> → JSON logs → exit code. The MCP server
+is the <em>machine interface</em> for hosts that prefer one: typed tool schemas
+instead of arg-string friction, hosts with no shell at all, live stateful
+sessions across tool calls, one surface for every host.</p>
+<p>Assumption per the new MCP spec (2025-06-18): <strong>Streamable HTTP with
+stateless JSON-RPC</strong> — one endpoint, session-less requests allowed. That
+does not mean the <em>server</em> is stateless (see "sessions" below); it means
+every request carries what it needs and the transport never invents hidden
+state. stdio remains the simplest local transport and is worth shipping
+first; the JSON-RPC core is shared between the two.</p>
+<h2 id="the-five-questions-answered-as-design-decisions">The five questions, answered as design decisions</h2>
+<h3 id="1-should-an-agent-be-able-to-start-a-qa-for-test">1. Should an agent be able to start a QA for test?</h3>
+<p>Yes — that is the core tool, in two shapes:</p>
+<ul>
+<li><strong><code>qa_run</code> (one-shot)</strong> — run file(s) with directives, return
+  <code>{exit_code, logs[], verdict}</code>. Wraps the CLI as a subprocess
+  (<code>flua --api local --instant --log json ...</code>), so the semantics are
+  exactly the shipped ones: exit-code verdict, pure-JSON stdout, notices on
+  stderr. This is the verify loop as a tool call.</li>
+<li><strong><code>qa_start</code> (session)</strong> — start a long-running engine, return a
+  <code>session_id</code>. The probing tool below.</li>
+</ul>
+<p>One-shot covers 90% of agent work; sessions cover debugging and
+interactive exploration.</p>
+<h3 id="2-should-the-server-keep-a-qa-running-so-the-agent-can-probe-it">2. Should the server keep a QA running so the agent can probe it?</h3>
+<p>Yes — as an explicit session model, not as implicit transport state:</p>
+<ul>
+<li><code>qa_start</code> returns a <code>session_id</code>; every probing tool takes it as an
+  argument. The MCP layer stays stateless even while the server holds
+  engines.</li>
+<li>The session runs the <strong>in-process engine</strong> (<code>from flua.engine import
+  LuaEngine</code> on an asyncio loop in a thread) — driving <code>start_qa</code>,
+  <code>api.dispatch</code>, and the message pump directly. Subprocess wrapping
+  (<code>flua --ui</code>-style keep-alive) can't do inspection; the engine object can.</li>
+<li>Probing tools on a session: <code>qa_probe</code> (devices, QA status, logs since
+  last call), <code>qa_action</code> (dispatch a device action / inject a UI event /
+  call a QA method), <code>qa_stop</code>.</li>
+<li><strong>TTL + cleanup are part of the contract</strong>: sessions idle out (default
+  e.g. 10 min), <code>qa_stop</code> and server shutdown kill engines — the current
+  sessions are listable via <code>qa_sessions</code>. An agent that forgets to stop a
+  session must not leak engines forever.</li>
+</ul>
+<h3 id="3-should-it-be-able-to-start-several-qas">3. Should it be able to start several QAs?</h3>
+<p>Yes — flua's engine is already an ensemble runtime (QAs calling each other
+via <code>fibaro.call</code>, multi-QA exit aggregation). Both shapes take lists:</p>
+<ul>
+<li><code>qa_run</code> accepts several main files (the CLI already does) — one engine,
+  N QAs, aggregated verdict.</li>
+<li><code>qa_start</code> likewise; <code>qa_probe</code>/<code>qa_action</code> address QAs by id (5000+,
+  from the probe result).</li>
+</ul>
+<p>No new engine work needed — the tool layer just passes lists through.</p>
+<h3 id="4-how-to-help-with-qa-coding-knowledge-apis-best-practices">4. How to help with QA coding knowledge (APIs, best practices)?</h3>
+<p>Knowledge is <strong>resources and prompts</strong>, not tools — tools stay imperative
+and typed:</p>
+<ul>
+<li><strong>Resources</strong> (<code>flua://docs/…</code>): USAGE.md, ARCHITECTURE.md, the
+  walkthroughs, the tutorial chapters, <code>docs/specs/hc3-api.json</code> (the
+  endpoint reference), and <code>docs/mcp.md</code>. Served from the installed
+  package (<code>setup_templates/docs</code>, synced by <code>scripts/sync-skills.sh</code>), so
+  the MCP works from pip alone. Text only, paths canonicalized, traversal
+  rejected. (Skills are not resources — the <code>.github/skills</code> bodies stay a
+  repo-level mechanism; the docs overlap covers the same knowledge.)</li>
+<li><strong>Prompts</strong>: <code>qa_debug</code> (error + file → structured next-step guidance:
+  read the log shape, <code>--check</code>, shrink-the-problem) and <code>qa_skeleton</code>
+  (a runnable QA template with flua-test assertions and the
+  deferred-onInit pattern) — implemented, see <code>docs/mcp.md</code>.</li>
+<li>Best practices live in the docs they already live in; the MCP just makes
+  them retrievable by URI. (Copilot hosts get the same knowledge via the
+  existing <code>.github/skills</code> — MCP resources are the transport for hosts
+  that don't read repo files.)</li>
+</ul>
+<h3 id="5-can-we-use-flua-as-is-and-wrap-the-command-in-an-mcp-server-that-startsstops-flua">5. Can we use flua as-is and wrap the command in an MCP server that starts/stops flua?</h3>
+<p>Yes — that is exactly the V1, and it stays valid for V2:</p>
+<ul>
+<li><strong>V1 (recommended first)</strong>: the one-shot tools are thin subprocess
+  wrappers around the CLI. Nothing new in flua itself — <code>--log json</code>,
+  <code>--check</code>, <code>--tool ui</code>, exit codes already provide the machine interface.</li>
+<li><strong>V2</strong>: sessions import the engine in-process (the MCP server is Python
+  anyway; <code>fibaro-flua</code> ships the engine). The CLI stays the reference
+  semantics; the in-process path reuses the same objects.</li>
+<li>What flua might need to <em>add</em> (small, later): nothing blocking. Nice-to-
+  haves: <code>--log json</code> for <code>--tool ui</code> output, a stable <code>flua --version
+  --machine</code> flag, maybe <code>--session</code>-style stdin/stdout control for
+  subprocess-backed sessions if in-process import ever proves awkward.</li>
+</ul>
+<h2 id="tool-surface-draft">Tool surface (draft)</h2>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Shape</th>
+<th>Transport</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>qa_check</code></td>
+<td>files → <code>{ok, findings[]}</code></td>
+<td>one-shot (subprocess)</td>
+</tr>
+<tr>
+<td><code>qa_run</code></td>
+<td>files, directives(mode/instant/speed/vars) → <code>{exit_code, logs[], verdict}</code></td>
+<td>one-shot (subprocess)</td>
+</tr>
+<tr>
+<td><code>devices</code></td>
+<td>files, directives → <code>{exit_code, devices[]}</code> (run to completion, then the final device list)</td>
+<td>one-shot (in-process engine)</td>
+</tr>
+<tr>
+<td><code>qa_start</code></td>
+<td>files, directives → <code>{session_id, qa_ids[]}</code></td>
+<td>in-process engine</td>
+</tr>
+<tr>
+<td><code>qa_probe</code></td>
+<td>session_id → <code>{devices[], qas[], logs[], refreshStates}</code></td>
+<td>in-process engine</td>
+</tr>
+<tr>
+<td><code>qa_action</code></td>
+<td>session_id, qa_id, action, args → result</td>
+<td>in-process engine</td>
+</tr>
+<tr>
+<td><code>qa_ui_text</code></td>
+<td>file → text rendering</td>
+<td>one-shot (<code>--tool ui</code>)</td>
+</tr>
+<tr>
+<td><code>qa_stop</code> / <code>qa_sessions</code></td>
+<td>session control</td>
+<td>server state</td>
+</tr>
+</tbody>
+</table>
+<p>Resources (implemented): <code>flua://docs/&lt;file&gt;</code> — the packaged docs tree,
+e.g. <code>flua://docs/USAGE.md</code>, <code>flua://docs/walkthroughs.md</code>,
+<code>flua://docs/tutorial/{chapter}.md</code>, <code>flua://docs/specs/hc3-api.json</code>,
+<code>flua://docs/mcp.md</code>. Prompts (implemented): <code>qa_debug</code>, <code>qa_skeleton</code>.</p>
+<h2 id="transport-notes-stateless-spec">Transport notes (stateless spec)</h2>
+<ul>
+<li>One JSON-RPC implementation, two transports, both shipped: <strong>stdio</strong>
+  (local hosts, the default) and <strong>Streamable HTTP</strong> (stateless mode —
+  <code>POST /mcp</code>, no session id, no SSE; <code>flua-mcp --http</code>, loopback by
+  default, <code>FLUA_MCP_TOKEN</code> required beyond loopback). Remote and browser
+  hosts use HTTP; local hosts keep stdio. Dependency-free holds: stdlib
+  <code>http.server</code> (ADR 0011).</li>
+<li>Secrets: HC3 credentials come from the server's environment (<code>.env</code>
+  chain), never from tool arguments — online/proxy runs reuse flua's own
+  env resolution.</li>
+<li>The four deltas from notes-agents.md (typed schemas, shell-less hosts,
+  live sessions, one standard surface) map onto the table above; sessions
+  are the only stateful piece and they are explicit by design.</li>
+</ul>
+<h2 id="open-questions--all-resolved">Open questions — all resolved</h2>
+<ol>
+<li>~~V1 transport order — stdio first, or Streamable HTTP first?~~ Both
+   shipped: stdio default, <code>--http</code> opt-in (ADR 0011).</li>
+<li>~~In-process sessions: one shared event loop per server, or one thread +
+   loop per session?~~ One engine per session on its own loop/thread
+   (sessions.py) — per-session isolation, mirroring how the tests drive
+   engines.</li>
+<li>~~Should the server cap <code>qa_run</code> concurrency?~~ Yes —
+   <code>MAX_CONCURRENT_RUNS</code> (4) shared by <code>qa_run</code> and <code>devices</code>; extra runs
+   fail fast with <code>isError</code> (server busy), never queue.</li>
+<li>~~Do we pin the MCP spec version and reject old-protocol clients?~~
+   <code>SUPPORTED_VERSIONS</code> is the pin: unsupported per-request versions answer
+   <code>-32022</code>, and the legacy <code>initialize</code> era is still served (dual-era).</li>
+<li>~~Should <code>qa_probe</code> include the refreshStates feed?~~ Yes — implemented:
+   the feed rides the same cursor-delta machinery as the logs (HC3 polling
+   shape <code>{status, last, changes, events}</code>).</li>
+<li>~~Naming: <code>qa_*</code> prefix everywhere, or drop it?~~ <code>qa_*</code> for the QA
+   tools; the docs tools are their own <code>docs_*</code> family (the same tree the
+   resource tier serves — see the dogfood note below).</li>
+</ol>
+<h2 id="dogfood-findings">Dogfood findings</h2>
+<p>Copilot (2026-10-18, two rounds): the host consumes <strong>tools</strong> well
+(<code>qa_check</code>/<code>qa_start</code>/<code>qa_probe</code>/<code>qa_stop</code> drove a full build-test loop),
+but never touched <code>resources/read</code> even with discover instructions pointing
+at it — it web-searched for knowledge that ships in the wheel (PyPI,
+flua.dev, deepwiki, a guessed repo name). Likely the client exposes tools
+only. Fix: the same docs tree is also served as <code>docs_list</code>/<code>docs_read</code>
+<strong>tools</strong> (tools are the lowest common denominator across hosts), and the
+instructions name the tool form first. Second finding: a wrong <code>--%%type</code>
+had no local way to enumerate valid types — <code>flua --tool catalog</code> now lists
+them, and the error names close matches.</p>
+</body>
+</html>

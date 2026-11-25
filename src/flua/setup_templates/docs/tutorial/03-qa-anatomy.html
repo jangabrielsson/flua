@@ -1,0 +1,162 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>03 · QuickApp anatomy</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="03--quickapp-anatomy">03 · QuickApp anatomy</h1>
+<p>Now the real thing. In this chapter you meet the Sunset Lamp, learn the three
+ideas every QuickApp is built from, and click its switch in a browser —
+while the whole thing still runs safely on your computer.</p>
+<h2 id="what-a-quickapp-is">What a QuickApp is</h2>
+<p>A QuickApp is a small program that <em>lives on your HC3</em>. Most of the time it
+does nothing. Then something happens — a button is pressed, a timer fires,
+a sensor reports — and the QuickApp wakes up, runs a few lines of code, and
+goes back to sleep.</p>
+<p>That "something happens" has a name: an <strong>event</strong>. And the code that runs is
+an <strong>action</strong>. That's idea number one:</p>
+<pre><code class="language-mermaid">graph LR
+  E[&quot;event&lt;br/&gt;(button pressed, timer, sensor…)&quot;] --&gt; A[&quot;action&lt;br/&gt;(your code)&quot;]
+  A --&gt; S[(&quot;state&lt;br/&gt;(properties)&quot;)]
+  S --&gt; UI[&quot;the HC3 shows it: ON&quot;]
+</code></pre>
+<p>The lamp we're about to build is tiny, but it has the full skeleton:</p>
+<ul>
+<li>it <strong>starts</strong> once (<code>onInit</code>),</li>
+<li>it <strong>reacts</strong> when someone switches it (<code>turnOn</code>, <code>turnOff</code>),</li>
+<li>it <strong>remembers</strong> whether it's on — in its <em>properties</em>, which the HC3
+  shows in the app.</li>
+</ul>
+<h2 id="the-sunset-lamp">The Sunset Lamp</h2>
+<p>Create <code>sunset_lamp.lua</code> in your project (or use the repo's copy at
+<code>examples/sunset_lamp.lua</code>):</p>
+<pre><code class="language-lua">--%%name:SunsetLamp
+--%%type:com.fibaro.binarySwitch
+
+function QuickApp:onInit()
+  self:debug(&quot;Sunset lamp ready&quot;)
+end
+
+function QuickApp:turnOn()
+  self:updateProperty(&quot;value&quot;, true)
+  print(&quot;Lamp on&quot;)
+end
+
+function QuickApp:turnOff()
+  self:updateProperty(&quot;value&quot;, false)
+  print(&quot;Lamp off&quot;)
+end
+</code></pre>
+<p>Line by line:</p>
+<ul>
+<li><code>--%%name:SunsetLamp</code> — the QuickApp's name, as it will appear in the HC3
+  app. The <code>--%%</code> lines at the top are the QuickApp's <em>header</em>: instructions
+  to flua (and later, to the HC3) about this QuickApp.</li>
+<li><code>--%%type:com.fibaro.binarySwitch</code> — this QuickApp pretends to be a
+  <em>binary switch</em>: a device that is ON or OFF. That's what gives it the
+  On/Off buttons you're about to see.</li>
+<li><code>function QuickApp:onInit()</code> — runs <strong>once</strong>, when the QuickApp starts.
+  (The <code>self:debug(...)</code> writes a line to the log, tagged with the lamp's
+  name.)</li>
+<li><code>function QuickApp:turnOn()</code> — an <strong>action</strong>. It runs when someone turns
+  the lamp on — a finger in the HC3 app, a scene, another QuickApp.</li>
+<li><code>self:updateProperty("value", true)</code> — the lamp's state. <code>value</code> is the
+  property of a switch: <code>true</code> = on. After this line, the HC3 app shows the
+  lamp as ON — the QuickApp <em>is</em> the device, and this is how it tells the
+  world.</li>
+<li><code>turnOff()</code> is the mirror image: <code>value</code> becomes <code>false</code>.</li>
+</ul>
+<blockquote>
+<p>How does flua know where the header ends? It doesn't need to — only
+<code>--%%</code> lines are header lines, everything else is code. (There <em>is</em> an
+<code>-- --------------- EOH ---------------</code> marker for the rare case where a
+QuickApp is embedded inside another file as a long string, so its header
+lines aren't read as the outer file's. Not needed here.)</p>
+</blockquote>
+<p>That's the whole anatomy: <strong>onInit</strong> (start once), <strong>actions</strong> (react),
+<strong>properties</strong> (remember and show).</p>
+<h2 id="run-it--and-click-the-switch">Run it — and click the switch</h2>
+<p>flua can serve the QuickApp's UI to a small viewer page, so you can click
+the buttons exactly like in the HC3 app. Press <strong>F5</strong> with the
+<strong>Flua: Run Current File (UI)</strong> configuration (from the menu, or
+<strong>Run → Run Without Debugging</strong> and pick it). It starts the lamp <em>and</em>
+serves the viewer:</p>
+<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+flua: UI viewer on http://127.0.0.1:8090/ — open it in a browser
+[04.10.2026][20:11:17][DEBUG  ][SunsetLamp5000]: Sunset lamp ready
+</code></pre>
+<p>(Under the hood that configuration runs <code>flua --ui 8090 sunset_lamp.lua</code> —
+run it in a terminal if you ever prefer that.)</p>
+<p>Now open <strong>http://127.0.0.1:8090/</strong> in a browser — flua serves the viewer
+page itself, from the flua package, with the address already filled in.
+Press <strong>Connect</strong>.</p>
+<blockquote>
+<p>✅ <strong>You should see</strong> a panel titled <code>SunsetLamp</code>, with a red <code>FALSE</code>
+label and <strong>Turn On / Turn Off</strong> buttons.</p>
+</blockquote>
+<p>You didn't write a single line about those buttons. flua added them because
+your QuickApp declared itself a <code>binarySwitch</code> — the HC3 does exactly the
+same: every switch gets On/Off controls and a state label for free. (That's
+why <code>--%%type</code> matters.)</p>
+<p>Click <strong>Turn On</strong>.</p>
+<blockquote>
+<p>✅ <strong>You should see</strong> two things: the label flips to a green <code>TRUE</code>, and
+your terminal logs <code>Lamp on</code>.</p>
+</blockquote>
+<pre><code class="language-text">[04.10.2026][20:11:19][DEBUG  ][SunsetLamp5000]: Lamp on
+</code></pre>
+<p>Walk through what just happened, because it's the whole game:</p>
+<ol>
+<li>You clicked <strong>Turn On</strong> in the viewer.</li>
+<li>The viewer called your QuickApp's <code>turnOn</code> <strong>action</strong>.</li>
+<li>Your code wrote <code>true</code> into the <code>value</code> <strong>property</strong>.</li>
+<li>The state changed — and the label (the viewer reads the state) flipped.</li>
+</ol>
+<p>On your real HC3 it would have been a finger in the Fibaro app, and the lamp
+would have been a light in your house. Everything else is identical.</p>
+<p>Click <strong>Turn Off</strong>, then on again. Each click is one event, one action, one
+state change.</p>
+<p>When you're done, stop the run with the red square (■) in VS Code's Run
+toolbar — the lamp runs until you stop it.</p>
+<h2 id="what-did-we-just-learn">What did we just learn?</h2>
+<ul>
+<li>A QuickApp <strong>starts once</strong> (<code>onInit</code>), <strong>reacts to events</strong> (actions like
+  <code>turnOn</code>), and <strong>remembers state</strong> (properties like <code>value</code>).</li>
+<li>The <strong>type</strong> you choose decides what the HC3 shows: a switch gets On/Off
+  buttons; a sensor gets a reading; a dimmer gets a slider.</li>
+<li>You develop against a <strong>browser UI</strong> on your computer; the same events
+  come from the HC3 app later.</li>
+</ul>
+<h2 id="next">Next</h2>
+<p>The lamp switches when <em>you</em> want it to. Next chapter it learns to switch
+<strong>by itself</strong> — when the sun goes down. That needs a timer, and a tiny bit
+of astronomy the HC3 does for us.</p>
+</body>
+</html>

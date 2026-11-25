@@ -31,7 +31,7 @@
 </style>
 </head>
 <body>
-<h1>flua — user guide for QA developers</h1>
+<h1 id="flua--user-guide-for-qa-developers">flua — user guide for QA developers</h1>
 <p>flua runs Fibaro QuickApps <strong>offline</strong> on your Mac or PC. You write the same
 Lua you'd write on the HC3 — <code>QuickApp</code>, <code>fibaro</code>, <code>api</code>, <code>net</code>, <code>mqtt</code> — and
 flua provides the rest of the world: a simulated HC3, real network access, a
@@ -73,11 +73,11 @@ agents and scripts get the same surface as the GUI.</p>
 <li><a href="#static-checks">Static checks</a></li>
 <li><a href="#flua-extensions-_flua">flua extensions (<code>_FLUA</code>)</a></li>
 </ul>
-<h2>Install</h2>
+<h2 id="install">Install</h2>
 <p>Python 3.11+. lupa (which bundles Lua) is the only runtime dependency.
 The full runtime matrix — tested Python versions, the Lua 5.4/lupa pin and
 why, and the HC3's own Lua 5.3 — is in
-<a href="docs/compatibility.md"><code>docs/compatibility.md</code></a>;
+<a href="compatibility.html"><code>docs/compatibility.md</code></a>;
 <code>flua --version --machine</code> prints the installed versions as one JSON line.</p>
 <pre><code class="language-bash">pip install fibaro-flua        # from PyPI — installs the flua command
 </code></pre>
@@ -105,7 +105,7 @@ classes. The wider
 probe is <code>flua --capabilities-json</code>: runtime metadata plus the
 compatibility surface table (implemented/partial/unsupported per category
 — QA methods, net.*, the REST sim, runtime modes, tooling).</p>
-<h2>Your first QuickApp</h2>
+<h2 id="your-first-quickapp">Your first QuickApp</h2>
 <p>A QuickApp is an ordinary Lua file. <code>QuickApp:onInit</code> runs exactly like on
 the HC3, and <code>self:debug</code> prints immediately (unlike the HC3, where you'd
 only see it in the debug window):</p>
@@ -123,7 +123,7 @@ end
 <code>api</code>, <code>net</code>, <code>mqtt</code>, timers, and runs <code>onInit</code> exactly like on the HC3.
 Anything that has nothing left to do (no timers, no network connections)
 makes flua exit; QAs with timers or open connections keep running.</p>
-<h2>Running QAs</h2>
+<h2 id="running-qas">Running QAs</h2>
 <pre><code class="language-bash">.venv/bin/flua script.lua              # one QA
 .venv/bin/flua qa1.lua qa2.lua         # several QAs, isolated, can talk to each other
 .venv/bin/flua -e 'setTimeout(function() print(&quot;hi&quot;) end, 100)'
@@ -189,7 +189,7 @@ and network events) are queued and delivered, in arrival order, after the
 sleeping callback resumes. It works anywhere in QA code — top level,
 <code>onInit</code>, callbacks — because the QA identity is registered before the file
 executes; only outside a QA (main-state code) does it raise an error.</p>
-<h2>VS Code setup</h2>
+<h2 id="vs-code-setup">VS Code setup</h2>
 <p>The repo ships <code>.vscode/launch.json</code> with five configurations (the
 <code>--tool setup</code> template has the same five, with the debug interpreter
 resolved to flua's <strong>absolute path</strong> — VS Code doesn't inherit the shell's
@@ -229,7 +229,7 @@ users; the two copies are kept byte-identical by a test. Setup also writes
 <code>qa-select</code>, <code>qa-simdevice</code>, <code>qa-selfassert</code>): type the prefix in a <code>.lua</code>
 file and accept the completion. The file is managed — upgrades deliver new
 snippets until you edit it, then it's yours.</p>
-<h3>The flua VS Code extension</h3>
+<h3 id="the-flua-vs-code-extension">The flua VS Code extension</h3>
 <p>The repo also ships the <strong>flua VS Code extension</strong> (<code>vscode/</code>) — the
 explorer drives flua without touching launch.json:</p>
 <ul>
@@ -271,7 +271,7 @@ A boot error in the saved file (syntax error, a bad <code>--%%var</code>, an <co
 crash) is logged and that QA is left dead — flua itself stays up, and the
 next save with fixed code restarts the QA. Ctrl-C stops it. Works on top
 of the debugger too.</p>
-<h3>Without the repo (pip install)</h3>
+<h3 id="without-the-repo-pip-install">Without the repo (pip install)</h3>
 <p>Installed from PyPI you don't have this checkout's developer setup — the
 VS Code run/debug configs, the Lua Language Server settings, and the agent
 files (Copilot skills/instructions, <code>AGENTS.md</code>). One command scaffolds a
@@ -289,7 +289,7 @@ type library</strong> — LuaLS definitions for <code>QuickApp</code>, <code>fib
 <code>json</code>, so QA code gets autocomplete and parameter hints), <code>AGENTS.md</code>
 and the <code>.github/</code> skills, instructions and prompts. Existing files are
 kept; <code>--force</code> overwrites.</p>
-<h2>QA directives (<code>--%%</code>)</h2>
+<h2 id="qa-directives---">QA directives (<code>--%%</code>)</h2>
 <p>Directives are ordinary Lua comments at the top of the file. flua parses them
 before running; the HC3 ignores them — the same file runs in both places.
 Parsing stops at the end-of-header marker:</p>
@@ -480,7 +480,7 @@ writes the sim owns stay local. Without a configured HC3 it degrades to
 plain offline. <code>--%%mode:readonly+call</code> unlocks exactly one more channel:
 device actions (<code>fibaro.call</code>) pass through, so test code can flip a
 light on and off — creating or deleting resources stays blocked.</p>
-<h3>The emulator database (<code>--%%db</code>)</h3>
+<h3 id="the-emulator-database---db">The emulator database (<code>--%%db</code>)</h3>
 <p><code>--%%db:house.json</code> seeds the simulated HC3 from a JSON file — the same
 schema as <code>examples/house.json</code> and the <code>--seed</code> flag (the directive wins
 over <code>--seed</code>). <code>--%%db:+house.json</code> additionally persists emulator state
@@ -518,7 +518,7 @@ controller.</p>
 <code>--%%name:sub1=val1,sub2=val2</code> for subparameters. A typo'd directive is
 reported at runtime (a <code>unknown --%% directive</code> warning) and <code>flua --check</code>
 flags it too.</p>
-<h3>Record &amp; replay the real house</h3>
+<h3 id="record--replay-the-real-house">Record &amp; replay the real house</h3>
 <p><code>flua record</code> captures a real house session — the HC3's device snapshot
 plus its refreshStates feed — into one JSON file; <code>--replay</code> plays it back
 into the offline sim, so a QA is regression-tested against what actually
@@ -534,7 +534,7 @@ polls <code>/refreshStates</code> every <code>--interval</code> seconds (default
 relative timestamps, so the replay is deterministic; events for devices the
 replay run did not seed are skipped silently. The recording doubles as a
 seed file: <code>--seed house.json</code> loads the devices without the events.</p>
-<h3><code>flua audit</code></h3>
+<h3 id="flua-audit"><code>flua audit</code></h3>
 <p>How much of the HC3 surface does the sim cover? One command answers:</p>
 <pre><code class="language-bash">.venv/bin/flua audit            # routes + device catalog, human-readable
 .venv/bin/flua audit --json     # the same numbers for agents/CI
@@ -553,7 +553,7 @@ catalog capture running offline. It also checks the QA templates
 ones for remapping to a parent type. The coverage floors are pinned by a
 test: routes, device models, the hierarchy, and the templates can only go
 up.</p>
-<h3>Inspecting simulator state (<code>flua --tool state</code>)</h3>
+<h3 id="inspecting-simulator-state-flua---tool-state">Inspecting simulator state (<code>flua --tool state</code>)</h3>
 <p>Agents (and humans) debugging flua itself sometimes need to look at the
 sim's raw state — and to answer "where did this object get stored twice?"
 (the shape of the updateView aliasing bug):</p>
@@ -568,7 +568,7 @@ scanner's real home is a <em>live</em> state; the same functions are importable:
 <pre><code class="language-python">from flua.tools.state_tool import scan_tree
 print(scan_tree(engine.api.state))   # {&quot;aliases&quot;: [{&quot;paths&quot;: [...]}], &quot;cycles&quot;: [...]}
 </code></pre>
-<h3>The house and the hub as data (<code>--tool house</code>, <code>--tool hubList</code>)</h3>
+<h3 id="the-house-and-the-hub-as-data---tool-house---tool-hublist">The house and the hub as data (<code>--tool house</code>, <code>--tool hubList</code>)</h3>
 <p>Two data tools feed the VS Code extension (the HC3 hub tree and the
 hub-aware completions) and give agents/scripts the same JSON:</p>
 <pre><code class="language-bash">flua --tool hubList                 # hub info + the hub's QuickApps (ids, names, types, rooms)
@@ -582,7 +582,7 @@ signal). <code>house</code> resolves the same priority the extension needs: HC3
 credentials first, else <code>--db</code>, else an honest empty house (a QA-only run
 has none). Both print one JSON document on stdout; the shape is the
 contract the extension and MCP clients consume.</p>
-<h3>Switching controllers (<code>--tool hub</code>)</h3>
+<h3 id="switching-controllers---tool-hub">Switching controllers (<code>--tool hub</code>)</h3>
 <p>Several HC3s? Give each a named profile and switch the <code>.env</code> chain with
 one command (design: <code>docs/notes/notes-hub-profiles.md</code>):</p>
 <pre><code class="language-bash">flua --tool hub add home http://192.168.1.20 admin   # prompts for the password
@@ -609,7 +609,7 @@ req = ApiRequest(segments=[], query={}, body={
 })
 print(plugin_update_view(state, req))   # (None, 204)
 </code></pre>
-<h3>Bridge errors</h3>
+<h3 id="bridge-errors">Bridge errors</h3>
 <p>When a Python↔Lua conversion fails inside the API bridge (a <code>lost
 reference</code> and friends), the QA sees one opaque line. <code>--%%debug:bridge=true</code>
 turns it into a diagnosis kit: the full Python traceback in the log, the
@@ -644,7 +644,7 @@ behavior is unchanged.</p>
 </tr>
 </tbody>
 </table>
-<h3>Debug logging</h3>
+<h3 id="debug-logging">Debug logging</h3>
 <p><code>--%%debug:refreshState=true,api=true,http=true</code> turns on per-category debug
 logging (any subset; it is a global directive, so an <code>--%%include</code>'d file
 can carry
@@ -672,7 +672,7 @@ it). <code>--%%debug:true</code> is shorthand for all channels on:</p>
 <p>The <code>ws</code> channel (and any other) can be turned on from the CLI without
 editing the QA's header: <code>flua --debug ws script.lua</code> (comma-separated
 channels, e.g. <code>--debug ws,api</code>) — shorthand for <code>-D debug:ws=true</code>.</p>
-<h3>Debugging real device communications</h3>
+<h3 id="debugging-real-device-communications">Debugging real device communications</h3>
 <p>flua's offline mode is <strong>a simulated HC3 with real network</strong>: <code>api.*</code> calls
 hit the sim's house state, while <code>net.*</code> (HTTP/WebSocket/MQTT clients) go
 to the real LAN. A QA under test therefore talks to the real device over
@@ -715,7 +715,7 @@ visually distinct from QA logs: a <code>[FLUA]</code> level column plus the QA t
 the message belongs to:</p>
 <pre><code>[02.10.2026][17:32:41][FLUA   ][my-qa5000]: api GET /devices/9999 -&gt; 404
 </code></pre>
-<h3>HTML in log messages</h3>
+<h3 id="html-in-log-messages">HTML in log messages</h3>
 <p>The HC3 console renders a small HTML subset in QA log lines; flua renders
 it to the terminal as well — <code>print</code> and <code>fibaro.debug</code>/<code>trace</code>/<code>warning</code>/
 <code>error</code> messages only (flua's own diagnostic lines are left alone):</p>
@@ -730,7 +730,7 @@ it to the terminal as well — <code>print</code> and <code>fibaro.debug</code>/
 </ul>
 <p>With colors on, formatting becomes ANSI; with <code>--color never</code> (or a
 non-terminal) the tags are stripped instead, so the text stays readable.</p>
-<h3>QuickApp UI (<code>--%%u</code>)</h3>
+<h3 id="quickapp-ui---u">QuickApp UI (<code>--%%u</code>)</h3>
 <p>Each <code>--%%u:</code> line defines one row of the QuickApp UI; several elements can
 share a row with <code>{{...},{...}}</code>. flua translates the rows into <strong>both</strong> UI
 property structures the HC3 understands — the legacy <code>viewLayout</code> and the
@@ -793,7 +793,7 @@ owns the view:</p>
 <p>flua's viewer executes both (UIAction via callUIEvent, direct actionNames
 as device actions). See <code>examples/child-ui.lua</code> for the child-class
 pattern (and <em>UI event dispatch on the HC3</em> below for the full model):</p>
-<h3>Child uiViews as resources (<code>--%%rsrc</code>)</h3>
+<h3 id="child-uiviews-as-resources---rsrc">Child uiViews as resources (<code>--%%rsrc</code>)</h3>
 <p>A <code>--%%rsrc:name:{rows}</code> directive declares a named child uiView — the
 rows are ordinary <code>--%%u</code> row shapes (the kind is implicit; the explicit
 <code>--%%rsrc:name:u:{rows}</code> spelling is accepted for when future kinds
@@ -931,7 +931,7 @@ array encodes as <code>[]</code>, while a plain empty table <code>{}</code> enco
 and breaks the UI. The HC3's own demos use <code>json.array()</code> for exactly this:</p>
 <pre><code class="language-lua">self:updateView(&quot;tagMulti&quot;, &quot;selectedItems&quot;, json.array())  -- [] not {}
 </code></pre>
-<h3>The UI viewer</h3>
+<h3 id="the-ui-viewer">The UI viewer</h3>
 <p><code>flua --ui [PORT]</code> serves the viewer <strong>itself</strong> over HTTP, alongside the
 simulated HC3 API — no file to open:</p>
 <pre><code class="language-bash">.venv/bin/flua --ui 8090 examples/ui.lua   # UI viewer on http://127.0.0.1:8090/
@@ -1033,7 +1033,7 @@ testing dates: leap years, DST switches, New Year logic. Combine with
 <pre><code class="language-bash">.venv/bin/flua --start &quot;2027/12/31 23:59:50&quot; script.lua
 # or in the file: --%%time:start=2027/12/31 23:59:50,instant=true
 </code></pre>
-<h3>The Lua config file</h3>
+<h3 id="the-lua-config-file">The Lua config file</h3>
 <p><code>.flua.lua</code> (in the directory you run from, or <code>~/.flua.lua</code>; the legacy
 <code>~/.plua/config.lua</code> also works) is Lua data, loaded once and merged into
 <code>_FLUA.config</code> — handy for per-machine settings:</p>
@@ -1050,7 +1050,7 @@ faulty <code>--%%var</code> expression (a syntax error, indexing a nil key) is a
 startup error — flua names the variable and exits 1 — but an expression
 that evaluates to nil (<code>config.foo</code>, <code>os.getenv("MISSING")</code>) simply leaves
 the variable unset.</p>
-<h3>Variables in packages</h3>
+<h3 id="variables-in-packages">Variables in packages</h3>
 <p>A <code>--%%var</code> can declare a <strong>package value</strong>: a quoted string after the last
 top-level comma of the expression —
 <code>--%%var:pwd=config.secretPwd,"&lt;set to service password&gt;"</code>. Commas inside
@@ -1110,7 +1110,7 @@ the local <code>.env</code> in the directory you run from, then <code>~/.env</co
 global fallback. Files are plain <code>KEY=value</code> lines (comments and quotes
 supported) and are re-read when they change — handy for API tokens and
 per-machine settings that don't belong in the QA code.</p>
-<h3>The <code>--%%include</code> defaults directive</h3>
+<h3 id="the---include-defaults-directive">The <code>--%%include</code> defaults directive</h3>
 <p>A QA can pull its defaults from another file — per-QA, explicit, and the
 path resolves relative to the main file (like <code>--%%file</code>):</p>
 <pre><code class="language-lua">--%%include:defaults.lua      -- inserts that file's directives as defaults
@@ -1133,7 +1133,7 @@ relative path must be run from the project root (flua never chdirs). This
 replaces the old <code>.directives</code> working-directory defaults (the file was
 ambiguous when QAs lived in different subdirectories — each QA now
 declares its own defaults explicitly).</p>
-<h3>Migrating from plua</h3>
+<h3 id="migrating-from-plua">Migrating from plua</h3>
 <p>plua projects migrate with a mostly mechanical pass: <code>flua --tool migrate .</code>
 scans the project for every plua-ism in one pass (directive spellings,
 script invocations, stale packages, baked IPs — exit 1 until clean), and
@@ -1157,7 +1157,7 @@ respell both when convenient. The remaining renames:</p>
 <p>The full checklist, the verified emulated-surface matrix, and the gotchas
 from real migrations live in the <code>plua-migration</code> skill
 (<code>flua --tool setup</code> installs the skill pack).</p>
-<h3>The <code>.flua-directives</code> override file</h3>
+<h3 id="the-flua-directives-override-file">The <code>.flua-directives</code> override file</h3>
 <p>Testing someone else's QA usually needs one or two overridden values — a
 password, an IP — without editing the QA (or VS Code's launch.json).
 <code>.flua-directives</code>, next to the QA's <strong>main file</strong>, is that file: the same
@@ -1179,7 +1179,7 @@ directives (<code>--%%time</code>, <code>--%%db</code>, ...) work too — they l
 shared config, like <code>-D</code> does. The file often holds secrets: gitignore it,
 or keep it expression-only (<code>os.getenv(...)</code>), reading values from the
 <code>.env</code> chain.</p>
-<h2>Multi-file QAs</h2>
+<h2 id="multi-file-qas">Multi-file QAs</h2>
 <p>On the HC3 a QA is a set of named Lua files — one is <code>main</code>. flua keeps your
 files on disk and declares the extras in the main file:</p>
 <pre><code class="language-lua">--%%file:lib.lua,lib
@@ -1206,7 +1206,7 @@ path when no name is declared) keeps today's behavior. Test-only helpers (mock-s
 libraries) can stay out of the package: plain Lua <code>require("name")</code> finds
 <code>name.lua</code> next to the main file at runtime, and require'd files are never
 packaged.</p>
-<h2>Classes (<code>class</code>)</h2>
+<h2 id="classes-class">Classes (<code>class</code>)</h2>
 <p><code>class(name)</code> is the HC3's Lua class helper — flua implements the HC3's
 (undocumented) contract, which matters when you port QAs that build their
 own class hierarchies (the Fibaro manual documents <code>net.HTTPClient</code> and
@@ -1233,8 +1233,8 @@ friends but never <code>class</code> itself). The contract:</p>
   local b = B(42)</code></p>
 <p>Methods <em>are</em> inherited (the class metatable's <code>__index</code> chain) — only
   the constructor must be redeclared per class.</p>
-<h2>The offline HC3</h2>
-<h3>Online mode — the real HC3</h3>
+<h2 id="the-offline-hc3">The offline HC3</h2>
+<h3 id="online-mode--the-real-hc3">Online mode — the real HC3</h3>
 <p>The backend is picked from the <strong>main QA's directives — <code>-D</code> flags and
 <code>.flua-directives</code> over its header over any <code>--%%include</code>'d defaults</strong>
 (see below), before the engine starts:</p>
@@ -1287,7 +1287,7 @@ stops flua immediately with a warning, because the HC3 locks itself after
 bypassing the hybrid dispatch (this is what <code>fibaro.callhc3</code> uses, and it's
 handy in test code that wants ground-truth data). Offline it stands in for
 the simulated HC3.</p>
-<h3>The FluaHelper bridge (the HC3's local-only API)</h3>
+<h3 id="the-fluahelper-bridge-the-hc3s-local-only-api">The FluaHelper bridge (the HC3's local-only API)</h3>
 <p>The HC3 serves part of its API only to LOCAL callers: the single-key QA
 variable endpoints (<code>GET /plugins/{id}/variables/{key}</code>) and the variable
 writes (<code>PUT</code>/<code>POST</code>/<code>DELETE</code>) refuse external callers, while the list
@@ -1348,7 +1348,7 @@ warning is logged). It runs in the <strong>helper's</strong> context: the QA's o
 and source-trigger data are the helper's, and actions affect the real
 controller. Avoid <code>fibaro.sleep</code> — it would block the helper's thread and
 drop the connection.</p>
-<h3>Mode × call routing (the behaviour matrix)</h3>
+<h3 id="mode--call-routing-the-behaviour-matrix">Mode × call routing (the behaviour matrix)</h3>
 <p>Where a QA's call executes — and whose state answers — depends on the
 mode and the id namespace. Emulated ids (5000 and up) always stay in the
 sim; HC3-namespace ids (below 5000) belong to the controller. The
@@ -1405,7 +1405,7 @@ matrix:</p>
 answer 501 in QA code (not the external REST's 404), and
 <code>GET /plugins/&lt;id&gt;</code> answers 501 even for the QA's own id — the variables
 endpoints are the supported read path.</p>
-<h3>Proxy mode (<code>--%%mode:proxy</code>)</h3>
+<h3 id="proxy-mode---modeproxy">Proxy mode (<code>--%%mode:proxy</code>)</h3>
 <p>To test a QA against its real UI in the phone app — or against scenes and
 other QAs on the controller — flua can deploy a <strong>proxy QuickApp</strong> on the
 HC3 (the proxy concept). The QA keeps running in the emulator while a
@@ -1469,7 +1469,7 @@ the proxy's callbacks.</p>
 (<code>FLUA_PROXY_PORT</code> in the .env chain overrides it; busy ports fall back to
 the next free one). Your machine and the HC3 must be on the same network,
 and your firewall must let the controller reach that port.</p>
-<h3>Mode comparison</h3>
+<h3 id="mode-comparison">Mode comparison</h3>
 <p>flua picks one of three modes per run: an explicit <code>--api local|remote</code> wins,
 then the main QA's directives (<code>--%%mode:...</code> — <code>-D</code> flags and
 <code>.flua-directives</code> over its header over any <code>--%%include</code>'d defaults), then
@@ -1562,7 +1562,7 @@ emulated shadow wins on id clashes, so a proxy QA and its HC3 twin (same
 deviceID) count once. An offline-pinned QA (<code>--%%mode:offline</code>) always sees
 the sim only. Custom events, global variables and the other house entities
 always live in the emulator in all three modes.</p>
-<h3>Testing against the real HC3</h3>
+<h3 id="testing-against-the-real-hc3">Testing against the real HC3</h3>
 <p>Two opt-in suites, gated so a plain <code>pytest</code> never touches the controller
 (set <code>HC3_TEST=1</code> and configure the credentials in the environment):</p>
 <pre><code class="language-bash">HC3_TEST=1 .venv/bin/pytest tests/test_hc3_live.py    # lifecycle: read-only + upload/call/delete
@@ -1618,7 +1618,7 @@ everything works between them:</p>
 </ul>
 <p>QAs find each other by name with <code>fibaro.getIds({type = "quickApp"})</code> — see
 <code>examples/qa3.lua</code> and <code>examples/qa4.lua</code> calling each other.</p>
-<h2>Loading QAs at runtime</h2>
+<h2 id="loading-qas-at-runtime">Loading QAs at runtime</h2>
 <p>From VS Code you often run one QA — let it bring up the QAs it needs:</p>
 <pre><code class="language-lua">local id = _FLUA.loadQAfromFile(&quot;examples/qa3.lua&quot;)   -- annotations parsed
 local id2 = _FLUA.loadQAfromString([[ ...inline QA... ]])
@@ -1670,7 +1670,7 @@ cannot crash against it.</p>
 endpoints with the HC3's partition model — the built-in partitions,
 deployed <code>com.fibaro.alarmPartition</code> QAs (arming dispatches to the QA's
 own <code>arm</code> action), and partitions created via <code>POST /alarms/v1/partitions</code>.</p>
-<h2>Network clients</h2>
+<h2 id="network-clients">Network clients</h2>
 <p>Real network, HC3-style APIs, all asynchronous through the pump (callbacks
 run in your QA, timers keep running while requests are in flight):</p>
 <ul>
@@ -1717,7 +1717,7 @@ listener's side.
 above 0x7F) cross the bridge byte-for-byte in both directions — a payload
 is escaped for the message bridge and un-escaped on the wire, so even a
 literal <code>\x</code> sequence in your data round-trips intact.</p>
-<h3>Mock servers (<code>net.*Server</code>)</h3>
+<h3 id="mock-servers-netserver">Mock servers (<code>net.*Server</code>)</h3>
 <p>A flua extension (no HC3 counterpart): a QA can <strong>host</strong> mock servers so its
 <code>net.*</code> clients can be tested without a controller or Python. The handler
 runs in the QA on every request; its return value is the reply. All servers
@@ -1766,7 +1766,7 @@ address base to match the QA's wire convention), <code>solaredge.lua</code> fill
 SunSpec map for a SolarEdge inverter, and <code>solaredge_mock.lua</code> wraps it in a
 QA with buttons that change the values — run it next to the user QA and
 press a button to watch the readings follow. See <code>examples/Modbus Server/README.md</code>.</p>
-<h2>Deploying to the HC3</h2>
+<h2 id="deploying-to-the-hc3">Deploying to the HC3</h2>
 <pre><code class="language-bash">.venv/bin/flua export script.lua -o myqa.fqa
 </code></pre>
 <p>Upload <code>myqa.fqa</code> through the HC3 web UI (Create QuickApp → import). The
@@ -1784,7 +1784,7 @@ runs the generated main through the normal pipeline — name, type,
 properties, UI rows, and <code>--%%file</code> extras all come back out of the
 package. The QA's own <code>--%%</code> header rides along too, so a downloaded QA's
 <code>--%%mode</code>/<code>--%%var</code> directives behave like they would unpacked.</p>
-<h3>The HC3 QA sandbox</h3>
+<h3 id="the-hc3-qa-sandbox">The HC3 QA sandbox</h3>
 <p>A QA on the real HC3 runs in a restricted Lua environment: the HC3's QA
 template (<code>quickApp.lua</code>, loaded for every QA) nils the following globals
 after its own <code>require</code>s — verified on a live HC3 5.221:</p>
@@ -1810,7 +1810,7 @@ not sandbox QAs — the emulator is a development tool. The compatibility
 contract is therefore the reverse one: a QA that stays inside the HC3's
 sandbox surface runs the same in flua; flua-only conveniences must be
 guarded, or the QA stays emulator-bound.</p>
-<h3>Loading files into a QA's environment</h3>
+<h3 id="loading-files-into-a-qas-environment">Loading files into a QA's environment</h3>
 <p>flua keeps the loaders the HC3 nils, but which environment a loaded file
 runs in is easy to get wrong. Inside a QA, the QA's <code>_G</code> <strong>is</strong> its own
 environment (<code>fibaro</code>/<code>api</code>/<code>net</code> live there); the <em>shared</em> runtime <code>_G</code>
@@ -1831,7 +1831,7 @@ has none of them. Which one each loader uses:</p>
   <code>loadfile(path, "bt", _G)</code>. (On the real HC3 all of these are nil; any
   use of them is flua-only.)</li>
 </ul>
-<h3>UI event dispatch on the HC3 (QA, children, v1, v2)</h3>
+<h3 id="ui-event-dispatch-on-the-hc3-qa-children-v1-v2">UI event dispatch on the HC3 (QA, children, v1, v2)</h3>
 <p>How an interaction becomes a method call — observed live on 5.221; the
 model below is our best reading of that behavior. Two channels exist:</p>
 <ul>
@@ -2038,7 +2038,7 @@ HC3 like the other standard properties.</p>
 <code>uploadQA</code> prints the new device id; <code>updateQA</code> puts all files at once;
 <code>downloadQA</code> writes a <code>&lt;QA-name&gt;_main_&lt;id&gt;.lua</code> main with the QA's
 directives plus the extra files — a normal flua project.</p>
-<h2>Bringing an HC3 QA home</h2>
+<h2 id="bringing-an-hc3-qa-home">Bringing an HC3 QA home</h2>
 <p>Export the QA from the HC3 UI (<code>.fqa</code>), then:</p>
 <pre><code class="language-bash">.venv/bin/flua unpack myqa.fqa -d myqa-project/
 </code></pre>
@@ -2046,7 +2046,7 @@ directives plus the extra files — a normal flua project.</p>
 from the package) with generated <code>--%%</code> directives and one file per QA file
 — the same <code>&lt;QA-name&gt;_&lt;file&gt;.lua</code> pattern <code>downloadQA</code> uses, minus the id.
 Ready for editing and debugging.</p>
-<h2>Static checks</h2>
+<h2 id="static-checks">Static checks</h2>
 <pre><code class="language-bash">.venv/bin/flua --check script.lua
 </code></pre>
 <p>Checks syntax, unknown <code>--%%</code> directives (typos), and deprecated API calls.
@@ -2071,7 +2071,7 @@ signatures render as <code>name(a, b)</code> — <code>argc</code> counts the im
 an action takes <code>argc - 1</code> arguments, named (with types) where the schema
 or the hand-maintained <code>devices/action_overrides.json</code> knows them, else
 <code>a, b, c, ...</code> placeholders.</p>
-<h3>Self-testing a QA (no repo needed)</h3>
+<h3 id="self-testing-a-qa-no-repo-needed">Self-testing a QA (no repo needed)</h3>
 <p>A QA can be its own test suite — no pytest, no repo. Assert inside the QA,
 exit with the failure count, and let the caller (a shell, CI, or a coding
 agent) check the exit code:</p>
@@ -2121,7 +2121,7 @@ with <code>t:finish()</code>/<code>exit(...)</code>) instead of blocking the res
 reports one PASS/FAIL/TIME line per file plus a summary and exits 0 only
 when everything passes: <code>FAIL bad_test.lua (failures: 1)</code>, <code>1 passed,
 1 failed, 0 timed out</code>.</p>
-<h3><code>flua doctor</code></h3>
+<h3 id="flua-doctor"><code>flua doctor</code></h3>
 <p>One command answers "why doesn't it work":</p>
 <pre><code class="language-bash">.venv/bin/flua doctor               # runtime, venv, HC3 credentials +
                                     # reachability, LuaLS/.vscode setup,
@@ -2152,7 +2152,7 @@ behavior. Bodies are truncated at 1000 chars (they may carry secrets).
 Both have <code>--%%</code> directive forms — <code>--%%trace:api,ui</code> and
 <code>--%%syslog:run.json</code> — so a run's tracing can live in the QA header, an
 <code>--%%include</code> file, or <code>.flua-directives</code> (the CLI flags win over them).</p>
-<h3>MCP server (<code>flua-mcp</code>)</h3>
+<h3 id="mcp-server-flua-mcp">MCP server (<code>flua-mcp</code>)</h3>
 <p>The same surface is available as an MCP server for hosts that prefer one
 (Claude Desktop, Copilot, …). It ships with flua:</p>
 <pre><code class="language-bash">flua-mcp                  # stdio JSON-RPC (dual-era: 2026-07-28 modern, 2025-06-18 legacy)
@@ -2205,7 +2205,7 @@ notices under the <code>flua</code> tag, and runtime-level lines untagged.
 <code>last</code>/<code>offset</code>/<code>filter</code>/<code>types</code> query params, <code>DELETE /debugMessages</code>
 clears it, <code>GET /debugMessages/tags</code> lists the QA tags seen — a
 machine-readable log feed with the same surface the real HC3 offers.</p>
-<h2>The HC3 REST API reference</h2>
+<h2 id="the-hc3-rest-api-reference">The HC3 REST API reference</h2>
 <p><code>docs/specs/hc3-api.json</code> is the checked-in structural reference of the HC3
 REST API — endpoints (method, path, parameters with types, request-body
 schemas, response status codes) and schema field names/types. It is
@@ -2214,7 +2214,7 @@ distributed: the local copy (<code>fibaro_api_docs/</code>, gitignored) is only 
 when regenerating the reference:</p>
 <pre><code class="language-bash">.venv/bin/python scripts/extract_hc3_api.py
 </code></pre>
-<h3>Registered endpoints (<code>api.registerEndpoint</code>)</h3>
+<h3 id="registered-endpoints-apiregisterendpoint">Registered endpoints (<code>api.registerEndpoint</code>)</h3>
 <p>Emulate a missing HC3 endpoint from Lua — modules can bring whole panels
 alive in the offline sim (<code>examples/mock-panels.lua</code> is one, required from
 <code>examples/uses-mock-panels.lua</code>):</p>
@@ -2249,7 +2249,7 @@ end)
 <li>Offline-sim feature: in remote mode the real HC3 owns the house and
   registered routes never apply.</li>
 </ul>
-<h2>flua extensions (<code>_FLUA</code>)</h2>
+<h2 id="flua-extensions-_flua">flua extensions (<code>_FLUA</code>)</h2>
 <p>Everything HC3-compatible is a plain global (<code>QuickApp</code>, <code>fibaro</code>, <code>api</code>,
 <code>net</code>, <code>mqtt</code>, <code>json</code>, …) — and like on the HC3 (one Lua state per QA), a
 QA's <code>_G</code> <strong>is</strong> its own environment: <code>_G.x = 1</code> writes the QA's global

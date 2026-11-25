@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>net.TCPSocket / net.UDPSocket — raw sockets from QA code</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: net-tcp-udp-sockets
+topic: runtime-net
+title: net.TCPSocket / net.UDPSocket — raw sockets from QA code
+pins:
+  - tests/test_tcp.py::test_tcp_echo_roundtrip
+  - tests/test_server.py::test_tcp_udp_ws_servers_round_trip
+verified: flua 0.1.166</p>
+<hr />
+<h1 id="nettcpsocket--netudpsocket--raw-sockets-from-qa-code">net.TCPSocket / net.UDPSocket — raw sockets from QA code</h1>
+<p>The raw transport clients (the HC3's <code>net.*</code> socket surface):</p>
+<ul>
+<li><code>net.TCPSocket</code> — connect, send/receive (text and binary round trips
+  are pinned), persistent connections.</li>
+<li><code>net.UDPSocket</code> — datagram send/receive; the engine-side UDP socket
+  binds an ephemeral socket synchronously.</li>
+</ul>
+<p>Both run their I/O on worker threads (the dedicated socket pool) so a
+blocked peer never freezes the pump — the same discipline as the other
+net classes. Binary data crosses the bridge as byte arrays
+(<code>_FLUA.escapeBytes</code>/<code>unescapeBytes</code>); keep payloads JSON-compatible.</p>
+<p>For the <em>server</em> side, see <code>net-fixture-servers</code>; for the fixture
+server round trips (tcp/udp/ws in one test), the pinned test above.</p>
+</body>
+</html>

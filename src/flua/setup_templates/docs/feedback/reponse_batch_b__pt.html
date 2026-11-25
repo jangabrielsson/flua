@@ -1,0 +1,149 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Batch B response — `--strict-tests` and `--result-json`</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="batch-b-response----strict-tests-and---result-json">Batch B response — <code>--strict-tests</code> and <code>--result-json</code></h1>
+<p>Follow-up to <code>reponse_pt.md</code>, for the "Using Flua" feedback authors.
+Released in <strong>0.1.112</strong> — the batch we scheduled as "Batch B" after your
+0.1.111 confirmation (all 32 tests passing, timer and child-removal fixes
+verified in the field).</p>
+<p>This closes the two remaining P0/P1 items from your proposal list.</p>
+<h2 id="change-01--sticky-callback-failures---strict-tests-">Change 01 — sticky callback failures (<code>--strict-tests</code>) ✅</h2>
+<p>Your exact acceptance test was:</p>
+<blockquote>
+<p>a timer assertion fails; a later callback prints success and exits 0;
+the final status is still failure. Repeat for UI and transport
+callbacks. A caught expected error passes. Legacy mode keeps its
+documented existing behaviour.</p>
+</blockquote>
+<p>All five are implemented and pinned:</p>
+<pre><code class="language-bash">flua --api local --strict-tests qa.lua     # exit 1 if any callback failed
+flua --api local -D strict-tests:true qa.lua   # the declarative spelling
+</code></pre>
+<ul>
+<li><strong>Sticky</strong>: unhandled errors at the timer, UI and net/mqtt dispatch
+  boundaries are recorded and never cleared. A later <code>_FLUA.exit(0)</code> does
+  not clear the record — the final exit is 1.</li>
+<li><strong>Boundaries</strong>: timer/UI/action callbacks record at the coroutine
+  dispatch; net/mqtt callbacks record at their handler sinks (where those
+  errors are actually caught). The record carries the dispatch kind
+  (<code>timer</code> / <code>ui</code> / <code>net</code>).</li>
+<li><strong>Caught errors pass</strong>: an error the QA code catches itself (e.g.
+  <code>pcall</code>) is not an unhandled callback error and does not fail the run.</li>
+<li><strong>Opt-in</strong>: without the flag, behavior is unchanged (callback errors
+  log and the run continues, like the HC3).</li>
+</ul>
+<p>The case you said you would test — a later callback calling
+<code>_FLUA.exit(0)</code> after an earlier failure — is pinned by
+<code>test_strict_tests_sticky_callback_failure</code> (the test asserts the later
+callback <em>did</em> run, prints <code>LATER OK</code>, and the process still exits 1).</p>
+<p>Minimal repro:</p>
+<pre><code class="language-lua">--%%mode:offline
+function QuickApp:onInit()
+  setTimeout(function() error(&quot;EXPECTED_CALLBACK_FAILURE&quot;) end, 10)
+  setTimeout(function() print(&quot;LATER OK&quot;); _FLUA.exit(0) end, 50)
+end
+</code></pre>
+<pre><code class="language-bash">flua --api local --strict-tests repro.lua; echo $?   # 1
+flua --api local repro.lua; echo $?                  # 0 (legacy unchanged)
+</code></pre>
+<h2 id="change-05----result-json-">Change 05 — <code>--result-json</code> ✅</h2>
+<pre><code class="language-bash">flua --api local --strict-tests --result-json result.json qa.lua
+</code></pre>
+<p>One machine-readable final record, written atomically (a missing file
+after a forceful kill is incomplete — never read it as a pass):</p>
+<pre><code class="language-json">{
+  &quot;schemaVersion&quot;: 1,
+  &quot;status&quot;: &quot;failed&quot;,
+  &quot;exitCode&quot;: 1,
+  &quot;runtime&quot;: {&quot;flua&quot;: &quot;0.1.112&quot;, &quot;lua&quot;: &quot;Lua 5.4&quot;, &quot;python&quot;: &quot;3.14.3&quot;},
+  &quot;clockMode&quot;: &quot;realtime&quot;,
+  &quot;wallSeconds&quot;: 0.101,
+  &quot;virtualSeconds&quot;: 0.063,
+  &quot;failures&quot;: [
+    {
+      &quot;kind&quot;: &quot;callback_error&quot;,
+      &quot;callbackKind&quot;: &quot;timer&quot;,
+      &quot;qa&quot;: 5000,
+      &quot;error&quot;: &quot;repro.lua:2: EXPECTED_CALLBACK_FAILURE&quot;
+    }
+  ],
+  &quot;cleanupComplete&quot;: true
+}
+</code></pre>
+<ul>
+<li><code>status</code> distinguishes <strong>passed</strong> / <strong>failed</strong> / <strong>timeout</strong> — the third
+  is the wall-cap case: a <code>--run-for N</code> deadline cutting pending work
+  short reports <code>"timeout"</code> with exit 1, so a hung suite can never look
+  green.</li>
+<li><code>clockMode</code> reports how the run was clocked (<code>realtime</code>, <code>speed:N</code>,
+  <code>instant</code>, <code>step</code>) — the per-run clock field we said in the previous
+  response belongs to a result record rather than <code>--version</code>.</li>
+<li>The <code>failures</code> array is the same record <code>--strict-tests</code> uses for its
+  exit-code override — one source of truth for both the exit code and the
+  JSON.</li>
+</ul>
+<h2 id="what-remains-batch-c-unscheduled">What remains (Batch C, unscheduled)</h2>
+<ul>
+<li>Change 04 — network policy profiles (<code>--network-policy
+  deny|loopback|allowlist</code>)</li>
+<li>Change 06 — <code>--capabilities-json</code></li>
+<li>Change 07 — export <code>--manifest-only</code></li>
+<li>Change 09 — event trace + resource summary</li>
+</ul>
+<p>None of these blocks the strict-testing workflow; Batch B was the piece
+that made CI results trustworthy, which is what your report asked for
+first.</p>
+<p>Please re-run your suite on 0.1.112 — in particular the
+<code>--strict-tests</code> + <code>--result-json</code> combination on your 30-check harness.
+Any findings get the same treatment as before.</p>
+<p>— flua maintainers</p>
+<hr />
+<h2 id="follow-up-batch-b-verification-results-and-one-fix">Follow-up: Batch B verification results and one fix</h2>
+<p>The authors ran their 32-check suite plus nine strict/result acceptance
+cases on 0.1.112 (Windows, Python 3.12.10): <strong>seven passed, two failed</strong> —
+both failures were the same gap: an error thrown by a <strong>mapped button
+callback</strong> (invoked through <code>UIAction</code> or <code>_FLUA.uiEvent</code>) was logged but
+not recorded, so strict mode exited 0 with an empty failures list.</p>
+<p>Their diagnosis was exact: <code>onUIEvent</code> schedules the mapped callback via
+<code>callAction</code>, whose own <code>xpcall</code> catches the action error before the outer
+coroutine dispatch can see it. Fixed: <code>callAction</code>'s framework catch
+boundary now records the failure (<code>kind: "ui"</code>) while keeping the legacy
+log-and-continue behavior and application-owned <code>pcall</code> untouched. Their
+minimal repro now exits 1 with <code>status: "failed"</code> and one <code>ui</code> failure
+record; both the <code>_FLUA.uiEvent</code> and direct <code>self:UIAction</code> spellings are
+pinned by <code>tests/test_dx.py::test_strict_tests_covers_mapped_ui_callbacks</code>.</p>
+<p>Their two remaining coverage suggestions (child UI dispatch, ordinary
+device actions) are on the list but not yet pinned — flagged honestly
+rather than claimed.</p>
+</body>
+</html>

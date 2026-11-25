@@ -1,0 +1,187 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>flua bug report — Dirigera project conversion (plua → flua)</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="flua-bug-report--dirigera-project-conversion-plua--flua">flua bug report — Dirigera project conversion (plua → flua)</h1>
+<p>Collected while checking that the Dirigera QuickApp project and its management
+scripts work after converting from plua to flua.</p>
+<ul>
+<li><strong>flua version</strong>: 0.1.98 (<code>/opt/homebrew/bin/flua</code>, Lua 5.4, Python 3.11.13)</li>
+<li><strong>Date</strong>: 2026-10-28</li>
+<li><strong>Project</strong>: Dirigera (IKEA Dirigera hub integration for HC3), main QA
+  <code>Dirigera.lua</code> + <code>Lib.lua</code> / <code>Devices.lua</code> / <code>Auth.lua</code> extras, pinned
+  <code>--%%mode:offline</code> in the header.</li>
+</ul>
+<hr />
+<h2 id="bug-1-high---api-remote-does-not-win-over-the-main-qas---modeoffline">BUG 1 (high): <code>--api remote</code> does not win over the main QA's <code>--%%mode:offline</code></h2>
+<p>The USAGE.md precedence list states <em>"an explicit <code>--api local|remote</code> always
+wins"</em>. In practice, when the <strong>main</strong> QA file has <code>--%%mode:offline</code> in its
+header, running <code>flua --api remote</code> starts the engine online (banner says
+<code>mode online</code>), but the main QA's own <code>api.*</code> calls stay pinned to the
+offline sim. This is silent: the QA happily runs against the sim while the
+user believes it talks to the real HC3.</p>
+<p>Repro (<code>/tmp/probe.lua</code>):</p>
+<pre><code class="language-lua">--%%mode:offline
+function QuickApp:onInit()
+  local info = api.get(&quot;/settings/info&quot;)
+  print(&quot;serialNumber:&quot;, info and info.serialNumber or &quot;nil&quot;)
+  _FLUA.exit(0)
+end
+</code></pre>
+<pre><code class="language-bash">$ flua --api remote /tmp/probe.lua
+🚀 flua 0.1.98 ... mode online
+serialNumber: HC3-00000000          # &lt;-- the SIM's serial
+
+$ flua --api remote -D mode:online /tmp/probe.lua
+serialNumber: HC3-XXXXXXXX          # &lt;-- the real HC3's serial (redacted)
+</code></pre>
+<p><code>_FLUA.mode</code> also reports <code>"offline"</code> for the QA in the first run.</p>
+<p>Expected behavior (options, either is fine):</p>
+<ul>
+<li><code>--api remote</code> overrides the file pin for the main QA too (as documented), or</li>
+<li>the documented per-QA pin stays, but flua then <strong>warns loudly</strong> that the
+  main QA's <code>api.*</code> calls are pinned to the sim despite <code>--api remote</code> —
+  currently there is no warning at all.</li>
+</ul>
+<p>Workaround today: <code>flua --api remote -D mode:online Dirigera.lua</code>.</p>
+<p>Related doc nit: USAGE.md documents the offline pin only for <em>secondary</em> QAs
+("<code>--%%mode:offline</code> on a secondary QA pins just that QA's api.* calls to the
+sim") — the main QA's pin behavior under <code>--api remote</code> is undocumented.</p>
+<hr />
+<h2 id="bug-2-low-flua---tool-ui-text-renderer-drops-nested-containers-legacy-viewlayout">BUG 2 (low): <code>flua --tool ui</code> text renderer drops nested containers (legacy viewLayout)</h2>
+<p>For the classic plua/HC3 row syntax <code>--%%u:{{button=...},{button=...}}</code> (two
+buttons on one row), the compiled UI is <strong>correct</strong> — the buttons exist in
+<code>viewLayout</code> (inside a <code>horizontal</code> container nested in the section item's
+<code>components</code>) and in <code>uiView</code>, and all <code>uiCallbacks</code> are generated. Only the
+text output of <code>flua --tool ui</code> is wrong: it iterates the section item's
+<code>components</code> one level deep and skips container entries, so the buttons
+simply disappear from the text dump.</p>
+<p>Minimal repro (<code>/tmp/uitest.lua</code>):</p>
+<pre><code class="language-lua">--%%name:UITest
+--%%type:com.fibaro.deviceController
+--%%u:{label=&quot;titelLabel&quot;,text=&quot;Dirigera&quot;}
+--%%u:{{button=&quot;b1&quot;,text=&quot;Request token&quot;,visible=true,onReleased=&quot;requestToken&quot;},{button=&quot;b2&quot;,text=&quot;Get token&quot;,visible=true,onReleased=&quot;getToken&quot;}}
+--%%u:{{button=&quot;b3&quot;,text=&quot;List device info&quot;,visible=true,onReleased=&quot;listDeviceInfo&quot;},{button=&quot;b4&quot;,text=&quot;Restart&quot;,visible=true,onReleased=&quot;restartQA&quot;}}
+--%%u:{multi=&quot;select_ID_4&quot;,text=&quot;Devices&quot;,visible=true,onToggled=&quot;selectDevices&quot;,options={}}
+--%%mode:offline
+</code></pre>
+<p>Actual output:</p>
+<pre><code>QA &quot;UITest&quot; (com.fibaro.deviceController)
+  label titelLabel &quot;Dirigera&quot;
+  space
+  space
+  space
+  select select_ID_4 &quot;Devices&quot; -&gt; onToggled=selectDevices
+  space
+</code></pre>
+<p>Expected: <code>button b1 "Request token" -&gt; onReleased=requestToken</code> etc. for
+b1–b4 (as the <code>uiView</code> path already renders). Root cause:
+<code>tools/ui.py</code> <code>_render_view_layout()</code> walks <code>item["components"]</code> without
+descending into nested <code>horizontal</code>/<code>vertical</code> containers; <code>_component_line()</code>
+returns <code>None</code> for containers, so everything nested inside them is invisible.
+(<code>_components()</code> used by <code>--tool ui --json</code> has the same one-level flatten,
+but the JSON dump at least contains the nested container dict with its
+buttons, so agents can recover them. <code>uiView</code>/<code>useUiView</code> paths are flat and
+unaffected.)</p>
+<hr />
+<h2 id="bug-3-minor-fidelity-pluginrestart-does-not-stop-the-current-run">BUG 3 (minor, fidelity): <code>plugin.restart()</code> does not stop the current run</h2>
+<p>On the HC3, <code>plugin.restart()</code> kills the QA immediately — code after the call
+never runs. In flua the restart is deferred: execution continues to the end of
+the current turn, and only then onInit runs again.</p>
+<p>Repro (<code>/tmp/plugintest.lua</code>):</p>
+<pre><code class="language-lua">--%%mode:offline
+function QuickApp:onInit()
+  print(&quot;before restart&quot;)
+  plugin.restart()
+  print(&quot;after restart (should not print)&quot;)
+  _FLUA.exit(0)
+end
+</code></pre>
+<pre><code class="language-bash">$ flua /tmp/plugintest.lua
+before restart
+after restart (should not print)   # &lt;-- runs, would not on HC3
+[FLUA] restarting QA
+before restart                      # &lt;-- restart happens after the turn
+</code></pre>
+<p>Real-world impact in this project is low (<code>getToken()</code> stores the token, then
+calls <code>plugin.restart()</code>; the trailing code is harmless), but any QA that
+does cleanup/unconditional work after <code>plugin.restart()</code> behaves differently
+under flua than on the controller. Worth either matching the HC3 (abort the
+current turn) or documenting the deferral in USAGE.md.</p>
+<hr />
+<h2 id="observed-not-bugs">Observed, not bugs</h2>
+<ul>
+<li><strong>Real network in offline mode</strong>: <code>net.HTTPClient</code>/<code>net.WebSocketClientTls</code>
+  really connect in offline mode (only the HC3 surface is mocked). The
+  Dirigera QA booted against the real hub, including a live WSS connection —
+  this matched the expectation for this project.</li>
+<li><strong>plua-style directives</strong> (<code>-- %%save</code>, <code>-- %%proxy</code>, <code>-- %%port</code>): flua
+  warns and ignores them. Good. (The leftovers themselves are a project-side
+  cleanup item, see appendix.)</li>
+<li><strong><code>flua --tool pack</code></strong> works on the project: 6 files
+  (<code>main, sha2, QC, Lib, Devices, Auth</code>), apiVersion 1.3, vars evaluated.</li>
+<li><strong><code>json.util.InitArray</code>, <code>plugin</code>, <code>__TAG</code>, <code>net.WebSocketClientTls</code></strong> are
+  all provided by the emulator — the ported code uses them unchanged.</li>
+</ul>
+<hr />
+<h2 id="appendix--project-side-leftovers-found-during-the-check-not-upstream">Appendix — project-side leftovers found during the check (not upstream)</h2>
+<p>For completeness; these are repo issues, not flua bugs:</p>
+<ol>
+<li><strong><code>Dirigera.lua</code> header</strong>: three dead plua directives with a space before
+   <code>%%</code> — <code>-- %%save:Dirigera.fqa</code>, <code>-- %%proxy:true</code>, <code>-- %%port=8269</code>.
+   flua warns on each (<code>flua --check</code>). They do nothing; remove them.</li>
+<li><strong>Management scripts still call plua</strong>:
+   - <code>scripts/project-config.sh</code> ARTIFACTS: <code>plua -t pack {SOURCE} {OUTPUT}</code>
+     — <strong>fails on the current sources</strong>: <code>Library not found: '$sha2.lua'</code>
+     (the <code>$sha2.lua</code>/<code>$qwikchild.lua</code> system files no longer exist in the
+     plua install). flua equivalent that works:
+     <code>flua --tool pack {SOURCE} -o {OUTPUT} -f</code> (<code>-f</code> needed to overwrite
+     <code>dist/Dirigera.fqa</code>).
+   - <code>scripts/create-release.sh</code> <code>check_dependencies</code> requires the <code>plua</code>
+     binary and points users to the plua repo — should check <code>flua</code>.
+   - <code>scripts/README.md</code> and <code>scripts/project-config.sh.example</code> document
+     plua as the packer in several places.</li>
+<li><strong>Stale artifacts</strong>:
+   - <code>dist/Dirigera.fqa</code> (Apr 2026) predates the current sources (Apr/Oct
+     2026): all 6 embedded files differ, and the <code>IP</code> var is baked as
+     <code>192.168.1.165</code> while the source says <code>192.168.50.165</code>.
+   - Root <code>Dirigera.fqa</code> (Sep 2025) is an old plua-format package (file
+     entries carry <code>"type":"lua"</code>, names like <code>"Auth;"</code>) — obsolete.</li>
+<li><strong>Baked private IP</strong>: <code>--%%var:IP="192.168.50.165"</code> packs the literal LAN
+   IP into the distributed <code>.fqa</code>. Consider a package value
+   (<code>--%%var:IP=expr,"&lt;placeholder&gt;"</code>) for distribution.</li>
+<li><strong><code>--%%mode:offline</code> pin</strong>: because of BUG 1, running this QA against the
+   real HC3 through flua requires <code>-D mode:online</code> in addition to
+   <code>--api remote</code>.</li>
+</ol>
+</body>
+</html>

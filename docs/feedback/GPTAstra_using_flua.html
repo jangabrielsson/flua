@@ -1,0 +1,312 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Experience using flua to test and debug Fibaro QuickApps</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<!--
+MIT License
+Copyright (c) 2026 Joachim Brørs Sommerfeld
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
+
+<h1 id="experience-using-flua-to-test-and-debug-fibaro-quickapps">Experience using flua to test and debug Fibaro QuickApps</h1>
+<p>Prepared 31.10.26 for upstream feedback, from an AI coding agent's perspective.</p>
+<p><strong>My assessment:</strong> flua made useful, repeatable testing of substantial QuickApps possible without deploying them to an HC3. It helped expose a real application defect, exercise UI callbacks and asynchronous cleanup, and test hours of scheduled behavior quickly. The main cost was preparing a trustworthy harness and deciding whether a failure belonged to the QA, the emulator, or the test's timing assumptions.</p>
+<p>This report reconstructs the work from saved tests, logs and results, primarily for <code>000.Plua Template</code>, with supporting examples from KNX QuickApps. It distinguishes those historical runs from checks made while writing this report. The complete QA suites were <strong>not rerun</strong> for this report. No HC3 access or deployment was performed to prepare it.</p>
+<p>The environment was Windows/PowerShell, a separate <code>.venv-flua</code>, Python 3.13.6, lupa 2.6 and an engine reporting Lua 5.4. We also used separate Lua 5.3 unit tests for HC3 compatibility. Those unit tests are not flua assertions.</p>
+<table>
+<thead>
+<tr>
+<th>Evidence</th>
+<th>Version and result</th>
+<th>Qualification</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Original template pilot, 25.10.26</td>
+<td>flua 0.1.84; adapted controls 100/100, long timers 13/13</td>
+<td>Raw controls were 98/100; backup validation found three failures; full-template restart failed.</td>
+</tr>
+<tr>
+<td>Template corrections, 28–29.10.26</td>
+<td>Logs still identify 0.1.84; final regression set: 139 flua assertions and 73 separate Lua 5.3 tests passed</td>
+<td>Controls retained a response adapter; full restart was not retested.</td>
+</tr>
+<tr>
+<td>KNX scenarios, 28.10.26</td>
+<td>0.1.84 baselines: ISE health 104, ISE reads 59, gateway reads 52, logger 30 passing assertions</td>
+<td>Synthetic KNX responses and blocked external calls.</td>
+</tr>
+<tr>
+<td>Upgrade verification, 29.10.26</td>
+<td>0.1.104 MCP handshake, documentation access and 17/17 async assertions passed</td>
+<td>A targeted check, not a repeat of all earlier suites.</td>
+</tr>
+<tr>
+<td>Initial report checks, 31.10.26</td>
+<td><code>.venv-flua</code> CLI reports 0.1.104 / Lua 5.4 / Python 3.13.6; property-route behavior checked directly</td>
+<td>Package/docs inspection and an in-process Python route probe; no full QA run.</td>
+</tr>
+<tr>
+<td>Credential follow-up, 31.10.26</td>
+<td>A second installation in <code>.venv</code> reports flua 0.1.111 / Lua 5.4 / Python 3.14.2 and supports <code>svar</code></td>
+<td>Parser and packaging-helper checks with dummy values; VS Code's configured <code>flua.executable</code> still points to <code>.venv-flua</code> 0.1.104.</td>
+</tr>
+</tbody>
+</table>
+<p>Sources: <a href="tests/flua_template/README.html">template pilot and follow-up report</a>, <a href=".validation/template-async-20261029/results.json">template regression results</a>, <a href="tests/flua_ise/README.html">ISE</a>, <a href="tests/flua_gateway/README.html">gateway</a>, <a href="tests/flua_knx_log/README.html">logger</a>, <a href=".validation/flua-update-20261029/mcp-verification.json">upgrade verification</a>. These are local evidence links; the descriptions and figures here are intended to remain understandable when this document is shared alone.</p>
+<p><strong>1. The best result was finding an actual QA defect.</strong></p>
+<p>The original backup tests showed that the template accepted a backup belonging to another UUID, accepted an unsupported schema, and restored keys outside its configured allowlist. The scenario returned six passes and three failures. Repeating the negative cases with a normal clock reproduced them, which helped separate application behavior from accelerated-time artifacts.</p>
+<p>After the template was corrected locally, the same scenario passed all nine assertions. A separate set of 26 Lua 5.3 unit tests covered additional failure paths, including unavailable reads, local-value precedence and rollback. This is the strongest evidence of flua's value: it supported a failing-test → targeted fix → regression-test workflow for code that stores user settings.</p>
+<p>Upstream should retain and promote this style of example: a realistic negative test against an existing multi-file QA, with a clear before/after result. A small self-testing lamp is useful for learning, but a persistence failure example demonstrates why the tool matters.</p>
+<p><strong>2. Testing UI behavior and event handling was practical.</strong></p>
+<p>We exercised real QA callbacks, short/cancelled/completed holds, enable/disable transitions, Show Details output, backup switching, managed timer cleanup and 40-to-1 render coalescing. MCP action/probe tools made it possible to inspect simulated properties, updated view data and logs without using a browser for every assertion.</p>
+<p>The passive KNX logger was another good example. Its 30-assertion scenario included a burst of events and 10,000 events while paused. It verified that collection remained bounded, the displayed log stayed frozen during pause, and resuming showed the collected data. This gave much better evidence than simply observing that <code>onInit</code> completed.</p>
+<p>These checks verified simulated state and rendered text. They did not establish physical HC3/mobile layout, physical KNX telegram exchange or notification delivery.</p>
+<p><strong>3. Virtual time and machine-readable results substantially improved the workflow.</strong></p>
+<p>At speed 1800, the template's long-timer scenario covered details auto-hide, daily backup and 24-hour debug expiry without waiting a day. ISE scenarios similarly exercised heartbeat cycles, missed responses, recovery and duplicate-alert suppression.</p>
+<p>The combination of <code>flua-test</code>, process exit codes, JSON logs and MCP summaries was well suited to an agent. Filtered logs reduced noise while summary counts still described the complete run. Bundled documentation available through <code>docs_list</code> / <code>docs_read</code> also helped: the agent could consult the installed tool's documentation directly.</p>
+<p>These are existing strengths worth keeping. The remaining improvement is making the appropriate clock and the meaning of the final verdict equally easy to discover.</p>
+<p><strong>4. Existing PLua projects needed more preparation than a simple run command suggested.</strong></p>
+<p>All 16 companion includes in the original template failed static checking because its <code>--%%file</code> paths were workspace-relative, while flua resolved them relative to the main file. The resulting path effectively repeated the QA directory. Other project checks also needed to account for PLua library aliases and unsupported directives such as <code>project</code> and <code>desktop</code>.</p>
+<p>We generated wrappers that resolved includes explicitly, selected offline mode, installed test hooks and recorded source hashes. Production files stayed unchanged during the pilot. That was workable, but it required project-specific Python/Lua glue before behavioral debugging could begin.</p>
+<p><strong>Suggested improvement:</strong> make a failed include diagnostic show the declared path, the base directory, the resolved path and a likely migration remedy. Document a first-class “test an existing PLua project without rewriting it” recipe, including aliases, companion load order and unsupported-but-harmless directives. The installed package already has migration tooling; this request is for a clear non-destructive testing workflow and better diagnostics, not a claim that migration support is absent.</p>
+<p>Evidence: <a href="tests/flua_template/build.py">wrapper builder</a> and <a href=".validation/m10-f2-20261029/run_flua.py">cross-QA smoke harness</a>.</p>
+<p><strong>5. A property-response mismatch caused misleading application failures.</strong></p>
+<p>In the original pilot, <code>GET /devices/5000/properties/useUiView</code> returned bare <code>false</code> with status 200. The template expected an object containing <code>value</code>, consistent with the HC3 contract recorded in this workspace. It therefore left its detected view as <code>unknown</code>. Two control assertions failed.</p>
+<p>A narrowly scoped test adapter wrapped successful scalar property responses as <code>{value=...}</code>. The controls then passed 100/100. That result is conditional on the adapter; it is not proof of unmodified flua compatibility. The adapter remained in the later template runs.</p>
+<p>While preparing this report, I directly invoked the installed 0.1.104 Python <code>device_property_get</code> route with a synthetic device. It still returned the supplied property itself, rather than an envelope:</p>
+<table>
+<thead>
+<tr>
+<th>Supplied property</th>
+<th>Returned data</th>
+<th>HTTP status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>false</code></td>
+<td><code>false</code></td>
+<td>200</td>
+</tr>
+<tr>
+<td><code>true</code></td>
+<td><code>true</code></td>
+<td>200</td>
+</tr>
+<tr>
+<td><code>0</code></td>
+<td><code>0</code></td>
+<td>200</td>
+</tr>
+<tr>
+<td><code>""</code></td>
+<td><code>""</code></td>
+<td>200</td>
+</tr>
+<tr>
+<td><code>{"nested":false}</code></td>
+<td><code>{"nested":false}</code></td>
+<td>200</td>
+</tr>
+</tbody>
+</table>
+<p>This was an in-process route check, not an end-to-end Lua/API or fresh physical HC3 comparison. The implementation is <code>flua/api/routes/devices.py</code>, function <code>device_property_get</code>.</p>
+<p><strong>Suggested improvement:</strong> verify and pin this endpoint against an HC3 capture, including <code>false</code>, zero, empty strings, object values and missing properties. If different calling surfaces intentionally have different response shapes, document them explicitly. Do not make users weaken valid QA-side response validation to accommodate a simulator mismatch.</p>
+<p><strong>6. Clock selection sometimes looked like an application bug.</strong></p>
+<p>Instant mode produced bunched callbacks and ordering failures in the template tests. Normal-speed controls passed, and paced long-timer runs passed with suitable observation margins. UI-event injection is asynchronous: asserting immediately after dispatch can observe the old state.</p>
+<p>In an ISE run at 60× speed, only 14 of 18 startup reads had completed at a 25-second virtual checkpoint. The recorded diagnosis was Windows timer granularity. Widening the test checkpoint to 60 virtual seconds resolved it, and an independent normal-speed run confirmed completion at 19 seconds. We preserved production's one-second pacing.</p>
+<p>The installed package now documents <code>--step</code> and exposes <code>step</code> through MCP <code>qa_run</code>. Its <code>quickapp-test</code> skill already explains why instant mode is unsuitable for some clock-dependent logic. We did not validate step mode against these historical scenarios.</p>
+<p><strong>Suggested improvement:</strong> put the same clock-selection guidance in every quick-start and agent entry point. Show when to use normal time, paced acceleration, step mode and instant mode; include one asynchronous UI example and a bounded “wait until condition” example. Existing timer traces should be the next diagnostic step when timing assumptions fail.</p>
+<p><strong>7. Full-template restart exposed a difficult historical failure.</strong></p>
+<p>On 0.1.84, restarting the full template failed before its second <code>onInit</code>, with <code>Error in bootstrap: lost reference</code> and <code>init.lua:1240</code> in the traceback. It also reproduced through MCP session/action/probe calls on a smoke wrapper without test assertions. A minimal restart QA passed and retained storage.</p>
+<p>An EventLib reload message appeared nearby, but that does not identify EventLib as the cause. The full restart was not retested in the later template corrections. Factory Reset's seven passing assertions stopped at an intercepted restart request, so they do not prove post-reset startup.</p>
+<p>The installed documentation includes a separate <code>updateView</code> aliasing / <code>lost reference</code> report and describes a fix in 0.1.87. That is a useful investigation lead, not evidence that our template failure had the same cause or is fixed in 0.1.104.</p>
+<p><strong>Suggested next step:</strong> rerun a preserved full-template reproduction on the current engine, then reduce companion libraries and state only if it still fails. Use the bridge diagnostics already shipped. A regression should verify actual second startup and retained storage, rather than replacing restart with a mock or invoking <code>onInit</code> on the same object.</p>
+<p>Historical evidence: <a href="tests/flua_template/results.json">original results</a>, key <code>lifecycle_full</code>, and the minimal-restart result described in the <a href="tests/flua_template/README.html">pilot report</a>.</p>
+<p><strong>8. Assertion counts alone were not a sufficient run verdict.</strong></p>
+<p>The historical lifecycle failure had exit code 1, but its assertion summary had zero failed assertions: startup failed before the suite could finish. The bootstrap error appeared at INFO level. An agent filtering only ERROR logs, or checking only <code>summary.failures == 0</code>, could reach the wrong conclusion.</p>
+<p>We learned to read exit status, bootstrap/runtime messages, assertion totals, completion and any time limit together. A successful <code>qa_start</code> response means that a session was created; it does not establish that initialization or the intended scenario succeeded.</p>
+<p><strong>Suggested improvement:</strong> expose a normalized outcome such as <code>passed</code>, <code>assertion_failed</code>, <code>runtime_error</code>, <code>timeout</code> or <code>incomplete</code>, alongside an explicit suite-completed marker. Preserve assertion totals as separate data. Include runtime errors in the default failure-focused output regardless of the original log level. A regression for “bootstrap failure before <code>finish()</code>” would protect this behavior.</p>
+<p><strong>9. Documentation and skill consistency need attention.</strong></p>
+<p>Several useful capabilities already exist, including step mode, structured traces, bridge diagnostics, <code>doctor --no-network</code>, migration tooling, record/replay, mock servers and <code>flua test</code>. We should use and improve discovery of these before asking upstream to build duplicates. Their presence in the installed package is not a claim that we exercised all of them.</p>
+<p>However, the installed 0.1.104 setup templates and the corresponding workspace copies contain conflicting instructions. File hashes matched for the setup, troubleshooting and test skills and the QuickApp instruction sheet, so the following examples are not solely an old local-copy problem:</p>
+<table>
+<thead>
+<tr>
+<th>Document</th>
+<th>Problem</th>
+<th>Requested correction</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>flua-setup/SKILL.md</code></td>
+<td>Says ONLINE is the default in one section, then correctly says offline in another</td>
+<td>State the same default throughout, and use explicit local mode in offline examples.</td>
+</tr>
+<tr>
+<td><code>quickapp-dev.instructions.md</code></td>
+<td>Its mode example says <code>online (default)</code></td>
+<td>Correct it to match the current engine.</td>
+</tr>
+<tr>
+<td><code>flua-setup/SKILL.md</code></td>
+<td>Describes generated LuaLS configuration as Lua 5.5, while this installation reports Lua 5.4</td>
+<td>Align editor guidance with the intended runtime; tell the agent to record <code>--version --machine</code> and distinguish the emulator from the target HC3 language baseline.</td>
+</tr>
+<tr>
+<td>Quick reference versus <code>quickapp-test</code></td>
+<td>The short reference leads with instant mode without the longer skill's caveat</td>
+<td>Put a brief clock-selection rule beside the first accelerated-time command.</td>
+</tr>
+<tr>
+<td><code>flua-troubleshooting/SKILL.md</code></td>
+<td>Recommends the retired <code>.directives</code> file</td>
+<td>Explain the current <code>--%%include</code> and <code>.flua-directives</code> mechanisms and their different purposes.</td>
+</tr>
+<tr>
+<td><code>flua-troubleshooting/SKILL.md</code></td>
+<td>Uses <code>pip show flua</code> when the installed distribution is <code>fibaro-flua</code></td>
+<td>Use the selected interpreter with <code>python -m pip show fibaro-flua</code>; apply the correct distribution name to reinstall instructions too.</td>
+</tr>
+</tbody>
+</table>
+<p>Automated consistency checks between canonical docs, generated skills and quick references would help prevent these contradictions from being copied into new projects.</p>
+<p>There is also <strong>local documentation debt</strong>: our flua guide and root routing text still describe an uninstalled pilot, and some guide paths moved under <code>A.Main/</code>. Those are our workspace's maintenance issues, not flua runtime bugs.</p>
+<p>The initial Windows MCP setup hit a Unicode decoding error in the verification subprocess. Running the venv interpreter with <code>-X utf8</code> resolved that setup issue. Windows examples should demonstrate interpreter selection, UTF-8 handling and checking CLI/MCP versions. This does not establish a current flua server encoding defect.</p>
+<p><strong>10. The missing skill is an integrated debugging workflow for an existing QA.</strong></p>
+<p>We had individual recipes for tests, migration and troubleshooting, but still had to assemble the practical sequence ourselves. The most helpful addition would be a vendor-neutral skill or worked example that guides an agent through:</p>
+<ul>
+<li>Recording engine, Python and Lua versions and resolving the complete companion-file graph.</li>
+<li>Running existing production source through an isolated test wrapper, with every adaptation disclosed.</li>
+<li>Seeding devices and controlling external events without accidentally exercising real integrations.</li>
+<li>Choosing a clock, waiting for asynchronous effects and checking explicit suite completion.</li>
+<li>Separating an application defect, a simulator contract mismatch and an invalid test assumption.</li>
+<li>Testing restart as a distinct boundary, then producing a small reproduction and a shareable evidence bundle.</li>
+</ul>
+<p>For request and lifecycle testing, examples should include lost, late and duplicate callbacks, callbacks delivered after cancellation, and replacement of an in-flight operation. We used custom doubles to exercise those cases. An unreachable port or simple echo server does not cover all of them.</p>
+<p>The installed tools already supply much of the machinery. The request is to connect them into a reliable path an agent can follow without discovering each piece independently.</p>
+<p><strong>11. Offline mode and a network-isolated test are different guarantees.</strong></p>
+<p>We explicitly selected the local simulator and separately replaced outgoing HTTP calls. Other harnesses intercepted KNX/device actions and blocked UDP. One async scenario deliberately attempted an HTTP request and verified that the wrapper blocked it.</p>
+<p>Those guards were important because selecting a simulated HC3 is not, by itself, evidence that every <code>net.*</code> path is contained. Our HTTP wrapper also was not a universal network sandbox.</p>
+<p><strong>Suggested improvement:</strong> make the effective HC3 mode and outbound-network policy visible together in the test workflow. Provide a documented strict test configuration, or a reusable guard, that denies unexpected traffic and reports attempted destinations without exposing credentials. Make unexpected requests fail tests unless they are explicitly part of the scenario.</p>
+<p>This would reduce custom harness code and make the meaning of “offline test passed” more precise.</p>
+<p><strong>12. Evidence packaging and small local changes would make the next run easier.</strong></p>
+<p>Source hashes helped us distinguish the original 17-file template pilot from the later 18-file version with its Requests companion. Preserved logs also prevented us from incorrectly assigning all tests dated 29.10.26 to the newer flua version installed that day.</p>
+<p>An upstream report/export recipe should collect versions, source hashes, command/MCP arguments, clock settings, fixtures, adapters, exit status, suite completion and trace locations. It should redact credentials and make omitted integration coverage explicit. This could build on existing diagnostics rather than introducing another independent framework.</p>
+<p>For this workspace, I suggest two small additions; neither was applied while writing this report:</p>
+<ul>
+<li><strong>Root <code>AGENTS.md</code>, Working style, immediately after local PLUA validation:</strong> “For flua validation, record the installed runtime version, use explicit local mode, and isolate external network calls. Keep test wrappers and response adapters separate from production source. Choose clock mode from the installed <code>quickapp-test</code> guidance. A pass requires a successful process outcome and completed assertions; list adapters and unverified hardware behavior.” Also replace the flua routing bullet's “not installed yet” wording and point it to <code>A.Main/Flua/agents_flua.md</code>.</li>
+<li><strong><code>000.Plua Template/README.md</code>, beside its testing guidance:</strong> add: “For offline regression testing, follow <code>tests/flua_template/README.md</code> and generate wrappers with <code>tests/flua_template/build.py</code> into a new evidence directory after intentional source changes. Preserve earlier manifests. Record mocks and adapters, require an explicit completed-suite verdict, and test actual restart separately from same-object <code>onInit</code> re-entry. Reuse the template's managed-timer and request-guard helpers when adding asynchronous behavior.”</li>
+</ul>
+<p><strong>13. Adopt <code>--%%svar</code> for credential variables where the toolchain supports it.</strong></p>
+<p>Following the user's requested convention, use secret-variable declarations for passwords, tokens, API keys and credentials such as these:</p>
+<pre><code class="language-lua">--%%svar:hc3_user=&quot;&quot;
+--%%svar:hc3_password=&quot;&quot;
+</code></pre>
+<p>This is an existing feature in the separately installed flua 0.1.111, not a missing feature request. It creates QuickApp-variable entries with <code>type="password"</code>; the bundled documentation describes masking in the HC3 web variable editor. QA code still reads the value through <code>self:getVariable(...)</code>, and API access can still expose it. The directive does not encrypt credentials or automatically remove them from logs, backups or packages.</p>
+<p>Keep source defaults empty and supply actual credentials through private local configuration. If a local <code>.flua-directives</code> file overrides a secret variable, it must also use <code>svar</code>: a same-named <code>svar</code> takes precedence over <code>var</code>, so leaving the existing plain-<code>var</code> override can cause the blank secret default to win. For this workspace's existing configuration pattern, the matching declarations would be:</p>
+<pre><code class="language-lua">--%%svar:hc3_user=config.hc3_177 and config.hc3_177.user or &quot;&quot;,&quot;&quot;
+--%%svar:hc3_password=config.hc3_177 and config.hc3_177.password or &quot;&quot;,&quot;&quot;
+</code></pre>
+<p>The final <code>,""</code> explicitly requests a blank distribution value. <code>svar</code> alone is not a promise that a shared FQA contains no credentials: without a package value, the evaluated value can be exported. Verify both <code>initialProperties.quickAppVariables</code> and the embedded source in generated packages. Personal uploads use the evaluated value, so distribution blanks are not a substitute for deployment authorization.</p>
+<p><strong>Compatibility matters here.</strong> Source inspection found support in <code>.venv</code> flua 0.1.111, but not in <code>.venv-flua</code> flua 0.1.104 or the inspected PLua 1.3.14/1.3.16 parsers. Those PLua versions ignore the unknown directive. Replacing <code>var</code> with <code>svar</code> in a PLua-packaged QA could therefore omit its variables. The current VS Code setting and PLua deploy tasks have not been switched, and production QA declarations and local credential overrides were not migrated for this report. Avoid adding duplicate <code>var</code>/<code>svar</code> declarations to hide that incompatibility.</p>
+<p>A local check of 0.1.111's parser accepted the exact two empty declarations above. A separate call to its packaging helper with dummy credentials and blank package values produced two <code>password</code>-typed entries with blank values and removed the dummy literals from embedded source. This was a parser/helper check without the QA engine or network, not fresh HC3 editor verification.</p>
+<p><strong>Suggested upstream improvement:</strong> make this feature prominent in credential examples and migration checks, including its minimum supported release, matching override directives, package-value behavior and UI-masking limits. A capability/version check should identify which executable the CLI, editor and MCP actually use; this workspace's two flua installations demonstrate why checking only one can be misleading.</p>
+<p><strong>Suggested root <code>AGENTS.md</code> addition</strong>, under Working style beside the credential-handling rules, not applied:</p>
+<blockquote>
+<p>Use <code>--%%svar</code> for password, token, API-key and credential QuickApp variables when the selected run/package tool supports it. Keep source defaults blank, use matching <code>svar</code> local overrides, and explicitly blank distribution values. Verify the generated variable type and absence of secrets in exported properties and embedded source. <code>svar</code> masks the editor; it does not encrypt values or make logging safe. Check PLua/flua compatibility before converting an existing QA.</p>
+</blockquote>
+<p>If upstream can address only a few items first, my priorities are:</p>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Work</th>
+<th>Observable success</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>High</td>
+<td>Property-endpoint contract, finding 5</td>
+<td>A captured HC3 contract and regression cases remove the need for the template's scalar-response adapter.</td>
+</tr>
+<tr>
+<td>High</td>
+<td>Complete versus failed/incomplete run outcomes, finding 8</td>
+<td>A bootstrap failure cannot look successful when assertion failures are zero or logs are filtered.</td>
+</tr>
+<tr>
+<td>High</td>
+<td>Consistent generated instructions, findings 6 and 9</td>
+<td>Freshly installed guidance agrees on mode defaults, runtime discovery and clock choice.</td>
+</tr>
+<tr>
+<td>Next</td>
+<td>Existing-project harness and fault-injection recipe, findings 4 and 10</td>
+<td>An agent can test a multi-file PLua QA and reproduce asynchronous failures without building substantial scaffolding first.</td>
+</tr>
+<tr>
+<td>Next</td>
+<td>Credential examples and toolchain capability checks, finding 13</td>
+<td>Secret variables retain their type and intended values through local overrides and packaging, without exposing credentials in distribution artifacts.</td>
+</tr>
+<tr>
+<td>Investigate</td>
+<td>Historical restart case, finding 7</td>
+<td>A current-version rerun either closes the old finding or produces a reduced, attributable regression.</td>
+</tr>
+</tbody>
+</table>
+<p>The tests give me confidence in using flua as an everyday tool for QA logic and regression work. The remaining improvement is reducing the effort required to explain exactly what a passing or failing run proves.</p>
+</body>
+</html>

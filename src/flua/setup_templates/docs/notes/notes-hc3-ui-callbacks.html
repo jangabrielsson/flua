@@ -1,0 +1,123 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Note: HC3 upload mangles custom UI handler names (field report + fix)</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="note-hc3-upload-mangles-custom-ui-handler-names-field-report--fix">Note: HC3 upload mangles custom UI handler names (field report + fix)</h1>
+<p>Status: fixed (2026-11-11) — a user's QA, packed by flua and uploaded to
+the HC3, had every button's custom handler replaced by the HC3's generated
+default: button <code>b2</code> with <code>onReleased='zoneDownButton'</code> came up on the
+controller as <code>onReleased='uib2OnReleased'</code> (<code>ui&lt;element&gt;&lt;eventType&gt;</code>),
+and taps logged "Class does not have uib2OnReleased function defined —
+action ignored".</p>
+<h2 id="the-diagnosis-chain">The diagnosis chain</h2>
+<ol>
+<li><strong>flua's package carried the right names</strong> — <code>uiCallbacks</code> with
+   <code>zoneDownButton</code>; verified in the packed .fqa.</li>
+<li><strong>The HC3's runtime dispatches through the stored uiCallbacks.</strong> The
+   descrambled fengari runtime (<code>dev/fengari_runtime.formatted.lua</code>)
+   builds <code>UICB[name .. "|" .. eventType] = callback</code> and calls
+   <code>qa[cb]</code> — no name generation there.</li>
+<li><strong>The actual trigger: <code>initialProperties.apiVersion</code>.</strong> The HC3's
+   JSON create (<code>POST /quickApp</code>) decides the package's format by that
+   field. WITHOUT it, the package is treated as legacy: the controller
+   converts the UI to uiView (useUiView becomes true) and re-derives
+   uiCallbacks with generated default names. WITH it (<code>"1.3"</code>) the
+   create preserves the package verbatim. Live-verified by bisection on
+   5.221.22: <code>UP.fqa + apiVersion</code> survives the JSON create; the same
+   package without it mangles. Headers (including plua's full set +
+   Fibaro-User-PIN), Host header, trailing slash, useUiView/uiView,
+   typeTemplateInitialized and useEmbededView were all probed and ruled
+   out. plua worked all along because its fqa builder copies <code>apiVersion</code>
+   into initialProperties — its packages carried the marker, flua's
+   didn't.</li>
+<li><strong>The web UI's Import button</strong> (<code>POST /quickApp/import</code>, multipart)
+   preserves ANY package — that is a separate pipeline, which is why the
+   tools switching to it also fixed the symptom (and remains the tools'
+   path).</li>
+</ol>
+<h2 id="the-fix">The fix</h2>
+<ul>
+<li><strong><code>qa_export</code> carries <code>initialProperties.apiVersion: "1.3"</code></strong> — the
+  real fix: any importer that posts the .fqa to the JSON create preserves
+  it, including a QA doing a plain
+  <code>api.post("/quickApp/", json.encode(fqa))</code> — no multipart needed.</li>
+<li>The tools also use <code>POST /quickApp/import</code> (multipart, <code>file</code> part with
+  a <strong>filename</strong> — a filename-less part crashes the handler with a
+  bodyless 500, live-verified) — belt-and-braces plus web-UI parity.
+  Every QA-create path goes through it: uploadFQA, uploadQA (new QA),
+  installHelper, proxy deploy. The offline sim keeps the JSON create (the
+  sim never re-derives).</li>
+<li>The sim parses the multipart import format too (<code>_fqa_from_multipart</code></li>
+<li>the ApiServer's multipart passthrough) and offline loopback
+  <code>127.0.0.1:11111</code> rewrites to the sim's <code>--ui</code> server, so both
+  install flows are testable in the emulator. The sim's JSON create also
+  imports <code>.fqa</code> bodies (raw or <code>{file: base64}</code>) like the real HC3, and
+  warns when a QA installs a package WITHOUT the apiVersion marker (the
+  real HC3 would re-derive its callbacks).</li>
+</ul>
+<h3 id="the-import-endpoints-parser-is-strictly-multipart">The import endpoint's parser is strictly multipart</h3>
+<p>A raw JSON .fqa body at <code>POST /quickApp/import</code> dies with HTTP 500
+<code>{"reason":"Network error","message":"Field name too long"}</code> — the handler
+parses ANY body as multipart form fields (live-verified). So the
+multipart recipe (quickapp-patterns skill) is for packages WITHOUT
+<code>initialProperties.apiVersion</code>; with the marker, plain <code>api.post</code> to
+<code>/quickApp/</code> suffices.</p>
+<h3 id="why-the-proxy-never-showed-the-problem">Why the proxy never showed the problem</h3>
+<p>Two reasons, both visible in the code:</p>
+<ol>
+<li><strong>The proxy's dispatch bypasses uiCallbacks.</strong> <code>onUIEvent</code> checks
+   <code>quickApp.UIHandler</code> FIRST — the proxy shim defines
+   <code>QuickApp:UIHandler(ev)</code> and forwards every UI event to the emulator
+   over HTTP, so the uiCallbacks table is never consulted.</li>
+<li><strong>The mirror re-syncs the UI properties anyway.</strong> On proxy runs flua
+   PUTs the correct <code>viewLayout</code>/<code>uiView</code>/<code>uiCallbacks</code> to the HC3 device
+   (<code>sync_proxy_ui</code>), overwriting the import's mangled table.</li>
+</ol>
+<p>Also kept from the earlier rounds (export-shape parity, harmless):
+<code>qa_export</code> emits <code>viewLayout</code> + <code>uiCallbacks</code> only for legacy QAs (no
+uiView/useUiView), no event fields on the elements,
+<code>typeTemplateInitialized: true</code>, empty userDescription/initialInterfaces
+omitted. None of these were the trigger, but they keep flua's packages
+close to the HC3's own export shape.</p>
+<p>Pinned by <code>tests/test_tools.py::test_upload_fqa_uses_the_web_import_endpoint</code>,
+<code>test_pack_legacy_ui_matches_the_hc3_export_shape</code> (apiVersion asserted),
+and the ui_server loopback/multipart tests.</p>
+<h2 id="open-verification">Open verification</h2>
+<ul>
+<li>The uiView-active case (<code>--%%useUiView:true</code>) — the apiVersion marker
+  applies the same way; not separately probed.</li>
+<li>The proxy's deploy still uses JSON <code>POST /quickApp</code> and repairs
+  uiCallbacks via updateProperty afterwards — with the apiVersion marker
+  its create would now also preserve; switching is optional parity.</li>
+</ul>
+</body>
+</html>

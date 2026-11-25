@@ -1,0 +1,250 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>flua project review — 2026-11-03</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="flua-project-review--2026-11-03">flua project review — 2026-11-03</h1>
+<h2 id="executive-summary">Executive summary</h2>
+<p>flua is a capable, unusually well-documented development environment for
+Fibaro QuickApps. Its strongest design choice is not the breadth of its
+emulation, but the clear execution contract underneath it: a single Lua-entry
+pump, message-based Python/Lua communication, per-QA isolation, virtual time,
+and explicit offline/online/proxy modes. The offline-first default is both a
+good safety boundary and a strong fit for fast iteration.</p>
+<p>The project also takes the user journey seriously. A beginner can move from
+installing the tool to building, testing, and deploying a QuickApp, while
+experienced developers get a CLI, VS Code integration, REST simulation,
+network libraries, and an agent-facing MCP interface.</p>
+<p>The main risks are now about <strong>managing the size of the product</strong>: core
+orchestration is concentrated in large modules; runtime and compatibility
+details are not presented as one easy-to-verify matrix; and the simulator's
+deliberate partial parity is easier to discover in reference material than at
+the point where a user first encounters it. These are manageable risks, not
+reasons to redesign the architecture.</p>
+<h2 id="at-a-glance">At a glance</h2>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Assessment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Runtime architecture</td>
+<td>Strong principles and clear behavioral contracts</td>
+</tr>
+<tr>
+<td>Offline development and safety</td>
+<td>Excellent; offline is the default and online is opt-in</td>
+</tr>
+<tr>
+<td>QuickApp onboarding</td>
+<td>Strong, especially the step-by-step tutorial</td>
+</tr>
+<tr>
+<td>Testing and packaging discipline</td>
+<td>Strong automated coverage and a useful wheel smoke test</td>
+</tr>
+<tr>
+<td>HC3 parity transparency</td>
+<td>Honest reference material, but the limits could be more visible in the workflow</td>
+</tr>
+<tr>
+<td>Maintainability</td>
+<td>Good modular boundaries in some areas; too much responsibility still sits in <code>engine.py</code></td>
+</tr>
+<tr>
+<td>Compatibility communication</td>
+<td>Needs a single, current statement of the supported Python/Lua/runtime combinations</td>
+</tr>
+</tbody>
+</table>
+<h2 id="what-is-working-well">What is working well</h2>
+<h3 id="1-a-coherent-execution-model">1. A coherent execution model</h3>
+<p>The single-entry rule—Lua is entered only by the pump—keeps the Python/Lua
+boundary understandable and avoids a class of reentrancy problems. Messages
+cross the boundary as data rather than function references, and the docs
+explain how timers, callbacks, network work, and remote API calls fit into
+that model. Per-QA coroutine suspension also means that one QA waiting for
+sleep or a remote call does not have to stop every other QA.</p>
+<p>The architecture is supported by explicit contracts rather than relying only
+on comments: <a href="ARCHITECTURE.html">ARCHITECTURE.md</a>,
+<a href="./concurrency.html">docs/concurrency.md</a>, and
+<a href="./invariants.html">docs/invariants.md</a> describe the rules and point to tests
+that pin important behavior. This is a strong foundation for making changes
+without silently breaking timing, event ordering, or identity semantics.</p>
+<h3 id="2-offline-first-is-a-good-product-and-safety-decision">2. Offline-first is a good product and safety decision</h3>
+<p>A fresh run uses the simulated HC3; accessing a real controller requires an
+explicit online choice. That makes experimentation safe by default and
+avoids surprising network access when credentials happen to be present.
+Proxy mode adds a useful third option for cases where the actual HC3 UI or
+controller behavior matters.</p>
+<p>The distinct ID namespaces and explicit routing rules are also practical:
+developers can reason about which devices are local and which calls may be
+forwarded. The decision is documented in
+<a href="./decisions/0001-default-mode-is-offline.html">docs/decisions/0001-default-mode-is-offline.md</a>
+and covered by tests.</p>
+<h3 id="3-a-notably-complete-quickapp-learning-path">3. A notably complete QuickApp learning path</h3>
+<p>The <a href="./tutorial/README.html">tutorial</a> is a real strength. It starts without
+assuming programming experience, builds one example through successive
+chapters, introduces the viewer and virtual clock, and eventually reaches
+testing and deployment. The main <a href="USAGE.html">USAGE.md</a> then serves as the
+broader reference for users who already know what they need.</p>
+<p>The development loop is also thoughtfully supported: project setup,
+Lua-language-server metadata, VS Code run/debug configurations, <code>flua doctor</code>,
+static checks, virtual-time controls, a UI viewer, self-testing QuickApps,
+and upload/download tools all reduce the amount of surrounding setup a
+developer must invent.</p>
+<h3 id="4-good-test-and-release-safeguards">4. Good test and release safeguards</h3>
+<p>The checked-in suite contains hundreds of focused test cases and uses local
+mock HC3 servers rather than requiring a live controller. CI runs Ruff and
+the offline suite across multiple Python versions. The wheel job installs the
+built package in a clean environment and smoke-tests setup, QA creation, and
+static checking—an important complement to source-tree tests.</p>
+<p>This is especially valuable for a project that emulates a large external
+surface: tests, invariants, endpoint documentation, and examples together
+make compatibility decisions easier to inspect.</p>
+<h3 id="5-a-useful-breadth-of-workflows-without-a-large-runtime-dependency-tree">5. A useful breadth of workflows without a large runtime dependency tree</h3>
+<p>The project supports offline runs, online rehearsal, proxy operation,
+multi-file QAs, simulated devices, REST access, HTTP/TCP/UDP/WebSocket/MQTT,
+record/replay, and MCP-based agent workflows. That is a substantial
+development environment, yet the runtime dependency footprint remains small.
+The <a href="README.html">README</a>, <a href="./mcp.html">MCP guide</a>, and
+<a href="./rest-endpoints.html">REST endpoint reference</a> make these distinct surfaces
+reasonably discoverable.</p>
+<h2 id="areas-to-improve">Areas to improve</h2>
+<h3 id="1-core-orchestration-has-become-concentrated">1. Core orchestration has become concentrated</h3>
+<p><code>src/flua/engine.py</code> is about 2,800 lines and owns or coordinates a wide range
+of responsibilities: QA lifecycle and file operations, logging and event
+feeds, the pump and message handlers, HC3 polling, proxy connections, network
+operations, and persistence. <code>cli.py</code> and <code>config.py</code> are also substantial.
+The central engine is a natural coordination point, but the number of
+responsibilities increases the cost of understanding a change and raises the
+risk that unrelated paths become coupled.</p>
+<p><strong>Recommendation — medium-term:</strong> keep <code>LuaEngine</code> as the stable facade and
+preserve the current message and lifecycle contracts, but move cohesive
+subsystems behind small collaborators as changes naturally touch them.
+Reasonable seams include transport handlers, proxy/HC3 polling, QA
+file/package operations, and persistence. Do not split solely to reduce line
+count; each extracted boundary should have a clear owner and focused tests.</p>
+<h3 id="2-runtime-compatibility-is-not-stated-in-one-authoritative-place">2. Runtime compatibility is not stated in one authoritative place</h3>
+<p>The supported Python range in <code>pyproject.toml</code> and the CI matrix do not quite
+match: package metadata includes Python 3.13, while the test matrix covers
+3.11, 3.12, 3.14, and 3.15. The same manifest pins <code>lupa</code> to 2.6 and notes
+that it bundles Lua 5.4, while also referring to development/testing against
+Lua 5.5. The language-server configuration documents Lua 5.4, and several
+tutorial and README transcripts show Lua 5.5 and much older flua versions.
+Some of these differences may be intentional, but a new user cannot readily
+tell which runtime is installed, which is tested, and which is the intended
+HC3 compatibility target.</p>
+<p><strong>Recommendation — high priority:</strong> publish one compatibility table that
+distinguishes Python versions, packaged Lua version, development/test Lua
+version, and HC3 target assumptions. Add Python 3.13 to CI or remove it from
+the stated support range. Use generic version placeholders in tutorial
+transcripts, or refresh them as part of releases. Relevant sources are
+<a href="pyproject.toml">pyproject.toml</a>,
+<a href=".github/workflows/tests.yml">the CI workflow</a>, and
+<a href="USAGE.html">USAGE.md</a>.</p>
+<h3 id="3-the-simulators-intentional-limits-should-be-closer-to-the-user">3. The simulator's intentional limits should be closer to the user</h3>
+<p>The project is appropriately candid that the simulated REST API is a useful
+subset, not a complete controller. The endpoint guide separates
+state-backed routes from shape-only stubs, and the runtime exposes a
+capability surface. However, an HC3-shaped response with empty data can look
+plausible to a developer whose QA expects real controller state. A user may
+discover the limit only after debugging the behavior of their QA.</p>
+<p><strong>Recommendation — high priority:</strong> make the implemented/partial/unsupported
+surface prominent in the first-run and offline-simulation workflow, not only
+in the reference docs. Link <code>flua --capabilities-json</code> and
+<a href="./rest-endpoints.html">docs/rest-endpoints.md</a> directly from the relevant
+simulation guidance. Where practical, make capability output identify
+shape-only stubs so users can distinguish “supported but empty” from
+“simulated with real state.”</p>
+<h3 id="4-the-documentation-set-is-strong-but-large-and-duplicated-by-purpose">4. The documentation set is strong but large and duplicated by purpose</h3>
+<p>There are several useful entry points—README, USAGE, the tutorial,
+architecture/concurrency references, VS Code setup material, and packaged
+documentation for MCP. That breadth is appropriate for the product, but
+users can still be unsure which document is the next one to read. The main
+user guide is long, while some concepts and setup steps also appear in the
+tutorial and README. The packaged docs are synchronized by a script, which
+helps, but remains another consistency boundary.</p>
+<p><strong>Recommendation — medium priority:</strong> retain the detailed manual and
+tutorial, but make the landing page task-oriented: “new to QuickApps,”
+“already have a QA,” “debugging,” “testing,” and “deploying.” Keep canonical
+explanations in one place and link to them from the other surfaces. Add a
+small CI check for especially drift-prone examples or compatibility values.</p>
+<h3 id="5-cross-platform-support-deserves-a-visible-install-validation-story">5. Cross-platform support deserves a visible install-validation story</h3>
+<p>The package is presented as cross-platform and supports a broad Python
+version range. The regular test matrix runs on Ubuntu, and the clean wheel
+smoke test also runs on Ubuntu. The project already documents that <code>lupa</code>
+wheels are not available for every interpreter/platform combination and may
+need a source build.</p>
+<p><strong>Recommendation — medium priority:</strong> either add periodic package-install
+smoke tests on macOS and Windows or clearly document which combinations are
+actively verified and when users may need a compiler to install <code>lupa</code>.
+This is particularly useful for new users, for whom a native build failure
+looks like a flua failure.</p>
+<h2 id="ease-of-use-for-quickapp-developers">Ease of use for QuickApp developers</h2>
+<p>For a developer with VS Code and basic terminal familiarity, flua offers a
+strong loop: create a Lua file, run it offline, inspect logs or the browser
+viewer, fast-forward time, add assertions, then deploy the same project.
+The tutorial makes that path accessible to people new to QuickApps, and the
+tools reduce common packaging and transfer chores.</p>
+<p>The experience is less straightforward once work crosses the emulator/HC3
+boundary. Users need to understand directives and mode precedence,
+credentials, package files, what the simulator actually models, and which
+calls are extensions versus HC3 behavior. Those topics are documented, but
+they are a larger conceptual surface than the first “hello QA” suggests.
+The most important improvement is not another feature; it is making the
+runtime compatibility and simulation limits visible exactly when users
+choose a workflow.</p>
+<h2 id="suggested-order-of-work">Suggested order of work</h2>
+<ol>
+<li><strong>Clarify the supported runtime matrix</strong> and align CI, package metadata,
+   Lua-language-server settings, and example transcripts.</li>
+<li><strong>Surface simulator coverage at point of use</strong>, linking capability output
+   and clearly identifying shape-only endpoints.</li>
+<li><strong>Keep the engine modular as features evolve</strong>, extracting tested
+   subsystems at natural boundaries rather than undertaking a broad rewrite.</li>
+<li><strong>Simplify the documentation entry points</strong> and add low-cost checks for
+   examples and duplicated compatibility claims.</li>
+<li><strong>Add cross-platform install smoke coverage</strong> or document the precise
+   verified platform/interpreter combinations.</li>
+</ol>
+<h2 id="review-scope">Review scope</h2>
+<p>This is an architecture, documentation, testing-process, and user-experience
+review—not a security audit or a full behavioral verification. No live HC3
+was contacted and no test suite was run for this documentation-only task.
+The worktree already contained uncommitted changes when reviewed; those
+changes were not treated as settled project behavior or modified as part of
+this review.</p>
+</body>
+</html>

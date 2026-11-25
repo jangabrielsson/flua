@@ -1,0 +1,148 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>02 · Your first QuickApp</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="02--your-first-quickapp">02 · Your first QuickApp</h1>
+<p>In this chapter you write a real QuickApp — a dozen lines — and run it.
+It will count to three, tell you it's done, and stop. You don't need to
+understand every line yet; chapter 03 explains them. Right now the goal is
+simpler: <strong>write, press F5, see it live.</strong></p>
+<h2 id="step-1--create-the-file">Step 1 — create the file</h2>
+<p>In VS Code, open your project folder (<code>my-first-qa</code> from chapter 01) and
+create a new file: <strong>File → New File…</strong>, name it <code>hello.lua</code>, and type:</p>
+<pre><code class="language-lua">--%%name:hello
+print(&quot;Hello from my first QuickApp&quot;)
+
+local n = 0
+setInterval(function()
+  n = n + 1
+  print(&quot;tick&quot;, n)
+  if n &gt;= 3 then
+    print(&quot;done&quot;)
+    os.exit()
+  end
+end, 400)
+</code></pre>
+<p>A few first impressions, without the theory:</p>
+<ul>
+<li>Lines starting with <code>--</code> are <em>comments</em> — notes for humans. The two
+  <code>--%%</code> lines at the top are the exception: those are notes for <strong>flua</strong>
+  (<code>--%%name:hello</code> gives the QuickApp a name).</li>
+<li><code>print(...)</code> writes a line to the log.</li>
+<li><code>setInterval(function() … end, 400)</code> means: <em>run this little block every
+  400 milliseconds.</em> That's a <strong>timer</strong> — the heart of every QuickApp.</li>
+<li>The <code>if</code> counts to three: after the third tick the QuickApp says <code>done</code>
+  and <code>os.exit()</code> ends it — and stops its timer with it.</li>
+</ul>
+<blockquote>
+<p><code>os.exit()</code> ends the QuickApp that called it. That's the same name real
+HC3 QuickApps use (there, every QuickApp is its own program — ending it
+is as simple as leaving a room). In these first experiments it's also
+what lets flua finish and hand you back the terminal — a QuickApp that
+never exits just keeps running.</p>
+</blockquote>
+<h2 id="step-2--run-it-with-f5">Step 2 — run it with F5</h2>
+<p>Make sure <code>hello.lua</code> is the tab you're looking at, and press <strong>F5</strong> (the
+first time, choose <strong>Flua: Run Current File (Terminal)</strong> from the menu —
+chapter 01's setup installed it). VS Code runs the file and shows the log
+in its terminal panel:</p>
+<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+[04.10.2026][20:50:10][DEBUG  ][hello5000]: Hello from my first QuickApp
+[04.10.2026][20:50:10][DEBUG  ][hello5000]: tick 1
+[04.10.2026][20:50:11][DEBUG  ][hello5000]: tick 2
+[04.10.2026][20:50:11][DEBUG  ][hello5000]: tick 3
+[04.10.2026][20:50:11][DEBUG  ][hello5000]: done
+</code></pre>
+<blockquote>
+<p>✅ <strong>You should see</strong> your QuickApp say hello, tick three times, and stop.</p>
+</blockquote>
+<p>That's a complete QuickApp, running. The <code>hello5000</code> at the start of each
+line is the QuickApp's <em>tag</em> — its name and its id. The <code>5000</code> is the id
+flua assigned it; on your real HC3 it would get the controller's next free
+id.</p>
+<p><strong>What did F5 do?</strong> The launch configuration ran <code>flua hello.lua</code> for
+you — and because your QuickApp doesn't declare a mode, flua ran it in its
+<strong>default world: the simulated HC3, on your computer</strong> (online is opt-in;
+chapter 06 shows how). It gave your QuickApp a home, started it, kept time
+for it, and stopped when the program ended. Your real HC3 was never
+involved — that's the whole point: experiment safely, then go live later.</p>
+<blockquote>
+<p>If F5 complains that <code>flua</code> was not found: VS Code on some systems
+doesn't inherit the shell's PATH when started from the dock. Chapter 01's
+setup normally prevents this — it writes the <strong>absolute path</strong> to flua
+into the launch configurations. If you wrote the configuration by hand (or
+reinstalled flua elsewhere), either re-run <code>flua --tool setup</code>, or restart
+VS Code from the terminal once — on macOS run <code>open -a "Visual Studio
+Code"</code> in a terminal, on Windows/Linux start <code>code</code> from one. If it says
+<em>No module named 'flua'</em> instead, VS Code is using a Python that doesn't
+have flua: open the Command Palette (Ctrl/Cmd+Shift+P), choose
+<strong>Python: Select Interpreter</strong>, and pick the one you installed flua into
+(chapter 01). You can always run the command by hand instead: open a
+terminal with <strong>Terminal → New Terminal</strong> and type <code>flua hello.lua</code> —
+every F5 run in this tutorial is exactly that command.</p>
+</blockquote>
+<h2 id="step-3--break-it-on-purpose">Step 3 — break it, on purpose</h2>
+<p>Programmers don't get code right the first time. They get it <em>wrong fast</em>
+and let the computer tell them where. Try it: change <code>local n = 0</code> to
+<code>local n = 0 + nn</code> (a name that doesn't exist), save, and press <strong>F5</strong>
+again:</p>
+<pre><code class="language-text">Error:  hello.lua:4: attempt to perform arithmetic on a nil value (global 'nn')
+</code></pre>
+<p>flua tells you the file, the line (4), and the problem: it tried to do
+arithmetic on <code>nn</code>, which is nothing. ("Bootstrap" is flua-speak for
+"while starting your QuickApp" — mistakes at startup show up like this,
+mistakes later show up while the QuickApp is running.)</p>
+<p>Change <code>0 + nn</code> back to <code>0</code>, save, F5. <strong>The loop from now on is exactly
+this: change one thing, save, F5, read the log.</strong></p>
+<blockquote>
+<p>QuickApp files run again every time from scratch — there is no hidden
+state between runs. That makes experiments safe: nothing you break
+survives the next run.</p>
+</blockquote>
+<h2 id="step-4--faster-tinkering-watch-mode">Step 4 — faster tinkering: watch mode</h2>
+<p>For a really fast loop, flua can watch your file and restart it on every
+save — no F5 needed. This one is a terminal command (it has extra flags):</p>
+<pre><code class="language-bash">flua --api local --watch hello.lua
+</code></pre>
+<p>Now edit something — change <code>"Hello from my first QuickApp"</code> to
+<code>"Good evening, HC3"</code> — and save. The log shows the QuickApp starting over
+with the new text. Press <code>Ctrl-C</code> in the terminal to stop watching.</p>
+<h2 id="the-two-line-takeaway">The two-line takeaway</h2>
+<ul>
+<li>A QuickApp is a small program that <strong>runs on its own</strong>, wakes up on
+  <strong>timers</strong>, and writes to a <strong>log</strong>.</li>
+<li>You develop it <strong>on your computer</strong> (the offline sim is the default) and
+  only later move it to the HC3.</li>
+</ul>
+<p>Next chapter: what a QuickApp <em>is</em> — and the Sunset Lamp gets its switch.</p>
+</body>
+</html>

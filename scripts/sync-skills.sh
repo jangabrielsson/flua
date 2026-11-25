@@ -41,10 +41,12 @@ rm -rf src/flua/setup_templates/recipes
 cp -R recipes src/flua/setup_templates/recipes
 echo "synced recipes -> src/flua/setup_templates/recipes"
 
-# the web docs landing page regenerates from the forum set before the copy
-$PYTHON scripts/gen-forum-index.py
 # the core reference docs render from markdown before the copy
 $PYTHON scripts/render-docs-html.py
+# the web docs landing page regenerates from the forum set AFTER the
+# renderer (a rendered INDEX.html would collide with it on
+# case-insensitive filesystems) — the landing page always wins
+$PYTHON scripts/gen-forum-index.py
 
 rm -rf "$DOCS_DEST"
 mkdir -p "$DOCS_DEST"

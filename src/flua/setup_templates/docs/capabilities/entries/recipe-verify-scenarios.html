@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Verify scenarios — declarative sim runs that prove a template works</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: recipe-verify-scenarios
+topic: tooling
+title: Verify scenarios — declarative sim runs that prove a template works
+pins:
+  - tests/test_builder.py::test_builder_verify_all_runs_every_scenario
+verified: flua 0.1.169</p>
+<hr />
+<h1 id="verify-scenarios--declarative-sim-runs-that-prove-a-template-works">Verify scenarios — declarative sim runs that prove a template works</h1>
+<p>Every recipe manifest can declare a <code>verify</code> block — a scenario run in
+the sim on a 6000x virtual clock (<code>flua --tool build --verify &lt;id&gt;</code>,
+<code>--verify-all</code>, <code>--json</code> for agents; CI gates template changes on it):</p>
+<pre><code class="language-json">&quot;verify&quot;: {
+  &quot;start&quot;: {&quot;time&quot;: &quot;12:00&quot;},
+  &quot;params&quot;: {&quot;deviceId&quot;: 1, &quot;offset&quot;: 1},
+  &quot;steps&quot;: [
+    {&quot;check&quot;: {&quot;device&quot;: &quot;deviceId&quot;, &quot;value&quot;: false}},
+    {&quot;waitUntil&quot;: {&quot;device&quot;: &quot;deviceId&quot;, &quot;value&quot;: true, &quot;timeout&quot;: &quot;12h&quot;}}
+  ]
+}
+</code></pre>
+<ul>
+<li>Steps: <code>device</code> calls (breach, setValue with args), <code>weather</code> changes,
+  <code>slider</code> drags, <code>wait</code> (virtual), <code>waitUntil</code> (poll until a device
+  value, with timeout), and <code>check</code> (device value, or QA log lines with
+  an exact count).</li>
+<li><code>start</code> anchors the virtual clock: <code>{time: "12:00"}</code> (today at noon,
+  safely before sunset), a full date-time, or <code>{before: "sunset",
+  by: "2m"}</code>.</li>
+<li>Device params with nonzero values are seeded from the bundled sim
+  devices (a <code>[sim:&lt;device&gt;]</code> marker overrides the filter kind).</li>
+<li>Checks retry briefly (reaction chains span pump passes) — the verdict
+  measures the outcome, not a race.</li>
+</ul>
+</body>
+</html>

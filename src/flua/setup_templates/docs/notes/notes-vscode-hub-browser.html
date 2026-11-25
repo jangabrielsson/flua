@@ -1,0 +1,145 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Note: the HC3 hub browser in the VS Code extension (design draft)</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="note-the-hc3-hub-browser-in-the-vs-code-extension-design-draft">Note: the HC3 hub browser in the VS Code extension (design draft)</h1>
+<p>Status: v1 implemented (2026-11-08) — <code>flua --tool hubList</code>, the hub tree
+in the VS Code extension (<code>vscode/src/hub.ts</code>), the QA actions and the
+remembered download folder. Stretch items (devices section, console tail,
+freshness badge, webview dashboard) remain.</p>
+<h2 id="context-and-goal">Context and goal</h2>
+<p>flua is the engine — for agent-loop development and for programmers who
+want their standard toolset (VS Code, git, a debugger, tests). Wizards and
+GUI conveniences are <strong>apps built on top of flua</strong>, and the VS Code
+extension is the first such app. The discipline that keeps this true:
+<strong>nothing exists only in the app</strong> — every tree action is a CLI/<code>--tool</code>
+command first, so agents and CI get the same surface as the GUI.</p>
+<p>This note designs the first app: an HC3 buffer in VS Code. It shows the
+hub and its QuickApps; a QA can be selected, downloaded, edited (the
+normal editor), tested (F5/<code>--ui</code>), and uploaded back — the whole loop
+without leaving VS Code or remembering ids.</p>
+<p>The symmetry to state up front: this tree is the <em>human</em> version of what
+<code>flua-mcp</code> already gives agents (list, download, check, upload as typed
+tools). Both ride the same CLI commands, so they cannot drift apart, and
+the agent path stays the reference implementation.</p>
+<h2 id="what-exists-today-verified">What exists today (verified)</h2>
+<ul>
+<li><strong>Extension</strong> (<code>vscode/src/</code>): commands for <code>downloadQA</code>, <code>uploadFile</code>,
+  <code>uploadFQA</code>, <code>updateQA</code>, <code>pack</code>, <code>unpack</code>, <code>check</code> — all thin wrappers
+  over <code>execFlua()</code> (<code>flua.ts</code>). No tree views, no data views yet.</li>
+<li><strong>flua tools</strong>: <code>downloadQA</code> (download + unpack), <code>updateQA</code> (upload an
+  unpacked project), <code>uploadQA</code>/<code>uploadFQA</code>/<code>uploadFile</code>, <code>pack</code>/<code>unpack</code>.</li>
+<li><strong>Missing piece</strong>: there is no command that <em>lists</em> a hub's QuickApps as
+  data. <code>doctor</code> checks hub reachability and reports model/firmware, but
+  not the QA list.</li>
+</ul>
+<h2 id="design">Design</h2>
+<h3 id="data-source-one-new-cli-command">Data source: one new CLI command</h3>
+<p><code>flua --tool hubList --json</code> prints a stable shape:</p>
+<pre><code class="language-json">{
+  &quot;hub&quot;: {&quot;name&quot;: &quot;HC3-00000422&quot;, &quot;model&quot;: &quot;HC3&quot;, &quot;firmware&quot;: &quot;5.221.22&quot;, &quot;url&quot;: &quot;http://192.168.1.20&quot;, &quot;reachable&quot;: true},
+  &quot;qas&quot;: [{&quot;id&quot;: 57, &quot;name&quot;: &quot;Heating&quot;, &quot;type&quot;: &quot;com.fibaro.deviceController&quot;, &quot;room&quot;: &quot;Living room&quot;}]
+}
+</code></pre>
+<ul>
+<li>Hub info comes from the same checks <code>doctor</code> already performs
+  (reachability, model, firmware) — no new hub surface.</li>
+<li>QAs keyed by <strong>id</strong>, never by name (HC3 names are not unique).</li>
+<li>Uses the <code>.env</code> credential chain like every other tool; without
+  credentials it fails with the same clear message the other tools give.</li>
+</ul>
+<h3 id="the-tree-extension-side">The tree (extension side)</h3>
+<p>One new file <code>vscode/src/hub.ts</code>, a <code>TreeDataProvider</code>:</p>
+<ul>
+<li>Root: the hub node — description carries <code>model · firmware ·
+  reachable</code>, refreshed by a refresh button (and on expand). No
+  background polling: the HC3 does not need flua hammering it, and a
+  refresh button is predictable.</li>
+<li>Children: one node per QA — label <code>name</code>, description
+  <code>id · type · room</code>.</li>
+<li>Actions on QA nodes (each maps 1:1 to an existing tool):</li>
+<li><strong>Download &amp; open</strong> — <code>downloadQA</code> + unpack + open the main file in
+    the editor.</li>
+<li><strong>Update</strong> — <code>updateQA</code> (upload the local, unpacked project).</li>
+<li><strong>Upload as .fqa</strong> — <code>uploadFQA</code> (fresh package).</li>
+<li><strong>Run (UI)</strong> — launch the workspace's existing run/debug config
+    (<code>--tool setup</code> already writes them).</li>
+<li><strong>Pack</strong> — <code>pack</code> the unpacked project back to <code>.fqa</code>.</li>
+<li>The same actions land in the command palette and the QA file's context
+  menu, like the current commands.</li>
+<li><strong>No delete action</strong>: flua never deletes on the hub — deletes stay in
+  the HC3 web interface (the same safety posture as every existing tool).</li>
+<li>Credentials: the tree only shells out to flua; the extension never
+  reads or stores the password.</li>
+</ul>
+<h3 id="stretch-not-v1">Stretch (not v1)</h3>
+<ul>
+<li>A devices section under the hub node (the <code>/devices</code> list, searchable —
+  overlaps with the completions note's <code>--tool house</code>; reuse it).</li>
+<li>A hub console tail (hub debug messages, paged like the HC3 web UI).</li>
+<li>A local-vs-hub freshness badge on QA nodes (the unpacked folder's
+  mtime vs the hub's <code>modified</code> timestamp).</li>
+<li>A webview dashboard (devices, console, live values) — deliberately
+  second: the tree proves the shape first, and a dashboard is a much
+  bigger surface.</li>
+</ul>
+<h2 id="alternatives-considered">Alternatives considered</h2>
+<ul>
+<li><strong>Webview dashboard first</strong>: richer, but heavier, less native, and more
+  to maintain; the tree covers the actual workflow (find → download →
+  edit → upload) with plain VS Code primitives.</li>
+<li><strong>Drive it through flua-mcp</strong>: the typed tools already exist, but the
+  extension would then depend on a running MCP server; the CLI tool keeps
+  the extension dependency-free and gives agents/CI the same JSON.</li>
+<li><strong>Parse <code>downloadQA</code> output</strong>: fragile; a dedicated <code>--json</code> tool is
+  the stable contract (the same reasoning as <code>--tool house</code> in the
+  completions note).</li>
+</ul>
+<h2 id="v1-scope">v1 scope</h2>
+<ol>
+<li><code>flua --tool hubList --json</code> with a pinning test for the shape and
+   the missing-credentials error.</li>
+<li><code>vscode/src/hub.ts</code> — the tree, refresh, and the five QA actions
+   wired to the existing <code>execFlua</code> bridge.</li>
+<li>Command palette + context-menu entries.</li>
+<li>Docs: USAGE.md (<code>--tool hubList</code>) and the extension README.</li>
+</ol>
+<h2 id="related">Related</h2>
+<ul>
+<li><code>docs/notes/notes-vscode-completions.md</code> — the other extension surface
+  (the <code>--tool house</code> data source overlaps with the stretch)</li>
+<li><code>vscode/src/flua.ts</code> — the <code>execFlua</code> bridge the tree rides</li>
+<li><code>src/flua/tools/download_qa.py</code> / <code>update_qa.py</code> — the actions</li>
+<li><code>docs/mcp.md</code> — the agent version of the same surface</li>
+</ul>
+</body>
+</html>

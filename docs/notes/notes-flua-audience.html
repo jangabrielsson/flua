@@ -1,0 +1,130 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Widening the flua audience — plan</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="widening-the-flua-audience--plan">Widening the flua audience — plan</h1>
+<p><em>Drafted 2026-11-15 with Jan. flua's uptake today is the ex-plua hard core;
+the goal is to lower the entry for the non-programmer majority of the
+Fibaro forum. This note records the strategy and the builder design.</em></p>
+<h2 id="the-barrier-decomposed">The barrier, decomposed</h2>
+<p>Today a new user clears: install Python → pip → install flua → get an
+editor (VS Code) → write a Lua file → run it → move the QA to the HC3.
+The agent path adds three more steps (install, configure, pay). Each step
+filters people out; flua currently serves only those who would have
+cleared all of them anyway.</p>
+<h2 id="strategy--four-plays-in-sequence">Strategy — four plays, in sequence</h2>
+<ol>
+<li><strong>Consume first (posting discipline, zero product work).</strong> A forum
+   member can download a finished <code>.fqa</code> and upload it in the HC3 web UI
+   — no flua, no Lua. They are <em>using</em> flua's output without knowing it.
+   The funnel: consume a finished QA → want one line changed → "flua makes
+   that change safe" → install. Ship finished QAs as downloads with a
+   marked "EDIT THESE 3 LINES" header.</li>
+<li><strong>Recipe library (content, feeds 3).</strong> 10–15 scenarios ("light on at
+   sunset", "notify when the door opens"), each a complete QA with three
+   marked lines to edit. Same artifacts serve the forum and the builder.</li>
+<li><strong>The QA builder (the product bet).</strong> A browser page on flua's own
+   local server (the proven viewer/icon-manager pattern): pick a recipe →
+   pick your actual devices/rooms/scenes from dropdowns fed by the live
+   HC3 → tweak values → flua generates the QA → "try it in the simulator"
+   → upload. A non-programmer never sees Lua, never opens an editor.</li>
+<li><strong>One-click install (distribution, later).</strong> A single executable
+   (PyInstaller-style; macOS app + Windows exe) removes Python and pip
+   entirely. After the builder exists, since the builder is what they
+   open. Needs CI builds and code signing for the Gatekeeper experience.</li>
+</ol>
+<p>The agent angle slots in at the <em>top</em> of the funnel (custom logic), not as
+the entry point.</p>
+<h2 id="the-builders-recipe-library-lives-on-github--no-releases-needed">The builder's recipe library lives on GitHub — no releases needed</h2>
+<p>The recipe set must grow without shipping a new flua. Recipes therefore
+live in the flua repo and the builder fetches them from the same GitHub
+that already serves <code>examples/iconInstall.lua</code>'s icons
+(<code>raw.githubusercontent.com/jangabrielsson/flua/main/...</code>):</p>
+<ul>
+<li><strong><code>recipes/</code></strong> in the repo — one folder per recipe: <code>manifest.json</code> +
+  <code>main.lua</code> (+ icons when a recipe ships a custom icon set). The
+  manifest is the builder's contract and the forum post's "what to edit":</li>
+</ul>
+<p><code>json
+  {
+    "id": "light-at-sunset",
+    "title": "Turn a light on at sunset",
+    "description": "One sentence for the picker.",
+    "params": [
+      {"name": "deviceId", "label": "Light", "kind": "device",
+       "filter": "com.fibaro.binarySwitch", "default": 0},
+      {"name": "offset", "label": "Minutes before sunset", "kind": "number",
+       "default": -30}
+    ]
+  }</code></p>
+<p><code>kind</code> drives the UI: <code>device</code>/<code>room</code>/<code>scene</code> become dropdowns populated
+  from the live HC3 (<code>?isTypeOf=</code>/type filters for devices), <code>number</code>/
+  <code>text</code>/<code>boolean</code> become inputs. The template QA carries the params as
+  <code>--%%var:name=&lt;default&gt;</code> lines — the generator bakes the picked values
+  into the header (<code>--%%var:deviceId=123</code>), so the same file is the
+  human-editable "finished QA" from play 1 and the builder's template.
+- <strong><code>recipes/index.json</code></strong> (checked in, regenerated by a script) lists the
+  manifests — the builder fetches the index first, then a recipe's files
+  on selection. Cached under <code>~/.flua/recipes</code> with a refresh action;
+  the wheel ships a snapshot of the index as the offline fallback.
+- <strong>Trust = the repo.</strong> Recipes come from the flua repo the user already
+  trusts (the wheel's source); the builder never executes fetched content
+  outside the sim, and the fetched QA is a plain file the user can read.
+- <strong>New recipe = one merge.</strong> No release, no packaging — the index entry
+  appears on the next builder refresh.</p>
+<h2 id="open-questions-decide-when-building-3">Open questions (decide when building 3)</h2>
+<ul>
+<li>Upload step: <code>uploadQA</code> directly, or offer a <code>.fqa</code> download too
+  (the consume-first artifact)?</li>
+<li>Builder entry point: <code>flua --tool build</code> (new tool) or a tab in the
+  existing viewer page?</li>
+<li>Recipe params beyond the flat kinds (e.g. time-of-day pickers, lists)?</li>
+<li>Offline behavior: the shipped index snapshot, with a banner when the
+  GitHub fetch fails.</li>
+</ul>
+<h2 id="milestones">Milestones</h2>
+<ol>
+<li>Posting discipline + the first 5 recipes as forum downloads (no code).</li>
+<li><code>recipes/</code> layout + <code>index.json</code> + the builder page (fetch → pick →
+   generate → simulate → upload), starting with the 5 recipes.
+   <strong>Shipped as the MVP</strong>: <code>flua --tool build</code> serves the builder page —
+   recipe list from the index (GitHub refresh + shipped fallback), HC3-fed
+   pickers with typed-id fallback, param baking into the marked --%%var
+   lines, a <code>.lua</code> download, direct upload to the HC3 (import endpoint),
+   and simulate-in-place: the generated QA runs on the laptop with a
+   virtual clock, picked devices re-pointed at bundled sim devices.
+   <strong>Parked as a PoC (2026-11-15)</strong> — waiting for forum feedback before
+   more investment; ADR 0015 delimits it against the no-wizard decision.</li>
+<li>One-click installers (macOS/Windows) once the builder is worth opening.</li>
+</ol>
+</body>
+</html>

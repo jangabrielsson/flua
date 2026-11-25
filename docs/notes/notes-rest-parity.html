@@ -1,0 +1,110 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Note: HC3 REST parity for flua</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="note-hc3-rest-parity-for-flua">Note: HC3 REST parity for flua</h1>
+<p>Status: design + implementations (2026-10-16/17).
+Implemented: real <code>/debugMessages</code> (console buffer) + DELETE + <code>/tags</code>;
+<code>/flua/systemLog</code> (structured system/crash log) + DELETE.</p>
+<h2 id="context">Context</h2>
+<p>The HC3's REST API manages QAs (upload/restart/delete), the house resources
+(devices, scenes, globals, alarms, …), the event log (<code>/refreshStates</code>), and
+the QA console (<code>/debugMessages</code>). flua's sim implements 77 of those routes
+in HC3 shapes (the live compat suite pins them), but several were
+shape-only stubs — most notably <code>/debugMessages</code>, which returned an empty
+buffer while the real QA logs went to stdout/stderr only.</p>
+<p>The gap that matters: <strong>agents and tools want the logs over REST</strong>, the same
+surface the real HC3 offers — one interface for both, no console parsing.</p>
+<h2 id="decision-parity-is-selective">Decision: parity is selective</h2>
+<p>Rule for adding/upgrading a route: implement it for real when (a) a QA
+calls it, (b) a tool/agent reads it, or (c) the compat suite shows shape
+drift that hurts. Everything else stays a shape-pinned stub. Full parity is
+a treadmill (359 endpoints in the spec, shapes drift per firmware).</p>
+<h2 id="implemented-real-debugmessages">Implemented: real <code>/debugMessages</code></h2>
+<p>HC3 semantics (<code>fibaro_api_docs/debugMessages.json</code>, schema <code>DebugMessageDto</code>):</p>
+<ul>
+<li><code>GET /debugMessages</code> → <code>{nextLast, messages: [{id, timestamp, type, tag,
+  message}]}</code>, newest last, bounded ring (10 000 lines, oldest fall off).</li>
+<li>Query params: <code>last</code> (only id &gt; last — the poll pattern), <code>offset</code>
+  (newest N; -1 = all), <code>filter</code> (comma list of tags), <code>types</code> (comma list),
+  <code>from</code>/<code>to</code> (timestamp bounds, inclusive). Bad numerics → 400.</li>
+<li><code>DELETE /debugMessages</code> → 204, clears the buffer; ids keep growing so
+  polling never replays cleared lines.</li>
+<li><code>GET /debugMessages/tags</code> → distinct tags seen so far.</li>
+</ul>
+<p>Where the lines come from:</p>
+<ul>
+<li>QA console lines — one tap in <code>lua/init.lua::formatLogLine</code> posts the
+  structured fields (<code>_PY.debug_message(level, tag, qaid, msg)</code>) in both
+  log modes; QA <code>print</code> maps to <code>fibaro.debug(__TAG, ...)</code> → type <code>debug</code>.</li>
+<li>flua's own notices — <code>engine.flua_log</code> records them (tag <code>flua</code> or
+  <code>&lt;name&gt;&lt;id&gt;</code>).</li>
+<li>Untagged runtime lines (JSON mode) — <code>_handle_log_structured</code> records
+  when <code>tag is None</code>. Text-mode untagged lines (<code>-e</code> prints, the greeting)
+  are not buffered — see open questions.</li>
+</ul>
+<p>State: <code>SimState.debug_messages</code> (deque, append is thread-safe — the pump
+and worker threads both log). Pins: <code>tests/test_api.py::test_debug_messages</code>,
+<code>tests/test_qa.py::test_debug_messages_record_qa_logs</code>.</p>
+<h2 id="implemented-fluasystemlog-structured-systemcrash-log">Implemented: <code>/flua/systemLog</code> (structured system/crash log)</h2>
+<p>The thing the real HC3 lacks: machine-readable engine lifecycle. flua-only
+route (the <code>/flua/*</code> namespace), same polling contract as <code>/debugMessages</code>
+(<code>last</code>/<code>offset</code>, DELETE):</p>
+<pre><code class="language-json">{&quot;id&quot;: 1, &quot;time&quot;: &quot;2026-10-17T08:09:26+02:00&quot;, &quot;event&quot;: &quot;qa_load&quot;,
+ &quot;qa&quot;: 5000, &quot;tag&quot;: &quot;name5000&quot;, &quot;code&quot;: 0, &quot;detail&quot;: &quot;&quot;}
+</code></pre>
+<p>Events: <code>run_start</code>/<code>run_stop</code> (engine start/stop), <code>qa_load</code>, <code>qa_restart</code>,
+<code>qa_exit</code> (with code), <code>qa_error</code> (boot failures, from Lua), <code>crash</code>
+(callback errors, from Lua), <code>error</code> (pump handler / dispatch failures).
+Emit points: engine lifecycle methods + <code>resumeQa</code>/<code>startQaInEnv</code> on the Lua
+side (<code>_PY.system_event</code>). Pins: <code>tests/test_api.py::test_flua_system_log</code>,
+<code>tests/test_qa.py::test_system_log_records_lifecycle_and_crashes</code>,
+<code>test_system_log_records_boot_failures</code>.</p>
+<h2 id="real-vs-stub--the-inventory">Real vs stub — the inventory</h2>
+<p>The canonical table lives in <strong><a href="rest-endpoints.html">../rest-endpoints.md</a></strong>
+(contributor reference); update it when <code>routes/__init__.py</code> changes.</p>
+<h2 id="open-questions">Open questions</h2>
+<ol>
+<li>~~Text-mode untagged runtime lines in <code>/debugMessages</code>~~ — done:
+   <code>engine.post_log</code> records flua notices under the <code>flua</code> tag, and the
+   Lua-side <code>postLog</code>/runtime <code>print</code> taps record untagged lines; the
+   buffer is complete in both log modes (single record per line).</li>
+<li>~~System-log file copy~~ — done: <code>--syslog FILE</code> appends every system
+   event as one JSON line (the complete history, complementing the bounded
+   <code>/flua/systemLog</code> buffer).</li>
+<li>Buffer bounds (10 000 / 2 000) — enough for agent probing sessions, or
+   should they be configurable?</li>
+<li>Should <code>offset</code>'s HC3 quirk ("number of returned messages") be
+   documented in USAGE.md alongside the endpoint, or is the pin enough?</li>
+</ol>
+</body>
+</html>

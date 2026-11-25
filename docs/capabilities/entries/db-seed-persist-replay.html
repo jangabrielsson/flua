@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>--%%db seeds and persists the house; --%%replay replays a session</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: db-seed-persist-replay
+topic: sim-world
+title: --%%db seeds and persists the house; --%%replay replays a session
+pins:
+  - tests/test_db.py::test_db_offline_persists_and_restores
+verified: flua 0.1.169</p>
+<hr />
+<h1 id="--db-seeds-and-persists-the-house---replay-replays-a-session">--%%db seeds and persists the house; --%%replay replays a session</h1>
+<p>Two ways to give a sim run a real world:</p>
+<ul>
+<li><code>--%%db:house.json</code> seeds the simulated HC3 from a JSON file
+  (devices, rooms, scenes, globals, alarms, profiles) — the same
+  schema as <code>examples/house.json</code> and the <code>--seed</code> flag.</li>
+<li><code>--%%db:+house.json</code> (the <code>+</code>) <em>also persists</em> emulator state back
+  to the file as it changes (atomic writes). What persists follows the
+  mode's source of truth: offline the whole sim, online QA state +
+  globals, proxy seed-only.</li>
+<li><code>--%%replay:house.json</code> replays a recorded house session
+  (<code>flua record</code>): seeds the sim and fires the recorded refreshState
+  events on the virtual timeline — "it worked yesterday" becomes a
+  deterministic reproduction.</li>
+</ul>
+<p><code>flua --tool createDB -o db.json</code> captures the real HC3 (device 1,
+location, family locations) into a seed file.</p>
+</body>
+</html>

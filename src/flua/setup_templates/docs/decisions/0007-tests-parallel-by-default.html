@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>0007 — tests run parallel by default, with a serial hatch and a slow-marker gate</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="0007--tests-run-parallel-by-default-with-a-serial-hatch-and-a-slow-marker-gate">0007 — tests run parallel by default, with a serial hatch and a slow-marker gate</h1>
+<ul>
+<li><strong>Status:</strong> active</li>
+<li><strong>Date:</strong> 2026-10-15</li>
+</ul>
+<h2 id="context">Context</h2>
+<p>The suite had grown to 433 tests at ~2 minutes serial. The tests are
+independent (ephemeral localhost ports, per-test HOME isolation, tmp_path),
+so the time was pure CPU, not contention.</p>
+<h2 id="decision">Decision</h2>
+<ul>
+<li><strong>Parallel by default</strong>: <code>pytest-xdist</code> with <code>-n auto</code> in addopts —
+  ~19 s on 8 cores, ~35 s on the CI's 2-core runners.</li>
+<li><strong>Serial hatch</strong>: <code>--serial</code> (implemented as a <code>tryfirst</code>
+  <code>pytest_cmdline_main</code> hook in the root <code>conftest.py</code> — the only hook
+  point early enough to override xdist's <code>-n auto</code> resolution); plain
+  <code>-n 0</code> also works.</li>
+<li><strong>Fast gate</strong>: tests that deliberately spend wall-clock time (real
+  sleeps, protocol settles, socket timeouts) carry the <code>slow</code> marker;
+  <code>-m "not slow"</code> runs the pure-logic core in ~6 s.</li>
+<li><strong>Mock teardown</strong>: threaded mock servers start <code>serve_forever</code> with
+  <code>poll_interval=0.01</code> (Python 3.14's default 0.5 s would tax every
+  fixture).</li>
+<li><strong>No shared-tree writes</strong>: the sync-skills test runs against temp copies
+  (<code>SKILLS_SRC</code>/<code>SKILLS_DEST</code>), so workers never rewrite the repo while
+  others read it.</li>
+</ul>
+<h2 id="consequences">Consequences</h2>
+<ul>
+<li>Trade-off: parallelism makes timing bugs visible (it surfaced 0005,
+  0006, and two latent teardown races) — that is treated as a feature.</li>
+<li>Pre-existing format drift in some test files is left untouched; only new
+  hunks are kept format-clean.</li>
+</ul>
+</body>
+</html>

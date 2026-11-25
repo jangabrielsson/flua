@@ -1,0 +1,198 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>fibaro.sleep(ms) — design note</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="fibarosleepms--design-note">fibaro.sleep(ms) — design note</h1>
+<p>Status: implemented. This documents the mechanics and the per-message-type
+delivery decisions.</p>
+<h2 id="goal">Goal</h2>
+<p><code>fibaro.sleep(ms)</code> suspends the <strong>calling QA</strong> for <code>ms</code> of virtual time —
+other QAs keep running. While a QA sleeps, messages destined for it (timer
+callbacks, device actions, UI events, network results, refreshState events,
+custom events) are <strong>queued</strong> and delivered — in arrival order — after the
+sleeping callback resumes. A restart drops the queue (the deferred messages
+belong to the old code instance).</p>
+<h2 id="why-coroutines">Why coroutines</h2>
+<p>All QAs share one Lua VM; a QA callback runs to completion inside
+<code>_PY.dispatch(batch)</code> on the pump thread (the single-entry discipline). A
+blocking sleep would freeze every QA. Instead, each QA callback runs in a
+small coroutine (<code>runInQa</code>): <code>fibaro.sleep(ms)</code> is <code>coroutine.yield(ms)</code>, and
+the runner schedules a <strong>QA-attributed wake timer</strong> through the existing
+timer machinery. The wake resumes the coroutine; the single-entry discipline
+still holds (resume happens inside dispatch). Because the wake is an ordinary
+timer, sleep rides the virtual clock: <code>--speed</code> accelerates it, <code>--instant</code>
+collapses it, a paused debugger freezes it.</p>
+<h2 id="which-message-types-defer-are-queued-where">Which message types defer (are queued) where</h2>
+<p>Every Python→Lua message funnels through <code>_FLUA.dispatch(batch)</code> →
+<code>handlers[msg.type](msg)</code>. Each handler knows its QA:</p>
+<table>
+<thead>
+<tr>
+<th>message</th>
+<th>QA from</th>
+<th>while that QA sleeps</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>timerExpired</code></td>
+<td><code>callback_qas[id]</code> (registered in <code>_FLUA.setTimeout</code>)</td>
+<td>queued — except wake timers (<code>wakeTimers[id]</code>), which end the sleep; the callback stays registered and runs from the queue</td>
+</tr>
+<tr>
+<td><code>deviceAction</code></td>
+<td>device id → <code>qaForDevice</code> (children resolve to the parent — they share its code)</td>
+<td>queued</td>
+</tr>
+<tr>
+<td><code>uiEvent</code></td>
+<td><code>msg.deviceId</code> → <code>qaForDevice</code></td>
+<td>queued</td>
+</tr>
+<tr>
+<td><code>httpResult</code>/<code>tcpResult</code>/<code>udpResult</code>/<code>wsEvent</code></td>
+<td><code>msg.qa</code></td>
+<td>queued</td>
+</tr>
+<tr>
+<td><code>mqttEvent</code></td>
+<td><code>msg.qa</code></td>
+<td>queued</td>
+</tr>
+<tr>
+<td><code>customEvent</code></td>
+<td>broadcast over <code>qaInstances</code></td>
+<td>per-QA: one queue entry per sleeping QA</td>
+</tr>
+<tr>
+<td><code>refreshStateEvent</code></td>
+<td>broadcast over <code>_FLUA.refreshStateListeners</code> (maps handle → qaId)</td>
+<td>per-QA: one queue entry per sleeping QA (deduped across its subscriber handles)</td>
+</tr>
+<tr>
+<td><code>startQA</code>/<code>restartQA</code></td>
+<td><code>msg.id</code></td>
+<td><strong>not queued</strong> — restart abandons the sleep <em>and the queue</em>; the wake timer was already cancelled Python-side</td>
+</tr>
+<tr>
+<td><code>runPreamble</code></td>
+<td>main state, no QA</td>
+<td>n/a</td>
+</tr>
+</tbody>
+</table>
+<p>The wake resumes the sleeping callback first, then drains the queue —
+deferred events run in arrival order after the code that slept. If a
+resumed callback (or a deferred handler) sleeps again, its sleep chains
+through the same machinery and the queue keeps waiting. Broadcasts are
+delivered per-QA on drain (re-dispatching through the shared handler would
+hand a second copy to every QA).</p>
+<h2 id="where-the-changes-live">Where the changes live</h2>
+<p><strong><code>src/flua/lua/init.lua</code></strong></p>
+<ul>
+<li><code>callback_qas</code> (timer id → qaId), <code>sleeping</code> (qaId → <code>true</code> while a sleep
+  is active), <code>wakeTimers</code> (wake timer ids, never deferred), <code>workQueues</code>
+  (qaId → FIFO of deferred messages).</li>
+<li><code>runInQa(qaId, fn, ...)</code> — the coroutine wrapper around every QA callback
+  entry point; <code>qaId == nil</code> means a runtime timer and runs plain (sleep
+  errors there). The runner mirrors the current thread's debug hook onto the
+  callback coroutine (<code>debug.gethook</code>/<code>debug.sethook</code>): this Lua build does
+  not inherit hooks into new coroutines, and without the mirror mobdebug
+  breakpoints/stepping would silently stop firing inside callbacks.</li>
+<li><code>resumeQa(qaId, co, ...)</code> — resume + error containment (<code>debug.traceback</code>
+  on the coroutine); a <code>number</code> yield marks the QA sleeping and schedules the
+  wake timer; any other yield is a protocol violation error. (The wake-timer
+  id is declared separately from its assignment: a closure inside a
+  <code>local id = ...</code> initializer binds to an outer id in this Lua version.)</li>
+<li><code>processWork(qaId)</code> / <code>deliverQueued(qaId, msg)</code> — the drain, run after
+  each wake: FIFO messages are delivered while the QA is awake; a deferred
+  handler that sleeps again suspends the drain until its own wake.</li>
+<li>Each handler in the table above gained its queue check / per-QA queue.</li>
+</ul>
+<p><strong><code>src/flua/lua/fibaro.lua</code></strong> — <code>fibaro.sleep(ms)</code>:
+<code>__assert_type</code> → <code>coroutine.running()</code> check (clear error outside a QA) →
+<code>coroutine.yield(ms)</code>. The old blocking <code>_PY.sleep</code> stub was removed (it did
+not exist on the Python side and would have errored). The QA identity (a
+stub in <code>qaInstances</code>) is registered before the file executes, so sleep works
+at top level, in onInit, and in callbacks alike.</p>
+<p><strong><code>src/flua/lua/quickapp.lua</code></strong> —
+<code>RefreshStateSubscriber:run()</code> registers <code>handle -&gt; _FLUA.qaId</code> so refresh
+delivery can be deferred per sleeping QA.</p>
+<p><strong><code>src/flua/engine.py</code></strong> — no changes needed: the wake timer is a normal
+QA-attributed timer, so <code>--speed</code>/<code>--instant</code>/<code>has_pending_work</code> behave
+unchanged, and <code>exit()</code>/<code>restart_qa()</code> cancel it via <code>cancel_qa</code>.</p>
+<h2 id="edge-cases">Edge cases</h2>
+<ul>
+<li><strong>exit() while sleeping</strong> — impossible from the QA itself (no code runs);
+  the wake timer is cancelled by <code>cancel_qa</code>. A stale queue entry for a dead
+  QA is harmless (nothing drains it; <code>qaInstances</code> entries linger the same
+  way).</li>
+<li><strong>restartQA while sleeping</strong> — <code>sleeping[id]</code> and <code>workQueues[id]</code> are
+  cleared, the old coroutine is abandoned, the new instance boots normally.</li>
+<li><strong>sleep anywhere in QA code</strong> — top level, onInit, callbacks. The QA
+  identity (a stub in <code>qaInstances</code>) registers before the file executes, so
+  a top-level sleep suspends the whole chunk — including the later
+  <code>QuickApp</code> construction — and messages queue by device id; the real
+  instance replaces the stub at construction, before the queue drains.
+  onInit runs synchronously in <code>__init</code>, in the HC3 order (onInit before
+  <code>initChildDevices</code>); an onInit error fails the load.</li>
+<li><strong>children</strong> — a sleeping child defers its parent QA (the code that
+  handles its events), like the HC3's shared instance thread.</li>
+<li><strong>nested sleep</strong> — a callback that sleeps again after waking re-arms
+  through the same path; deferred messages keep their FIFO order across
+  chained sleeps.</li>
+<li><strong>intervals</strong> — a deferred tick runs on wake and reschedules from there:
+  intervals effectively pause during a sleep.</li>
+<li><strong>sleep inside <code>async.run</code></strong> — the async runner sees a non-awaitable yield
+  and reports it (<code>async.await</code> yields a function, <code>fibaro.sleep</code> a number).</li>
+<li><strong>reentrancy</strong> — while sleeping, no Lua runs for that QA (single entry);
+  drain and resume only happen inside dispatch.</li>
+</ul>
+<h2 id="tests-teststest_sleeppy">Tests (<code>tests/test_sleep.py</code>)</h2>
+<ul>
+<li>sleep suspends only the calling QA; a timer of that QA firing during the
+  sleep runs after the sleeping callback resumed (arrival order); the other
+  QA's timer is unaffected.</li>
+<li>device action arriving during the sleep is delivered after the
+  continuation.</li>
+<li>sleep works in <code>onInit</code> and at top level (the QA identity registers
+  before the file runs); messages during an onInit sleep queue; an onInit
+  error still fails the load.</li>
+<li><code>onInit</code> runs before <code>initChildDevices</code> (HC3 order).</li>
+<li><code>--instant</code> (speed=inf) collapses the sleep.</li>
+<li><code>fibaro.sleep</code> outside a QA (main-state code) errors.</li>
+<li>error in the code after the sleep is contained and printed.</li>
+<li>restart during sleep drops the deferred queue and the pending sleep.</li>
+<li><code>examples/sleep.lua</code> runs end to end and keeps its deferred timer.</li>
+</ul>
+</body>
+</html>

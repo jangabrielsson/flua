@@ -1,0 +1,205 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>05 · Make it yours</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="05--make-it-yours">05 · Make it yours</h1>
+<p>Until now the lamp's interface was the two buttons the HC3 gives every
+switch. This chapter adds <strong>your own</strong> control panel: a switch that turns
+the automatic mode on and off, and a label that says what the lamp is
+doing. You'll also give the lamp its first <strong>quickApp variable</strong> — a value
+you can change later from the HC3 app without touching the code.</p>
+<h2 id="the-lamp-with-a-control-panel">The lamp with a control panel</h2>
+<p>Save this as <code>sunset_lamp_ui.lua</code> (or use the repo's copy at
+<code>examples/sunset_lamp_ui.lua</code>):</p>
+<pre><code class="language-lua">--%%name:SunsetLamp
+--%%type:com.fibaro.binarySwitch
+--%%var:auto=true
+--%%var:wattage=60
+
+--%%u:{label=&quot;status&quot;,text=&quot;Automatic mode&quot;}
+--%%u:{switch=&quot;automatic&quot;,text=&quot;Automatic&quot;,value=&quot;true&quot;,onReleased=&quot;toggleAuto&quot;}
+
+function QuickApp:onInit()
+  self:debug(&quot;Sunset lamp ready,&quot;, self:getVariable(&quot;wattage&quot;), &quot;W&quot;)
+  self:checkSun()
+  setInterval(function() self:checkSun() end, 60 * 1000)
+end
+
+function QuickApp:turnOn()
+  self:updateProperty(&quot;value&quot;, true)
+  print(&quot;Lamp on&quot;)
+end
+
+function QuickApp:turnOff()
+  self:updateProperty(&quot;value&quot;, false)
+  print(&quot;Lamp off&quot;)
+end
+
+function QuickApp:toggleAuto(e)
+  local auto = e.values and e.values[1] == &quot;true&quot;
+  self:setVariable(&quot;auto&quot;, auto)
+  self:updateView(&quot;status&quot;, &quot;text&quot;, auto and &quot;Automatic mode&quot; or &quot;Manual mode&quot;)
+  if auto then self:checkSun() end
+end
+
+function QuickApp:checkSun()
+  if not self:getVariable(&quot;auto&quot;) then return end -- manual mode: hands off
+  local now = os.date(&quot;*t&quot;)
+  local h, m = fibaro.getValue(1, &quot;sunsetHour&quot;):match(&quot;(%d+):(%d+)&quot;)
+  local sunsetMin = tonumber(h) * 60 + tonumber(m)
+  local nowMin = now.hour * 60 + now.min
+  if nowMin &gt;= sunsetMin and not self.properties.value then
+    self:turnOn()
+  elseif nowMin &lt; sunsetMin and self.properties.value then
+    self:turnOff()
+  end
+end
+</code></pre>
+<h3 id="your-own-ui-the---u-lines">Your own UI: the <code>--%%u</code> lines</h3>
+<p>The two new header lines describe the panel:</p>
+<pre><code class="language-lua">--%%u:{label=&quot;status&quot;,text=&quot;Automatic mode&quot;}
+--%%u:{switch=&quot;automatic&quot;,text=&quot;Automatic&quot;,value=&quot;true&quot;,onReleased=&quot;toggleAuto&quot;}
+</code></pre>
+<p>Each <code>--%%u</code> line is one row of your QuickApp's own UI:</p>
+<ul>
+<li>a <strong>label</strong> named <code>status</code>, showing "Automatic mode";</li>
+<li>a <strong>switch</strong> named <code>automatic</code>, starting ON (<code>value="true"</code>). When someone
+  flips it, the QuickApp's <code>toggleAuto</code> action runs (<code>onReleased</code>).</li>
+</ul>
+<p>That's the whole recipe for HC3 interfaces: rows of <code>label</code>, <code>button</code>,
+<code>switch</code>, <code>slider</code>, <code>select</code> — each with a name and the action to call. The
+HC3 app renders the same rows on the real controller later.</p>
+<h3 id="reacting-toggleauto">Reacting: <code>toggleAuto</code></h3>
+<pre><code class="language-lua">function QuickApp:toggleAuto(e)
+  local auto = e.values and e.values[1] == &quot;true&quot;
+  self:setVariable(&quot;auto&quot;, auto)
+  self:updateView(&quot;status&quot;, &quot;text&quot;, auto and &quot;Automatic mode&quot; or &quot;Manual mode&quot;)
+  if auto then self:checkSun() end
+end
+</code></pre>
+<p>Two new tricks:</p>
+<ul>
+<li><strong>UI actions receive an event.</strong> <code>e.values[1]</code> is what the user did — a
+  switch delivers <code>"true"</code> or <code>"false"</code>. The lamp stores it in a
+  <strong>variable</strong> named <code>auto</code> (see the next section for why a variable and
+  not a property).</li>
+<li><strong><code>self:updateView(...)</code></strong> changes a piece of your UI: the <code>status</code> label
+  now reads "Manual mode" — or "Automatic mode" again when switched back.
+  This is how QuickApps talk to their own panels.</li>
+</ul>
+<p>And the guard at the top of <code>checkSun</code>:</p>
+<pre><code class="language-lua">if not self:getVariable(&quot;auto&quot;) then return end
+</code></pre>
+<p>In manual mode the lamp leaves the light alone — the user has taken over.
+<code>return</code> means "stop this function right here".</p>
+<h3 id="your-own-icon">Your own icon</h3>
+<p>A QA's tile icon is the <code>deviceIcon</code> property — an icon <strong>id</strong> from the
+controller's library. While you develop, preview a custom icon set
+straight from a folder: put the icons next to the QA in the upload naming
+(<code>icon.png</code>, <code>icon0.png</code> + <code>icon100.png</code> for a binarySwitch, …) and point
+at them:</p>
+<pre><code class="language-lua">--%%icons:icons
+</code></pre>
+<p>flua then uses the QA's own id as its <code>deviceIcon</code> and the web view
+renders and switches the folder's icons with <code>value</code>/<code>state</code> — no HC3, no
+upload (<code>examples/local-icons.lua</code> is the runnable demo). The directive is
+preview-only and never travels into a packed <code>.fqa</code>; production icons come
+from the controller (chapter 06).</p>
+<h3 id="quickapp-variables---var">QuickApp variables: <code>--%%var</code></h3>
+<p>Both header lines starting with <code>--%%var</code> give the lamp <strong>variables</strong> —
+named values that live <em>with</em> the QuickApp:</p>
+<pre><code class="language-lua">--%%var:auto=true
+--%%var:wattage=60
+</code></pre>
+<ul>
+<li><code>wattage</code> is a value you might tweak later — on the real HC3 you can
+  edit variables in the app (device settings) without changing any code.</li>
+<li><code>auto</code> is the lamp's <strong>memory</strong>: whether the automatic mode is on.
+  <code>toggleAuto</code> writes it with <code>self:setVariable("auto", …)</code> and <code>checkSun</code>
+  reads it with <code>self:getVariable("auto")</code>.</li>
+</ul>
+<p>Why a variable and not a property? A QuickApp's properties are <strong>fixed by
+its type</strong>: a <code>binarySwitch</code> has <code>value</code>, and that's the schema — you can't
+invent an <code>auto</code> property for it. (<code>self:updateProperty("value", …)</code> from
+chapter 03 works because <code>value</code> is in the schema.) Variables, on the
+other hand, are free-form, and — the real reason <code>auto</code> is one — they
+<strong>survive restarts</strong>: when the HC3 (or flua) restarts the QuickApp, the
+variables keep their values, so the user's switch choice isn't lost. The
+<code>--%%var:auto=true</code> line only sets the <em>starting</em> value, the first time.</p>
+<p>If a value does <strong>not</strong> need to survive a restart, don't give it a
+variable — a plain Lua variable in the file (or a field on <code>self</code>, like
+<code>self.lastCheck = os.time()</code>) is simpler and just as good. Variables earn
+their keep exactly when the value must outlive the QuickApp's run.</p>
+<h2 id="run-it-and-flip-the-switch">Run it and flip the switch</h2>
+<p>Press <strong>F5</strong> with the <strong>Flua: Run Current File (UI)</strong> configuration, as in
+chapter 03, and open <strong>http://127.0.0.1:8090/</strong>.</p>
+<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+flua: UI viewer on http://127.0.0.1:8090/ — open it in a browser
+[04.10.2026][21:00:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready, 60 W
+[04.10.2026][21:00:00][DEBUG  ][SunsetLamp5000]: Lamp on
+</code></pre>
+<p>If the lamp <em>didn't</em> turn on: it's daytime where your virtual clock thinks
+it is (F5 starts at the real time, like chapter 04). Pin the sun with
+chapter 04's trick instead:</p>
+<pre><code class="language-bash">flua --api local --ui 8090 --start '2026/10/4 18:30:00' sunset_lamp_ui.lua
+</code></pre>
+<p>Open the viewer (chapter 03) and press <strong>Connect</strong>.</p>
+<blockquote>
+<p>✅ <strong>You should see</strong> the panel from before — On/Off and the state label —
+and <em>below</em> it, your own rows: the status label and the <strong>Automatic</strong>
+switch, sitting ON.</p>
+</blockquote>
+<p>Now flip <strong>Automatic</strong> off.</p>
+<blockquote>
+<p>✅ <strong>You should see</strong> the status label change to <code>Manual mode</code> — your
+<code>toggleAuto</code> action ran, stored <code>auto=false</code>, and updated the label.</p>
+</blockquote>
+<p>And because it's past sunset in the virtual world, flip the lamp off and on
+with <strong>Turn Off / Turn On</strong> — manual mode means the lamp won't fight you:
+<code>checkSun</code> returns immediately and leaves the light exactly where you put
+it. Flip <strong>Automatic</strong> back on and watch it take over again.</p>
+<p>Press the red square (■) in VS Code's Run toolbar when you're done.</p>
+<h2 id="what-did-we-just-learn">What did we just learn?</h2>
+<ul>
+<li><strong><code>--%%u</code> rows</strong> build your QuickApp's own UI — labels, buttons, switches,
+  sliders, selects — each calling one of your actions.</li>
+<li><strong>UI actions receive the event</strong> (<code>e.values</code>), so they know what the user
+  did.</li>
+<li><strong><code>updateView</code></strong> lets the QuickApp change its own UI live.</li>
+<li><strong>QuickApp variables</strong> (<code>--%%var</code>, <code>getVariable</code>/<code>setVariable</code>) are
+  free-form values that live with the device — tweakable settings, and
+  state that survives restarts (a QA's properties are fixed by its type).</li>
+</ul>
+<p>Next: the lamp has been living in a simulation this whole time. Time to
+move it into your real HC3.</p>
+</body>
+</html>

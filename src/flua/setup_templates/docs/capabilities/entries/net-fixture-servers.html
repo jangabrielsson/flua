@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>net.HTTPServer / TCPServer / UDPServer — in-QA fixture servers</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: net-fixture-servers
+topic: runtime-net
+title: net.HTTPServer / TCPServer / UDPServer — in-QA fixture servers
+pins:
+  - tests/test_server.py::test_tcp_udp_ws_servers_round_trip
+  - tests/test_server.py::test_handler_error_is_http_500
+  - tests/test_server.py::test_tcp_server_persistent_connection_and_binary
+verified: flua 0.1.166</p>
+<hr />
+<h1 id="nethttpserver--tcpserver--udpserver--in-qa-fixture-servers">net.HTTPServer / TCPServer / UDPServer — in-QA fixture servers</h1>
+<p>flua's server implementations — a QA can <em>be</em> the server:</p>
+<ul>
+<li><code>net.HTTPServer():listen(port, handler)</code> — the handler takes a
+  request table (<code>method/url/headers/body</code>) and returns a response; a
+  handler that raises answers 500 with the error text (pinned). Port 0
+  picks a free one; the bound port is reported.</li>
+<li><code>net.TCPServer</code> — persistent connections with binary payloads
+  (pinned); <code>net.UDPServer</code> — datagram service.</li>
+<li><code>net.WebSocketServer</code> — the request/response + push + disconnect
+  story lives in <code>websocket-server-push</code>.</li>
+</ul>
+<p>The classic fixture pattern: run the server in a test QA, have the QA
+under test connect to it — deterministic tests without external
+processes, and the same code runs on the HC3.</p>
+</body>
+</html>

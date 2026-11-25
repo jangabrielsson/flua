@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>flua documentation</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="flua-documentation">flua documentation</h1>
+<p>What lives where, so contributors can tell canonical reference from scratch
+notes at a glance.</p>
+<h2 id="orientation-start-here">Orientation (start here)</h2>
+<ul>
+<li><strong><a href="CONTRIBUTING.html">../CONTRIBUTING.md</a></strong> — setup, dev loop, and the
+  orientation pair.</li>
+<li><strong><a href="ARCHITECTURE.html">../ARCHITECTURE.md</a></strong> — components and layers.</li>
+<li><strong><a href="concurrency.html">concurrency.md</a></strong> — the execution model: pump, bridge
+  queues, per-QA coroutines, worker threads, blocking rules, graceful exit,
+  and the two race lessons.</li>
+<li><strong><a href="invariants.html">invariants.md</a></strong> — the behavioral contracts, each with
+  the test that pins it.</li>
+<li><strong><a href="walkthroughs.html">walkthroughs.md</a></strong> — guided traces: QA boot,
+  <code>fibaro.sleep</code>, remote API suspension, event delivery, proxy shadowing.</li>
+</ul>
+<h2 id="decisions">Decisions</h2>
+<ul>
+<li><strong><a href="decisions/">decisions/</a></strong> — ADR-lite: the <em>why</em> behind deliberate
+  choices (mode default, id namespaces, proxy event rules, the pump races,
+  test parallelism). Update these when a decision changes.</li>
+</ul>
+<h2 id="reference">Reference</h2>
+<ul>
+<li><strong><a href="USAGE.html">../USAGE.md</a></strong> — the user guide: directives, modes,
+  <code>--%%</code> reference, all runtime features.</li>
+<li><strong><a href="rest-endpoints.html">rest-endpoints.md</a></strong> — which REST endpoints are
+  real vs shape-only stubs, and the rule for promoting one.</li>
+<li><strong><a href="mcp.html">mcp.md</a></strong> — the <code>flua-mcp</code> server: protocol surface, tools,
+  host registration, and what agents can rely on.</li>
+<li><strong><a href="AGENTS.html">../AGENTS.md</a></strong> — working rules for AI agents (any
+  framework).</li>
+<li><strong><a href="CHANGELOG.html">../CHANGELOG.md</a></strong> — release notes.</li>
+<li><strong><a href="specs/">specs/</a></strong> — checked-in external references: <code>hc3-api.json</code>
+  (the HC3 REST surface), <code>refreshEvents.json</code> (real event samples the
+  emulator matches), <code>fibaro-sleep.md</code>, and HTML captures of HC3 docs.</li>
+</ul>
+<h2 id="tutorial-user-facing">Tutorial (user-facing)</h2>
+<ul>
+<li><strong><a href="tutorial/">tutorial/</a></strong> — the non-programmer tutorial (Sunset Lamp),
+  plus its built PDF. Regenerate with <code>scripts/build-tutorial-pdf.sh</code> after
+  editing chapters.</li>
+</ul>
+<h2 id="scratch-notes-not-canonical">Scratch notes (not canonical)</h2>
+<p>These live in <a href="notes/">notes/</a> and capture in-progress thinking. Treat them
+as dated working notes, not reference — promote anything that becomes a
+rule into the reference docs above.</p>
+<ul>
+<li><code>notes-agents.md</code> — agent-facing DX ideas (now partly realized: flua-test,
+  <code>--log json</code>, AGENTS.md).</li>
+<li><code>notes-mcp.md</code> — flua as an MCP server (draft design: tool surface,
+  sessions, stateless transport).</li>
+<li><code>notes-rest-parity.md</code> — HC3 REST parity strategy; real <code>/debugMessages</code>
+  implemented, system/crash log drafted.</li>
+<li><code>notes-distribution.md</code> — packaging/distribution surfaces.</li>
+<li><code>notes-mqtt-broker.md</code> — MQTT broker explorations.</li>
+<li><code>notes-select-value.md</code> — select-value UI semantics.</li>
+</ul>
+</body>
+</html>

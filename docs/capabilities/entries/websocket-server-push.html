@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>net.WebSocketServer can push and disconnect — event-driven server protocols</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: websocket-server-push
+topic: runtime-net
+title: net.WebSocketServer can push and disconnect — event-driven server protocols
+pins:
+  - tests/test_server.py::test_ws_server_push_disconnect_and_events
+verified: flua 0.1.165</p>
+<hr />
+<h1 id="netwebsocketserver-can-push-and-disconnect--event-driven-server-protocols">net.WebSocketServer can push and disconnect — event-driven server protocols</h1>
+<p>flua's <code>net.WebSocketServer</code> is a full server, not just request/response:</p>
+<ul>
+<li><code>ws:listen(port, handler)</code> — the handler returns a reply, like a
+  request/response endpoint.</li>
+<li><code>ws:send(conn, message)</code> — push an <strong>unsolicited</strong> frame to a client
+  (event-driven protocols, subscriptions, notifications).</li>
+<li><code>ws:disconnect(conn)</code> — close a connection server-side.</li>
+<li>Lifecycle events per connection: <code>connected</code> / <code>disconnected</code> (plus
+  <code>error</code>/<code>dataReceived</code> on the client side), via <code>addEventListener</code>.</li>
+</ul>
+<p>Pattern: <code>ws:addEventListener('connected', ...)</code> tracks clients, and a
+<code>setTimeout</code>/event source pushes to them. The disconnect events on both
+sides are asynchronous — never assert one side saw its event from the
+other side's handler (see the pinned test's barrier pattern).</p>
+<p>For reacting to <em>device</em> changes, <code>RefreshStateSubscriber</code> over the
+refreshStates feed is the HC3 mechanism — see <code>docs/forum/11-refreshstate.html</code>.</p>
+</body>
+</html>

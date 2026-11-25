@@ -1,0 +1,102 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>flua REST endpoints — real vs stub</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="flua-rest-endpoints--real-vs-stub">flua REST endpoints — real vs stub</h1>
+<p>Which simulated endpoints carry real data and which are HC3-shaped stubs.
+The classification rule (from <code>docs/notes/notes-rest-parity.md</code>): implement a
+stub for real only when (a) a QA calls it, (b) a tool/agent reads it, or
+(c) the compat suite flags shape drift.</p>
+<p>The stub column is <strong>machine-readable</strong>: <code>SHAPE_ONLY_ROUTES</code> in
+<code>src/flua/api/__init__.py</code> is the source of truth (update both together),
+<code>flua --capabilities-json</code> serves it as the <code>rest</code> table
+(<code>status: state | stub | extension</code>), and the runtime warns on first use
+of a stub (default on; <code>--%%warn:stubApi=false</code> silences).</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Real (state-backed)</th>
+<th>Stub (shape-only: empty/zeroed)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Devices</td>
+<td>CRUD (<code>POST /devices</code> = base device from the type skeleton, flua extension; <code>GET/PUT/DELETE /devices/{id}</code> — PUT: <code>name</code>/<code>visible</code>/<code>enabled</code>/<code>roomID</code> + a merged <code>properties</code> dict, all restart the QA; <code>PUT /devices/{id}/properties/{name}</code> restarts too), actions, groupAction, <code>/flua/devices</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Plugins</td>
+<td>variables, child devices, views, restart, UI events, <code>/flua/embeddedUI</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>House</td>
+<td>scenes, rooms, sections, globals, alarm partitions, profiles, customEvents (CRUD + <code>{name}/publish</code>; firing uncreated events 404s), <code>/home</code> (+ PUT)</td>
+<td><code>/iosDevices</code>, <code>/alarms/v1/devices</code>, <code>/notificationCenter</code>, <code>/energy/devices</code></td>
+</tr>
+<tr>
+<td>Panels</td>
+<td><code>/panels/location</code> (+ PUT <code>{id}</code>)</td>
+<td><code>/panels/climate</code>, <code>/panels/{id}</code>, <code>/panels/notifications</code>, <code>/panels/family</code>, <code>/panels/sprinklers</code>, <code>/panels/humidity</code>, <code>/panels/favoriteColors</code></td>
+</tr>
+<tr>
+<td>Logs &amp; feeds</td>
+<td><code>/refreshStates</code>, <code>/debugMessages</code> (+ <code>tags</code>, DELETE), <code>/flua/systemLog</code> (+ DELETE)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>System</td>
+<td><code>/settings/info</code> (+ PUT), <code>/settings/location</code> (+ PUT), <code>/weather</code>, <code>/quickApp/*</code> (files/export), <code>/proxy</code>, <code>/diagnostics</code>, <code>/icons</code> (the checked-in controller icon catalog — <code>devices/icons.json</code>, scraped from the HC3; <code>?deviceType=</code> filters to the type's icon sets, unknown types 404)</td>
+<td><code>/users</code></td>
+</tr>
+</tbody>
+</table>
+<p>Notes:</p>
+<ul>
+<li><strong>Stubs still answer 200 in the HC3's response shape</strong> — they are
+  shape-compatible by design (the live compat suite pins that), they just
+  carry no data.</li>
+<li><strong><code>/flua/*</code> routes have no HC3 counterpart</strong> — they are the flua-only
+  machine surface (<code>/flua/devices</code>, <code>/flua/embeddedUI</code>, <code>/flua/systemLog</code>,
+  <code>/flua/icons/{set}/{file}</code> — the icon cache channel, <code>/flua/iconMap</code> —
+  the deviceIcon id→set lookup + per-set file lists for state switching).</li>
+<li><strong><code>PUT /weather</code> is a flua extension</strong> — the HC3's weather is
+  provider-owned and read-only; the sim lets a test QA override it
+  (merging per field; each changed field emits a <code>WeatherChangedEvent</code>).</li>
+<li>The full HC3 surface is much larger than this table (359 endpoints in
+  <code>docs/specs/hc3-api.json</code>); the sim implements the slice QAs, tools, and
+  the viewer actually touch — the rest forwards to the HC3 online.</li>
+</ul>
+</body>
+</html>

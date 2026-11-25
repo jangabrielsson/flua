@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Note: hub profiles — switching between controllers (design)</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="note-hub-profiles--switching-between-controllers-design">Note: hub profiles — switching between controllers (design)</h1>
+<p>Status: implemented (2026-11-08) — <code>flua --tool hub</code>, the extension's
+Switch-hub picker, the <code>active</code> marker in <code>hub list</code>, and the
+<code>serial:id</code> per-hub state key. Multi-hub trees and profile encryption
+remain out of scope.</p>
+<h2 id="the-problem">The problem</h2>
+<p>A user with several HC3s (home, cottage, a customer's) edits <code>.env</code> files
+by hand to switch. The chain already composes — process env &gt; project
+<code>.env</code> &gt; <code>~/.env</code> — so a project can pin itself while a global default
+covers everything else. What's missing is a name for each controller and a
+one-command way to switch the global default (or pin a project).</p>
+<h2 id="design-named-profiles-in-fluahubsjson">Design: named profiles in <code>~/.flua/hubs.json</code></h2>
+<p>One file, one entry per hub:</p>
+<pre><code class="language-json">{
+  &quot;home&quot;:    {&quot;url&quot;: &quot;http://192.168.1.20&quot;, &quot;user&quot;: &quot;admin&quot;, &quot;password&quot;: &quot;...&quot;},
+  &quot;cottage&quot;: {&quot;url&quot;: &quot;http://192.168.2.30&quot;, &quot;user&quot;: &quot;admin&quot;, &quot;password&quot;: &quot;...&quot;}
+}
+</code></pre>
+<ul>
+<li>Created mode 0600, same plaintext-on-disk posture as <code>.env</code> today (the
+  HC3 itself does not encrypt; secret means "not shown", never "safe").</li>
+<li>Passwords never appear in argv, logs, or <code>list</code> output — <code>add</code> prompts
+  interactively (getpass), so the extension's picker and agents only ever
+  see the password-free list.</li>
+</ul>
+<h3 id="the-tool-flua---tool-hub">The tool: <code>flua --tool hub</code></h3>
+<ul>
+<li><code>hub add &lt;name&gt; &lt;url&gt; &lt;user&gt; [-f]</code> — prompts for the password; <code>-f</code>
+  replaces an existing name.</li>
+<li><code>hub list [--json]</code> — names, urls, and (when reachable) the serial; no
+  passwords. The JSON form is the extension's contract.</li>
+<li><code>hub switch &lt;name&gt;</code> — rewrites <code>HC3_URL</code>/<code>HC3_USER</code>/<code>HC3_PASSWORD</code> in
+  <code>~/.env</code>, preserving every other key (the chain's global default).
+  With <code>--project</code>, writes the project <code>.env</code> instead — pin this folder,
+  override the global default.</li>
+<li><code>hub remove &lt;name&gt;</code> — deletes the profile; never touches <code>.env</code> (switching
+  stays explicit).</li>
+</ul>
+<p>Nothing else changes: tools, the engine, <code>doctor</code> (which reports where
+<code>HC3_URL</code> came from), and the extension all keep reading the same chain.
+The precedence stays: project pin &gt; global profile &gt; nothing (offline).</p>
+<h2 id="the-extension-a-switch-not-a-credential-store">The extension: a switch, not a credential store</h2>
+<p>The hub view title gains <strong>Switch hub</strong>: <code>--tool hub list --json</code> → Quick
+Pick (name + url + serial) → <code>hub switch &lt;name&gt;</code> in the shared terminal
+(so the interactive prompt still works if ever needed) → tree refresh. The
+extension never reads the profiles file beyond the password-free list.</p>
+<p>The completions surface needs no change: <code>--tool house</code> reads the chain on
+every fetch, so the next refresh follows the switch automatically.</p>
+<h2 id="cache-and-per-hub-state--two-identity-fixes">Cache and per-hub state — two identity fixes</h2>
+<ul>
+<li>The package cache is already keyed by hub <strong>serial</strong> (<code>hcName</code>) — the
+  serial is identity (the IP may change), so switching naturally separates
+  caches, and a hub that moved keeps its cache.</li>
+<li><strong>Gap 1</strong>: <code>hub.dirs</code> (workspaceState: the remembered download folder
+  and its unpack-time <code>modified</code>) is keyed by <strong>QA id only</strong> — id 57 on
+  hub A collides with id 57 on hub B, poisoning the staleness badge. Key
+  it <code>serial:id</code>.</li>
+<li><strong>Gap 2</strong>: the serial-fallback-to-URL in <code>hubSerial()</code> is fine but
+  deserves a pinning comment; keep serial-first.</li>
+</ul>
+<h2 id="out-of-scope-named-not-forgotten">Out of scope (named, not forgotten)</h2>
+<ul>
+<li>Browsing several hubs simultaneously in one tree (the <code>hubList</code> contract
+  is single-hub; a multi-hub view would read the same profiles file).</li>
+<li>Encrypting the profiles file (would need a keyring integration per OS —
+  a real decision, not a hidden default).</li>
+</ul>
+<h2 id="verification-without-a-second-controller">Verification without a second controller</h2>
+<p>The tests mock everything (the tool writes files under a fake HOME, like
+the existing tool tests); a single real controller still exercises
+<code>add</code>/<code>list</code>/<code>switch</code> end to end, and the extension picker shows the one
+profile.</p>
+<h2 id="related">Related</h2>
+<ul>
+<li><code>docs/notes/notes-vscode-qa-cache.md</code> — the cache whose keying this fixes</li>
+<li><code>src/flua/environment.py</code> — the chain the tool writes into</li>
+<li><code>vscode/src/hub.ts</code> — the picker and the <code>serial:id</code> state key</li>
+</ul>
+</body>
+</html>

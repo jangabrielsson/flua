@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Self-asserting QAs — the flua-test library and --strict-tests</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: flua-test-library
+topic: testing
+title: Self-asserting QAs — the flua-test library and --strict-tests
+pins:
+  - tests/test_qa.py::test_example_self_test_passes_and_exits_zero
+  - tests/test_dx.py::test_strict_tests_sticky_callback_failure
+verified: flua 0.1.170</p>
+<hr />
+<h1 id="self-asserting-qas--the-flua-test-library-and---strict-tests">Self-asserting QAs — the flua-test library and --strict-tests</h1>
+<p>The verification-legibility surface (ADR 0013's second promise): a QA
+can assert its own behavior and exit with the verdict as the exit code:</p>
+<ul>
+<li>The <code>flua-test</code> library (<code>$flua-test</code> bundled lib,
+  <code>examples/selfTest.lua</code> as the living fixture) turns assertions into
+  PASS/FAIL lines and a final exit code — a test scaffold an agent can
+  drop into any QA project.</li>
+<li><code>--strict-tests</code> (CI mode, <code>--%%strict-tests:true</code> as a directive)
+  makes <strong>unhandled callback errors fail the run with exit 1</strong>, sticky
+  — a silently swallowed error in a timer/UI/net callback becomes a
+  red build instead of a mystery.</li>
+<li><code>--result-json</code> renders the run's verdicts machine-readably, so a
+  requirements checklist (each requirement → PASS/FAIL) is one
+  generation step away from an agent's test run.</li>
+</ul>
+<p>The recipe verify scenarios (<code>recipe-verify-scenarios</code>) are the same
+idea in declarative form; both exit 0/1 for CI.</p>
+</body>
+</html>

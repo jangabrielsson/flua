@@ -1,0 +1,126 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Contributing to flua</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="contributing-to-flua">Contributing to flua</h1>
+<p>Thanks for your interest! flua is an open project — pull requests are
+welcome.</p>
+<p>Before diving in, read the orientation pair:</p>
+<ul>
+<li><strong><a href="ARCHITECTURE.html">ARCHITECTURE.md</a></strong> — components and layers.</li>
+<li><strong><a href="concurrency.html">docs/concurrency.md</a></strong> — the execution model
+  (pump, bridge queues, per-QA coroutines, worker threads, blocking rules,
+  graceful exit).</li>
+<li><strong><a href="walkthroughs.html">docs/walkthroughs.md</a></strong> — guided traces through
+  the key flows, when you want to <em>see</em> a mechanism run.</li>
+<li><strong><a href="invariants.html">docs/invariants.md</a></strong> — the behavioral contracts,
+  each with the test that pins it: when a change touches a contract, the
+  pin is the test to run (and update deliberately).</li>
+<li><strong><a href="decisions/">docs/decisions/</a></strong> — the why behind deliberate
+  choices; update these when a decision changes.</li>
+</ul>
+<h2 id="setup">Setup</h2>
+<pre><code class="language-bash">python3 -m venv .venv
+.venv/bin/pip install -e &quot;.[dev]&quot;     # pytest + ruff
+git config core.hooksPath .githooks    # the pre-commit hook keeps the synced trees fresh
+</code></pre>
+<p>Requires Python 3.11+; <code>lupa</code> is the only runtime dependency.</p>
+<p>The pre-commit hook runs <code>scripts/sync-skills.sh</code> and stages the
+regenerated trees (skills, docs, forum index) — commits can then never
+fail the CI sync guard because of drift. Hooks are not transferred by
+clone, which is why the <code>core.hooksPath</code> line above is part of setup.</p>
+<h2 id="development-loop">Development loop</h2>
+<pre><code class="language-bash">.venv/bin/pytest tests/ -q            # full suite (live-HC3 tests are skipped)
+.venv/bin/pytest tests/test_qa.py -q  # one file
+.venv/bin/ruff check src/ tests/      # lint
+.venv/bin/ruff format src/ tests/     # format (line length 100)
+</code></pre>
+<p>Run one test, test class, or test function with pytest's normal selectors:</p>
+<pre><code class="language-bash">.venv/bin/pytest tests/test_qa.py::test_name -q
+.venv/bin/pytest tests/test_qa.py -k timer -q
+</code></pre>
+<p>Tests run against local mock servers, never a real HC3. The opt-in live
+suites (<code>HC3_TEST=1 pytest tests/test_hc3_live.py</code>) need your own controller
+credentials and touch only their own test QA.</p>
+<p>Some tests bind localhost sockets. If tests fail in a restricted sandbox,
+rerun them in an environment that permits local socket binds. Prefer existing
+<code>wait_until</code>/<code>wait_for_output</code> helpers over sleeps so tests remain deterministic.</p>
+<h2 id="making-a-change">Making a change</h2>
+<ol>
+<li>Open an issue or discuss the change first when it is not a small fix.</li>
+<li>Keep changes focused: one concern per PR, behavior and tests together.</li>
+<li>Add a test for new behavior — the suite is the contract. New tests follow
+   the existing patterns (mock HC3 servers, <code>wait_until</code> helpers, stdout
+   assertions).</li>
+<li>Update the docs: user-facing behavior in <code>USAGE.md</code>, internals in
+   <code>ARCHITECTURE.md</code>, new directives in the directive table.</li>
+<li>Run <code>ruff check</code> and the full suite before pushing.</li>
+</ol>
+<p>Prefer the one-command workflow when your change is ready:</p>
+<pre><code class="language-bash">git add &lt;the files in this PR&gt;
+./scripts/pr.sh my-fix &quot;feat: describe the change&quot;
+</code></pre>
+<p>It runs the gate (ruff + the offline suite), creates a <code>contrib/</code> branch,
+commits the staged files, pushes, and opens the PR (<code>gh</code> required for the
+last step). CI runs the same gate on every PR and push to <code>main</code>.</p>
+<p>For larger changes, also run <code>ruff format --check src/ tests/</code> and inspect the
+complete diff with <code>git diff --check</code>.</p>
+<h2 id="code-style">Code style</h2>
+<ul>
+<li>PEP 8 via ruff (line length 100), type hints where they help.</li>
+<li>API handlers are pure functions over <code>SimState</code>; side effects go through
+  <code>req.emit</code>/<code>req.remote</code>.</li>
+<li>Everything crossing the Lua↔Python bridge is a JSON-compatible message —
+  never a Lua function reference.</li>
+<li>Keep <code>_PY</code> (the bridge surface) minimal; end-user convenience lives in Lua.</li>
+<li><code>dev/</code> is scratch; do not commit probes.</li>
+</ul>
+<h2 id="ai-agents">AI agents</h2>
+<p>Agents working on this repo (any framework) start at
+<a href="AGENTS.html">AGENTS.md</a> — the repo map, commands, invariants, and conventions
+in one place.</p>
+<p>The expected agent workflow is: inspect source and tests, make a focused
+change, add deterministic coverage, update documentation, run targeted tests,
+run Ruff, and report validation results. Agents must not contact a real HC3 or
+commit scratch probes from <code>dev/</code> unless explicitly instructed.</p>
+<h2 id="pull-requests">Pull requests</h2>
+<ul>
+<li>Keep one logical concern per pull request.</li>
+<li>Explain the user-visible or architectural effect, not only the files changed.</li>
+<li>Include tests and documentation updates, or explain why they are not needed.</li>
+<li>List the exact validation commands that were run.</li>
+<li>Call out compatibility changes, new dependencies, and any remaining risks.</li>
+</ul>
+<h2 id="license">License</h2>
+<p>MIT — see <a href="LICENSE">LICENSE</a>.</p>
+</body>
+</html>

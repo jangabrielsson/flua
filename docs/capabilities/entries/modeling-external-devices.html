@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Model the external device as a sim QA speaking the real protocol</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: modeling-external-devices
+topic: sim-world
+title: Model the external device as a sim QA speaking the real protocol
+pins:
+  - tests/test_modbus_mock.py::test_solaredge_mock_serves_both_wire_bases
+  - tests/test_modbus_mock.py::test_modbus_server_write_functions_round_trip
+verified: flua 0.1.169</p>
+<hr />
+<h1 id="model-the-external-device-as-a-sim-qa-speaking-the-real-protocol">Model the external device as a sim QA speaking the real protocol</h1>
+<p>For integrations, the <em>far side</em> should be a QA in the sim — not a
+Python fake:</p>
+<ul>
+<li><code>examples/Modbus Server/</code> — a Modbus server in Lua (write functions
+  round-trip, pinned) plus a Solaredge device and its mock that serves
+  <strong>both wire bases</strong> (client and buttons) — the complete
+  device+mock pair in one folder.</li>
+<li>The bundled sim devices are the same idea for house devices
+  (<code>weatherMgr</code> drives <code>PUT /weather</code>, <code>alarmEndpoint</code> serves
+  <code>/alarms/v1</code>) — see <code>sim-devices</code>.</li>
+<li>The device QA holds its state in properties and emits
+  <code>DevicePropertyUpdatedEvent</code>s, so the QA under test reacts through
+  the normal event feed — no special test hooks.</li>
+</ul>
+<p>Result: the integration runs offline exactly as it would against the
+real device, and the device model doubles as the fixture in the
+pinning tests. Write the model once, use it everywhere.</p>
+</body>
+</html>

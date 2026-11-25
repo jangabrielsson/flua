@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>/devices?isTypeOf= follows the inheritance tree; ?type= is exact</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: istypeof-vs-type
+topic: hc3-api
+title: /devices?isTypeOf= follows the inheritance tree; ?type= is exact
+pins:
+  - tests/test_api.py::test_devices_query_filters
+verified: flua 0.1.168, HC3 5.221</p>
+<hr />
+<h1 id="devicesistypeof-follows-the-inheritance-tree-type-is-exact">/devices?isTypeOf= follows the inheritance tree; ?type= is exact</h1>
+<p>Two query filters on the device list, easy to confuse:</p>
+<ul>
+<li><code>?isTypeOf=com.fibaro.binarySensor</code> matches the <strong>whole inheritance
+  tree</strong> — a <code>com.fibaro.FGWDS221</code> (a Fibaro Z-Wave device registered
+  under its product type) shows up because it is a binarySensor child.</li>
+<li><code>?type=com.fibaro.binarySensor</code> matches the type <strong>exactly</strong>.</li>
+</ul>
+<p>The sim implements both with the same semantics. The QA builder's
+device pickers use <code>isTypeOf</code> filters, and the recipe manifests' device
+<code>filter</code> fields are <code>isTypeOf</code> base types — that is why a flood sensor
+appears for a <code>binarySensor</code> filter.</p>
+</body>
+</html>

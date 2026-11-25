@@ -1,0 +1,335 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Feedback: building a Skoda QuickApp with flua</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="feedback-building-a-skoda-quickapp-with-flua">Feedback: building a Skoda QuickApp with flua</h1>
+<h2 id="context">Context</h2>
+<p>This feedback comes from building <a href="./skoda.lua">skoda.lua</a>, a separate
+<a href="./skoda_mock.lua">mock service QA</a>, an
+<a href="./dev/skoda_test.lua">offline integration test</a>, and an HC3 package.
+The inputs were the local MySkoda OpenAPI YAML and HTML developer guide.
+The implementation was written from scratch after the user explicitly
+excluded the bundled Skoda example.</p>
+<p>The installed version was flua 0.1.144. Verification finished with static
+checks, 73 passing assertions through the flua MCP test tool, and a separate
+strict virtual-time test run. No real HC3 or car was contacted.</p>
+<p>These are observations from one session, not a comprehensive product review.
+Some requests below may already be possible through interfaces I did not
+discover. That discoverability is itself part of the feedback.</p>
+<h2 id="what-worked-well">What worked well</h2>
+<h3 id="real-client-code-against-a-local-service">Real client code against a local service</h3>
+<p>The strongest feature was the combination of isolated QAs, dynamic loading,
+<code>net.HTTPServer</code>, and the ordinary <code>net.HTTPClient</code>.</p>
+<p>The client could load a second QA at startup, discover its ephemeral
+loopback port, and talk to it over actual HTTP. The mock kept vehicle state,
+checked fake credentials, enforced quotas, and processed commands. That
+exercised the client's real request construction and callbacks rather than
+replacing its HTTP layer with test-only functions.</p>
+<p>The <code>_FLUA</code> marker provided a clear boundary: automatic mock startup is
+emulator-only; the HC3 path needs no server extension. Keeping the mock out
+of <code>--%%file</code> declarations also kept it out of the deployment package.</p>
+<h3 id="offline-hc3-simulation-with-real-networking">Offline HC3 simulation with real networking</h3>
+<p><code>--api local</code> made the safety boundary explicit. HC3 REST calls stayed in
+the simulator while HTTP traffic reached the local mock. The installed
+network-testing guidance explains this distinction well; “offline” does
+not mean networking is disabled.</p>
+<h3 id="useful-test-primitives">Useful test primitives</h3>
+<p><code>require("flua-test")</code> supplied assertions and a terminating verdict without
+adding a dependency or building a separate Python test suite.</p>
+<p>The test could drive UI events and <code>fibaro.call</code>, inspect the rendered
+view, verify state returned over HTTP, and exercise errors. <code>--strict-tests</code>
+was valuable because a callback exception should not become a passing run
+just because a later callback exits successfully.</p>
+<p>Virtual time made timer-related verification practical. The warning in the
+agent documentation about choosing <code>--step</code> rather than <code>--instant</code> for
+<code>os.time()</code>-dependent scheduling was particularly useful.</p>
+<h3 id="checks-and-packaging">Checks and packaging</h3>
+<p><code>flua --check</code> was quick and easy to use. The MCP UI tool exposed declared
+elements and callback bindings without requiring a browser.</p>
+<p>The <code>battery</code> interface guidance prevented inventing properties that would
+appear to work locally but be ignored on an HC3. <code>typeinfo</code> was useful for
+checking the declared property contract.</p>
+<p>Packaging the client alone was straightforward. Empty credential variables
+were preserved, and no mock or test file was included.</p>
+<h2 id="where-the-experience-was-harder">Where the experience was harder</h2>
+<h3 id="1-finding-the-right-information-took-too-many-routes">1. Finding the right information took too many routes</h3>
+<p>I used workspace instructions and skills, the MCP documentation list/read
+tools, CLI help, bundled documentation, and eventually installed Lua runtime
+source.</p>
+<p>There was already enough capability to complete the task. The difficulty
+was finding the exact contracts:</p>
+<ul>
+<li>Does dynamic QA loading return before <code>onInit</code> has completed?</li>
+<li>What can be accessed through <code>_FLUA.qa(id)</code>?</li>
+<li>How should the client know that a mock's server is ready?</li>
+<li>How should a sibling file be resolved independently of the working directory?</li>
+<li>Does <code>listen(0, handler)</code> expose its assigned port immediately?</li>
+<li>How do virtual timers interact with pending real HTTP?</li>
+</ul>
+<p>The generic docs explained many pieces, but I still read runtime source to
+confirm behavior and discovered <code>_FLUA.mainPath</code> there.</p>
+<p><strong>Suggestion:</strong> provide a compact, indexed “client QA + dynamically loaded
+mock QA” recipe with explicit readiness, path, lifetime, and error contracts.
+It should be generic, not tied to Skoda or another service.</p>
+<h3 id="2-documentation-responses-were-too-large-for-targeted-questions">2. Documentation responses were too large for targeted questions</h3>
+<p>The MCP <code>docs_list</code> response was about 51 KB and was offloaded to a temporary
+file. Reading the patterns skill returned about 23 KB and was also
+offloaded. I then had to search or read those files through other tools.</p>
+<p>This weakens the advantage of having documentation available through MCP:
+the agent ends up doing filesystem archaeology anyway.</p>
+<p><strong>Suggestions:</strong></p>
+<ul>
+<li>Add filtering and pagination to <code>docs_list</code>.</li>
+<li>Add a local <code>docs_search</code> returning short excerpts and stable section IDs.</li>
+<li>Let <code>docs_read</code> select a heading or line range and impose an output limit.</li>
+<li>Return related sections for a symbol such as <code>_FLUA.mainPath</code> or
+  <code>net.HTTPServer</code>, rather than the whole manual.</li>
+<li>Offer task-oriented entry points such as “mock an HTTP service” and
+  “verify a packaged QA.”</li>
+</ul>
+<p>No web search or remote knowledge service should be needed for this.</p>
+<h3 id="3-installed-skills-and-callable-skills-were-not-the-same-thing">3. Installed skills and callable skills were not the same thing</h3>
+<p>Workspace skill files were present and readable. However, an attempt to
+invoke <code>quickapp-api</code> through the skill-loading interface failed because
+that name was not in that interface's available list.</p>
+<p>This does not show that the skill content was missing; it shows that
+installation, discovery, and invocation were not aligned in this setup.</p>
+<p><strong>Suggestion:</strong> expose a capability summary distinguishing:</p>
+<ul>
+<li>Skills available as local documents.</li>
+<li>Skills registered with the editor's skill loader.</li>
+<li>How an agent should load each category.</li>
+</ul>
+<p>A setup/doctor check could flag the mismatch and offer the appropriate
+local or MCP document path.</p>
+<h3 id="4-tool-discovery-added-avoidable-friction">4. Tool discovery added avoidable friction</h3>
+<p>Searching for specific flua MCP tools sometimes returned other related
+tools rather than the named tool. It took several searches before the
+generic <code>flua_tool</code> interface was available.</p>
+<p>I also initially passed two names to <code>typeinfo</code>, which only accepts one.
+That was my incorrect assumption, not a flua failure.</p>
+<p><strong>Suggestions:</strong></p>
+<ul>
+<li>Supply a short agent-facing tool map with exact names and example calls.</li>
+<li>Make the generic tool registry discoverable through one compact response.</li>
+<li>Include argument schemas or concise usage in registry results.</li>
+<li>When arguments are invalid, return a valid example alongside the error.</li>
+</ul>
+<p>Search ranking and deferred-tool exposure also depend on the host. Those
+problems are not necessarily fixable inside flua alone.</p>
+<h3 id="5-real-networking-plus-virtual-time-needs-a-clearer-testing-recipe">5. Real networking plus virtual time needs a clearer testing recipe</h3>
+<p>An early <code>--step</code> test reached its virtual watchdog before a raw HTTP
+request completed. I changed the harness to use a bounded, short-timer
+wait loop, which allowed the test to continue successfully.</p>
+<p>That observation is not enough to diagnose a scheduler bug. The harness
+was mixing real asynchronous I/O with virtual deadlines, and my initial
+synchronization was insufficient.</p>
+<p><strong>Suggestions:</strong></p>
+<ul>
+<li>Document how <code>--step</code> advances while socket I/O is pending.</li>
+<li>Clearly distinguish virtual-time deadlines from wall-clock I/O timeouts.</li>
+<li>Provide a test helper such as <code>eventually(predicate, timeout)</code> that
+  cooperates with the pump and reports a useful timeout.</li>
+<li>Provide an awaitable request helper for test QAs without changing normal
+  HC3 client code.</li>
+<li>Include one generic regression example combining a dynamic mock, real
+  HTTP, virtual timers, and a watchdog.</li>
+</ul>
+<p>I also hit a nil access after loading another QA because I assumed the
+instance was already available. That was my test bug, but a documented
+readiness pattern or loader helper would make this mistake less likely.</p>
+<h3 id="6-passing-tests-still-required-parsing-verbose-logs">6. Passing tests still required parsing verbose logs</h3>
+<p>The MCP test runner returned a successful result, but the complete output
+was large enough to be offloaded. Its per-file <code>failures</code> field was null
+even though the assertion library printed a failure count. I counted
+<code>PASS:</code> lines in Python to report the final assertion total.</p>
+<p><strong>Suggestions:</strong></p>
+<ul>
+<li>Have <code>flua-test</code> publish structured assertion totals to the runner.</li>
+<li>Return <code>assertionsPassed</code>, <code>assertionsFailed</code>, and runtime errors directly.</li>
+<li>Default to a concise summary; include full logs on request or failure.</li>
+<li>Preserve diagnostics while clearly separating deliberately exercised
+  HTTP errors from actual test failures.</li>
+</ul>
+<p>Expected 401/422/429 cases generated error-level client logs. They were
+correct behavior, but without test context they can look like failed tests.</p>
+<h2 id="why-i-went-outside-the-workspace">Why I went outside the workspace</h2>
+<table>
+<thead>
+<tr>
+<th>What I accessed</th>
+<th>Why</th>
+<th>How flua could improve it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Installed generic examples</td>
+<td>To check the HTTP server API</td>
+<td>Serve a small, runnable generic recipe through documentation tools</td>
+</tr>
+<tr>
+<td>Bundled USAGE documentation</td>
+<td>To verify dynamic loading and configuration behavior</td>
+<td>Symbol/heading-level documentation lookup</td>
+</tr>
+<tr>
+<td>Installed Lua runtime source</td>
+<td>To confirm loader behavior, server semantics, and <code>_FLUA.mainPath</code></td>
+<td>Explicit public contracts with examples and readiness guarantees</td>
+</tr>
+<tr>
+<td>Temporary MCP output files</td>
+<td>Tool results were too large for direct reading</td>
+<td>Bounded results, filters, and concise structured summaries</td>
+</tr>
+<tr>
+<td>Bundled Skoda README</td>
+<td>I discovered an existing example while searching installed docs</td>
+<td>Task-scoped searches that do not automatically pull in matching application examples</td>
+</tr>
+</tbody>
+</table>
+<p>These were local reads, not contacts with a real service.</p>
+<p>Reading the bundled Skoda README was an approach the user did not want.
+After the user clarified that constraint, I did not use the bundled Skoda
+implementation. I should have kept the investigation focused on generic
+flua references instead of treating an application example as the next
+source of guidance.</p>
+<p>Avoiding these reads does not require copying all installed source into
+every workspace. A good local documentation interface would be better.</p>
+<h2 id="why-i-started-python">Why I started Python</h2>
+<p>I used Python for supporting inspection, not to implement the mock server
+or the QuickApp:</p>
+<ol>
+<li><strong>Extracting text from the supplied HTML.</strong> A small standard-library HTML
+   parser stripped markup, scripts, and styles so I could read the local
+   developer guide.</li>
+<li><strong>Inspecting the exported <code>.fqa</code>.</strong> I checked the JSON structure, variables,
+   interface declaration, included files, and packaged source.</li>
+<li><strong>Comparing source with packaged source.</strong> Exact equality initially failed
+   because packing rewrites <code>--%%var</code> expressions as baked literals,
+   including changing quote style. That was expected pack behavior, not a
+   packaging defect.</li>
+<li><strong>Summarizing the MCP test result.</strong> I parsed the saved JSON and counted
+   assertion log lines because the structured result did not expose that
+   count.</li>
+</ol>
+<p>Python was convenient because <code>.fqa</code> is JSON and Python was already
+available. Its use is not inherently a problem. Nevertheless, these are
+routine QA-development operations that flua could make easier without
+ad hoc scripts.</p>
+<p><strong>Suggested additions:</strong></p>
+<ul>
+<li><code>flua --tool inspectFQA FILE --json</code>: metadata, file inventory, interfaces,
+  initial variables, and validation findings.</li>
+<li><code>flua --tool verifyPackage SOURCE PACKAGE</code>: compare executable source,
+  account for documented directive rewriting, and verify packaged variables
+  and included files.</li>
+<li>A packaging manifest with source hashes and a summary of intentional
+  transformations.</li>
+<li>Structured test assertion totals, removing the need to parse log text.</li>
+</ul>
+<p>Local HTML-to-text conversion is a lower priority and could remain an
+editor/tooling responsibility rather than expanding flua itself.</p>
+<h2 id="information-quality-and-safety">Information quality and safety</h2>
+<p>The workspace instructions supplied conflicting statements about whether
+online or offline mode was the default. The installed CLI help established
+offline as the default for this version; all verification commands used
+explicit <code>--api local</code> anyway.</p>
+<p><strong>Suggestion:</strong> stamp generated agent docs and skills with their source
+version and offer an offline freshness check. A compact capability response
+should identify actual defaults, network behavior, available extensions,
+and matching documentation. Avoid silently overwriting customized docs.</p>
+<p>It would also help to document the limits of each verification layer:</p>
+<ul>
+<li>Static checks do not prove asynchronous runtime correctness.</li>
+<li>A local mock validates the client against the mock's contract, not a car.</li>
+<li>Removing <code>_FLUA</code> in a controlled test verifies the client's branch logic,
+  not execution on genuine HC3 firmware.</li>
+<li>Package inspection proves contents, not deployment success.</li>
+</ul>
+<p>The separation was useful in this task, but the tools could make those
+boundaries more visible in their summaries.</p>
+<h2 id="highest-value-improvements">Highest-value improvements</h2>
+<table>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Improvement</th>
+<th>Benefit in this task</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Searchable, bounded local documentation and a compact tool map</td>
+<td>Avoid most installed-source searches and oversized tool responses</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Generic dynamic mock-QA recipe with readiness and path contracts</td>
+<td>Make the central architecture easy to implement correctly</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Structured assertion results and concise default test output</td>
+<td>Eliminate log parsing and make pass/fail evidence clear</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Documented real-I/O/virtual-time semantics plus eventual/await helpers</td>
+<td>Reduce fragile asynchronous test boilerplate</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Package inspection and source-aware verification</td>
+<td>Replace custom Python package checks</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Version-aware agent docs and skill-discovery diagnostics</td>
+<td>Resolve conflicting defaults and loading confusion</td>
+</tr>
+</tbody>
+</table>
+<h2 id="overall">Overall</h2>
+<p>flua's core functionality was a very good fit: the actual HC3-style client
+could communicate with an actual local HTTP service hosted by another QA,
+with no external mock framework and no live hardware.</p>
+<p>The biggest opportunity is not adding another transport or device API.
+It is making the existing capabilities easier to discover, compose, and
+verify. A short path from “I need a mock service” to a documented readiness
+pattern, a terminating test, and a verified package would have removed most
+of the external searching and supporting Python in this session.</p>
+</body>
+</html>

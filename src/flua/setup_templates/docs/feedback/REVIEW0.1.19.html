@@ -1,0 +1,117 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Project review: flua 0.1.19</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="project-review-flua-0119">Project review: flua 0.1.19</h1>
+<p>This review looks at three areas: architecture, QuickApp (QA) developer
+experience, and contributor experience. The items below are recommendations,
+not changes already made.</p>
+<h2 id="summary">Summary</h2>
+<p>flua has a strong foundation: the single-entry Lua pump is clearly documented,
+API routes are separated from simulator state, virtual time supports
+deterministic behavior, and most tests use local mocks rather than requiring a
+live HC3. The QA tutorial and development tools are also substantial.</p>
+<p>The main opportunities are to reduce the responsibilities concentrated in
+<code>LuaEngine</code>, strengthen offline compatibility and packaging checks, and resolve
+conflicting documentation about whether a plain run can contact a real HC3.</p>
+<h2 id="architecture">Architecture</h2>
+<h3 id="1-reduce-luaengine-responsibilities-incrementally">1. Reduce <code>LuaEngine</code> responsibilities incrementally</h3>
+<p><code>LuaEngine</code> is about 1,750 lines and owns QA lifecycle and file management,
+proxy and poller behavior, persistence, network-message handling, and the
+message pump. Extract focused collaborators where the existing boundaries are
+already clear. Potential seams include QA startup and preparation,
+HC3 polling, and pump dispatch.</p>
+<p>Keep the single-entry Lua invariant centralized: the pump should remain the
+only place that enters Lua. The goal is clearer ownership and more manageable
+tests, not a broad redesign of the message protocol.</p>
+<h3 id="2-make-hc3-compatibility-fixtures-available-in-routine-ci">2. Make HC3 compatibility fixtures available in routine CI</h3>
+<p>The compatibility suite compares response shapes with a live controller and
+is intentionally opt-in. Add sanitized, versioned response fixtures for
+important HC3 endpoints, and use them in normal CI to detect simulator
+regressions without contacting a controller. Keep the live suite as an
+additional upstream compatibility check.</p>
+<h2 id="qa-developer-experience">QA developer experience</h2>
+<h3 id="3-reconcile-conflicting-documentation-about-the-default-mode">3. Reconcile conflicting documentation about the default mode</h3>
+<p>The CLI implementation and user guide say that a plain run defaults to the
+offline simulator. Some other references still describe online-by-default
+behavior, including the architecture guide, test fixture commentary, and the
+generated QA-project <code>AGENTS.md</code>.</p>
+<p>Update those references to match the current behavior. Add a CLI regression
+test that proves a plain invocation remains offline even if HC3 credentials
+are present. This is the highest-priority recommendation because the
+discrepancy affects whether QA code could contact a real controller.</p>
+<h3 id="4-align-installed-project-lua-tooling-with-the-runtime">4. Align installed-project Lua tooling with the runtime</h3>
+<p>The repository's <code>.luarc.json</code> targets Lua 5.5 and declares HC3 globals, while
+the packaged setup template targets Lua 5.4 and disables several useful
+diagnostics. Align the template with the supported runtime and the repository
+configuration.</p>
+<p>Consider shipping Lua Language Server type definitions for <code>QuickApp</code>,
+<code>fibaro</code>, <code>api</code>, and network APIs. Add a test that keeps the repository and
+packaged configuration in sync.</p>
+<h3 id="5-document-a-repeatable-qa-level-testing-pattern">5. Document a repeatable QA-level testing pattern</h3>
+<p>The project has good internal engine and template tests, but QA developers
+could use a standard recipe for testing their own QuickApps against a seeded
+simulator. Document a pytest fixture or small helper pattern for launching a
+QA and asserting on logs, simulator state changes, actions, and UI events.
+Prefer an approach that does not require QA authors to depend directly on
+engine internals.</p>
+<h2 id="contributor-experience">Contributor experience</h2>
+<h3 id="6-test-the-advertised-python-support-range-in-ci">6. Test the advertised Python support range in CI</h3>
+<p>CI currently tests Python 3.11 and 3.13, while the project advertises support
+from Python 3.11 onward and lists Python 3.12 in package metadata. Add Python
+3.12 to the CI matrix, or clearly document a narrower tested support range.
+Consider covering each supported minor version.</p>
+<h3 id="7-smoke-test-the-built-wheel">7. Smoke-test the built wheel</h3>
+<p>CI currently installs the editable checkout. Pip users instead depend on
+packaged Lua files, examples, and QA setup templates. Build the wheel in CI,
+install it into a clean environment, and smoke-test commands such as
+<code>flua --examples</code> and <code>flua --tool setup</code>.</p>
+<p>The existing source-tree tests check template content; a wheel-level test
+would also detect packaging omissions.</p>
+<h3 id="8-keep-the-contributor-instructions-and-ci-gate-aligned">8. Keep the contributor instructions and CI gate aligned</h3>
+<p>CI runs Ruff lint and pytest. Formatting is documented as an additional step
+for larger changes. Consider enforcing <code>ruff format --check</code> in CI so the
+formatting expectation is consistent and review churn is reduced.</p>
+<p>The contributor guide and PR script already provide a focused workflow; this
+recommendation extends that existing approach rather than replacing it.</p>
+<h2 id="suggested-order">Suggested order</h2>
+<ol>
+<li>Correct the mode documentation and add the offline-default regression test.</li>
+<li>Add wheel packaging smoke tests and Python 3.12 CI coverage.</li>
+<li>Align the Lua language-server setup template and add a sync check.</li>
+<li>Add simulator compatibility fixtures for commonly used HC3 endpoints.</li>
+<li>Document a QA-level testing pattern.</li>
+<li>Extract <code>LuaEngine</code> responsibilities in small, test-backed steps.</li>
+<li>Decide whether format checking should be part of the required CI gate.</li>
+</ol>
+</body>
+</html>

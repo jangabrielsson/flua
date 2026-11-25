@@ -1,0 +1,147 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Note: hub-aware completions in the VS Code extension (design draft)</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="note-hub-aware-completions-in-the-vs-code-extension-design-draft">Note: hub-aware completions in the VS Code extension (design draft)</h1>
+<p>Status: v1 implemented (2026-11-08) — <code>flua --tool house</code>, the completions
+provider in the VS Code extension (<code>vscode/src/completions.ts</code>), the
+<code>flua.house.refresh</code>/<code>flua.house.generateHomeTable</code> commands, and the
+<code>flua.houseDb</code>/<code>flua.houseRefresh</code> settings. Stretch items (live refresh
+against a running emulator, room filters, ht.lua regeneration) remain.</p>
+<h2 id="context-and-goal">Context and goal</h2>
+<p>Magic numbers are the biggest friction in <code>fibaro.*</code> calls: <code>fibaro.call(45,
+"turnOn")</code> says nothing about what device 45 is. A developer in the HC3
+web editor can look up the ID, but in VS Code the number is just a
+number. This note designs completions that carry the data — device IDs
+<em>with names and rooms</em>, global variable names, scene IDs, custom event
+names, and a <code>HT.kitchen.light</code> home table — through the existing flua
+VS Code extension. One edge worth claiming: the data can also come from
+the <strong>simulated house</strong> (db/seed file), so completions work fully
+offline — or for a house that does not exist yet.</p>
+<h2 id="what-exists-today-verified">What exists today (verified)</h2>
+<ul>
+<li><strong>Extension</strong> (<code>vscode/src/</code>): <code>extension.ts</code> registers commands only;
+  <code>flua.ts</code> provides <code>execFlua()</code> — every feature shells out to the flua
+  CLI. No HTTP client, no credential handling in the extension: the CLI
+  owns the <code>.env</code> chain.</li>
+<li><strong>Data surfaces in flua</strong>:</li>
+<li>Real hub (online): the <code>hc3.py</code> client — <code>/devices</code>,
+    <code>/globalVariables</code>, <code>/scenes</code>, <code>/customEvents</code>.</li>
+<li>Sim: the emulator serves <code>/devices</code>, <code>/globalVariables</code>, <code>/scenes</code>,
+    <code>/customEvents</code> (<code>src/flua/api/routes/</code>); <code>--tool state</code> already
+    loads sim state from a seed/db file.</li>
+<li><strong>LuaLS</strong>: <code>--tool setup</code> installs LuaLS + types; a generated, typed
+  Lua module in the workspace gets completions for free.</li>
+</ul>
+<h2 id="design">Design</h2>
+<h3 id="data-source-one-new-cli-command">Data source: one new CLI command</h3>
+<p><code>flua --tool house --json</code> prints a stable shape:</p>
+<pre><code class="language-json">{
+  &quot;devices&quot;: [{&quot;id&quot;: 45, &quot;name&quot;: &quot;Kitchen light&quot;, &quot;room&quot;: &quot;Kitchen&quot;, &quot;type&quot;: &quot;com.fibaro.binarySwitch&quot;}],
+  &quot;globals&quot;: [&quot;AlarmState&quot;, &quot;Presence&quot;],
+  &quot;scenes&quot;: [{&quot;id&quot;: 3, &quot;name&quot;: &quot;Evening lights&quot;}],
+  &quot;customEvents&quot;: [&quot;DoorOpened&quot;]
+}
+</code></pre>
+<p>Resolution order:</p>
+<ol>
+<li>HC3 credentials present (the <code>.env</code> chain) → fetch from the hub
+   (online mode, the same path <code>downloadQA</code>/<code>uploadQA</code> use).</li>
+<li>Else a db/seed file (a new <code>flua.houseDb</code> extension setting, or the
+   workspace's <code>.flua-directives</code> <code>--%%db:</code>) → load the sim state, the
+   same logic as <code>--tool state</code>.</li>
+<li>Else empty — a QA-only run has no house, and an empty list is honest.</li>
+</ol>
+<p>The tool is the single choke point: the provider never talks to a hub or
+the sim directly, so credential handling and offline behavior stay in one
+place (and agents/CI get the same JSON for free).</p>
+<h3 id="completions-provider-extension-side">Completions provider (extension side)</h3>
+<p>One new file <code>vscode/src/completions.ts</code>:</p>
+<ul>
+<li><code>languages.registerCompletionItemProvider("lua", provider, '"', "'", ".", " ", "0".."9")</code></li>
+<li>Context detection is a backward scan of the text before the cursor
+  (line-local regexes), no AST needed for v1:</li>
+<li>first argument of <code>fibaro.call(</code> / <code>fibaro.getValue(</code> /
+    <code>fibaro.setValue(</code> → device items: <code>insertText = id</code>,
+    <code>label = "45 — Kitchen light"</code>, <code>detail = room</code>, <code>filterText</code> includes
+    the name so typing <code>kitchen</code> finds it.</li>
+<li>inside <code>fibaro.getGlobalVariable("</code> / <code>fibaro.setGlobalVariable("</code> →
+    global names.</li>
+<li><code>fibaro.scene("execute", &lt;id&gt;)</code> → scene IDs with names.</li>
+<li>inside <code>fibaro.emitCustomEvent("</code> → custom event names.</li>
+<li><code>HT.*</code>: <strong>no provider needed</strong> — a <code>flua.generateHomeTable</code> command
+  writes a <code>---@class</code>-annotated <code>ht.lua</code> into the workspace (rooms →
+  names → ids, plus the <code>HT = json.decode(fibaro.getGlobalVariable(...))</code>
+  loader snippet). Plain LuaLS then completes
+  <code>HT.kitchen.light</code>, and the table travels in the QA like any file.</li>
+<li>Cache: in-memory, refreshed by a <code>flua.refreshHouse</code> command and on
+  extension activation; setting <code>flua.houseRefresh</code> (<code>onSave</code> | <code>manual</code>).
+  Data never leaves the machine.</li>
+<li>Trigger caveat: numeric positions (device/scene IDs) auto-trigger less
+  reliably than string positions — Ctrl+Space always works. Document it.</li>
+</ul>
+<h3 id="stretch-not-v1">Stretch (not v1)</h3>
+<ul>
+<li>Live refresh against a <em>running</em> emulator (<code>--ui</code>/helper port, REST
+  query) so the list tracks the run.</li>
+<li>A room filter and a "type icon" in the device items.</li>
+<li>Regenerating <code>ht.lua</code> when the house changes (save-time diff).</li>
+</ul>
+<h2 id="alternatives-considered">Alternatives considered</h2>
+<ul>
+<li><strong>LuaLS addon</strong> (Lua plugin API): context-aware completions inside
+  <code>fibaro.call</code> without a native VS Code provider; works in any LuaLS
+  host. More moving parts (addon shipping/loading, per-workspace
+  install), no access to flua settings/commands — and the extension's
+  whole architecture is already <code>execFlua</code> + native providers.</li>
+<li><strong>Generated constants module</strong> (<code>local DEV = {...}</code> or <code>HT</code> alone):
+  completions only for names the user already knows to reference; no
+  context awareness in calls. <code>HT</code> covers the readability goal, the
+  provider covers discoverability — v1 does both but keeps them separate.</li>
+</ul>
+<h2 id="v1-scope">v1 scope</h2>
+<ol>
+<li><code>flua --tool house --json</code> (hub or db/seed) with a pinning test for
+   the JSON shape.</li>
+<li><code>vscode/src/completions.ts</code> — the four contexts above.</li>
+<li><code>flua.generateHomeTable</code> + <code>flua.refreshHouse</code> commands, the
+   <code>flua.houseDb</code>/<code>flua.houseRefresh</code> settings.</li>
+<li>Docs: USAGE.md (<code>--tool house</code>) and the extension README.</li>
+</ol>
+<h2 id="related">Related</h2>
+<ul>
+<li><code>src/flua/tools/state_tool.py</code> — the seed/db loading logic to reuse</li>
+<li><code>vscode/src/flua.ts</code> — the <code>execFlua</code> bridge the provider rides</li>
+<li><code>docs/notes/notes-mcp.md</code> — same design-draft style</li>
+</ul>
+</body>
+</html>

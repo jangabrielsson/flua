@@ -1,0 +1,165 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>01 · Install</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="01--install">01 · Install</h1>
+<p>In this chapter you install the two tools you will use from now on, and you
+run one command that proves everything works. Ten to twenty minutes, no
+programming.</p>
+<h2 id="what-you-are-installing">What you are installing</h2>
+<ul>
+<li><strong>Python</strong> — the engine flua runs on. Your computer may already have it.</li>
+<li><strong>Visual Studio Code (VS Code)</strong> — a free editor where you write QuickApps.</li>
+<li><strong>flua</strong> — the program that <em>runs</em> QuickApps on your computer, pretending
+  to be your HC3 so you can try everything safely before touching the real
+  thing.</li>
+</ul>
+<blockquote>
+<p>flua never changes anything on your HC3 until you explicitly tell it to
+(in a later chapter). Everything in the first chapters happens entirely on
+your own computer.</p>
+</blockquote>
+<h2 id="step-1--python">Step 1 — Python</h2>
+<p>Open a terminal and check:</p>
+<pre><code class="language-bash">python3 --version
+</code></pre>
+<p>You want <strong>3.11 or newer</strong>. If you see an error or an older version, install
+the latest Python from <a href="https://www.python.org/downloads/">python.org</a>
+(Windows: tick <em>"Add Python to PATH"</em> in the installer).</p>
+<blockquote>
+<p>✅ <strong>You should see</strong> something like <code>Python 3.13.2</code>.</p>
+</blockquote>
+<h2 id="step-2--vs-code">Step 2 — VS Code</h2>
+<p>Download and install <strong>Visual Studio Code</strong> from
+<a href="https://code.visualstudio.com/">code.visualstudio.com</a>.</p>
+<h2 id="step-3--flua">Step 3 — flua</h2>
+<p>In the terminal:</p>
+<pre><code class="language-bash">python3 -m pip install fibaro-flua
+</code></pre>
+<p>(On Windows this is usually <code>py -3 -m pip install fibaro-flua</code>.)</p>
+<p>Check that it works:</p>
+<pre><code class="language-bash">flua --version
+</code></pre>
+<blockquote>
+<p>✅ <strong>You should see</strong> <code>flua 0.1.x</code> (or newer).</p>
+</blockquote>
+<p>If the <code>flua</code> command is not found, it still works as a Python module —
+every <code>flua</code> command in this tutorial can also be written <code>python3 -m flua</code>.</p>
+<h2 id="step-4--the-smoke-test">Step 4 — the smoke test</h2>
+<p>One line, to prove the whole machine runs:</p>
+<pre><code class="language-bash">flua --api local -e 'print(&quot;Hello HC3!&quot;)'
+</code></pre>
+<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+[04.10.2026][20:11:43][DEBUG  ][QA5000]: Hello HC3!
+</code></pre>
+<p>Let's unpack the two lines, because you will type them a lot:</p>
+<ul>
+<li><code>--api local</code> means <em>"run on my computer, not on my HC3"</em> — the safe mode
+  for experiments.</li>
+<li><code>-e 'print(...)'</code> is flua's one-liner: run this tiny program and exit.</li>
+</ul>
+<p><code>Hello HC3!</code> is your first QuickApp talking. That's the entire loop you will
+use from now on: write, run, look, adjust.</p>
+<blockquote>
+<p>✅ <strong>You should see</strong> <code>Hello HC3!</code> in your terminal.</p>
+</blockquote>
+<h2 id="step-5--the-checkup-flua-doctor">Step 5 — the checkup: <code>flua doctor</code></h2>
+<p>flua can check its own health — and yours. One command tells you whether
+Python, flua, your project folder, and the editor setup are all right:</p>
+<pre><code class="language-bash">flua doctor
+</code></pre>
+<pre><code class="language-text">flua doctor
+  ✓ flua              0.1.x (Lua 5.4, Python 3.x)
+  ✓ virtualenv        virtualenv at ~/sunset-lamp/.venv
+  ✓ HC3 credentials   not configured — offline sim only
+  ✓ HC3 connection    skipped — no HC3_URL
+  ✗ LuaLS setup       no .luarc.json/.luals — run `flua --tool setup` for HC3 autocomplete
+  ✓ VS Code run/debug .vscode/launch.json present
+  ✓ VS Code extension installed (version 0.1.84)
+  ✓ flua-mcp          flua-mcp on PATH
+  ✓ project files     1 QA file(s)
+flua doctor: 8 ok, 1 problem(s)
+</code></pre>
+<p>Every ✓ is something that works; every ✗ names the fix right there. (The
+two ✗ above disappear after the next step.) When something breaks later —
+and it will — this is the first command to run, and the block to paste when
+you ask for help.</p>
+<blockquote>
+<p>✅ <strong>You should see</strong> <code>flua doctor</code> with mostly ✓ marks. The ✗ ones are
+fine for now; the next step fixes them.</p>
+</blockquote>
+<h2 id="step-6--a-project-folder-with-everything-set-up">Step 6 — a project folder with everything set up</h2>
+<p>flua can prepare a project folder with all the VS Code settings you need
+(run buttons, a debugger setup, language help):</p>
+<pre><code class="language-bash">flua --tool setup my-first-qa
+</code></pre>
+<pre><code class="language-text">  wrote .vscode/launch.json
+  wrote .vscode/extensions.json
+  wrote .luarc.json
+  wrote AGENTS.md
+  wrote .github/skills
+done — VS Code will suggest the Python and Lua MobDebug extensions on the next open; agents pick up AGENTS.md and the .github files; `flua --ui` serves the UI viewer at http://127.0.0.1:PORT/ (no file to open)
+Read on:
+  USAGE.md   https://github.com/jangabrielsson/flua/blob/main/USAGE.md
+  Tutorial   https://github.com/jangabrielsson/flua/tree/main/docs/tutorial
+</code></pre>
+<p>(No <code>viewer/index.html</code> in the list — flua serves the viewer page itself
+when you run <code>--ui</code>; you'll meet it in chapter 03.)
+The two links at the end open in the browser with a cmd/ctrl-click — the
+<code>USAGE.md</code> manual for when you wonder "can flua do X", and this tutorial.</p>
+<p>Now open the folder in VS Code — <strong>File → Open Folder… → <code>my-first-qa</code></strong>.
+A popup asks you to install the recommended extensions (<strong>Python</strong>,
+<strong>Lua MobDebug</strong>, <strong>Lua Language Server</strong>, and <strong>flua</strong>) — accept. They give you syntax coloring, error squiggles, and later a debugger. The setup also installed a
+<strong>type library</strong> (the hidden <code>.luals/</code> folder): the language server now
+knows what <code>QuickApp</code>, <code>fibaro</code> and <code>api</code> look like, so from chapter 02 on
+you'll get autocomplete and parameter hints as you type QA code.</p>
+<p>The setup also installed <strong>launch configurations</strong> — small scripts that run
+your QuickApps when you press <code>F5</code>. From the next chapter on, F5 is how you
+run things; no terminal needed.</p>
+<h2 id="step-7-optional-but-smart--your-hc3s-address">Step 7 (optional but smart) — your HC3's address</h2>
+<p>In a later chapter you will upload the lamp to your real HC3. flua finds it
+through a small settings file, and setting it up now takes one minute.</p>
+<p>In your project folder, create a file named <code>.env</code> (in VS Code:
+<strong>File → New File… → <code>.env</code></strong>):</p>
+<pre><code class="language-bash">HC3_URL=http://192.168.1.10/
+HC3_USER=admin
+HC3_PASSWORD=your-hc3-password
+</code></pre>
+<p>The address is the one you use to open your HC3 in a browser — the same
+<code>admin</code> user and password. This file stays on your computer; flua reads it
+and sends the credentials only to your own HC3.</p>
+<p>(If you prefer not to, skip it — the next chapters run entirely on your
+computer and don't need it.)</p>
+<h2 id="youre-set">You're set</h2>
+<p>Everything is installed. Next: your first QuickApp — seven lines that tick.</p>
+</body>
+</html>

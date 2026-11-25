@@ -1,0 +1,179 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Note: device schemas — type composition, interface semantics, property type checks (plan)</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="note-device-schemas--type-composition-interface-semantics-property-type-checks-plan">Note: device schemas — type composition, interface semantics, property type checks (plan)</h1>
+<p>Status: implemented 2026-11-10 — phases 0–2 done (extraction + artifact,
+schema-first skeletons + interface semantics + <code>--%%interface:</code>, and the
+warn-only property type/enum checks). ADR 0014 is the decision record;
+phase 3 (catalog/template verification, device-specific types feeding the
+catalog) stays unplanned.</p>
+<h2 id="context-and-goal">Context and goal</h2>
+<p>Original HC3 sources now live locally (gitignored, <code>HC3_info/</code>): 189
+device-type XMLs (<code>types/</code>), 130 interface XMLs (<code>interfaces/</code>), and 1173
+property JSON schemas (<code>www/json-schema/</code>). The type XML declares the
+base-type chain, the interfaces a device gets, typed properties with
+defaults (and <code>jsonSchema</code> refs), and actions with arity; the interface
+XML declares the properties/actions an interface adds; the JSON schemas
+carry the enums (e.g. <code>deviceRole</code>). Today flua ignores all of it:
+device skeletons come from a hand-curated hierarchy fallback
+(<code>devices/hierarchy.json</code> + <code>skeleton_for</code>), interfaces are stored with
+no semantics (ADR 0012), there is no <code>--%%interface:</code> directive, and
+property types are unchecked anywhere.</p>
+<p>The goal: <strong>preprocess the XML/JSON into flua's own compact schema
+artifact, shipped in the wheel, and drive device-structure setup from
+it</strong> — type composition on <code>--%%type:</code>/<code>POST /devices</code>, interface
+add/remove semantics (<code>--%%interface:</code>, <code>POST /plugins/interfaces</code>), and
+property type checks (runtime warnings + static <code>flua --check</code>).</p>
+<p>The access constraint shapes the architecture: the sources stay
+gitignored and are never shipped; only the <strong>distilled schema</strong> (facts
+flua needs, in our format) is committed. That is also technically the
+right format: smaller, faster, no XML parsing at runtime.</p>
+<h2 id="phase-0--extraction">Phase 0 — extraction</h2>
+<p><code>scripts/extract_device_schemas.py</code> (precedent: <code>extract_icons.py</code>,
+<code>extract_hc3_api.py</code>) reads <code>HC3_info/{types,interfaces}/*.xml</code> and
+<code>HC3_info/www/json-schema/properties/*.json</code>, resolves the <code>jsonSchema</code>
+refs into inline <code>enum</code>s, and emits <code>src/flua/devices/type_schemas.json</code>:</p>
+<pre><code class="language-json">{
+  &quot;types&quot;: {
+    &quot;com.fibaro.binarySwitch&quot;: {
+      &quot;baseType&quot;: &quot;com.fibaro.actor&quot;,
+      &quot;interfaces&quot;: [&quot;light&quot;, &quot;autoTurnOff&quot;],
+      &quot;properties&quot;: {
+        &quot;value&quot;: {&quot;type&quot;: &quot;bool&quot;},
+        &quot;deviceIcon&quot;: {&quot;type&quot;: &quot;int&quot;, &quot;default&quot;: 301},
+        &quot;deviceRole&quot;: {&quot;type&quot;: &quot;string&quot;, &quot;enum&quot;: [&quot;Light&quot;, &quot;Other&quot;, ...]}
+      },
+      &quot;actions&quot;: {&quot;turnOn&quot;: {&quot;argc&quot;: 1}, &quot;turnOff&quot;: {&quot;argc&quot;: 1}}
+    }
+  },
+  &quot;interfaces&quot;: {
+    &quot;autoTurnOff&quot;: {
+      &quot;properties&quot;: {&quot;autoOffTimestamp&quot;: {&quot;type&quot;: &quot;int&quot;, &quot;default&quot;: 0},
+                     &quot;autoOffDefaultTime&quot;: {&quot;type&quot;: &quot;int&quot;, &quot;default&quot;: 900}},
+      &quot;actions&quot;: {&quot;setAutoOff&quot;: {&quot;argc&quot;: 3, &quot;args&quot;: [{&quot;name&quot;: &quot;time&quot;, &quot;type&quot;: &quot;int&quot;}]}}
+    }
+  }
+}
+</code></pre>
+<ul>
+<li>The script runs <strong>locally only</strong> (the sources are gitignored; CI has no
+  access). The emitted artifact is committed and covered by a
+  <strong>self-consistency test</strong> (every <code>baseType</code> resolves, every interface
+  reference exists, property types are a known set) — a sync guard
+  against the sources is impossible by design.</li>
+<li>Base-type inheritance is flattened at extraction time (a type's
+  property set includes its ancestors'), so runtime consumption is a
+  plain lookup.</li>
+</ul>
+<p>Open: is the extraction script itself committed (pure logic, no data —
+leaning yes), or kept local alongside the sources?</p>
+<h2 id="phase-1--type-composition--interface-semantics">Phase 1 — type composition + interface semantics</h2>
+<ul>
+<li><code>devices/__init__.py</code>: load <code>type_schemas.json</code>; <code>skeleton_for</code> builds
+  skeletons from the schema (typed properties with defaults, the
+  <code>interfaces</code> array, action metadata). <code>hierarchy.json</code> remains the
+  fallback for types the schema does not know.</li>
+<li><code>POST /plugins/interfaces</code> (<code>plugin_update_interfaces</code>): add/remove now
+  applies the interface's schema — added properties land with defaults,
+  actions become part of the device's action surface, removed interfaces
+  drop both. The existing plugin-restart-on-change behavior stays; the
+  ADR 0012 pinning tests are updated (storage round-trip + restart) to
+  also assert the new semantics.</li>
+<li>New <code>--%%interface:name[,name...]</code> directive (config.py, like
+  <code>--%%type:</code>), applied at QA load through the same code path as the
+  REST route — the QA boots with the interface's properties present.</li>
+<li><strong>ADR 0014</strong> records this, amending 0012: interface semantics are no
+  longer undocumented; they derive from the distilled schema. The
+  delayed-action REST mechanism (<code>delay</code> on the action route,
+  <code>DELETE /devices/action/{timestamp}/{id}</code>) stays out of scope — the
+  schema documents the interface's own properties/actions, not the
+  generic delayed-action bookkeeping.</li>
+</ul>
+<h2 id="phase-2--property-type-checks">Phase 2 — property type checks</h2>
+<ul>
+<li><strong>Runtime (warn-only)</strong>: the sim warns when <code>updateProperty</code> sets a
+  known-typed property to a mismatching type or an out-of-enum value.
+  Warn, never reject — the real HC3 silently coerces (write-safety's
+  documented behavior), and flua must not break QAs the controller
+  accepts.</li>
+<li><strong>Static (<code>flua --check</code>)</strong>: pattern-match <code>self:updateProperty("p",
+  &lt;literal&gt;)</code> against the schema — literal booleans/numbers/strings only,
+  conservative (no type inference); enum literals checked too. This
+  catches the typo/type bug before the run.</li>
+</ul>
+<h2 id="phase-3-later-unplanned-now">Phase 3 (later, unplanned now)</h2>
+<ul>
+<li><code>--tool catalog</code> and the <code>newQA</code> templates verified/generated against
+  the schemas (templates stay hand-written; a consistency check flags
+  drift).</li>
+<li>The device-specific type files (<code>com.fibaro.FGD212</code> etc.) — real
+  device types with their own properties/actions — feeding the catalog
+  and the sim-device set.</li>
+</ul>
+<h2 id="known-type-system-oddities-mined-2026-11-10">Known type-system oddities (mined 2026-11-10)</h2>
+<p>The 15-year-old type system is cleaner than expected, with drift
+concentrated in a few places:</p>
+<ul>
+<li>The <strong>interface layer is conflict-free</strong>: no interface↔type or
+  interface↔interface property conflicts (pinned by the consistency
+  test) — a device can never get a contradictory spec through its
+  interfaces.</li>
+<li>Base-chain overrides that change a type: only two, both sensible
+  (<code>multilevelSwitch.value</code> bool→int, <code>temperatureSensor.value</code>
+  real→temperature).</li>
+<li>Legitimate polymorphism: <code>value</code> (bool/int/real/temperature across
+  families), <code>state</code> (bool for switches, string for shutters/multimedia,
+  int for the CO detector).</li>
+<li>Drift candidates (same domain, different declaration): <code>exitTime</code>
+  (bool vs int across two alarm partitions), <code>port</code> (int vs string —
+  two alarm integrations say string), <code>input1</code>/<code>input2</code> (bool vs
+  string), <code>Temperature</code> (real on <code>weather</code>, temperature on the other
+  weather providers).</li>
+<li>Flua-side impact: none at runtime — the checks are per-device. The
+  drift matters only for cross-family work (catalog, template
+  verification).</li>
+</ul>
+<h2 id="open-questions">Open questions</h2>
+<ol>
+<li>Commit the extraction script? (pure logic, no data — leaning yes;
+   the alternative keeps every trace of the sources local)</li>
+<li>Enums in v1? They make both type checks real (deviceRole's list is
+   big) at the cost of artifact size — leaning yes, they're the value.</li>
+<li>Runtime type mismatch: confirm warn-only (never reject)?</li>
+<li>Scope of types in v1: the generic <code>com.fibaro.*</code> set only, or the
+   device-specific files (FGD212, FGBS222, ...) too?</li>
+<li>Action <code>argc</code>: metadata only in v1, or should the sim validate
+   <code>fibaro.call</code> argument counts against it (warn)?</li>
+</ol>
+</body>
+</html>

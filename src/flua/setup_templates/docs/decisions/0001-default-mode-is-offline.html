@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>0001 — offline is the default mode</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="0001--offline-is-the-default-mode">0001 — offline is the default mode</h1>
+<ul>
+<li><strong>Status:</strong> active</li>
+<li><strong>Date:</strong> 2026-10-15 (retroactive — documents long-standing behavior)</li>
+</ul>
+<h2 id="context">Context</h2>
+<p>flua runs the same QA file offline (simulated HC3), online (real HC3), or in
+proxy mode. A fresh checkout has no HC3 credentials, and a tool that silently
+phoned a production controller by default would be dangerous — flua is
+installed by people whose controller lives on their LAN.</p>
+<h2 id="decision">Decision</h2>
+<p>The default is <strong>offline</strong> (the simulated HC3). Online is opt-in, in two
+independent ways: an explicit <code>--api remote</code> flag, or the main QA's
+<code>--%%mode:online|proxy</code> directive. <code>--api</code> always wins over directives;
+the first QA spec carries the mode.</p>
+<h2 id="consequences">Consequences</h2>
+<ul>
+<li>A bare <code>flua script.lua</code> never needs credentials and never touches the
+  HC3. <code>cli.py::_resolve_runtime</code> pins this; <code>tests/test_hc3.py::
+  test_cli_default_mode_is_offline</code> is the contract test.</li>
+<li>Credentials only matter once the run opts in; the env chain
+  (<code>HC3_URL</code>/<code>HC3_USER</code>/<code>HC3_PASSWORD</code>) stays unused offline.</li>
+<li>The mode-comparison table in USAGE.md documents the three-way resolution.</li>
+</ul>
+<p>One code comment claimed online was the default; that comment was stale and
+was corrected when this decision was written down.</p>
+</body>
+</html>

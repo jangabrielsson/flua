@@ -1,0 +1,207 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Debugging the Sonos QA with flua — experience report</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="debugging-the-sonos-qa-with-flua--experience-report">Debugging the Sonos QA with flua — experience report</h1>
+<p>Date: 2026-10-31 · flua 0.1.107 → 0.1.109 · macOS, Python 3.11.13</p>
+<h2 id="context">Context</h2>
+<p>Debugging <code>SonosPlayer</code> (a <code>com.fibaro.player</code> QA backed by SonosLib 0.90) that
+reported intermittent communication errors. The QA talks to the Sonos local
+WebSocket API (<code>wss://&lt;player&gt;:1443/websocket/api</code>) over up to four concurrent
+connections (household + one per player coordinator), sends bursts of
+subscribe commands at connect, and then waits for server events.</p>
+<p>The same <code>.fqa</code> ran fine on the HC3, so the problem was in the emulator's
+<code>net.WebSocketClientTls</code> layer. flua was the primary debugging tool throughout.</p>
+<h2 id="outcome">Outcome</h2>
+<p>Found a real flua bug: each <code>wsSend</code> message spawned its own asyncio task that
+ran the send in the default thread pool, so a burst of sends from Lua produced
+concurrent <code>SSL_write</code> calls on one <code>SSLSocket</code>. CPython's ssl layer is not
+safe for concurrent writers; the TLS record stream got corrupted. Symptoms
+were exactly what the QA showed:</p>
+<ul>
+<li><code>[SSL: BAD_LENGTH] bad length (_ssl.c:2437)</code></li>
+<li><code>EOF occurred in violation of protocol (_ssl.c:2437)</code></li>
+<li><code>[SSL] called a function you should not call (_ssl.c:2437)</code></li>
+</ul>
+<p>followed by the player closing the socket (WS close 1000) and a
+disconnect/reconnect loop with 30 s command timeouts.</p>
+<p>Verified in 0.1.109: burst test 3/3 clean (was 3/3 broken), full QA run 90 s
+with zero disconnects/errors. The upstream fix (write lock, blocking receiver
+reads with <code>SO_SNDTIMEO</code>, close-frame dedup) also addressed the two secondary
+issues found along the way.</p>
+<hr />
+<h2 id="what-worked-well">What worked well</h2>
+<ol>
+<li>
+<p><strong>Offline mode with real network</strong> ("sim HC3, real network") was the single
+   most important enabler. The QA's own <code>net.WebSocketClientTls</code> calls reached
+   the real Sonos player on the LAN, so the exact HC3 code path ran against the
+   exact real device — without the HC3. This hybrid mode is not obvious and
+   deserves prominent documentation.</p>
+</li>
+<li>
+<p><strong><code>--%%debug:ws=true</code> byte-level trace.</strong> Indispensable. It showed every
+   tx/rx frame with size and masked preview, the 101 handshake, and the server
+   close code (1000). Without it the failure would have looked like a random
+   Sonos disconnect. Secret masking in previews is appreciated.</p>
+</li>
+<li>
+<p><strong><code>flua --check</code></strong> caught a directive syntax bug in seconds
+   (<code>--%%file</code> colon form in a migrated plua-era test file).</p>
+</li>
+<li>
+<p><strong><code>downloadQA</code></strong> made it trivial to inspect what was actually deployed on
+   the HC3 and diff it against the workspace.</p>
+</li>
+<li>
+<p><strong>Installation layout made hypothesis-testing fast.</strong> <code>websocket.py</code> is
+   stdlib-only and lives in <code>site-packages</code>, so I could apply a two-line test
+   patch locally, re-run against the player, and prove the fix before it went
+   upstream. (Upstream 0.1.109 later replaced the patch cleanly.)</p>
+</li>
+<li>
+<p><strong>Reproducibility of the bug.</strong> A minimal 25-line QA (7 sends on connect)
+   reproduced the failure 100%, which turned the fix into a regression test.</p>
+</li>
+<li>
+<p><strong><code>--run-for</code> + <code>_FLUA.exit()</code></strong> gave clean bounded runs for repro QAs.
+   <code>--version</code> output includes the interpreter (Python 3.11.13) — mattered
+   here, since ssl behavior was the suspect.</p>
+</li>
+<li>
+<p><strong>AGENTS.md pack-verify loop</strong> (pack → inspect JSON) worked exactly as
+   documented; the regenerated <code>.fqa</code> checked out (name, baked IP variable,
+   lib version, guard present).</p>
+</li>
+</ol>
+<h2 id="what-could-improve">What could improve</h2>
+<ol>
+<li>
+<p><strong>WS trace lines don't identify the connection.</strong> With 2–4 concurrent
+   sockets the trace is flat (<code>ws tx text 106b …</code>) with no conn id or host.
+   I had to correlate by timestamp and cmdId. Suggest a per-line prefix like
+   <code>ws[c3 192.168.50.223] tx …</code>, and include the conn id in <code>wsEvent</code>/<code>error</code>
+   payloads. (SonosLib colors its own logs per coordinator; flua's trace was
+   the only stream without an identity.)</p>
+</li>
+<li>
+<p><strong>No CLI flag to enable debug channels.</strong> <code>--%%debug:ws=true</code> is header-only,
+   so enabling the trace meant copying the QA file and editing its header.
+   Suggest a CLI override (<code>--debug ws</code> / <code>--debug=ws=true</code>).</p>
+</li>
+<li>
+<p><strong>Confusing diagnostic for legacy <code>--%%file:path:name</code>.</strong> The check error
+   was <code>--%%file:SonosLib.lua:SonosLib,SonosLib.lua:SonosLib: no such file: …</code>
+   — a doubled path that didn't tell me the colon form is the old syntax.
+   A migration hint ("use <code>--%%file:path,name</code>") would have saved a detour.</p>
+</li>
+<li>
+<p><strong>No tool for probing a WebSocket endpoint outside a QA.</strong> Isolating
+   player behavior from emulator behavior required hand-rolled Python probes
+   (raw handshake, pipelined subscribes, 150 s soak). A <code>flua --tool ws</code>
+   (handshake / send N frames / subscribe / soak with ping-pong) would replace
+   that and make "is it the device or the emulator?" a 30-second answer.</p>
+</li>
+<li>
+<p><strong>Docs gap: debugging real communications.</strong> Neither AGENTS.md nor the
+   docs I found mention that offline mode uses real network for <code>net.*</code>, or
+   that <code>--%%debug:ws=true</code> exists, or what its output looks like. A short
+   "debugging real device comms" section (offline + real network, ws trace,
+   <code>--run-for</code>, <code>_FLUA.exit</code>) would have cut the discovery phase significantly.</p>
+</li>
+<li>
+<p><strong>Send-failure events carry no payload context.</strong> The Lua <code>error</code> event got
+   only the Python exception string; when a burst corrupts, you can't tell
+   which send failed. A masked preview of the failed frame (the masking logic
+   already exists) would close that gap.</p>
+</li>
+<li>
+<p><strong>Minor, fixed in 0.1.109:</strong> on server close the client echoed a close
+   frame and then <code>close()</code> sent a second one (trace showed <code>tx close 2b</code>
+   followed by <code>tx close 0b</code>); receiver used 0.5 s <code>settimeout</code> polling which
+   could land mid-TLS-record.</p>
+</li>
+</ol>
+<h2 id="missing-info--skills">Missing info / skills</h2>
+<ul>
+<li><strong>No guidance on testing QAs against real LAN devices.</strong> The offline+real
+  network hybrid is powerful but undocumented; I only discovered it from the
+  startup banner.</li>
+<li><strong>No network-protocol skill or pattern doc.</strong> Existing skills cover UI
+  testing and REST APIs; nothing covers "connect → burst → watch disconnect
+  → assert stability" for socket protocols, or how to write a bounded repro QA
+  (<code>--run-for</code> + <code>_FLUA.exit</code>).</li>
+<li><strong>The <code>net</code> trace events</strong> (<code>wsConnect</code>, <code>wsEvent</code>, per-frame bytes) exist in
+  the engine but I never found them documented; a doc line pointing at
+  <code>--log json</code> / trace output would help.</li>
+</ul>
+<h2 id="observations-on-the-qa-itself-found-via-flua-not-fluas-fault">Observations on the QA itself (found via flua, not flua's fault)</h2>
+<ul>
+<li>SonosLib reconnects the socket after a drop but never re-sends its
+  subscriptions (the send buffer flushes once on first connect). After any
+  reconnect the QA goes deaf until restart — the flua bug made this visible
+  because drops were constant. Worth fixing in SonosLib.</li>
+<li><code>metadataStatus</code> handler crashed on tracks without an artist
+  (<code>attempt to index a nil value (field 'artist')</code>) — nil-guard added.</li>
+</ul>
+<h2 id="appendix-minimal-repro-burst-sends-on-connect">Appendix: minimal repro (burst sends on connect)</h2>
+<pre><code class="language-lua">--%%name:WsTest
+--%%type:com.fibaro.binarySwitch
+--%%debug:ws=true
+local KEY = &quot;...&quot;  -- any value the device accepts
+
+function QuickApp:onInit()
+  local sock = net.WebSocketClientTls({timeout=10000})
+  sock:addEventListener(&quot;connected&quot;, function()
+    print(&quot;CONNECTED, sending 7 rapid subscribes&quot;)
+    for i=1,7 do
+      local msg = {playerId=&quot;&lt;player-id&gt;&quot;, namespace=&quot;playerVolume&quot;,
+                   command=&quot;subscribe&quot;, cmdId=tostring(i)}
+      sock:send(json.encode({msg,{}}))
+    end
+  end)
+  sock:addEventListener(&quot;dataReceived&quot;, function(d) print(&quot;RX:&quot;,d:sub(1,80)) end)
+  sock:addEventListener(&quot;disconnected&quot;, function()
+    print(&quot;DISCONNECTED&quot;); setTimeout(function() _FLUA.exit(0) end, 2000)
+  end)
+  sock:addEventListener(&quot;error&quot;, function(err) print(&quot;ERROR:&quot;,err) end)
+  sock:connect(&quot;wss://192.168.50.223:1443/websocket/api&quot;, {
+    [&quot;X-Sonos-Api-Key&quot;] = KEY,
+    [&quot;Sec-WebSocket-Protocol&quot;] = &quot;v1.api.smartspeaker.audio&quot;,
+  })
+  setTimeout(function() print(&quot;10s watchdog&quot;); _FLUA.exit(0) end, 10000)
+end
+</code></pre>
+<p>Before the fix this disconnects after 1–2 responses; after the fix all 7
+responses arrive and the connection stays up.</p>
+</body>
+</html>

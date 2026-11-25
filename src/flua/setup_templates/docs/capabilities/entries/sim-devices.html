@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>The bundled sim devices — drive a world without an HC3</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: sim-devices
+topic: sim-world
+title: The bundled sim devices — drive a world without an HC3
+pins:
+  - tests/test_qa.py::test_sim_device_sensor_ui
+  - tests/test_qa.py::test_load_sim_device_bundled
+verified: flua 0.1.168</p>
+<hr />
+<h1 id="the-bundled-sim-devices--drive-a-world-without-an-hc3">The bundled sim devices — drive a world without an HC3</h1>
+<p><code>src/flua/simdevices/*.lua</code> ship in the wheel and load by bare name:</p>
+<pre><code class="language-lua">local motion = _FLUA.loadSimDevice(&quot;motionSensor&quot;)
+fibaro.call(motion, &quot;breach&quot;)          -- value = true
+local temp = _FLUA.loadSimDevice(&quot;temperatureSensor&quot;,
+  {&quot;name:Hall temp&quot;, &quot;property:value=21.5&quot;, &quot;property:unit=C&quot;})
+</code></pre>
+<ul>
+<li>The directive table (second argument) presets properties, renames, or
+  overrides the header — one bundled device becomes any number of
+  distinct devices.</li>
+<li>Value sensors take <code>setValue(value, unit?)</code>; breach sensors
+  <code>setValue(bool)/breach/clearBreach</code> (the sensor's <code>value</code> IS the
+  breach state); switches <code>turnOn/turnOff</code>; <code>weatherMgr</code> drives
+  <code>PUT /weather</code> with sliders.</li>
+<li>Sensors carry a UI in the web view: binary ones Breach/Clear buttons,
+  multilevel ones sliders over their real range — tap them and reacting
+  QAs fire, so <code>--ui</code> doubles as a test bench. Boot value is a number
+  (0), never the skeleton's empty string (Lua truthiness would make
+  <code>value &gt; threshold</code> crash).</li>
+<li>Sim devices keep themselves alive (<code>_FLUA.keepAlive()</code>) and are the
+  builder's offline pickers (<code>sim:</code> picks).</li>
+</ul>
+</body>
+</html>

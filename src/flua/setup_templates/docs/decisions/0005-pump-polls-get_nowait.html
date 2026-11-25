@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>0005 — the pump polls the outbound queue with get_nowait, never wait_for</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="0005--the-pump-polls-the-outbound-queue-with-get_nowait-never-wait_for">0005 — the pump polls the outbound queue with get_nowait, never wait_for</h1>
+<ul>
+<li><strong>Status:</strong> active</li>
+<li><strong>Date:</strong> 2026-10-15</li>
+</ul>
+<h2 id="context">Context</h2>
+<p>The 0.1.36 CI failures (Python 3.11/3.12; 3.13 green): QAs' work ended
+early under load — an online QA's API call never printed, a restarted QA's
+third boot never arrived, an instant-mode interval chain died ~17 ticks in.
+All were the same defect: the pump consumed messages from <code>_outbound</code> with</p>
+<pre><code class="language-python">await asyncio.wait_for(self._outbound.get(), timeout=_PUMP_POLL)
+</code></pre>
+<p>On Python ≤ 3.12, when an item landed exactly as the timeout fired,
+<code>wait_for</code> cancelled the getter and raised <code>TimeoutError</code> — <strong>the already
+retrieved item was discarded</strong>. A lost timer/restart/API message then made
+<code>has_pending_work()</code> report idle and the run ended early. Python 3.13
+reworked <code>wait_for</code>, which is why only 3.13 passed — and why local 3.14
+runs never reproduced it.</p>
+<h2 id="decision">Decision</h2>
+<p>The pump polls without any cancellable get:</p>
+<pre><code class="language-python">try:
+    batch = [self._outbound.get_nowait()]
+except asyncio.QueueEmpty:
+    self._flush_db()
+    await asyncio.sleep(_PUMP_POLL)
+    continue
+</code></pre>
+<p><code>get_nowait()</code> cannot lose an item. Idle cadence (10 ms) and busy-mode
+delivery are unchanged.</p>
+<h2 id="consequences">Consequences</h2>
+<ul>
+<li>Rule for future edits (also in concurrency.md): never cancel a pending
+  <code>Queue.get()</code>; use polling.</li>
+<li>Verified on 3.11/3.12/3.13/3.14/3.15 under 2- and 8-worker loads.</li>
+<li>0.1.36 was yanked from PyPI over this; 0.1.37 ships the fix.</li>
+</ul>
+</body>
+</html>

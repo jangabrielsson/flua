@@ -1,0 +1,138 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>09 · Multi-file QAs — your own libraries</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="09--multi-file-qas--your-own-libraries">09 · Multi-file QAs — your own libraries</h1>
+<p>The lamp has grown, and so will the next QuickApp. Before copy-pasting the
+same helper into every QA, learn the HC3's answer: a QuickApp can consist of
+<strong>several files</strong> — one main file plus your own libraries, packed and
+deployed together as one device.</p>
+<h2 id="declaring-extra-files">Declaring extra files</h2>
+<p>The header directive <code>--%%file:path,name</code> adds a file. The files load <strong>in
+declaration order, before the main file</strong>, and share the same environment —
+a function defined in a library is simply there when the main file runs:</p>
+<pre><code class="language-lua">--%%name:multifile-demo
+--%%file:multifile/lib.lua,lib
+-- --------------- EOH ---------------
+function QuickApp:onInit()
+  print(&quot;helper says:&quot;, helper())
+end
+</code></pre>
+<p><code>multifile/lib.lua</code>:</p>
+<pre><code class="language-lua">function helper()
+  return &quot;loaded in order&quot;
+end
+</code></pre>
+<p>Run it:</p>
+<pre><code class="language-bash">flua --api local examples/multifile.lua
+</code></pre>
+<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+[05.10.2026][10:33:55][DEBUG  ][multifile-demo5000]: helper says: loaded in order
+</code></pre>
+<p>That's the whole feature. The <code>,lib</code> part is the file's <em>name</em> on the HC3
+(the path is where it lives on your disk — relative to the main file);
+flua reports both when you ask:</p>
+<pre><code class="language-lua">local files = api.get(&quot;/quickApp/&quot;..self.id..&quot;/files&quot;)
+for _, f in ipairs(files) do print(&quot;file:&quot;, f.name) end
+</code></pre>
+<pre><code class="language-text">file: main
+file: lib
+</code></pre>
+<h2 id="what-libraries-are-good-for">What libraries are good for</h2>
+<ul>
+<li><strong>Shared helpers</strong> — parsing, formatting, time math, the <code>findDevice</code>
+  pattern from chapter 10 — written once, used by every QA that declares
+  the file.</li>
+<li><strong>Big QAs, organized</strong> — the lamp's sun logic, its UI callbacks and its
+  actions can live in separate files instead of one long scroll.</li>
+<li><strong>Versioned code</strong> — swap one library file to upgrade a behavior across
+  QAs.</li>
+</ul>
+<p>Two ground rules:</p>
+<ul>
+<li>The files are <strong>one program</strong>, not several QAs — a library has no
+  <code>--%%name</code>, no <code>onInit</code> of its own (well, its top-level code <em>does</em> run,
+  in declaration order — but one QA, one life).</li>
+<li><code>--%%</code> lines in a library file are just comments to flua — directives are
+  read from the <strong>main file only</strong>.</li>
+</ul>
+<h2 id="deploying-multi-file-qas">Deploying multi-file QAs</h2>
+<p><code>--tool uploadQA</code> packs the main file and every <code>--%%file</code> into one package
+(the <code>.fqa</code> format the HC3 app understands), so the whole QA — libraries
+included — travels as one device:</p>
+<pre><code class="language-bash">flua --tool uploadQA main.lua     # packs + uploads all declared files
+flua --tool updateQA 123 main.lua # same, into an existing QA
+</code></pre>
+<p>And the other direction, <code>downloadQA</code>, writes the files out with names that
+carry the HC3 id — <code>My QA_main_123.lua</code>, <code>My_QA_lib_123.lua</code> — so a
+downloaded QA is a working flua project you can edit and re-upload.</p>
+<h2 id="the-sunset-lamp-refactored">The Sunset Lamp, refactored</h2>
+<p>A taste of the payoff. Move the sun logic into <code>sun.lua</code>:</p>
+<pre><code class="language-lua">-- sun.lua — the lamp's library: everything about the sun
+function sunMinutes()
+  local h, m = fibaro.getValue(1, &quot;sunsetHour&quot;):match(&quot;(%d+):(%d+)&quot;)
+  return tonumber(h) * 60 + tonumber(m)
+end
+
+function isAfterSunset()
+  local now = os.date(&quot;*t&quot;)
+  return now.hour * 60 + now.min &gt;= sunMinutes()
+end
+</code></pre>
+<p>…and the lamp's main file becomes smaller, with the library declared in the
+header:</p>
+<pre><code class="language-lua">--%%name:SunsetLamp
+--%%type:com.fibaro.binarySwitch
+--%%file:sun.lua,sun
+
+function QuickApp:checkSun()
+  if not self:getVariable(&quot;auto&quot;) then return end
+  if isAfterSunset() and not self.properties.value then
+    self:turnOn()
+  elseif not isAfterSunset() and self.properties.value then
+    self:turnOff()
+  end
+end
+</code></pre>
+<p>Same behavior, easier to read — and <code>sun.lua</code> is ready for the next
+sun-driven QA you write.</p>
+<h2 id="what-did-we-just-learn">What did we just learn?</h2>
+<ul>
+<li><code>--%%file:path,name</code> adds library files; they load <strong>before the main
+  file</strong>, in declaration order, sharing its environment.</li>
+<li>One QA, several files — directives live in the main file only.</li>
+<li>The tools pack and unpack the whole set as one device.</li>
+</ul>
+<p>Next: the finale of this tutorial — several QAs running <em>together</em>, finding
+each other, and how to debug the ensemble.</p>
+</body>
+</html>

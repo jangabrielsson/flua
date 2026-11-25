@@ -31,13 +31,13 @@
 </style>
 </head>
 <body>
-<h1>flua concurrency &amp; threading model</h1>
+<h1 id="flua-concurrency--threading-model">flua concurrency &amp; threading model</h1>
 <p>The runtime's ground rules for <em>who runs where</em> and <em>who may wait for what</em>.
 This is the doc to read before touching the pump, the bridge, timers, or the
 graceful-exit path — most of it was learned the hard way (see the two race
 lessons at the end). Component-level orientation lives in ARCHITECTURE.md;
 this is the execution model underneath it.</p>
-<h2>The big picture</h2>
+<h2 id="the-big-picture">The big picture</h2>
 <p>Everything runs on <strong>one asyncio event loop</strong> (the CLI's <code>asyncio.run</code> loop in
 tests, <code>cli.py::_run</code> in production). On top of that loop sit:</p>
 <ul>
@@ -72,7 +72,7 @@ tests, <code>cli.py::_run</code> in production). On top of that loop sit:</p>
                                      │   net/ws/mqtt receivers        │
                                      └────────────────────────────────┘
 </code></pre>
-<h2>The message plumbing</h2>
+<h2 id="the-message-plumbing">The message plumbing</h2>
 <ul>
 <li><strong>Lua → Python</strong> (<code>_inbound</code>, a <code>collections.deque</code>): <code>_PY.post(msg)</code> appends
   and returns immediately. Never blocks, never calls Lua.</li>
@@ -86,7 +86,7 @@ tests, <code>cli.py::_run</code> in production). On top of that loop sit:</p>
 <li><strong>Wire format</strong>: everything crossing the bridge is a JSON-compatible dict
   (<code>messages.py</code>). Lua function references must never cross.</li>
 </ul>
-<h2>The pump loop</h2>
+<h2 id="the-pump-loop">The pump loop</h2>
 <p><code>engine.py::_pump</code> (wake every <code>_PUMP_POLL = 0.01</code> s):</p>
 <ol>
 <li><code>clock.tick(time.monotonic())</code> — advance virtual time by real elapsed.</li>
@@ -102,7 +102,7 @@ tests, <code>cli.py::_run</code> in production). On top of that loop sit:</p>
 <p>The batch is the atomic unit of delivery. Order within a batch and across
 batches is FIFO; this is what guarantees "the greeting prints before QA
 output" and "a resumed QA runs before its deferred messages".</p>
-<h2>Per-QA coroutines and the suspend machinery</h2>
+<h2 id="per-qa-coroutines-and-the-suspend-machinery">Per-QA coroutines and the suspend machinery</h2>
 <p><code>lua/init.lua</code> keeps per-QA state in plain tables:</p>
 <ul>
 <li><code>qaRunners[qaId]</code> — the QA's current callback coroutine.</li>
@@ -121,7 +121,7 @@ message; the engine spawns a <code>flua-api</code> worker thread that runs the H
 request (the pump keeps going — other QAs keep running). The response comes
 back as an <code>apiResult</code> message that resumes the QA's coroutine. Only the
 <em>calling</em> QA suspends.</p>
-<h2>Worker threads and tracked work</h2>
+<h2 id="worker-threads-and-tracked-work">Worker threads and tracked work</h2>
 <table>
 <thead>
 <tr>
@@ -173,7 +173,7 @@ back as an <code>apiResult</code> message that resumes the QA's coroutine. Only 
 <p><strong>Rule: anything a suspended QA can be waiting on must be counted by
 <code>has_pending_work()</code>.</strong> A worker that isn't counted is a hole the
 graceful-exit check will eventually fall through (see race lesson 2).</p>
-<h2>Blocking rules</h2>
+<h2 id="blocking-rules">Blocking rules</h2>
 <ul>
 <li><strong>The pump must never block on I/O.</strong> QA <code>api.*</code> calls suspend and move to
   <code>flua-api</code>; <code>net.HTTPClient</code> moves to <code>flua-http</code>; sockets to their
@@ -189,7 +189,7 @@ graceful-exit check will eventually fall through (see race lesson 2).</p>
 <li><strong><code>has_pending_work()</code> may run on any thread at any time.</strong> It only reads;
   it must never call Lua or take locks that a worker might hold.</li>
 </ul>
-<h2>Graceful exit</h2>
+<h2 id="graceful-exit">Graceful exit</h2>
 <p>The CLI (<code>cli.py::_keep_running</code>) polls every 50 ms and exits when the run
 is done. Pending work is:</p>
 <pre><code>timers ∪ keep-alive QAs ∪ _inbound ∪ _outbound ∪ _http_tasks
@@ -198,7 +198,7 @@ is done. Pending work is:</p>
 <p>with overrides: <code>--%%keep-alive:true</code> QAs (online only) hold the run open,
 <code>--ui</code> holds it open, <code>--run-for N</code>/<code>--%%maxhours</code> bound it in virtual time,
 and <code>exit(code)</code> from a QA sets the process exit code (last failing QA wins).</p>
-<h2>Two race lessons (do not regress these)</h2>
+<h2 id="two-race-lessons-do-not-regress-these">Two race lessons (do not regress these)</h2>
 <ol>
 <li>
 <p><strong>Never cancel a pending <code>Queue.get()</code>.</strong> The pump used
@@ -227,13 +227,13 @@ and <code>exit(code)</code> from a QA sets the process exit code (last failing Q
    <code>tests/test_engine.py::test_api_result_handoff_is_atomic</code>).</p>
 </li>
 </ol>
-<h2>Shutdown</h2>
+<h2 id="shutdown">Shutdown</h2>
 <p><code>engine.stop()</code> sets <code>_running = False</code>, cancels the pump/poller/proxy/http
 tasks, and awaits the pump task. Worker threads are daemons and are never
 joined — a hung HC3 must not delay exit. Workers that finish after teardown
 drop their results through <code>_post_from_worker</code> (a closed loop = the run is
 over). Tests: cancel first, then assert — never sleep for teardown.</p>
-<h2>Where the pieces live</h2>
+<h2 id="where-the-pieces-live">Where the pieces live</h2>
 <ul>
 <li>Pump, handlers, worker spawns: <code>src/flua/engine.py</code></li>
 <li>Suspend/defer machinery, dispatch: <code>src/flua/lua/init.lua</code></li>

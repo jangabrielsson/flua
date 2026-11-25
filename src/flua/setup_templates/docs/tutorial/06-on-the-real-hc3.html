@@ -1,0 +1,140 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>06 · On the real HC3</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="06--on-the-real-hc3">06 · On the real HC3</h1>
+<p>The lamp has lived its whole life in a simulation on your computer. This
+chapter moves it into your real HC3 — the same file, unchanged. That's the
+flua promise: <strong>what you tested at home is what runs on the controller.</strong></p>
+<h2 id="before-you-start">Before you start</h2>
+<p>Three small things, all done or known from earlier chapters:</p>
+<ul>
+<li>Your HC3 and your computer are on the same network.</li>
+<li>The <code>.env</code> file from chapter 01 (step 6) holds the HC3's address and your
+  credentials.</li>
+<li>You know which light is <em>safe to play with</em> — pick a real lamp you can
+  watch, and make sure turning it on and off is harmless (nobody is in the
+  shower on its circuit).</li>
+</ul>
+<blockquote>
+<p>A note on honesty: everything in this chapter up to the upload is exactly
+what flua does; the upload commands themselves talk to <em>your</em> controller,
+which this tutorial can't rehearse for you. They are the tool's documented
+behavior, and they print what they do. If anything looks different, the
+next chapter teaches you how to read the situation.</p>
+</blockquote>
+<h2 id="step-1--a-dress-rehearsal-against-your-real-house">Step 1 — a dress rehearsal against your real house</h2>
+<p>So far the lamp has run in the simulated world (offline is flua's default).
+For the dress rehearsal, tell the lamp to go <strong>online</strong> with a mode
+directive in its header — <code>--%%mode:online</code> — or pass <code>--api remote</code> on the
+command line. Your QuickApp still runs on your computer, but every question
+it asks the HC3 — <code>fibaro.getValue(1, "sunsetHour")</code>, <code>api.get(...)</code>,
+everything — is answered by your <strong>real</strong> controller:</p>
+<pre><code class="language-bash">flua --api remote --start '2026/10/4 18:30:00' sunset_lamp_ui.lua
+</code></pre>
+<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode online
+[04.10.2026][18:30:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready, 60 W
+</code></pre>
+<p>The sunset hour now comes from your actual HC3 and location, not the
+simulation's Stockholm default. Nothing is deployed, nothing is changed on
+the controller — the lamp is just <em>consulting</em> it. Press <code>Ctrl-C</code> when
+you've seen enough.</p>
+<p>(If flua refuses to start and complains about credentials, your <code>.env</code> is
+missing or the address/password is wrong — flua exits on the first failed
+login attempt on purpose, because the HC3 locks itself after four.)</p>
+<h2 id="step-2--upload-the-lamp">Step 2 — upload the lamp</h2>
+<p>One command puts the lamp onto the controller:</p>
+<pre><code class="language-bash">flua --tool uploadQA sunset_lamp_ui.lua
+</code></pre>
+<pre><code class="language-text">uploaded SunsetLamp — HC3 device id 123
+</code></pre>
+<p>(<code>123</code> will be <em>your</em> HC3's next free device id.) The tool packages the QA —
+your <code>--%%</code> header becomes the device's name, type, UI and variables — and
+creates the device on the HC3. Open the Fibaro app on your phone: the
+SunsetLamp is there, a real switch with your <strong>Automatic</strong> toggle below the
+On/Off buttons.</p>
+<p><strong>The first real test:</strong> tap <strong>Turn On</strong> in the app. The light comes on.
+That's your action running on the HC3, exactly as it ran in the viewer.
+Welcome to home automation.</p>
+<p><strong>Pack first, or verify after.</strong> <code>uploadQA</code> packages on the fly; when you
+distribute the QA as a <code>.fqa</code>, <code>flua --tool pack sunset_lamp_ui.lua
+--verify</code> proves the artifact came out right (inventory, variables,
+placeholder and leak scan) — and <code>flua --tool inspectFQA sunset_lamp_ui.fqa
+--json</code> re-checks any package later, machines included.</p>
+<p><strong>Custom icons.</strong> The HC3 ships the standard icon library; your own icons
+are <code>User&lt;id&gt;</code> sets, managed in the browser with <code>flua --tool icons ui</code>
+(list, preview, upload per device type, delete). A QA can even install its
+own set on first boot — <code>examples/iconInstall.lua</code> is the complete recipe
+(download, deduplicate by content, upload once, reinstall-safe).</p>
+<h2 id="step-3--fix-it-update-it">Step 3 — fix it, update it</h2>
+<p>Found something to improve? Edit the file, then update the QA in place (the
+device id is the one uploadQA printed):</p>
+<pre><code class="language-bash">flua --tool updateQA 123 sunset_lamp_ui.lua
+</code></pre>
+<p>If you didn't note the id: <code>flua --tool downloadQA</code> fetches a QA into a
+project folder whose file names carry the id —</p>
+<pre><code class="language-bash">flua --tool downloadQA 123 -d lamp/
+# lamp/SunsetLamp_main_123.lua  (the id travels with the file name)
+flua --tool updateQA lamp/SunsetLamp_main_123.lua   # updates QA 123
+</code></pre>
+<p>so a downloaded QA is always re-uploadable, even weeks later.</p>
+<p>New QAs can land directly in a room:</p>
+<pre><code class="language-bash">flua --tool uploadQA --room 5 sunset_lamp_ui.lua
+</code></pre>
+<p>(<code>5</code> is the room's id — visible in the HC3 app's room settings.)</p>
+<h2 id="the-other-direction-bringing-an-hc3-qa-home">The other direction: bringing an HC3 QA home</h2>
+<p>The HC3 app can export any QuickApp as an <code>.fqa</code> file. flua can unpack that
+file into a normal flua project — so QAs you wrote on the controller can
+live on your computer too:</p>
+<pre><code class="language-bash">flua unpack myqa.fqa -d myqa-project/
+</code></pre>
+<pre><code class="language-text">unpacked to myqa-project/ (main: myqa-project/&lt;QA-name&gt;_main.lua)
+</code></pre>
+<pre><code class="language-bash">flua export sunset_lamp_ui.lua -o lamp.fqa
+</code></pre>
+<pre><code class="language-text">exported 1 files to lamp.fqa
+</code></pre>
+<p><code>unpack</code> regenerates the <code>--%%</code> header from the package (name, type, UI
+rows, variables), so you can read exactly how the device was configured —
+and <code>export</code> produces a package another HC3 owner could install from the
+app. Both directions are open.</p>
+<h2 id="what-did-we-just-learn">What did we just learn?</h2>
+<ul>
+<li>The <strong>same file</strong> runs in the simulation, consults your real HC3, and
+  finally lives <strong>on</strong> it — flua never rewrites your code between worlds.</li>
+<li><code>--tool uploadQA</code> deploys; <code>updateQA</code> updates; <code>downloadQA</code>/<code>unpack</code>/
+  <code>export</code> move QAs in both directions.</li>
+</ul>
+<p>Next chapter: when it doesn't go as planned — reading the log, checking
+your work before running it, and debugging like a grown-up.</p>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Note: device emulation (seeded houses that behave)</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="note-device-emulation-seeded-houses-that-behave">Note: device emulation (seeded houses that behave)</h1>
+<p>Status: layer 1 implemented (2026-10-18) — seeded physical devices react to
+the canonical light actions (<code>turnOn</code>/<code>turnOff</code>/<code>setValue</code>) by updating
+their <code>value</code> property, gated by the catalog's <code>light</code> interface. Layer 2
+(QAs behind seeded devices) is designed but not built.</p>
+<h2 id="context">Context</h2>
+<p>A db/seed file (<code>--tool createDB</code>, <code>--seed</code>, <code>--%%db:</code>) carries the real
+house: dozens of devices, fetchable via <code>/devices</code>, but inert — <code>POST
+/devices/{id}/action/{action}</code> only recorded a <code>DeviceActionRanEvent</code>.
+QAs/plugins have real logic (their actions run the QA's code); physical
+devices had none. Layer 1 gives them the canonical default behavior.</p>
+<h2 id="layer-1-done">Layer 1 (done)</h2>
+<ul>
+<li><code>POST /devices/{id}/action/{action}</code> on a <strong>non-plugin, non-proxy</strong>
+  device applies the type's canonical light semantics: <code>turnOn</code> →
+  <code>value = true</code> (dimmers: 99), <code>turnOff</code> → false (0), <code>setValue</code> accepts
+  a number or <code>"on"</code>/<code>"off"</code>.</li>
+<li>The catalog's <code>light</code> interface is the gate — sensors/meters stay inert.</li>
+<li>The change records a <code>DevicePropertyUpdatedEvent</code> in the refreshStates
+  feed, like a real device would.</li>
+<li>QAs and proxy devices are untouched: their actions keep running real
+  code (engine pump / the HC3).</li>
+</ul>
+<h2 id="layer-2-design--not-built">Layer 2 (design — not built)</h2>
+<p>Real behavior behind seeded devices, three pieces:</p>
+<ol>
+<li><strong>Type-template emulation</strong> — instantiate the <code>quickapp-types</code> template
+   for a device's type as a QA <strong>pinned to the device's id</strong>, so the
+   template's canonical actions run in a real QA environment (timers,
+   debug, properties all work). Covers non-QA devices with per-type
+   behavior beyond on/off.</li>
+<li><strong>Real QA files</strong> — for devices that are QAs on the HC3
+   (<code>interface: quickApp</code>), <code>--tool downloadQA</code> fetches the source; the
+   downloaded files run as emulated QAs. Needs one small extension: honor
+   <strong><code>--%%deviceId:N</code> as an id pin in the emulator</strong> (today it is
+   uploadFile metadata only), so the QA takes its original id and becomes
+   the seeded device.</li>
+<li><strong>Selection</strong> — the db/seed carries the emulation list
+   (<code>"emulate": [ids]</code>), <code>--%%deviceId</code> pins act as the implicit selection
+   for downloaded QAs. Default: nothing emulated (layer 1 only) — with
+   100+ devices the user opts in per device. No wildcard.</li>
+</ol>
+<p>Open design points: id collisions between pins and engine-assigned ids
+(5000+); whether pinned QAs shadow the seeded device entry or replace it;
+proxy mode interaction (a pinned QA with the same id as a proxied device
+must not double-emit).</p>
+</body>
+</html>

@@ -1,0 +1,348 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>flua-mcp — the MCP server</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="flua-mcp--the-mcp-server">flua-mcp — the MCP server</h1>
+<p>Machine interface to flua for agent hosts (Claude Desktop, Copilot, …).
+Ships in the fibaro-flua wheel as the <code>flua-mcp</code> console script; one version
+with flua (design: <code>docs/notes/notes-mcp.md</code>, packaging: ADR 0010).</p>
+<h2 id="protocol-surface-current">Protocol surface (current)</h2>
+<ul>
+<li><strong>Transport</strong>: stdio (default) — newline-delimited JSON-RPC 2.0 on
+  stdin/stdout. <strong>Streamable HTTP</strong> (opt-in) — <code>flua-mcp --http</code>, one
+  <code>POST /mcp</code> endpoint in stateless mode (ADR 0011): no SSE, no
+  <code>Mcp-Session-Id</code> (sessions are explicit tool arguments), same dispatch
+  core as stdio.</li>
+<li><strong>Spec revision</strong>: dual-era. The <strong>modern</strong> surface (2026-07-28) needs no
+  handshake — every request carries its protocol version in <code>params._meta</code>
+  and <code>server/discover</code> (required) lists <code>supportedVersions</code>. The <strong>legacy</strong>
+  <code>initialize</code> handshake (2025-06-18) is still served for older clients.
+  Unsupported versions answer error <code>-32022</code> with <code>{supported, requested}</code>.</li>
+<li><strong>stdout is pure JSON-RPC</strong> — one response line per request; server
+  diagnostics go to stderr, and session QAs' own prints are redirected
+  there too (the engines run with their log stream on stderr). Agents can
+  parse stdout unconditionally.</li>
+<li><strong>Capabilities</strong>: <code>tools</code>, <code>resources</code> (the packaged docs as
+  <code>flua://docs/*</code> and the skill guidance as <code>flua://skills/*</code>), and
+  <code>prompts</code> (<code>qa_debug</code>, <code>qa_skeleton</code>).</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Era</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>server/discover</code></td>
+<td>modern</td>
+<td><code>{resultType, supportedVersions, capabilities, _meta.serverInfo, instructions}</code></td>
+</tr>
+<tr>
+<td><code>initialize</code></td>
+<td>legacy</td>
+<td>handshake → <code>{protocolVersion, capabilities, serverInfo}</code></td>
+</tr>
+<tr>
+<td><code>ping</code></td>
+<td>both</td>
+<td>liveness → <code>{}</code></td>
+</tr>
+<tr>
+<td><code>tools/list</code></td>
+<td>both</td>
+<td>the tools with their JSON-Schema inputs (<code>resultType: "complete"</code>)</td>
+</tr>
+<tr>
+<td><code>tools/call</code></td>
+<td>both</td>
+<td>run one tool → <code>{resultType, content, isError}</code></td>
+</tr>
+<tr>
+<td><code>resources/list</code></td>
+<td>both</td>
+<td>every doc resource → <code>{resultType, resources: [{uri, name, title, description, mimeType}]}</code></td>
+</tr>
+<tr>
+<td><code>resources/read</code></td>
+<td>both</td>
+<td>one resource's text → <code>{resultType, contents: [{uri, mimeType, text}]}</code></td>
+</tr>
+<tr>
+<td><code>prompts/list</code></td>
+<td>both</td>
+<td>the prompts with their argument schemas → <code>{resultType, prompts: [{name, title, description, arguments}]}</code></td>
+</tr>
+<tr>
+<td><code>prompts/get</code></td>
+<td>both</td>
+<td>one rendered prompt → <code>{resultType, description, messages: [{role, content}]}</code></td>
+</tr>
+<tr>
+<td><code>notifications/initialized</code>, <code>notifications/cancelled</code></td>
+<td>legacy</td>
+<td>accepted, never answered</td>
+</tr>
+</tbody>
+</table>
+<p>Error semantics: invalid JSON/requests and unknown methods answer with the
+standard JSON-RPC error codes (<code>-32700</code>/<code>-32600</code>/<code>-32601</code>); bad <em>tool
+arguments</em> and tool failures travel in the result as <code>isError: true</code> —
+never as a JSON-RPC error. Unknown tool names are JSON-RPC errors
+(<code>-32601</code>), per the spec.</p>
+<h2 id="tools">Tools</h2>
+<h3 id="one-shot">One-shot</h3>
+<h4 id="qa_check"><code>qa_check</code></h4>
+<p>Static checks — same layers as <code>flua --check</code>: Lua syntax, unknown <code>--%%</code>
+directives, deprecated HC3 APIs, and every <code>--%%file</code> include. Does not run
+the QA.</p>
+<pre><code class="language-json">{&quot;name&quot;: &quot;qa_check&quot;, &quot;arguments&quot;: {&quot;files&quot;: [&quot;main.lua&quot;, &quot;other.lua&quot;]}}
+</code></pre>
+<p>Result: <code>{"ok": bool, "findings": [{"file", "severity", "message"}]}</code> —
+<code>ok</code> is false when any finding is <code>error</code>-severity.</p>
+<h4 id="qa_run"><code>qa_run</code></h4>
+<p>Runs QA files to completion in the emulator and returns the outcome.
+One-shot: the run ends when the QAs drain.</p>
+<pre><code class="language-json">{&quot;name&quot;: &quot;qa_run&quot;, &quot;arguments&quot;: {&quot;files&quot;: [&quot;main.lua&quot;], &quot;instant&quot;: true}}
+</code></pre>
+<p>Arguments: <code>files</code> (required), <code>mode</code> (<code>local</code>|<code>remote</code>), <code>instant</code>,
+<code>step</code> (deterministic deadline-ordered fast-forward — mutually exclusive
+with <code>instant</code>), <code>runFor</code> (positive = at least N virtual s then exit when
+idle, N wall s hard deadline; negative = exactly abs(N) virtual s — step
+mode: run until idle, at most abs(N) wall s), <code>speed</code>, <code>start</code> (virtual
+start time, e.g. <code>"2027/10/6 18:30:00"</code>), <code>maxHours</code> (cap virtual time;
+timers beyond the horizon never fire), <code>timeout</code> (wall seconds, default
+120), <code>filter</code> (<code>{levels?, match?}</code> — server-side log narrowing; the agent
+asks for "just the failures" instead of shelling out).</p>
+<p>Result: <code>{"exitCode", "logs", "verdict", "summary"}</code> — <code>logs</code> are the QA's
+<code>--log json</code> lines, <code>verdict</code> the stderr notices, and <code>summary</code> the answer
+without jq: level counts and flua-test <code>pass</code>/<code>fail</code>/<code>failures</code> tallies. A
+nonzero <code>exitCode</code> is a failed run.</p>
+<h4 id="flua_tool"><code>flua_tool</code></h4>
+<p>Runs one <code>flua --tool</code> command and returns its exit code and output — the
+whole tool registry (<code>migrate</code>, <code>icons download</code>, <code>state</code>, <code>pack</code>, <code>unpack</code>,
+<code>hub</code> — controller profiles and switching, <code>house</code> — the controller's
+devices/globals/scenes, <code>typeinfo</code> — a type's or interface's properties
+and actions, …) without per-tool schemas.</p>
+<pre><code class="language-json">{&quot;name&quot;: &quot;flua_tool&quot;, &quot;arguments&quot;: {&quot;name&quot;: &quot;migrate&quot;, &quot;args&quot;: [&quot;.&quot;]}}
+</code></pre>
+<p>Arguments: <code>name</code> (required — a bare <code>flua --tool</code> lists them), <code>args</code>
+(optional list of strings, the tool's own arguments). Result:
+`{"exitCode", "stdout", "stderr"}.</p>
+<p>When the user names a device or room ("the light in the bedroom"),
+resolve it with <code>house</code>: the JSON carries every device as
+<code>{id, name, type, room}</code> — match the user's words against name/room/type
+and, if several devices match, present them and ask which one; never
+pick silently. The homeTable idiom keeps ids maintainable (see
+<code>flua://skills/quickapp-patterns/SKILL.md</code>).</p>
+<h4 id="qa_ui"><code>qa_ui</code></h4>
+<p>The structured UI of one QA: <code>{name, type, useUiView, elements, callbacks}</code>
+(the <code>flua --tool ui --json</code> payload) — elements carry name/text/value/
+options, so an agent can read a QA's controls without parsing prose.</p>
+<pre><code class="language-json">{&quot;name&quot;: &quot;qa_ui&quot;, &quot;arguments&quot;: {&quot;files&quot;: [&quot;main.lua&quot;]}}
+</code></pre>
+<h4 id="devices"><code>devices</code></h4>
+<p>Runs QA files to completion (same semantics as <code>qa_run</code>, in-process) and
+returns the <strong>final device list from the REST feeds</strong> — the simulated
+house after the run — plus the aggregated <code>exitCode</code>.</p>
+<pre><code class="language-json">{&quot;name&quot;: &quot;devices&quot;, &quot;arguments&quot;: {&quot;files&quot;: [&quot;main.lua&quot;], &quot;instant&quot;: true}}
+</code></pre>
+<p>Arguments: <code>files</code> (required), <code>mode</code>, <code>instant</code>, <code>speed</code>, <code>start</code>,
+<code>maxHours</code> (cap virtual time; timers beyond the horizon never fire),
+<code>timeout</code>. Result: <code>{"exitCode", "devices": [{id, name, type, properties,
+...}]}</code> — <code>/devices</code> verbatim (the HC3 pseudo-device id 1 is included).
+<code>--%%</code> directives reach the engine exactly as the CLI parses them, so the
+device names and properties are the run's real ones.</p>
+<h4 id="qa_test"><code>qa_test</code></h4>
+<p>Runs the self-asserting test QAs (<code>*_test.lua</code>, the quickapp-test pattern)
+with <code>flua test --json</code> — the same machine contract the VS Code Test
+Explorer adapter consumes.</p>
+<pre><code class="language-json">{&quot;name&quot;: &quot;qa_test&quot;, &quot;arguments&quot;: {&quot;paths&quot;: [&quot;tests/&quot;], &quot;timeout&quot;: 10}}
+</code></pre>
+<p>Arguments: <code>paths</code> (optional — files or directories; default: the server's
+cwd, discovering <code>*_test.lua</code>), <code>list</code> (discover only, no run), <code>timeout</code>
+(wall seconds per test file, default 30). Each test QA runs in its own
+emulator process and must exit itself (<code>t:finish()</code>/<code>exit(...)</code>); a test
+that never exits is reported <code>TIME</code>, not allowed to block the rest.</p>
+<p>Result: <code>{"exitCode", "files": [{file, status, exitCode, failures, output}],
+"summary": {passed, failed, timedOut}}</code> — the <code>flua test --json</code> document
+with the process exit code added; <code>exitCode</code> is 0 only when everything
+passes. With <code>list: true</code>: <code>{"exitCode", "files": [paths]}</code>. An empty
+discovery answers <code>exitCode: 0</code> with an empty <code>files</code> list and a <code>notice</code>
+carrying the runner's prose.</p>
+<h4 id="docs_list--docs_read"><code>docs_list</code> / <code>docs_read</code></h4>
+<p>The docs tree <strong>as tools</strong> — the same content <code>resources/*</code> serves, for
+hosts whose MCP client only exposes tools (Copilot, for example).</p>
+<pre><code class="language-json">{&quot;name&quot;: &quot;docs_list&quot;, &quot;arguments&quot;: {}}
+{&quot;name&quot;: &quot;docs_read&quot;, &quot;arguments&quot;: {&quot;path&quot;: &quot;USAGE.md&quot;}}
+</code></pre>
+<p><code>docs_read</code> accepts a bare path (<code>USAGE.md</code>, <code>tutorial/09-multi-file-qas.md</code>)
+or the full <code>flua://docs/...</code> URI and returns <code>{path, text}</code>. Unknown paths
+answer <code>isError</code> with close-match suggestions (<code>did you mean ...</code>) and a
+pointer at <code>docs_list</code>; traversal is rejected. Prefer these over web
+search — the wheel is the authoritative reference.</p>
+<h3 id="sessions-live-probing">Sessions (live probing)</h3>
+<p>A session is a running flua engine an agent can probe across tool calls.
+The MCP transport itself stays stateless: the <code>sessionId</code> is an explicit
+argument, never connection state.</p>
+<ul>
+<li><strong><code>qa_start</code></strong> — <code>{files, mode?, instant?, speed?, start?, ttl?}</code> →
+  <code>{sessionId, qaIds}</code>. Idle sessions are reaped after <code>ttl</code> seconds
+  (default 600).</li>
+<li><strong><code>qa_probe</code></strong> — <code>{sessionId}</code> → <code>{devices, qas, debugMessages,
+  systemEvents, refreshStates}</code>. The three feeds are <strong>deltas since the
+  previous probe</strong> (cursor-based) — repeated probes only show what is
+  new. <code>refreshStates</code> carries the HC3 polling shape
+  <code>{status, last, changes, events}</code>.</li>
+<li><strong><code>qa_action</code></strong> — <code>{sessionId, qaId, action, args?}</code> → <code>{status}</code>;
+  dispatches <code>POST /devices/{id}/action/{action}</code> into the running engine
+  (reaches the QA's <code>callAction</code>).</li>
+<li><strong><code>qa_sessions</code></strong> — <code>{}</code> → <code>{sessions: [{sessionId, qaIds, ageSeconds}]}</code>.</li>
+<li><strong><code>qa_stop</code></strong> — <code>{sessionId}</code> → <code>{stopped}</code>. Unknown session ids are
+  <code>isError</code> tool results.</li>
+</ul>
+<p>Sessions run in-process (each engine owns its asyncio loop on a daemon
+thread, like the test suite drives them) and are always torn down when the
+stdio pipe closes — an agent cannot leak engines. The idle TTL is reset by
+<strong>use</strong>: a probe of a session that has idled past its TTL revives it
+(asking about a session is usage, not abandonment).</p>
+<h2 id="resources">Resources</h2>
+<p>The docs ship in the wheel (<code>src/flua/setup_templates/docs</code>, synced from the
+repo by <code>scripts/sync-skills.sh</code>) and are served as MCP resources under the
+<code>flua://docs/</code> scheme — so a host without a repo checkout can still read the
+same knowledge a local agent reads from the checkout. The same wheel ships
+the skill guidance (<code>src/flua/setup_templates/github/skills</code> — the skills
+<code>--tool setup</code> installs for Copilot) under <code>flua://skills/</code>: the
+<code>docs_list</code>/<code>docs_read</code> tools cover both trees. Text files only (the
+tutorial PDF is not served).</p>
+<pre><code class="language-json">{&quot;method&quot;: &quot;resources/read&quot;, &quot;params&quot;: {&quot;uri&quot;: &quot;flua://docs/USAGE.md&quot;}}
+</code></pre>
+<p>Examples: <code>flua://docs/USAGE.md</code>, <code>flua://docs/ARCHITECTURE.md</code>,
+<code>flua://docs/tutorial/01-install.md</code>, <code>flua://docs/decisions/0010-mcp-ships-in-the-wheel.md</code>,
+<code>flua://docs/specs/hc3-api.json</code>, <code>flua://docs/mcp.md</code> (this page),
+<code>flua://skills/quickapp-patterns/SKILL.md</code> (the QuickApp patterns).
+<code>resources/list</code> enumerates them with mime types and curated descriptions;
+paths are canonicalized and traversal (<code>..</code>) is rejected with a JSON-RPC
+error, never a filesystem escape.</p>
+<h2 id="prompts">Prompts</h2>
+<p>Two reusable guidance prompts:</p>
+<ul>
+<li><strong><code>qa_debug</code></strong> — <code>{error (required), code?}</code> → one message with the
+  debugging workflow in order: static checks (<code>qa_check</code>), offline
+  reproduction (<code>qa_run</code>), how to read each error shape (syntax vs
+  traceback vs timeout/drain), the JSON log format, shrinking the problem,
+  and the doc resources to consult (<code>flua://docs/invariants.md</code>,
+  <code>flua://docs/walkthroughs.md</code>, the tutorial's debugging chapter,
+  <code>flua://docs/USAGE.md</code>). The reported error and code are bound into the
+  message.</li>
+<li><strong><code>qa_skeleton</code></strong> — <code>{name?}</code> → a runnable, self-testing QA template:
+  <code>--%%file:$flua-test.lua</code> (assertions that no-op on a real HC3), the
+  deferred-onInit pattern, and <code>t:expect</code>/<code>t:assert_eq</code>/<code>t:finish()</code> with
+  the exit code as the verdict. The emitted skeleton is pinned by a test
+  that extracts it and runs it through <code>qa_run</code> — it never rots.</li>
+</ul>
+<p>Missing required arguments and unknown prompt names are JSON-RPC errors
+(<code>-32602</code>/<code>-32601</code>), like the tools.</p>
+<h2 id="streamable-http-transport-opt-in">Streamable HTTP transport (opt-in)</h2>
+<pre><code class="language-bash">flua-mcp --http                # 127.0.0.1:8091, no auth (loopback only)
+flua-mcp --http 0.0.0.0:8091   # LAN-reachable — requires FLUA_MCP_TOKEN
+</code></pre>
+<p>One endpoint, stateless mode per the 2026-07-28 spec: <code>POST /mcp</code> carries
+a JSON-RPC request and returns the response; notifications answer <code>202</code>
+with no body; <code>GET</code>/<code>DELETE</code> answer <code>405</code> (no SSE); a request carrying
+<code>Mcp-Session-Id</code> answers <code>404</code> — transport sessions do not exist here.
+CORS is permissive so browser hosts work. The server <strong>refuses to bind a
+non-loopback address without <code>FLUA_MCP_TOKEN</code></strong>, and every request must
+carry <code>Authorization: Bearer &lt;token&gt;</code> when one is set. Bodies over 10 MiB
+are rejected with <code>413</code>.</p>
+<pre><code class="language-bash">curl http://127.0.0.1:8091/mcp -H 'Content-Type: application/json' \
+  -d '{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;server/discover&quot;,&quot;params&quot;:{}}'
+</code></pre>
+<p>Register the HTTP server in a host the same way as stdio, with the URL:</p>
+<pre><code class="language-json">{&quot;mcpServers&quot;: {&quot;flua&quot;: {&quot;url&quot;: &quot;http://127.0.0.1:8091/mcp&quot;}}}
+</code></pre>
+<h2 id="running-it-stdio">Running it (stdio)</h2>
+<pre><code class="language-bash">flua-mcp                 # stdio JSON-RPC server (reads stdin, answers stdout)
+flua-mcp --version       # flua-mcp 0.1.40 (protocols 2026-07-28, 2025-06-18)
+</code></pre>
+<p>Register it as a stdio MCP server in the host's config — no extra install,
+no extra dependencies:</p>
+<ul>
+<li><strong>Claude Desktop</strong> (<code>claude_desktop_config.json</code>):</li>
+</ul>
+<p><code>json
+  {"mcpServers": {"flua": {"command": "flua-mcp"}}}</code></p>
+<ul>
+<li><strong>Copilot / other <code>mcp.json</code> hosts</strong> (uses the interpreter flua runs on):</li>
+</ul>
+<p><code>json
+  {"mcpServers": {"flua": {"command": "python", "args": ["-m", "flua.mcp.server"]}}}</code></p>
+<h2 id="what-agents-can-rely-on">What agents can rely on</h2>
+<ul>
+<li>The same methods and semantics hold over stdio and HTTP — one dispatch
+  core, two transports. Remote agents reach flua-mcp over HTTP through a
+  tunnel or a token-guarded LAN port; local hosts keep stdio.</li>
+<li><code>initialize</code> and <code>tools/list</code> are the discovery surface — schemas are
+  complete and typed; never parse <code>tools/list</code> prose. <code>resources/list</code> is
+  the same for docs: read <code>resources/read</code>, don't guess file locations.
+  <code>prompts/list</code> is the same for guidance: <code>prompts/get</code> renders it.</li>
+<li>Tool results are JSON inside the MCP <code>text</code> content block (single block).</li>
+<li><code>qa_run</code> never talks to a controller unless <code>mode: "remote"</code> is explicit;
+  the default is the offline sim.</li>
+<li>Credentials: <code>mode: "remote"</code> uses the server process's environment
+  (<code>HC3_URL</code>/<code>HC3_USER</code>/<code>HC3_PASSWORD</code>, the same chain <code>flua</code> uses) — never
+  tool arguments.</li>
+<li>Runs are bounded (<code>timeout</code>) and capped: at most 4 concurrent one-shot
+  runs (<code>qa_run</code>/<code>devices</code>/<code>qa_test</code>) — further ones fail fast with
+  <code>isError</code>.
+  Every tool failure is either an <code>isError</code> result or a JSON-RPC error —
+  the server process never dies on a bad request. Engine errors are
+  actionable: a wrong <code>--%%type</code> names close matches and points at
+  <code>flua --tool catalog</code>.</li>
+</ul>
+<h2 id="status--next">Status &amp; next</h2>
+<ul>
+<li>Done: stdio core, one-shot tools (<code>qa_check</code>, <code>qa_run</code>, <code>qa_ui</code>,
+  <code>devices</code>, <code>qa_test</code>, <code>flua_tool</code>), the session tier (<code>qa_start</code>/<code>qa_probe</code>/<code>qa_action</code>/
+  <code>qa_sessions</code>/<code>qa_stop</code>), the resource tier (<code>flua://docs/*</code>) plus its
+  tool fallback (<code>docs_list</code>/<code>docs_read</code> — hosts without resource
+  support), the prompt tier (<code>qa_debug</code>/<code>qa_skeleton</code>), the Streamable
+  HTTP transport (stateless), packaging, tests (<code>tests/test_mcp.py</code>,
+  <code>tests/test_mcp_http.py</code>).</li>
+<li>Planned: nothing concrete — candidates: more REST parity tools
+  (rooms/sections/scenes), HTTP session mode (deliberately out of scope
+  so far, ADR 0011).</li>
+</ul>
+</body>
+</html>

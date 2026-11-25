@@ -1,0 +1,82 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Response to issue #5 — class() semantics and loader environments</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="response-to-issue-5--class-semantics-and-loader-environments">Response to issue #5 — class() semantics and loader environments</h1>
+<p>(Reply draft for GitHub issue #5, flua 0.1.177.)</p>
+<hr />
+<p>Great field report — both findings checked out, and both turned out to be
+documentation gaps rather than divergences. Fixed in 0.1.177: the two traps
+are now documented, <code>dofile</code> is rebound per QA, and there is a sanctioned
+loader.</p>
+<h2 id="1-class--that-is-the-hc3s-contract-now-documented">1. <code>class()</code> — that is the HC3's contract, now documented</h2>
+<p>The return-value contract is HC3-faithful, not a flua quirk: <code>class(name)</code>
+installs the class as the global <code>name</code> and returns the parent-setter, and
+the class object is read back through <code>_G[name]</code>. The strongest evidence was
+in the repo next door — Yahue's own production <code>defClass</code> does exactly the
+<code>local p = class(name); local cl = _G[name]</code> dance and runs on a real HC3,
+and EventRunner does the same. Fibaro's manual never documents <code>class()</code>
+itself, which is precisely why it cost source-diving.</p>
+<p>Same for <code>__init</code>: flua asserts <code>rawget(t, '__init')</code>, so a subclass needs
+its own constructor — and the real HC3 behaves the same way (every Yahue
+subclass redeclares <code>__init</code> and chains the parent explicitly:
+<code>HueClass.__init(self, device)</code>). No code change here; the rule is now
+written down in a new <strong>Classes (<code>class</code>)</strong> section in USAGE.md with both
+patterns.</p>
+<h2 id="2-loaders--dofile-rebound-_flualoadfile-added">2. Loaders — <code>dofile</code> rebound, <code>_FLUA.loadFile</code> added</h2>
+<p>One nuance worth naming: on the real HC3, <code>dofile</code>/<code>load</code>/<code>loadfile</code> are
+<strong>nil in QAs</strong> (the sandbox section in USAGE.md lists them, verified live on
+5.221) — so any QA using them is flua-only by definition, and there was no
+HC3 behavior to diverge from. The trap was which table counts as "the
+globals": the QA's <code>_G</code> is its env, the shared runtime <code>_G</code> has no
+<code>fibaro</code>/<code>api</code>/<code>net</code>.</p>
+<p>What changed in 0.1.177:</p>
+<ul>
+<li><code>dofile(path)</code> is rebound per QA, exactly like <code>require</code> already was — a
+  dofile'd file runs in the QA's environment and behaves like a <code>--%%file</code>
+  include (minus packaging).</li>
+<li><code>_FLUA.loadFile(path)</code> is the sanctioned loader: it returns a chunk bound
+  to the QA's env, so harness/tool code never needs to know about the <code>_G</code>
+  aliasing.</li>
+<li>Raw <code>load</code>/<code>loadfile</code> stay stock (shared <code>_G</code> when no env is passed) —
+  documented, with your <code>loadfile(path, "bt", _G)</code> workaround called out.</li>
+</ul>
+<p>Documented in USAGE.md (new <em>Loading files into a QA's environment</em> section
+plus the <code>_FLUA</code> extensions list), ARCHITECTURE.md, and pinned by a new
+test, <code>tests/test_qa.py::test_qa_dofile_and_loadfile_run_in_qa_env</code>, which
+also asserts the raw-<code>load</code> contrast stays as documented.</p>
+<p>The working harness (production files loaded unchanged, <code>HUE:app()</code> driven
+with mocked resources, <code>flua --check</code> + virtual time) is exactly the shape
+of QA these docs are for — thanks for the field report; it read like the
+issues I'd want other harness builders to avoid.</p>
+</body>
+</html>

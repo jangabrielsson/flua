@@ -1,0 +1,111 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>0016 — a web UI builder for `--%%u` / `--%%rsrc`</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="0016--a-web-ui-builder-for---u----rsrc">0016 — a web UI builder for <code>--%%u</code> / <code>--%%rsrc</code></h1>
+<ul>
+<li>Status: <strong>active</strong> (built as <code>--tool uibuilder</code>)</li>
+<li>Date: 2026-11-23</li>
+</ul>
+<h2 id="context">Context</h2>
+<p>Child devices are the one place on the HC3 where modern view elements
+(<code>tabView</code>, <code>collapsible</code>) are safe — the editor never rewrites a child's
+uiView. But that safety comes with a cost: there is <em>no HC3-side tool</em> to
+author those UIs, so today they are written as <code>--%%u</code>/<code>--%%rsrc</code> rows by
+hand (or pasted from <code>--tool ui --as-lua</code>). flua already owns the entire
+compile chain — rows → <code>uiView</code>/<code>viewLayout</code>/<code>uiCallbacks</code>, the inverse
+(<code>ui_to_u_rows</code>), <code>lua_literal</code>, <code>child_bindings</code>, <code>--%%rsrc</code> — and its
+web viewer already renders the uiView faithfully. The missing piece is
+authoring: a visual builder that emits the directives.</p>
+<h2 id="the-shape">The shape</h2>
+<p><code>flua --tool uibuilder [PORT]</code> serves a standalone page in the same style
+as the UI viewer. The editor model is <strong>the row JSON</strong> the directives
+parse to — no new format.</p>
+<ul>
+<li><strong>Target selector</strong> (the top-level switch, replacing a naive v1/v2
+  toggle):</li>
+<li><strong>Main QA — v1</strong>: the legacy format. Elements: label (HTML text
+    allowed — the v1 reason to exist), button, slider, switch, select,
+    multi. No v2-only elements. Export: <code>--%%u</code> lines (legacy package).</li>
+<li><strong>Main QA — v2</strong>: the uiView format. Full element set (adds
+    <code>tabView</code>, <code>collapsible</code>, <code>image</code>), <code>UIAction</code> bindings. Export:
+    <code>--%%u</code> lines + the <code>--%%useUiView:true</code> hint.</li>
+<li><strong>Child device</strong>: children carry a uiView only — the v1/viewLayout
+    question does not apply. Full element set, <strong>child bindings</strong>
+    (<code>actionName</code> = the method, <code>json.array()</code> for argless). Export:
+    <code>--%%rsrc:&lt;name&gt;:{…}</code> (the resource form; a name field in the UI).</li>
+<li><strong>Palette</strong> — the elements the selected target allows; v2-only elements
+  are marked and disabled for Main-v1.</li>
+<li><strong>Properties</strong> — one form per element: name, text, callbacks
+  (<code>onReleased</code>, <code>onChanged</code>, <code>onToggled</code>, <code>onTabChanged</code>, …), min/max/
+  value, options, values, url — the fields the compiler understands. For
+  the Child target, callbacks are the child class's method names.</li>
+<li><strong>Row editor</strong> — add/remove/reorder rows; several elements share a row;
+  tabView/collapsible bodies edited as nested rows.</li>
+<li><strong>Live preview</strong> — the server compiles the rows through <code>compile_ui</code>
+  (plus <code>child_bindings</code> for the Child target) and the preview pane
+  reuses the viewer's <code>renderComponent</code>, so what you see is what the HC3
+  renders, bindings included. Preview interactions are local/inert (no QA
+  behind the page).</li>
+<li><strong>Export pane</strong> — copy buttons for the directive forms first
+  (<code>--%%u</code> and/or <code>--%%rsrc</code> per target); the raw Lua table
+  (<code>--as-lua</code> shape) later, behind a toggle.</li>
+<li><strong>Import</strong> — paste existing <code>--%%u</code>/<code>--%%rsrc</code> back into the model
+  (the parser already exists).</li>
+</ul>
+<h2 id="reuse">Reuse</h2>
+<ul>
+<li>Server side: two small HTTP routes — compile rows → uiView (preview)
+  and parse pasted directives → rows. Everything else exists.</li>
+<li>Client side: the viewer's <code>renderComponent</code>/<code>appendRows</code> for the
+  preview; the page/theme conventions of the viewer.</li>
+<li>No new format, no new compiler, no persistence.</li>
+</ul>
+<h2 id="non-goals">Non-goals</h2>
+<ul>
+<li>No editing of running QAs, no HC3 upload (export/uploadQA exist).</li>
+<li>No pixel-perfect WYSIWYG; no drag-and-drop beyond row reordering.</li>
+<li>No file writing — copy-paste into source is the contract; the builder
+  is stateless.</li>
+</ul>
+<h2 id="decisions">Decisions</h2>
+<ol>
+<li>Standalone <code>--tool uibuilder</code> (not a mode inside <code>--ui</code>).</li>
+<li>Export the directive forms first (<code>--%%u</code> / <code>--%%rsrc</code>); the raw Lua
+   table comes later behind a toggle.</li>
+<li>The binding/format choice is a three-way <strong>target</strong>, not a v1/v2
+   element toggle: the uiView format is the same everywhere; what differs
+   is the binding target (main QA <code>UIAction</code> vs. child <code>actionName</code>) and
+   the one format a child cannot have (viewLayout/v1).</li>
+</ol>
+</body>
+</html>

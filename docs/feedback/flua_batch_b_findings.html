@@ -1,0 +1,129 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Flua 0.1.112: Batch B verification</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="flua-01112-batch-b-verification">Flua 0.1.112: Batch B verification</h1>
+<p>Tested 31 October 2026 on Windows, Python 3.12.10, Lupa 2.6, Lua 5.4.
+Only synthetic/local fixtures were used; no controller or physical device access.</p>
+<h2 id="results">Results</h2>
+<p>The existing 32-check regression suite passed unchanged.
+Of nine additional strict/result acceptance cases, seven passed and two failed.</p>
+<table>
+<thead>
+<tr>
+<th>Case</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Timer error, followed by a successful callback and exit 0</td>
+<td>Pass: exit 1, failed result, timer error recorded</td>
+</tr>
+<tr>
+<td>HTTP success-callback error, followed by exit 0</td>
+<td>Pass: exit 1, failed result, net error recorded</td>
+</tr>
+<tr>
+<td>Error caught by application pcall</td>
+<td>Pass: exit 0, passed result, no failures</td>
+</tr>
+<tr>
+<td>Legacy timer-error behaviour without strict mode</td>
+<td>Pass: legacy exit 0 retained</td>
+</tr>
+<tr>
+<td>Declarative <code>-D strict-tests:true</code></td>
+<td>Pass: sticky timer failure</td>
+</tr>
+<tr>
+<td>Pending work cut short by positive <code>--run-for</code></td>
+<td>Pass: timeout result and exit 1</td>
+</tr>
+<tr>
+<td>Error thrown directly by a custom UIHandler</td>
+<td>Pass: exit 1, ui error recorded</td>
+</tr>
+<tr>
+<td>Mapped button callback invoked through UIAction</td>
+<td>FAIL: error logged, exit 0, passed result, empty failures</td>
+</tr>
+<tr>
+<td>Mapped button callback invoked through _FLUA.uiEvent</td>
+<td>FAIL: error logged, exit 0, passed result, empty failures</td>
+</tr>
+</tbody>
+</table>
+<p>JSON result checks include schemaVersion, agreement with process exit code,
+runtime version, realtime clock mode, timing fields and cleanupComplete=true.
+The cleanup flag is reported by Flua; it is not an independent resource-leak audit.
+The timeout case does not test a blocked Lua/native stack or an independent outer
+supervisor. We retain an external wall-clock guard and independent log checking.</p>
+<h2 id="minimal-remaining-ui-reproduction">Minimal remaining UI reproduction</h2>
+<p>Save as <code>ui_callback_error.lua</code>:</p>
+<pre><code class="language-lua">--%%mode:offline
+--%%u:{button=&quot;btnFailure&quot;,text=&quot;Test&quot;,onReleased=&quot;failUi&quot;}
+function QuickApp:failUi()
+  error(&quot;EXPECTED_UI_CALLBACK_FAILURE&quot;)
+end
+function QuickApp:onInit()
+  setTimeout(function()
+    _FLUA.uiEvent(&quot;btnFailure&quot;, &quot;onReleased&quot;)
+  end, 10)
+  setTimeout(function()
+    print(&quot;LATER OK&quot;)
+    _FLUA.exit(0)
+  end, 500)
+end
+</code></pre>
+<pre><code class="language-text">flua --api local --strict-tests --result-json ui-result.json --run-for -2 ui_callback_error.lua
+</code></pre>
+<p>Observed in the equivalent guarded fixture: the UI error is logged, <code>LATER OK</code>
+prints, process exit is 0, and the result says <code>status="passed"</code>, <code>exitCode=0</code>,
+<code>failures=[]</code>. Replacing <code>_FLUA.uiEvent(...)</code> with
+<code>self:UIAction("onReleased", "btnFailure")</code> reproduces the same gap.</p>
+<p>Expected: the mapped callback error should be recorded and remain a strict-mode
+failure despite the later exit 0, just as timer and HTTP callback errors do.</p>
+<h2 id="likely-cause-and-suggested-correction">Likely cause and suggested correction</h2>
+<p>In the installed <code>quickapp.lua</code>, <code>onUIEvent</code> schedules <code>callAction</code> for a mapped
+callback. <code>callAction</code> catches the action exception using <code>xpcall</code> and logs it,
+without recording a strict failure. Therefore the outer coroutine dispatch sees
+no exception. This is simulator framework error handling, not an application
+deliberately catching an expected error.</p>
+<p>Suggested upstream change: record the original exception at this framework catch
+boundary, retaining the UI/action origin and avoiding duplicate failure entries.
+Keep legacy logging/continuation and application-owned pcall behaviour unchanged.
+Add tests for mapped callbacks, direct UIHandler, child UI dispatch and ordinary
+actions; the last two are suggested coverage, not claimed verified here.</p>
+<p>No changes were made to the installed Flua implementation to hide this finding.</p>
+</body>
+</html>

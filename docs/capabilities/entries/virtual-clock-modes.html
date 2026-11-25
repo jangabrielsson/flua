@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>The virtual clock — realtime, accelerated, and instant runs</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: virtual-clock-modes
+topic: runtime
+title: The virtual clock — realtime, accelerated, and instant runs
+pins:
+  - tests/test_virtual_time.py::test_instant_mode_advances_virtual_time
+verified: flua 0.1.166</p>
+<hr />
+<h1 id="the-virtual-clock--realtime-accelerated-and-instant-runs">The virtual clock — realtime, accelerated, and instant runs</h1>
+<p>Everything a QA waits for schedules against the engine's virtual clock;
+the mode decides how fast it advances:</p>
+<ul>
+<li><code>speed = 1</code> — realtime; virtual time tracks the wall clock.</li>
+<li><code>speed = N</code> — accelerated: virtual time runs N times faster (the
+  builder's simulate uses 600, verify scenarios 6000).</li>
+<li><code>speed = inf</code> / <code>--instant</code> — timers fire one deadline at a time and
+  the clock jumps to each deadline: hours of simulated time complete at
+  CPU speed, and <code>os.time()</code> inside a callback reads the callback's own
+  deadline (deadline-ordered — the forum-reported bug of a sweep
+  advancing past all deadlines is pinned against).</li>
+<li><code>--step</code> — deadline-ordered fast-forward like plua's speedTime.</li>
+</ul>
+<p><code>os.time()</code>/<code>millitime</code> read the virtual clock, so
+<code>os.time()</code>-relative delay math (event engines, sunset math) stays
+coherent in every mode. A debugger pause does not advance virtual time.</p>
+</body>
+</html>

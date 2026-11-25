@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>0003 — proxy devices never emit local refresh events</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="0003--proxy-devices-never-emit-local-refresh-events">0003 — proxy devices never emit local refresh events</h1>
+<ul>
+<li><strong>Status:</strong> active</li>
+<li><strong>Date:</strong> 2026-10-15 (retroactive)</li>
+</ul>
+<h2 id="context">Context</h2>
+<p>In proxy mode the real HC3 owns the device; the sim only shadows it under
+the same id. Every mutating call is forwarded, and the HC3 emits its own
+refreshStates event, which the poller mirrors back into the sim feed. If the
+sim also emitted a local event, subscribers would see every change twice.</p>
+<h2 id="decision">Decision</h2>
+<p>The sim emits <strong>no local refresh event for proxy devices</strong> — not for
+property updates, not for actions arriving from proxy callbacks, not for
+device create/remove. The single source of events is the HC3, arriving
+through the poll's mirror.</p>
+<h2 id="consequences">Consequences</h2>
+<ul>
+<li>One event per change, guaranteed — the invariant the tests assert
+  ("exactly ONE event… a local duplicate would make it two").</li>
+<li>Everything downstream (subscribers, the feed, <code>EventMgr</code>) stays
+  indistinguishable from a plain online run.</li>
+<li>Pins: <code>tests/test_proxy.py::test_proxy_update_property_forwarded_event_comes_from_hc3</code>
+  and the no-duplicate assertions on child create/remove.</li>
+</ul>
+</body>
+</html>

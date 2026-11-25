@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Multi-file QAs — --%%file extras and bundled libs travel in the .fqa</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: multi-file-qas
+topic: packaging
+title: Multi-file QAs — --%%file extras and bundled libs travel in the .fqa
+pins:
+  - docs/tutorial/09-multi-file-qas.md
+verified: flua 0.1.166</p>
+<hr />
+<h1 id="multi-file-qas----file-extras-and-bundled-libs-travel-in-the-fqa">Multi-file QAs — --%%file extras and bundled libs travel in the .fqa</h1>
+<p>A QA is one <code>main.lua</code> plus any files it declares:</p>
+<ul>
+<li><code>--%%file:lib.lua,name</code> — paths resolve relative to the main file;
+  the files travel in the exported/uploaded <code>.fqa</code> package.</li>
+<li>A <code>$</code> prefix (<code>--%%file:$lib/sourcetrigger.lua</code>) loads a library
+  bundled with flua — plain Lua that also runs on the HC3, so it ships
+  in the package like any QA file.</li>
+<li><code>--%%include:defaults.lua</code> merges another file's directives into the
+  header (the <code>--%%headers:X</code> plua spelling is accepted).</li>
+<li>Develop in the unpacked format (individual <code>.lua</code> files); the HC3
+  sees <code>.fqa</code> — <code>--tool pack/unpack</code> and <code>uploadQA/downloadQA</code> do the
+  conversion. The tutorial's chapter 9 walks the whole flow.</li>
+</ul>
+</body>
+</html>

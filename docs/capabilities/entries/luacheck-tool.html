@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>The luacheck tool — a linter over the QA's file closure</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: luacheck-tool
+topic: tooling
+title: The luacheck tool — a linter over the QA's file closure
+pins:
+  - tests/test_tools.py::test_luacheck_tool_lints_the_file_closure
+  - tests/test_tools.py::test_luacheck_globals_exist_in_the_runtime
+verified: flua 0.1.171</p>
+<hr />
+<h1 id="the-luacheck-tool--a-linter-over-the-qas-file-closure">The luacheck tool — a linter over the QA's file closure</h1>
+<p><code>flua --tool luacheck main.lua</code> runs the luacheck CLI over every file
+that makes up the QA — main + <code>--%%file</code> extras + <code>--%%include</code>
+defaults, with <code>$lib</code> bundled libs resolved (the pack pipeline's
+closure) — so an agent never hand-resolves the file set.</p>
+<p>The two things the tool adds over raw luacheck:</p>
+<ul>
+<li><strong>The globals whitelist</strong> — flua/HC3 globals (<code>fibaro</code>, <code>api</code>,
+  <code>net</code>, <code>mqtt</code>, <code>json</code>, <code>QuickApp</code>, timers, <code>RefreshStateSubscriber</code>,
+  <code>class</code>, …) are declared, so the output flags <em>real</em> undefined
+  variables (the <code>PCALL</code> class of bug the HASS round found) instead of
+  expected-global noise. The whitelist is pinned: every name must
+  still exist in the Lua runtime or the test fails.</li>
+<li><strong>The closure</strong> — one command covers the whole QA, with
+  <code>allow_defined</code> so a global <em>assigned in any closure file</em> is legal
+  everywhere (multi-file project state like a shared <code>HASS</code> table
+  stays quiet) and <code>class 'Name'</code> declarations recognized as globals.
+  A project <code>.luacheckrc</code> next to the main file (or in the cwd)
+  <strong>fully replaces</strong> the generated config — per-project style is the
+  project's call, and the project must then include the runtime
+  globals it uses. Bundled-lib basenames (qwikchild, eventlib, ...)
+  get their style classes (212/3xx/4xx/5xx/6xx) suppressed — flua's
+  code, not the QA author's — while undefined-variable/field (21x)
+  stays active.</li>
+</ul>
+<p>luacheck itself is <strong>not bundled</strong> — Lua linters ship platform-specific
+parsers, so it stays a user install (<code>luarocks install luacheck</code> /
+<code>brew install luacheck</code>); the tool errors cleanly when it is missing.
+The undefined-global static pass is the <code>rainy_day_todos.md</code> item this
+tool defers to the ecosystem for.</p>
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>The alarm system — alarmEndpoint, alarmPanel, and /alarms/v1</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: alarm-endpoint
+topic: sim-world
+title: The alarm system — alarmEndpoint, alarmPanel, and /alarms/v1
+pins:
+  - tests/test_qa.py::test_load_sim_device_alarm_endpoint
+verified: flua 0.1.166</p>
+<hr />
+<h1 id="the-alarm-system--alarmendpoint-alarmpanel-and-alarmsv1">The alarm system — alarmEndpoint, alarmPanel, and /alarms/v1</h1>
+<p>flua simulates the HC3's alarm model with two bundled devices:</p>
+<ul>
+<li><code>_FLUA.loadSimDevice("alarmEndpoint")</code> — serves the <code>/alarms/v1/*</code>
+  endpoints with the HC3's partition model: built-in partitions,
+  deployed <code>com.fibaro.alarmPartition</code> QAs (arming dispatches to the
+  QA's own <code>arm</code> action), and partitions created via
+  <code>POST /alarms/v1/partitions</code>.</li>
+<li><code>_FLUA.loadSimDevice("alarmPanel")</code> — a control-panel UI over the
+  same endpoints: partition select, Arm/Disarm buttons, live state via
+  the refreshState feed.</li>
+</ul>
+<p>Breaching a partition emits the alarm events; the endpoint tracks
+live-state changes (pinned). Scenes and QAs reacting to
+<code>AlarmPartitionBreachedEvent</code> / <code>ArmedEvent</code> get the same feed as on a
+real controller.</p>
+</body>
+</html>

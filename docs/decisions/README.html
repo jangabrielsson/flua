@@ -1,0 +1,130 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>flua decisions</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="flua-decisions">flua decisions</h1>
+<p>ADR-lite: the <em>why</em> behind deliberate, hard-to-reverse choices. One file
+per decision, newest last. Update this instead of the code comments when a
+decision changes.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Decision</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="0001-default-mode-is-offline.html">0001</a></td>
+<td>offline is the default mode; online is opt-in</td>
+<td>active</td>
+</tr>
+<tr>
+<td><a href="0002-id-namespaces.html">0002</a></td>
+<td>three id namespaces: HC3 &lt; 5000, engine QAs ≥ 5000, runtime devices ≥ 900000</td>
+<td>active</td>
+</tr>
+<tr>
+<td><a href="0003-proxy-devices-never-emit-local-events.html">0003</a></td>
+<td>proxy devices never emit local refresh events</td>
+<td>active</td>
+</tr>
+<tr>
+<td><a href="0004-device-lifecycle-events.html">0004</a></td>
+<td>device create/remove emit DeviceCreated/DeviceRemoved events</td>
+<td>active</td>
+</tr>
+<tr>
+<td><a href="0005-pump-polls-get_nowait.html">0005</a></td>
+<td>the pump polls the outbound queue with get_nowait, never wait_for</td>
+<td>active</td>
+</tr>
+<tr>
+<td><a href="0006-in-flight-api-calls-are-pending-work.html">0006</a></td>
+<td>suspended QAs' remote calls count as pending work</td>
+<td>active</td>
+</tr>
+<tr>
+<td><a href="0007-tests-parallel-by-default.html">0007</a></td>
+<td>tests run parallel by default with a serial hatch and a slow-marker gate</td>
+<td>active</td>
+</tr>
+<tr>
+<td><a href="0008-fqa-files-runnable-as-scripts.html">0008</a></td>
+<td><code>.fqa</code> files are directly runnable as scripts</td>
+<td>active</td>
+</tr>
+<tr>
+<td><a href="0009-real-logs-over-rest.html">0009</a></td>
+<td>the sim serves real logs over REST (debugMessages + systemLog)</td>
+<td>active</td>
+</tr>
+<tr>
+<td><a href="0010-mcp-ships-in-the-wheel.html">0010</a></td>
+<td>the MCP server ships in the fibaro-flua wheel as a second entry point</td>
+<td>active</td>
+</tr>
+<tr>
+<td><a href="0011-streamable-http-transport.html">0011</a></td>
+<td>flua-mcp serves Streamable HTTP in stateless mode, opt-in, loopback + token-guarded</td>
+<td>active</td>
+</tr>
+<tr>
+<td><a href="0012-interfaces-stored-not-emulated.html">0012</a></td>
+<td>device interfaces are stored, not emulated — no properties, actions, or UI effects</td>
+<td>active</td>
+</tr>
+<tr>
+<td><a href="0013-no-wizard-app.html">0013</a></td>
+<td>no wizard app; the agent loop is the product surface — elicitation and verification instead</td>
+<td>active, amended by 0015</td>
+</tr>
+<tr>
+<td><a href="0014-device-schemas.html">0014</a></td>
+<td>device structures and interface semantics derive from the distilled type/interface schema</td>
+<td>active</td>
+</tr>
+<tr>
+<td><a href="0015-recipe-builder-tool.html">0015</a></td>
+<td>the recipe builder is a tool on top of flua (engine-first, CLI/JSON), parked as a PoC</td>
+<td>active</td>
+</tr>
+<tr>
+<td><a href="0016-uibuilder.html">0016</a></td>
+<td>a web UI builder for <code>--%%u</code>/<code>--%%rsrc</code> — target switch, palette, live preview, export to directives</td>
+<td>active</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>

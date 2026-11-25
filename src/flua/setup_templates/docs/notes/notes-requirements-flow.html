@@ -1,0 +1,431 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Note: the requirements flow — elicitation and verification on the agent loop (design draft)</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="note-the-requirements-flow--elicitation-and-verification-on-the-agent-loop-design-draft">Note: the requirements flow — elicitation and verification on the agent loop (design draft)</h1>
+<p>Status: design draft — nothing implemented (2026-11-09); <strong>parked
+2026-11-10</strong> for the owner to think through. ADR 0013 is the mandate;
+this note is the shape exploration. The state machine, the sub-agent
+brief, the house-as-seed, the Tasks-driven interview, the
+fact/thinking division, and the spec-format draft
+(<code>requirements-flow-spec-format.md</code>) are all captured here — resume
+from these files.</p>
+<h2 id="context-and-goal">Context and goal</h2>
+<p>ADR 0013 committed flua to two surfaces instead of a wizard: <strong>requirements
+elicitation</strong> (spec + skeleton + test scaffold, CLI-first) and
+<strong>verification legibility</strong> (requirements → PASS/FAIL, judgeable by
+non-coders). This note explores what those are, and picks directions.</p>
+<p>The core idea in one sentence: <strong>make the requirement a first-class,
+versioned artifact that compiles to the prompt driving an agent's whole
+loop</strong> — build, test in the testbed, verify against the requirements, and
+loop back to the user (or the requirements editor) for refinements until
+the product is solved. The forum post said "the requirement is the
+product; the code is just how it compiles" — this is that made
+mechanical.</p>
+<h2 id="the-state-machine-two-loops-two-human-gates">The state machine: two loops, two human gates</h2>
+<p>The whole process is one state machine, driven by a single initial
+prompt — the <strong>brief</strong> — that tells the agent how to interact with flua
+through every state until "done":</p>
+<pre><code>                 LOOP 1 — requirements (user ⇄ agent ⇄ flua)
+                 user speaks in natural language; the agent
+                 formalizes it into the spec (rendered, diffed);
+                 repeat until the user APPROVES the spec
+                              │ spec approved
+                 ┌────────────▼────────────┐
+                 │ LOOP 2 — implementation  │
+                 │ (agent ⇄ flua testbed)   │
+                 │ write → run → R1..Rn    │
+                 │ PASS/FAIL → fix, until  │
+                 │ every check passes      │
+                 └────────────┬────────────┘
+                              │ all checks pass
+                 ┌────────────▼────────────┐
+                 │ 3. &quot;is this ok?&quot; — the  │
+                 │    demo gate            │
+                 └────────────┬────────────┘
+                 &quot;not quite&quot;  │    &quot;yes&quot;
+   (back to loop 1 with the   │
+    correction, as a spec     ▼
+    diff)                  4b. done — the user
+                            approves; the agent
+                            never deploys
+</code></pre>
+<p>Three things fall out of this shape:</p>
+<ul>
+<li><strong>Two human gates, one mechanical loop.</strong> The user approves the <em>spec</em>
+  (words) at the end of loop 1 and the <em>behavior</em> (the demo) at step 3.
+  Between them, loop 2 is fully mechanical and agent-owned. The user is
+  in control exactly twice — the two places judgment cannot be delegated.</li>
+<li><strong>The spec is the only artifact that crosses a loop boundary.</strong> Loop 1
+  produces it; loop 2 consumes it (checks derive from requirements); a
+  "not quite" at the demo gate re-enters loop 1 as a <em>spec change</em> (a
+  visible diff), and loop 2 re-runs from the updated spec. Code never
+  travels back — it is disposable; requirements are not.</li>
+<li><strong>The initial prompt IS the state machine.</strong> One brief encodes: iterate
+  loop 1 until the user approves; run loop 2 until every requirement
+  check passes; ask at the gate; route 4a/4b. That is exactly what
+  <code>--tool spec prompt</code> renders.</li>
+</ul>
+<h2 id="loop-1-is-analysis-not-transcription">Loop 1 is analysis, not transcription</h2>
+<p>The two loops are not equal in importance. Loop 2 is becoming commodity
+— agents implement against a testbed in their own ways, and flua already
+makes that mechanical. Loop 1 is where the value is, because the two
+participants have wildly different budgets: <strong>the agent can run a
+thousand analysis iterations, the user can answer a handful of
+questions.</strong> A requirements tool that makes the user do the agent's work
+is a typing monkey; the whole point of treating the requirement as a
+first-class artifact is that the agent can think about it <em>before</em>
+anything runs.</p>
+<p>The loop-1 protocol therefore gains an analyze-before-ask phase, on
+every user utterance:</p>
+<ol>
+<li><strong>Formalize</strong> — translate the user's words into spec edits (the
+   rendered diff, as before).</li>
+<li><strong>Analyze</strong> — work the spec as an artifact, not as prose. A
+   requirement-analysis checklist (a template-library entry, agent-side)
+   enumerates the question classes:
+   - <em>trigger completeness</em> — what starts it, what stops it, what
+     re-arms it (R3's "manual off wins" ambiguity);
+   - <em>timing and failure edges</em> — DST, controller/QA restart (state is
+     lost!), device offline, sunset data missing, power loss;
+   - <em>scope and identity</em> — which of the matching devices, which rooms,
+     which exceptions ("but not if the alarm is armed");
+   - <em>interactions</em> — other QAs and scenes touching the same devices;
+     the house has actors the spec does not know yet;
+   - <em>contradictions</em> — two requirements that cannot both hold (R2 vs
+     R3 shapes), detected by reasoning;</li>
+<li><strong>Ask — minimally.</strong> Only the questions that survive the analysis
+   pass reach the user, ordered by value, few per turn. The budget rule
+   is explicit in the protocol: the user's answers are the scarce
+   resource; every question must be one the agent could not settle
+   itself.</li>
+</ol>
+<p><strong>The division of labor: flua checks facts, the agent checks
+thinking.</strong> flua's loop-1 surface is a <strong>fact-checker</strong>, not an oracle of
+requirement quality: <code>--tool spec check</code> validates the spec against
+reality, with no implementation run and no opinions about what makes a
+requirement good:</p>
+<ul>
+<li><em>existence and identity</em> — every named device/room resolves against
+  the hub (the house ground truth), and the name matches a unique
+  device ("3 matches for 'hall light' — which one?");</li>
+<li><em>type and capability</em> — the referenced device type is real, and the
+  intended actions fit its capabilities (a binarySwitch has no
+  <code>setValue</code> 0–99; the catalog knows the canonical actions);</li>
+<li><em>vocabulary validity</em> — cron tuples are well-formed, sunrise/sunset
+  offsets in range, global variables referenced exist (or are flagged
+  to be created);</li>
+<li><em>environment facts</em> — the location is set (sunset math needs it),
+  the referenced globals/scenes exist.</li>
+</ul>
+<p>Everything else — trigger completeness, timing and failure edges,
+contradictions, interactions, whether a check verifies the transition —
+is <strong>agent-side analysis</strong>. The agent runs its reasoning; flua answers
+the questions of fact it can answer a thousand times for free. The user
+only sees what survives both.</p>
+<p>The resulting division of labor: <strong>the agent explores the requirement
+space; the user decides.</strong> The spec is where the exploration is
+recorded, so the user can review <em>thinking</em>, not just conclusions — a
+decision the user accepts is one line; a question the user asked the
+agent to settle is a diff.</p>
+<h2 id="existing-pieces-this-builds-on">Existing pieces this builds on</h2>
+<ul>
+<li><code>--tool newQA</code> — device-<em>type</em> templates (30 types) with substitution:
+  the proven "template + slots" mechanism, but for device shape, not
+  behavior.</li>
+<li><code>--tool house</code> — ground truth: devices with id/name/type/room, globals,
+  scenes, customEvents. Elicitation can be <em>concrete</em>: real rooms, real
+  devices, not abstractions.</li>
+<li><code>--tool setup</code> — project scaffold; the spec compilation extends it.</li>
+<li><code>flua test</code> + <code>flua-test</code> — self-asserting runs with exit codes; the
+  verification half already exists, it just doesn't speak requirements.</li>
+<li>The skills — quickapp-patterns (homeTable, sunset, schedulers),
+  hc3-write-safety, scenes: the knowledge the interview and the templates
+  draw on, already agent-readable.</li>
+<li>The viewer (<code>--ui</code>, timeline, HTML) — where a rendered checklist can
+  live without building a new app.</li>
+</ul>
+<h2 id="shape-exploration-the-idea-space">Shape exploration (the idea space)</h2>
+<p><strong>1. Natural-language chat.</strong> Keep it as the <em>input channel</em> — agents
+already interview users in prose. But prose is a terrible artifact: not
+diffable, not compilable, not checkable. Chat feeds the spec; it is not
+the spec.</p>
+<p><strong>2. Guided interview (wizard-lite, multiple choice).</strong> The good half of
+the wizard: rooms → devices → trigger → conditions → actions →
+exceptions, with the choices pulled from <code>--tool house</code> (real names, real
+types) and the trigger vocabulary from the skills (device change, cron,
+sunrise/sunset, global variable, custom event). The difference from a
+wizard: its output is a <strong>spec</strong>, not code. Deterministic, testable,
+CLI-first (<code>flua --tool spec ask</code>). Works for the standard 80% of
+automations.</p>
+<p><strong>3. Visual flow diagram (Node-RED style).</strong> Rejected as an <em>editor</em> —
+ADR 0013's discipline, and agents read text, not boxes. A diagram is at
+most a <em>render</em> of the spec later (mermaid already renders our forum
+diagrams; a spec → flowchart render is cheap and optional).</p>
+<p><strong>4. Solution requirement template library.</strong> The strongest entry point
+for non-coders: pick a known-good <em>behavior</em> pattern ("motion turns on a
+light for N minutes, only after dark", "notify when a door opens and
+nobody's home", "thermostat follows a daily schedule") and substitute the
+house specifics (which sensor, which light, which times). Distinct from
+<code>newQA</code>'s device-type templates: this is <em>behavior</em>, and it seeds from
+quickapp-patterns + the examples. This is also how humans already learn
+home automation — by copying a neighbor's automation and swapping names.</p>
+<p><strong>Recommended shape: template library + guided interview → structured
+spec.</strong> The template gets the user 80% there by substitution; the
+interview fills the gaps with grounded choices; the spec is what
+everything compiles from. Natural language stays the agent-side channel.</p>
+<h2 id="the-spec-sketch">The spec (sketch)</h2>
+<p>A structured, diffable, agent-readable, renderable document. Direction:
+markdown with YAML frontmatter (human- and agent-readable in one file —
+<code>json.decode</code>-friendly where needed), something like:</p>
+<pre><code class="language-markdown">---
+name: Hall light on motion
+template: motion-light
+house: HT                          # symbolic refs only — never baked ids
+devices:
+  sensor: HT.hall.motion
+  light: HT.hall.light
+requirements:
+  - id: R1
+    text: motion after sunset turns the hall light on
+  - id: R2
+    text: the light turns off after 5 minutes with no motion
+  - id: R3
+    text: manual switch off during the 5 minutes wins
+---
+</code></pre>
+<ul>
+<li><strong>Symbolic house refs</strong> (<code>HT.hall.motion</code>) — the homeTable idiom (ADR
+  of ids: names in code, ids behind them). The interview resolves the
+  user's words through <code>--tool house</code>; the spec keeps names.</li>
+<li><strong>Requirements carry ids</strong> — the checklist and the test scaffold map
+  1:1 onto them. Refinement is visible as a spec diff ("R2 changed from
+  10 to 5 minutes").</li>
+<li><strong>Safety defaults ride along</strong> — write-safety notes (which controller,
+  read-modify-write) as spec fields, so the generated code inherits them.</li>
+<li><strong>Scenes caveat</strong> — a spec whose trigger is a scene must carry literal
+  ids (triggers can't use variables); the spec model should say so
+  explicitly rather than pretend.</li>
+</ul>
+<h2 id="the-requirements-editor">The requirements editor</h2>
+<p>The user edits the spec by <em>dialogue</em>, not by editing files. Shape: two
+panes in one surface.</p>
+<ul>
+<li><strong>Top</strong>: the requirements as the agent currently interprets them — the
+  rendered spec, requirement ids visible, changes highlighted as they
+  land (the diff IS the feedback). This pane is the ground truth; the
+  user reads it and corrects it.</li>
+<li><strong>Bottom</strong>: a chat field — the user specifies requirements in natural
+  language ("no, the hall light, not the kitchen — and only after dark").</li>
+</ul>
+<p>Each chat turn flows through the <strong>interpreter</strong>, which turns prose into
+spec edits: the top pane updates, the user sees their words reflected
+(or mis-reflected — which is the point: the interpretation is visible and
+correctable, not hidden).</p>
+<p><strong>Who asks the questions: the agent, via MCP Tasks.</strong> The interview is
+agent-driven work — the <em>agent</em> asks the user questions and translates
+the answers into spec edits, and the user answers in the chat UI they
+already have. flua's role shrinks to the part only flua can do: hold the
+spec state, validate edits, and render it. Two mechanisms, primary and
+fallback:</p>
+<ol>
+<li><strong>MCP Tasks (<code>io.modelcontextprotocol/tasks</code>, the official way)</strong> —
+   the spec becomes a long-running task: the agent starts it, drives the
+   dialogue through the task's input request, writes spec edits through
+   its update tool, and flua validates + persists + renders each state.
+   The capability is announced in the session capability exchange, so
+   agents discover the task surface. <strong>flua holds no LLM keys</strong> — the
+   user's own agent account does the interpretation; flua never asks for
+   access tokens. Exact tool shapes are pinned against the Tasks
+   extension spec when implemented, not here.</li>
+<li><strong>Job-id / polling (the manual, backward-compatible way)</strong> —
+   <code>spec/start</code> returns a <code>specId</code>, <code>spec/update</code>/<code>spec/state</code> carry the
+   conversation and a <code>spec/stop</code> closes it. This is precisely the
+   pattern flua-mcp's session tier already proves (<code>qa_start</code> →
+   <code>{sessionId, qaIds}</code>, <code>qa_probe</code>, <code>qa_action</code>, TTL reaping,
+   transport-stateless) — the spec task reuses the same machinery.</li>
+</ol>
+<p>The trust argument settles the earlier interpreter question: with Tasks
+(or the fallback), the interpreter is <strong>always the user's agent</strong>, never
+flua — no LLM endpoint config, no <code>.env</code> keys, no dependency. The direct
+LLM backend (open question 12) is dropped unless a standalone editor
+without any agent ever materializes.</p>
+<p><strong>The two panes become two windows.</strong> The interaction model is still
+"requirements on top, chat below" — but the chat pane is the user's
+agent UI, and the top pane is flua's rendered spec (the checklist page
+under <code>--ui</code>, or the terminal render). The cost: no single integrated
+surface. The gain: nothing new to build for the chat half, and the
+rendered spec is the same artifact the demo gate reviews. A later TUI or
+a spec page with a chat box is an optional integration, not v1.</p>
+<p>Launcher discipline unchanged: <code>--tool spec ...</code> first (ask/prompt/report
++ the task/session tools), apps on top.</p>
+<h2 id="the-sub-agent-framing">The sub-agent framing</h2>
+<p>This is the current trend made concrete: the spec/prompt is the <strong>brief
+for a specialized QA sub-agent</strong>. The user's everyday agent is the
+parent — it interviews the user, hands the QA sub-agent the brief, and
+shows the user the results. The sub-agent's entire world is:</p>
+<ul>
+<li>the <strong>requirements</strong> (with ids — the acceptance vocabulary);</li>
+<li>the <strong>tool inventory</strong> — what flua/flua-mcp expose: <code>qa_check</code>,
+  <code>qa_run</code>, <code>qa_test</code>, <code>--tool house</code> (ground truth), <code>--tool newQA</code>
+  (device templates), the sim with its bundled sim devices;</li>
+<li>the <strong>knowledge artifacts</strong> — the skills as <code>flua://skills/*</code>
+  (best-practice code, patterns, write-safety), served resources;</li>
+<li>the <strong>loop protocol</strong> below — including when to come back to the user.</li>
+</ul>
+<p>flua's role in this framing is not to write code but to be the best
+possible <em>environment</em> a sub-agent can be dropped into — ADR 0013's moat
+thesis, stated as architecture. The brief makes the sub-agent
+specialized; the environment makes it succeed.</p>
+<h2 id="the-house-in-the-spec--the-emulator-setup">The house in the spec = the emulator setup</h2>
+<p>Part of requirements collection is the user's <strong>home environment</strong> —
+rooms, devices, their types. In the spec this section does double duty:</p>
+<ul>
+<li>it is the <strong>symbolic reference</strong> the code compiles against
+  (<code>HT.hall.motion</code>);</li>
+<li>it <strong>compiles to the emulator seed</strong> — a seed file (<code>--seed</code>/<code>--%%db</code>)
+  that stands up the simulated house with the right devices (types,
+  names, rooms; the bundled sim devices and <code>newQA</code> templates cover the
+  catalog). The testbed then mirrors the user's house <em>shape</em>, so the
+  sub-agent tests against the user's world, not an abstract one.</li>
+</ul>
+<p>When the user has a real HC3, <code>--tool house</code> provides the ground truth
+instead of interview answers — the house section is fetched, not guessed.
+The interview's "which rooms, which devices" questions only fire when
+that is not available.</p>
+<h2 id="compilation-spec--driving-prompt--check-scaffold--checklist">Compilation: spec → driving prompt + check scaffold + checklist</h2>
+<ul>
+<li><strong>The driving prompt</strong> is the primary output. It binds the spec's
+  requirements, the house snapshot, and the <strong>loop protocol</strong> into one
+  brief the agent executes:</li>
+<li><em>implement</em> — write the QA against the sim (offline; no controller
+    unless mode=remote is explicit);</li>
+<li><em>verify</em> — run <code>flua test</code>/<code>qa_run</code>; every requirement maps to a
+    check that prints <code>R&lt;n&gt;: &lt;requirement&gt; — PASS/FAIL</code>;</li>
+<li><em>fix</em> — iterate in the testbed until all checks pass; a failed check
+    is a bug to fix, not a report to file;</li>
+<li><em>ask, don't guess</em> — when a requirement is ambiguous, contradictory,
+    or the house data lacks the device/room it names, stop and ask the
+    user: the requirement id, the concrete question, and the candidates
+    from <code>--tool house</code>. Bounded retries (e.g. three attempts on one
+    requirement, then ask) so the loop never spins silently;</li>
+<li><em>refine</em> — the user's answer updates the spec (a visible diff), the
+    prompt re-renders, the loop resumes;</li>
+<li><em>demonstrate</em> — when the checks pass, the sub-agent stands up the
+    simulation (seeded house + the QA running, timeline/UI in the
+    viewer) and asks the user <strong>"is this how you want it?"</strong> — the
+    running sim is the prototype the user reviews, not the code;</li>
+<li><em>finish</em> — the user confirms the demonstration; the agent never
+    deploys (flua's standing rule, restated).</li>
+<li><strong>Check scaffold</strong>: one self-asserting check per requirement, phrased in
+  the requirement's words — the starting point the agent implements
+  against (the flua-test pattern; the sim's virtual clock tests the
+  sunset/schedule cases).</li>
+<li><strong>Checklist render</strong>: <code>--tool spec report</code> → the spec with each
+  requirement's latest verdict — the judgment surface. A non-coder reads
+  "R2: PASS" and knows what to say next; they never read Lua.</li>
+<li><strong>Templates</strong> now do double duty: they seed the <em>requirement set</em> at
+  elicitation time and contribute a reference approach to the <em>prompt</em> at
+  compile time (a known-good pattern for the agent to start from, not a
+  straightjacket).</li>
+</ul>
+<h2 id="form-factor">Form factor</h2>
+<p>CLI-first throughout (<code>--tool spec ask|prompt|check|report</code>), so agents get the
+identical surface via <code>flua_tool</code>/MCP — the app discipline from ADR 0013.
+The driving prompt may also ship as an MCP <strong>prompt</strong> (the existing prompt
+tier: <code>qa_spec</code> taking the spec and rendering the bound brief), so
+MCP-only hosts get the loop protocol without installing anything. A thin
+web form for the interview/editor can come later under the existing
+<code>--ui</code> server; it must emit and read the same spec format.</p>
+<h2 id="what-this-is-not">What this is NOT</h2>
+<p>Not a visual editor. Not a code-generation platform — <strong>flua generates
+zero code</strong>; it elicits the spec, renders the driving prompt, and reports
+the verdicts. The agent writes the code; templates give the agent a
+reference approach. Not a block-scene clone — the HC3's block editor owns
+that; our specs that compile to scenes do so deliberately (literal-id
+caveat).</p>
+<h2 id="open-questions-the-iteration-surface">Open questions (the iteration surface)</h2>
+<ol>
+<li><strong>Spec schema</strong> — markdown+YAML frontmatter vs pure YAML/JSON with a
+   markdown render? The former reads better to humans; the latter is
+   easier to validate. Leaning frontmatter.</li>
+<li><strong>Protocol home</strong> — the loop protocol in the spec file itself, or a
+   stable template (skill/MCP prompt) the spec references? Leaning the
+   latter: specs stay clean, the protocol evolves without touching every
+   spec.</li>
+<li><strong>Spec↔code drift</strong> — the spec owns requirements and the agent writes
+   code; what happens when a user or agent edits the generated code
+   directly (the normal programmer path)? Requirements stay in the spec;
+   code edits are free, but the checklist always re-derives from the
+   spec. This is the hardest design question.</li>
+<li><strong>Who edits the spec on refinement</strong> — the user, or the agent with
+   user approval (the diff as the review surface)?</li>
+<li><strong>Template library home</strong> — skills tree (agent-installable, already
+   synced) vs a new <code>setup_templates/specs</code> dir vs both?</li>
+<li><strong>Interview UX</strong> — terminal Q&amp;A first, web form later? How many
+   questions before it feels like a wizard again (the thing we rejected)?
+   (The requirements editor above is the intended answer — dialogue, not
+   a form.)</li>
+<li><strong>Scene specs</strong> — in or out of v1? (Leaning out; QA-shaped first.)</li>
+<li><strong>Sharing specs</strong> — a community spec library is the eventual network
+   effect; not v1.</li>
+<li><strong>House collection channel</strong> — real HC3 ground truth via <code>--tool
+   house</code>, an interview-built seed, or both (fetch when reachable, ask
+   when not)? And who compiles the seed — the spec tool or the sub-agent
+   itself from the spec's house section?</li>
+<li><strong>The "is this ok?" demo surface</strong> — where does the user review the
+    prototype: the <code>--ui</code> viewer/timeline (interactive), the rendered
+    checklist, or both? The answer decides whether the viewer grows a
+    "confirm/refine" affordance.</li>
+<li><strong>Editor form factor</strong> — v1: no chat surface at all (the agent UI is
+    the chat; flua renders the spec). Does the terminal <code>--tool spec</code>
+    render suffice, or does the <code>--ui</code> viewer get the spec page early so
+    the demo gate and the spec share a surface?</li>
+<li><strong>Interpreter backend</strong> — resolved by Tasks: the user's agent, never
+    flua. Open: pin the exact Tasks tool shapes against the extension
+    spec; decide whether the job-id/polling fallback reuses the session
+    tier machinery directly (leaning: yes).</li>
+<li><strong>The analysis checklist</strong> — an agent-side template entry (skill),
+    with the fact checks above as the flua-side <code>spec check</code> surface.
+    Which facts are checkable keeps growing as the house ground truth
+    and the device catalog deepen — the linter's scope is whatever flua
+    can answer <em>about the world</em>, never about requirement quality.</li>
+</ol>
+<h2 id="first-slice-the-vertical-proof">First slice (the vertical proof)</h2>
+<p><code>--tool spec ask --from-template motion-light</code> against a <code>--tool house</code>
+snapshot → emit the spec markdown and <code>--tool spec prompt</code> renders the
+driving brief (spec + house refs + loop protocol) → hand it to an agent
+(Copilot/Claude/MCP) that loops in the sim → <code>--tool spec report</code> renders
+the checklist from the last <code>flua test</code> run. One template, end to end,
+proves the loop — with flua generating zero code.</p>
+</body>
+</html>

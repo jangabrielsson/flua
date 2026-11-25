@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>/icons is shaped by the X-Fibaro-Version header</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: icons-x-fibaro-version
+topic: hc3-api
+title: /icons is shaped by the X-Fibaro-Version header
+pins:
+  - tests/test_hc3.py::test_hc3_remote_sends_fibaro_version_header
+verified: flua 0.1.167, HC3 5.221</p>
+<hr />
+<h1 id="icons-is-shaped-by-the-x-fibaro-version-header">/icons is shaped by the X-Fibaro-Version header</h1>
+<p>flua's remote REST rides <code>X-Fibaro-Version: 2</code> (the web UI's shape), and
+the HC3's <code>/icons</code> answers <strong>differently per version</strong>:</p>
+<ul>
+<li><strong>v1</strong>: the full icon library — <code>{&lt;iconId&gt;: {name, stateMaps, ...}}</code>.</li>
+<li><strong>v2</strong>: a per-type table (devices/rooms/scenes), a subset — what the
+  web UI uses.</li>
+</ul>
+<p>Gotchas, all live-verified:</p>
+<ul>
+<li>Never combine query params with v2 on <code>/icons</code> — the controller
+  hangs (the swagger UI does not).</li>
+<li>A QA's <code>api.get("/icons")</code> returns the <strong>v2</strong> shape; the icon-manager
+  tool uses v1 explicitly.</li>
+<li>To read the v1 library from QA code, use a raw <code>net.HTTPClient</code> call
+  with the <code>X-Fibaro-Version: 1</code> header.</li>
+</ul>
+<p>Custom icon sets show up under v2 as <code>User&lt;id&gt;</code> entries whose
+<code>deviceType</code> is the <em>registered</em> type (e.g. <code>com.fibaro.FGWDS221</code>), not
+the base type — match children with <code>isTypeOf</code>, see
+<code>istypeof-vs-type</code>.</p>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Response to "Additional Flua proposals: testing asynchronous and long-lived QuickApps"</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="response-to-additional-flua-proposals-testing-asynchronous-and-long-lived-quickapps">Response to "Additional Flua proposals: testing asynchronous and long-lived QuickApps"</h1>
+<p>Reply to <code>flua_additional_proposals.md</code> (A01–A10), for the same feedback
+authors. Current release: 0.1.114.</p>
+<p>Thank you for keeping the quality bar: synthetic-only scenarios, no
+silent real-device fallbacks, positive and negative fixtures per proposal,
+and the repeated "not proof of firmware parity" honesty. We reviewed all
+ten against the current tree. One headline before the item-by-item: <strong>none
+of A01–A10 is a flua defect</strong>, and you said so yourself. They are
+harness-layer features, and roughly half of them can be built today on
+primitives flua already ships — which shapes our response below.</p>
+<h2 id="what-already-exists-and-where-to-find-it">What already exists (and where to find it)</h2>
+<p>Several proposals are largely covered by existing machinery; the remaining
+delta is a convenience layer, not new capability:</p>
+<ul>
+<li><strong>A02 (scripted transports)</strong> — flua's own test suite scripts local mock
+  HTTP/WebSocket/TCP servers for exactly these cases: delayed responses,
+  disconnects, duplicate notifications, stale GETs after newer events,
+  401/429 retry schedules. Any QA-side fixture can do the same with
+  <code>net.HTTPServer</code>/<code>TCPServer</code>/<code>UDPServer</code>/<code>WebSocketServer</code> (in-QA
+  servers) or an external loopback server. The missing piece is only a
+  <em>declarative</em> scripting layer on top — real, but convenience.</li>
+<li><strong>A05 (migration fixtures)</strong> — <code>--%%db</code> seeds a populated inventory
+  (devices, rooms, scenes, variables, profiles) and <code>db_persist</code> round-trips
+  it; <code>--tool migrate</code> scans existing projects. A synthetic-inventory
+  builder with before/after comparison would be new glue, not new
+  machinery.</li>
+<li><strong>A06 (correlated latency)</strong> — <code>--trace api,ui,net,timer</code> already emits
+  structured per-event records with virtual-clock timestamps; correlating
+  them by one operation ID is the delta.</li>
+<li><strong>A07 (lifecycle resources)</strong> — already on our list as the resource
+  summary (pending timers, owned requests, subscriptions, queues); your
+  generation-tagged retention diagnostics extend it.</li>
+<li><strong>A08 (seeded async scenarios)</strong> — <code>flua record</code> / <code>--%%replay</code> seed and
+  replay recorded house sessions on the virtual timeline.</li>
+<li><strong>A09 (source-vs-package differential)</strong> — pack/unpack round-trip tests
+  exist; the observation-diff harness (run both forms against identical
+  fixtures, compare declared observations) is the new part.</li>
+</ul>
+<h2 id="what-we-are-shortlisting-as-small-future-flua-additions">What we are shortlisting as small future flua additions</h2>
+<p>Two items are self-contained enough to belong in flua rather than in an
+external harness:</p>
+<ul>
+<li><strong>A04 (write-volume diagnostics)</strong> — a ledger of writes by QA/target/
+  operation/time window, attempts vs actual changes, with test budgets.
+  Diagnostic value is real and it fits the existing <code>--trace</code>/result-json
+  reporting model.</li>
+<li><strong>A10 (structural UI validation)</strong> — <code>--check</code> extended with unique
+  element names per device scope, callback-target existence, selected-value
+  validation and update-frequency budgets. Modest, rides the uiView
+  machinery, and catches exactly the "missing button callback" class that
+  bit real QAs.</li>
+</ul>
+<h2 id="what-we-are-parking">What we are parking</h2>
+<p><strong>A01 (slow-controller profiles)</strong> and <strong>A03 (restart injection)</strong> are
+genuinely new fault-injection frameworks — substantial, and in our
+judgment better built as an external harness on flua's public surface
+(the sim API, <code>plugin.restart</code>, mock transports) than inside the emulator.
+They are filed with the rationale, not rejected: if real projects start
+hitting timing/queueing bugs that only these expose, the calculus changes.</p>
+<p>Everything is recorded in <code>docs/rainy_day_todos.md</code> with the per-item
+overlap notes, so this context survives.</p>
+<h2 id="one-recurring-theme-we-agree-with">One recurring theme we agree with</h2>
+<p>Your "suggested delivery approach" says to reuse existing tracing,
+transports and helpers rather than a parallel framework — that is exactly
+our position. flua's value is the trustworthy emulator (<code>--strict-tests</code>,
+<code>--result-json</code>, deadline-ordered clocks, the pinned REST contracts);
+fault injection and scenario orchestration belong one layer up, where they
+can be application-shaped. We would rather add small primitives (A04, A10)
+that every harness benefits from than absorb the harness itself.</p>
+<p>As always: any of these that a real project ends up needing twice gets
+promoted. Feedback with reproduced defects gets top priority, as the
+previous rounds showed.</p>
+<p>— flua maintainers</p>
+</body>
+</html>

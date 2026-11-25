@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>0014 — device structures and interface semantics derive from the distilled type/interface schema</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="0014--device-structures-and-interface-semantics-derive-from-the-distilled-typeinterface-schema">0014 — device structures and interface semantics derive from the distilled type/interface schema</h1>
+<ul>
+<li><strong>Status:</strong> active</li>
+<li><strong>Date:</strong> 2026-11-10</li>
+</ul>
+<h2 id="context">Context</h2>
+<p>The HC3's device-type and interface definitions exist as local sources
+(device-type with base-type chains, typed properties, defaults and
+enum schemas; interfaces with the properties/actions an interface
+adds).</p>
+<p>ADR 0012 deferred all interface semantics on the grounds that the
+behavior was undocumented. Those sources document it. flua therefore
+distills them into its own compact artifact and drives device-structure
+setup from it.</p>
+<h2 id="decision">Decision</h2>
+<ul>
+<li><strong>The distilled schema is the shipped artifact.</strong> <code>scripts/
+  extract_device_schemas.py</code> (local-only, run by hand when the sources
+  change) reads the local sources and emits <code>src/flua/devices/
+  type_schemas.json</code> — base-type chains flattened, typed properties with
+  defaults and enums, per-type interfaces, action metadata (argc/args).
+  The sources are never shipped; only this "compiled" format is
+  committed. A self-consistency test (baseTypes resolve, no inheritance
+  cycles, interface refs exist, property types known) is the guard —
+  freshness against the sources cannot be checked in CI by design.</li>
+<li><strong>Device skeletons are schema-first.</strong> The schema builds the device
+  structure (typed properties at their defaults, every interface the
+  type declares expanded — including <code>quickApp</code>, the QA-device
+  properties). The capture (<code>devices.json</code>) and the hierarchy fallback
+  remain for types the schema does not know. One deliberate divergence:
+  the schema declares <code>useUiView=true</code> (the HC3 default); flua keeps the
+  legacy layout as the skeleton default — a QA opts in with
+  <code>--%%useUiView:true</code>.</li>
+<li><strong>Interfaces have semantics.</strong> <code>POST /plugins/interfaces</code> and the new
+  <code>--%%interface:name[,name...]</code> directive apply the interface's schema:
+  add brings its properties (at their defaults) and action metadata;
+  remove drops them — except properties the device's type itself
+  declares. The plugin restart on interface change is unchanged. Unknown
+  interface names keep the ADR 0012 plumbing: stored, no semantics.</li>
+<li><strong>Property types and enums are checked, warn-only.</strong> The runtime warns
+  when <code>updateProperty</code> sets a known-typed property to a mismatching
+  type or an out-of-enum value; <code>flua --check</code> flags literal mismatches
+  statically. flua never rejects and never drops the update — the real
+  HC3 is believed to silently ignore mismatched updates (field
+  knowledge, not yet captured from a live controller; the documented
+  coercion case is the setVariable endpoint instead). The sim applies
+  the value either way, so the mismatch stays visible.</li>
+<li><code>setVariable</code> is a different surface: <code>quickAppVariables</code> is an array
+  of <code>{name = string, value = anything}</code> entries — the value slot is
+  polymorphic by design, which is why the documented value coercion
+  (numeric-looking strings become numbers) exists there and the schema
+  type checks stop at the array boundary.</li>
+</ul>
+<h2 id="consequences">Consequences</h2>
+<ul>
+<li>ADR 0012 is amended: its "no semantics" rule now applies to
+  <em>unknown</em> interfaces only.</li>
+<li><code>tests/test_devices.py</code> (schema consistency, schema skeletons, the
+  directive) and <code>tests/test_api.py</code> (interface add/remove semantics)
+  pin the behavior.</li>
+<li>The artifact is only as fresh as the last local extraction run; the
+  self-consistency test catches structural corruption, not staleness.</li>
+<li>Action <code>argc</code> is metadata only — the sim does not validate
+  <code>fibaro.call</code> argument counts (the HC3's own behavior is permissive,
+  and QA actions are Lua methods).</li>
+</ul>
+</body>
+</html>

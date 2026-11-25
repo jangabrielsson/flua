@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>flua-mcp — the agent server over the same machinery</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: mcp-server-basics
+topic: agents
+title: flua-mcp — the agent server over the same machinery
+pins:
+  - tests/test_mcp.py::test_initialize_handshake
+  - tests/test_mcp.py::test_resources_list_serves_the_packaged_docs
+verified: flua 0.1.169</p>
+<hr />
+<h1 id="flua-mcp--the-agent-server-over-the-same-machinery">flua-mcp — the agent server over the same machinery</h1>
+<p>The wheel ships <code>flua-mcp</code> as a second entry point: a Model Context
+Protocol server over stdio (plus Streamable HTTP, opt-in, loopback +
+token-guarded) that exposes flua to coding agents:</p>
+<ul>
+<li><strong>Resources</strong> — the packaged docs (USAGE, ARCHITECTURE, the
+  tutorial, specs, skills, and the capabilities entries) served as
+  <code>flua://docs/...</code> URIs, with close-match suggestions on typos.</li>
+<li><strong>Tools</strong> — <code>docs_list</code>/<code>docs_read</code>, <code>flua_tool</code> (run any
+  <code>flua --tool</code> command — including <code>caps</code>), session management, and
+  QA lifecycle tools.</li>
+<li><strong>Prompts</strong> — the same guidance surfaces as the <code>.github/skills</code>.</li>
+</ul>
+<p>The discipline: everything the MCP serves exists as a CLI/<code>--tool</code>
+surface first — the MCP is a face of flua, never a second
+implementation (ADR 0013). Hosts that only expose tools can still
+reach the docs through <code>docs_list</code>/<code>docs_read</code>.</p>
+</body>
+</html>

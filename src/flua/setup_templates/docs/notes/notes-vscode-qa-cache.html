@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Note: the hub resource cache in the VS Code extension (design)</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="note-the-hub-resource-cache-in-the-vs-code-extension-design">Note: the hub resource cache in the VS Code extension (design)</h1>
+<p>Status: implemented (2026-11-08) — <code>vscode/src/cache.ts</code>, the View (.fqa)
+and Download flows, <code>modified</code> in <code>--tool hubList</code>, the hub-newer staleness
+badge on tree nodes, and the 30-day pruning sweep on activation.</p>
+<h2 id="goal">Goal</h2>
+<p>Browsing a hub QA should not mean re-downloading it every time. Two flows
+share one cache:</p>
+<ol>
+<li><strong>View (.fqa)</strong> — open a hub QA in the existing <code>.fqa</code> custom editor
+   without unpacking it into the workspace.</li>
+<li><strong>Download (edit)</strong> — the unpack-into-workspace flow reuses the cached
+   package instead of re-exporting from the HC3.</li>
+</ol>
+<h2 id="the-key-insight-freshness-for-free">The key insight: freshness for free</h2>
+<p>The hub tree already fetches <code>/devices</code> on every refresh. <code>hubList</code> carries
+each QA's <code>modified</code> timestamp (one more field from the data it already
+pulls), so staleness decisions cost <strong>zero extra HC3 calls</strong>. The
+expensive export (<code>POST /quickApp/export/{id}</code>) runs only when the cached
+copy is missing or stale — and once cached, viewing works offline.</p>
+<h2 id="cache-layout">Cache layout</h2>
+<ul>
+<li>Root: <code>context.globalStorageUri / hc3-cache / &lt;hub-serial&gt; /</code> — outside
+  the workspace, invisible to git, machine-local. Keyed by hub serial
+  (<code>/settings/info</code>'s <code>hcName</code>), so several hubs cannot collide.</li>
+<li>Per QA: <code>&lt;id&gt;.fqa</code> (the package, from <code>flua --tool downloadFQA -o</code>) and
+  <code>&lt;id&gt;.json</code> meta: <code>{modified, fetchedAt, name}</code>.</li>
+<li>Lifecycle: overwrite on update. A prune-older-than-N-days sweep on
+  activation is a later nicety, not v1.</li>
+</ul>
+<h2 id="flows">Flows</h2>
+<p><strong>View (.fqa)</strong> (new tree action <code>Flua: View (.fqa)</code>):</p>
+<ol>
+<li>Cache hit and fresh (<code>meta.modified</code> equals the <code>hubList</code> entry's
+   <code>modified</code>) → open the cached <code>.fqa</code> in the custom editor
+   (<code>vscode.openWith</code>, viewType <code>flua.fqaViewer</code>).</li>
+<li>Missing or stale → <code>flua --tool downloadFQA &lt;id&gt; -o &lt;cache&gt; -f</code> →
+   write meta → open.</li>
+</ol>
+<p><strong>Download (edit)</strong> (the existing tree action, re-routed):</p>
+<ol>
+<li><code>cache.ensure(qa)</code> — same hit-or-fetch as above, one HC3 call at most.</li>
+<li><code>flua --tool unpack &lt;cached.fqa&gt; -d &lt;workspace&gt;/&lt;name&gt;-&lt;id&gt;</code> — local,
+   deterministic, and the cache now feeds every repeat download of the
+   same QA.</li>
+</ol>
+<h2 id="enabling-the-staleness-badge-follow-up">Enabling the staleness badge (follow-up)</h2>
+<p><code>modified</code> in <code>hubList</code> is also the data a tree-node badge needs ("hub
+newer than the local project"): record the <code>modified</code> the project was
+unpacked from (a small meta file in the project dir, or the
+<code>hub.dirs</code> workspaceState entry extended with it) and compare on refresh.
+Follow-up, not v1 — the cache note pins the data shape it depends on.</p>
+<h2 id="secrets-and-safety">Secrets and safety</h2>
+<p>The cache stores exactly what <code>downloadFQA</code> writes into the workspace
+today — the same package, same variable contents. No new secret surface;
+the viewer masks secret variables as before. The cache is display
+material only: nothing in these flows writes to the hub.</p>
+<h2 id="related">Related</h2>
+<ul>
+<li><code>docs/notes/notes-vscode-hub-browser.md</code> — the tree this extends</li>
+<li><code>src/flua/tools/download_fqa.py</code> — <code>-o</code>/<code>-f</code> (the cache's fetch step)</li>
+<li><code>src/flua/tools/hub_list.py</code> — gains <code>modified</code> per QA</li>
+<li><code>vscode/src/hub.ts</code>, <code>vscode/src/fqaEditor.ts</code> — the consumer and the
+  viewer</li>
+</ul>
+</body>
+</html>

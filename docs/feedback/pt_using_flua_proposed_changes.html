@@ -1,0 +1,220 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Optional Flua change proposals</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="optional-flua-change-proposals">Optional Flua change proposals</h1>
+<p>Companion to <code>using_flua.md</code>, 31 October 2026. Written for upstream consideration.</p>
+<h2 id="status-and-scope">Status and scope</h2>
+<p>These are independently reviewable change specifications, not an applied patch
+or a tested implementation. Upstream may accept, modify, defer or reject each
+proposal. All new commands, options, schemas and paths below are <strong>proposed</strong>,
+not documentation of currently available features. Implementation locations are
+logical components, not verified source filenames for a particular revision.
+No application-specific code, configuration or credentials are included.</p>
+<p>The first three proposals address observed behaviour. The others improve testing,
+safety and documentation; they are not claims that every related feature is absent.</p>
+<h2 id="change-01-sticky-callback-failures-in-strict-test-mode">Change 01: Sticky callback failures in strict test mode</h2>
+<p><strong>Priority:</strong> P0. <strong>Target:</strong> callback dispatcher, execution state and CLI exit handling.</p>
+<p>Proposed invocation:</p>
+<pre><code class="language-text">flua --api local --strict-tests --run-for -3 test.lua
+</code></pre>
+<p>Changes:</p>
+<ul>
+<li>Add opt-in <code>--strict-tests</code>, preserving legacy exit behaviour outside this mode.</li>
+<li>Record every unhandled Lua callback exception in run-owned failure state.</li>
+<li>Cover initialization, timers, UI callbacks and transport callbacks at their
+  actual dispatch boundaries. An exception caught by application code is not an
+  unhandled callback error. Do not infer failure merely from a log message.</li>
+<li>A later successful callback or explicit exit 0 must not clear a recorded failure.</li>
+<li>Explicit nonzero exit remains nonzero. Expected-error tests must use an explicit
+  assertion mechanism rather than resetting the failure state globally.</li>
+<li>Define one documented exit-code mapping for runtime errors, failed assertions,
+  timeouts and CLI errors; keep it consistent with the structured result.</li>
+</ul>
+<p>Illustrative control flow, not a drop-in implementation:</p>
+<pre><code class="language-text">dispatch(callback):
+    try execute(callback)
+    catch unhandled_lua_error:
+        run.failures.append(sanitized_error)
+        apply_documented_continue_or_stop_policy()
+
+finish(requested_code):
+    if strict_tests and run.failures is not empty:
+        return documented_failure_code
+    return requested_code
+</code></pre>
+<p>Acceptance tests: timer assertion fails; later callback prints success and exits 0;
+final status is still failure. Repeat for UI and transport callbacks. A caught
+expected error passes. Legacy mode keeps its documented existing behaviour.</p>
+<h2 id="change-02-deliver-instant-mode-callbacks-at-their-due-time">Change 02: Deliver instant-mode callbacks at their due time</h2>
+<p><strong>Priority:</strong> P0. <strong>Target:</strong> virtual clock and scheduler.</p>
+<p>Changes:</p>
+<ul>
+<li>Advance the clock to the earliest eligible deadline, not a later queued timer.</li>
+<li>Execute a callback while its due time is the current virtual time. Then
+  recompute the next eligible deadline, including timers created by that callback.</li>
+<li>Define stable ordering for equal deadlines, for example registration sequence.</li>
+<li>Define when zero-delay work is dispatched; avoid recursive execution that
+  bypasses queued callbacks. Bound same-time work to detect an infinite loop.</li>
+<li>Do not advance beyond the configured virtual deadline just to complete work.</li>
+<li>Specify how wall-clock I/O completion interacts with instant mode. Use a
+  deterministic mock scheduler where appropriate; do not imply that real network
+  latency is reproduced by advancing virtual time.</li>
+</ul>
+<p>Acceptance tests: the two-timer reproduction in the report passes in instant and
+realtime modes. Add nested timers, equal deadlines, cancellation, zero-delay
+starvation, virtual-limit boundaries and callbacks pending across QA restart.
+Ordering is deterministic under an explicitly documented scheduling policy.</p>
+<p>Compatibility: this corrects observable timing and may expose applications that
+accidentally depended on the old behaviour. Describe the change in release notes.</p>
+<h2 id="change-03-add-the-missing-child-deletion-convenience-method">Change 03: Add the missing child-deletion convenience method</h2>
+<p><strong>Priority:</strong> P1. <strong>Target:</strong> simulated QuickApp API and child registry.</p>
+<p>Changes:</p>
+<ul>
+<li>Implement <code>QuickApp:removeChildDevice(id)</code> using the existing simulated deletion
+  operation rather than maintaining an unrelated second deletion implementation.</li>
+<li>First document or verify HC3 behaviour for ownership checks, return values,
+  unknown IDs, repeated deletion and references to deleted children.</li>
+<li>Keep registry updates and any notifications consistent between method and REST
+  entry points. Do not silently delete another parent's device.</li>
+<li>If parity cannot yet be established, list the method as unsupported explicitly;
+  do not supply a successful no-op.</li>
+</ul>
+<p>Acceptance tests: a synthetic parent creates and removes its child; both parent
+registry and REST inventory agree. Cross-parent deletion and repeated deletion
+follow the documented contract. Test handling of stale object references.</p>
+<h2 id="change-04-explicit-isolated-test-profiles">Change 04: Explicit isolated test profiles</h2>
+<p><strong>Priority:</strong> P1. <strong>Target:</strong> configuration resolution, transports and tool entry points.</p>
+<p>Proposed options:</p>
+<pre><code class="language-text">--network-policy deny|loopback|allowlist
+--allow-host localhost
+--no-user-config
+</code></pre>
+<p>Changes:</p>
+<ul>
+<li>Apply policy at the supported transport boundary, including HTTP, WebSocket,
+  reconnects and retries; document any routes outside that boundary.</li>
+<li>Deny before connection. Define DNS and redirect rules, IPv4/IPv6 handling and
+  hostname resolution checks so an allowed name cannot redirect to a denied host.</li>
+<li><code>--no-user-config</code> disables implicit home/project credential/config discovery;
+  explicitly provided fixture configuration remains available.</li>
+<li>Upload, remote API and live proxy operations require separate explicit opt-in;
+  a simulated HC3 mode alone must not grant it.</li>
+<li>Produce a sanitized policy-denial event with no authorization headers or query secrets.</li>
+</ul>
+<p>Acceptance tests: loopback fixture works; LAN/external targets and disallowed
+redirects fail; background retries cannot bypass the policy; inherited fake
+credentials are not loaded. No test contacts a real controller or device.</p>
+<p>Compatibility: opt-in initially. State clearly that this is supported-transport
+isolation, not a security sandbox for arbitrary Lua/Python/native extensions.</p>
+<h2 id="change-05-bounded-execution-and-a-machine-readable-final-result">Change 05: Bounded execution and a machine-readable final result</h2>
+<p><strong>Priority:</strong> P1. <strong>Target:</strong> test runner lifecycle and reporting.</p>
+<p>Proposed options: <code>--wall-timeout 20</code> and <code>--result-json result.json</code>.</p>
+<p>Proposed result example:</p>
+<pre><code class="language-json">{
+  &quot;schemaVersion&quot;: 1,
+  &quot;status&quot;: &quot;failed&quot;,
+  &quot;exitCode&quot;: 1,
+  &quot;runtime&quot;: {&quot;flua&quot;: &quot;&lt;version&gt;&quot;, &quot;lua&quot;: &quot;&lt;version&gt;&quot;, &quot;integerBytes&quot;: 8},
+  &quot;clockMode&quot;: &quot;instant&quot;,
+  &quot;networkPolicy&quot;: &quot;deny&quot;,
+  &quot;wallSeconds&quot;: 0.7,
+  &quot;virtualSeconds&quot;: 2,
+  &quot;failures&quot;: [{&quot;kind&quot;: &quot;callback_error&quot;, &quot;callbackKind&quot;: &quot;timer&quot;}],
+  &quot;cleanupComplete&quot;: true
+}
+</code></pre>
+<p>The values illustrate a schema, not an observed result or committed exit mapping.</p>
+<p>Changes: independent monotonic wall-time supervision, virtual-time limit,
+atomic final-result write and a documented schema. Distinguish pass, fail and
+timeout; a completion marker is not sufficient. Terminate only owned execution
+resources, never unrelated processes. If a native call blocks the interpreter,
+supervision may need an outer process rather than another callback in that interpreter.</p>
+<p>Acceptance tests: infinite Lua loop, blocked fixture request and ordinary success.
+Final status and process exit agree. Cleanup is verified. A missing final result
+after a forceful kill must be treated as incomplete, never as a pass.</p>
+<h2 id="change-06-versioned-capabilities-and-executable-skills">Change 06: Versioned capabilities and executable skills</h2>
+<p><strong>Priority:</strong> P1. <strong>Target:</strong> capability metadata, documentation and CI.</p>
+<p>Proposed command: <code>flua --capabilities-json</code>.</p>
+<p>Changes: list API support as implemented/partial/unsupported with release/runtime
+metadata. Separate simulator tests from verification on actual HC3 firmware.
+Cover child lifecycle, storage, UI formats, callbacks and JSON array/null handling.</p>
+<p>Add or consolidate skills for strict CI testing, clock semantics, isolation/mock
+transports, lifecycle cleanup and export safety. Test every command example in
+CI against the release. Generate bundled and repository skill copies from a
+single source or check their equality. Setup should offer a merge preview and
+preserve existing workspace instructions/settings unless replacement is explicit.</p>
+<p>Acceptance tests: reported capabilities match executable probes; unsupported
+features are not reported as implemented. A modified local AGENTS file survives
+normal setup. Packaged guidance matches the released CLI.</p>
+<h2 id="change-07-export-preview-and-explicit-variable-handling">Change 07: Export preview and explicit variable handling</h2>
+<p><strong>Priority:</strong> P2. <strong>Target:</strong> development export and configuration documentation.</p>
+<p>Proposed option: <code>export ... --manifest-only</code>.</p>
+<p>Changes: preview included files and variable names, value origins and whether
+values would be embedded, without printing resolved secret values. Explain
+configuration precedence and export resolution. Offer an explicit synthetic
+fixture configuration mode and optional rejection of flagged sensitive values.
+Never silently rewrite defaults or claim a heuristic scan guarantees secrecy.</p>
+<p>Acceptance tests: a synthetic secret from external configuration is flagged
+without appearing in preview/log output; export defaults and callbacks survive
+round-trip checks; absent/null/false/zero/empty values remain distinguishable
+where the package contract requires it.</p>
+<h2 id="change-08-runtime-and-locale-diagnostics">Change 08: Runtime and locale diagnostics</h2>
+<p><strong>Priority:</strong> P2. <strong>Target:</strong> diagnostic output and compatibility documentation.</p>
+<p>Changes: report Lua/Python/Lupa versions, integer size, numeric characteristics,
+locale and clock mode. Explain what those values do and do not imply about HC3.
+Add overflow/bit-operation/timestamp boundary fixtures and locale-sensitive UTF-8
+pattern fixtures. Consider numeric32 testing only with clearly stated limitations;
+do not advertise a different native runtime as an exact firmware emulation.</p>
+<p>Acceptance tests: diagnostic output matches the executing interpreter. Boundary
+tests run under each supported profile. Locale-related differences are documented
+or fixed, not hidden by changing application parsing rules.</p>
+<h2 id="change-09-optional-event-trace-and-resource-inventory">Change 09: Optional event trace and resource inventory</h2>
+<p><strong>Priority:</strong> P2. <strong>Target:</strong> scheduler, transport ownership and QA lifecycle.</p>
+<p>Proposed options: <code>--trace-events trace.jsonl</code> and <code>--resource-summary</code>.</p>
+<p>Changes: trace registration/due/delivery/cancellation, callback correlation,
+generation IDs and lifecycle boundaries. Summarize owned pending timers,
+requests, subscriptions and queue lengths. Bound trace volume and redact payloads,
+credentials and sensitive URLs by default. A resource count is not proof that
+all memory is reclaimable or equivalent to process RSS.</p>
+<p>Acceptance tests: stopping/restarting a synthetic QA releases or fences its owned
+work; late completions cannot mutate the new generation. Trace size remains
+bounded and synthetic secrets do not appear in output.</p>
+<h2 id="suggested-acceptance-sequence">Suggested acceptance sequence</h2>
+<p>Review each change independently. First qualify failure propagation and virtual
+time; then add bounded, isolated execution and API parity. Diagnostics and skills
+can follow in separate changes. Use only synthetic fixtures in upstream tests.
+Document rejected/deferred proposals rather than treating the entire list as one
+mandatory redesign. None of these proposals requires changes to production QAs
+or access to a user's controller.</p>
+</body>
+</html>

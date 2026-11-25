@@ -232,6 +232,21 @@ async def test_docs_channel_serves_packaged_tree(server) -> None:
     status, gheaders, guide = await asyncio.to_thread(_http_page, f"{base}/docs/USAGE.html")
     assert status == 200 and "text/html" in gheaders["Content-Type"]
     assert "flua" in guide and "<h1" in guide  # rendered markdown, not source
+    # the TOC anchors resolve: every #link has a matching heading id
+    # (GitHub-style slugs — ``QA directives (`--%%`)`` is qa-directives---)
+    anchors = set(re.findall(r'href="#([^"]+)"', guide))
+    ids = set(re.findall(r'id="([^"]+)"', guide))
+    assert anchors and anchors <= ids, f"broken TOC anchors: {sorted(anchors - ids)}"
+    # cross-doc links rewrite to the served tree: the repo-root
+    # docs/concurrency.md becomes concurrency.html and resolves
+    status, _, arch = await asyncio.to_thread(_http_page, f"{base}/docs/ARCHITECTURE.html")
+    assert status == 200 and 'href="concurrency.html"' in arch
+    assert 'href="docs/' not in arch
+    status, _, conc = await asyncio.to_thread(_http_page, f"{base}/docs/concurrency.html")
+    assert status == 200 and "<h1" in conc
+    # a directory link (ARCHITECTURE -> docs/decisions/) serves a listing
+    status, _, listing = await asyncio.to_thread(_http_page, f"{base}/docs/decisions/")
+    assert status == 200 and ".html" in listing
     # a missing file 404s, and ../ escapes the tree
     with pytest.raises(urllib.error.HTTPError) as exc:
         await asyncio.to_thread(_http_page, f"{base}/docs/nope.html")

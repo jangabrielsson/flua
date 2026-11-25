@@ -1,0 +1,185 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Response to "Using Flua to test and debug Fibaro QuickApps"</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="response-to-using-flua-to-test-and-debug-fibaro-quickapps">Response to "Using Flua to test and debug Fibaro QuickApps"</h1>
+<p>Reply to the experience report (<code>pt_using_flua.md</code>) and the change
+proposals (<code>pt_using_flua_proposed_changes.md</code>), 31 October 2026. Addressed
+in release <strong>0.1.111</strong>.</p>
+<p>Thank you for this report — it is the kind of feedback we can act on
+directly: reproductions instead of impressions, acceptance criteria per
+proposal, and a clear statement of what was <em>not</em> qualified (debugger,
+proxy, physical devices). We verified both P0 reproductions against the
+then-current release and confirmed them, then triaged the nine change
+proposals into three batches. This document records what shipped, what is
+scheduled, and where we made a different call than the proposal.</p>
+<h2 id="verified-reproductions">Verified reproductions</h2>
+<p>Both P0s reproduced on 0.1.110 exactly as described:</p>
+<ol>
+<li><strong>Unhandled timer error → exit 0.</strong> The callback error and traceback
+   print, but the process exits 0 — and a later <code>_FLUA.exit(0)</code> cannot
+   clear it because no failure state exists. Confirmed.</li>
+<li><strong>Instant-mode clock jump.</strong> With <code>--instant --run-for -3</code>, the 1 s
+   timer observed <code>os.time() - start == 2</code> because a 2 s timer was also
+   queued. Root cause: instant mode swept the whole timer heap in one pass
+   and advanced the clock to each deadline as it <em>popped</em> them — so by the
+   time the pump delivered the first callback, the clock already read the
+   last deadline. Confirmed.</li>
+</ol>
+<h2 id="what-shipped-in-01111">What shipped in 0.1.111</h2>
+<h3 id="change-02--instant-mode-callbacks-observe-their-own-deadlines-p0-">Change 02 — instant-mode callbacks observe their own deadlines (P0) ✅</h3>
+<p><code>--instant</code> now uses the same deadline-ordered discipline as <code>--step</code>:
+only the earliest timer fires per pump pass, and the clock advances to
+<em>its</em> deadline just before its callback runs. Both modes share one
+<code>deadline_ordered</code> clock property, so <code>--instant</code> and <code>--step</code> are now the
+same fast-forward semantics (under two names — <code>--step</code> keeps the plua
+spelling). <code>--speed</code> remains the continuous clock, with its documented
+"virtual time passes while your code executes" caveat.</p>
+<ul>
+<li>Your two-timer reproduction passes in both modes; the assertion
+  <code>TIMER_TEST_COMPLETE</code> now prints and the run exits 0.</li>
+<li>New regression tests: the two-timer fixture end to end (instant + step),
+  nested-timer ordering (a timer scheduled from a callback lands between
+  the remaining ones), and the TimerManager unit test updated to the new
+  single-fire contract.</li>
+<li>One nuance worth knowing when writing such fixtures: <code>os.time()</code> returns
+  whole seconds (Lua truncates), so sub-second deadlines are not
+  assertable through <code>os.time()</code> deltas — use integer-second deadlines in
+  assertions (our tests do).</li>
+<li>USAGE.md no longer documents instant mode as "unsafe for
+  <code>os.time()</code>-relative logic" — that caveat was the bug.</li>
+</ul>
+<h3 id="change-03--quickappremovechilddeviceid-p1-">Change 03 — <code>QuickApp:removeChildDevice(id)</code> (P1) ✅</h3>
+<p>Implemented on the real HC3 endpoint,
+<code>DELETE /plugins/removeChildDevice/{id}</code> (the simulated route already
+existed: 404 for unknown ids, 501 for non-children, 204 on success, with
+device-removed events). The method is guarded to the QA's own children —
+a foreign id returns nothing and the child stays in the inventory — and a
+successful removal clears the QA's local <code>self.childDevices</code> entry, so a
+repeated call returns nothing instead of re-deleting.</p>
+<ul>
+<li>Parity tests: create → remove → REST inventory agrees → repeat returns
+  nothing; a second QA cannot remove a foreign child.</li>
+<li>The stale-reference behavior you asked us to document: after removal the
+  QA's local reference is cleared, and any <em>other</em> captured reference is
+  the caller's responsibility — matching the REST contract.</li>
+</ul>
+<h3 id="change-08-partial--runtime-diagnostics-">Change 08 (partial) — runtime diagnostics ✅</h3>
+<p><code>flua --version --machine</code> now reports:</p>
+<pre><code class="language-json">{&quot;version&quot;: &quot;0.1.111&quot;, &quot;lua&quot;: &quot;Lua 5.4&quot;, &quot;lupa&quot;: &quot;2.6&quot;,
+ &quot;python&quot;: &quot;3.14.3&quot;, &quot;integerBytes&quot;: 8, &quot;locale&quot;: &quot;C/C.UTF-8/C/C/C&quot;}
+</code></pre>
+<p>Lua/Python/Lupa versions, native integer width, and locale — the fields
+you asked for. The clock mode is not in there yet (it is not meaningful
+for <code>--version</code>); it belongs to a per-run result record instead, which
+ties into Change 05 below.</p>
+<h3 id="tooling-follow-ups-from-your-report">Tooling follow-ups from your report</h3>
+<ul>
+<li><strong>LuaLS annotations</strong>: a new <code>.luals/net.lua</code> types the whole <code>net.*</code>
+  surface (HTTPClient/TCPSocket/UDPSocket/WebSocketClient(Tls) + the four
+  server classes), and <code>.luarc.json</code> gains the log-level globals
+  (<code>NONE</code>/<code>ERROR</code>/<code>WARNING</code>/<code>DEBUG</code>/<code>TRACE</code>/<code>LOG_LEVEL</code>) — the packaged
+  copies ship with the wheel, guarded by a byte-equality sync test.</li>
+<li><strong>Log levels</strong>: <code>QuickApp:debug/trace/warning/error</code> now respect the
+  <code>LOG_LEVEL</code> global (default: everything logs, like the HC3; a QA may
+  lower it).</li>
+</ul>
+<h2 id="what-is-scheduled-per-the-agreed-split">What is scheduled, per the agreed split</h2>
+<h3 id="batch-b-next-release--the-remaining-p0-and-its-companion">Batch B (next release) — the remaining P0 and its companion</h3>
+<ul>
+<li><strong>Change 01 — sticky callback failures (<code>--strict-tests</code>).</strong> Opt-in, so
+  the default keeps mirroring the HC3 (where callback errors log and the
+  QA continues). Unhandled errors at the timer/UI/transport dispatch
+  boundaries record into run-owned failure state; a later <code>_FLUA.exit(0)</code>
+  cannot clear it; the final exit is 1. Acceptance tests exactly as you
+  specified (timer, then UI and transport; a caught expected error still
+  passes).</li>
+<li><strong>Change 05 — <code>--result-json</code>.</strong> A machine-readable final record
+  (schema v1: status, exitCode, runtime, clockMode, wall/virtual seconds,
+  failures with kinds) written atomically; a missing file after a kill is
+  incomplete, never a pass. The failures field feeds directly from Change
+  01. The independent wall-time supervision you proposed is the one piece
+  we are still designing — see below.</li>
+</ul>
+<h3 id="batch-c-scheduled-separately">Batch C (scheduled separately)</h3>
+<ul>
+<li><strong>Change 04 — network policy profiles.</strong> Agreed it is valuable — your
+  audit-hook wrapper shows the need — but it is a feature of its own:
+  deny-before-connect across HTTP/WebSocket with DNS and redirect rules is
+  easy to get subtly wrong, so we want it tested on its own rather than
+  bundled. Not a security sandbox for arbitrary Lua/Python — we will say
+  so in the docs, as you suggested.</li>
+<li><strong>Change 06 — <code>--capabilities-json</code></strong> (implemented/partial/unsupported
+  table, probed by tests).</li>
+<li><strong>Change 07 — export <code>--manifest-only</code></strong> (file/secret preview without
+  printing resolved values).</li>
+<li><strong>Change 09 — event trace + resource summary.</strong> Partial infrastructure
+  already exists (structured <code>net</code>/timer trace events, the timeline); the
+  QA-lifecycle resource inventory is new.</li>
+</ul>
+<h2 id="points-where-we-made-a-different-call">Points where we made a different call</h2>
+<ul>
+<li><strong>Change 01 exit code</strong>: we will use exit code 1 for a strict failure
+  rather than inventing a new code — simpler for CI, with the JSON result
+  carrying the failure kinds.</li>
+<li><strong>Change 05 wall supervision</strong>: a timeout implemented inside the Lua
+  interpreter cannot fire while Lua is on the stack; your own note
+  ("supervision may need an outer process") is correct and matches our
+  design. The outer supervisor will be the CLI's wall cap, not a callback
+  inside the interpreter.</li>
+<li><strong>Capability claims</strong>: we agree with the report's framing and will keep
+  the matrix "verified by executable probes", never claims about firmware
+  parity.</li>
+</ul>
+<h2 id="please-re-run-your-suite">Please re-run your suite</h2>
+<p>All of this is in <code>fibaro-flua==0.1.111</code>. Your two P0 fixtures should now
+behave as specified (the clock one is fixed; the exit-code one is the last
+item of Batch B and still reproduces — by design, until <code>--strict-tests</code>
+ships). The 30-check suite result and any new findings are welcome; the
+same triage process applies.</p>
+<p>— flua maintainers</p>
+<hr />
+<h2 id="follow-up-from-the-feedback-author">Follow-up from the feedback author</h2>
+<p>Received after 0.1.111:</p>
+<blockquote>
+<p>Thanks for the fixes and the detailed response. We (me and Codex :) )
+reran the suite on Flua 0.1.111, and all 32 tests passed. We verified
+the timer fixes, including nested timers in both --instant and --step,
+as well as child removal and registry/REST consistency. Once
+--strict-tests is released, we'll also test callback-error exit codes,
+including the case where a later callback calls _FLUA.exit(0).</p>
+</blockquote>
+<p>Status: Batch A confirmed in the field. Batch B (<code>--strict-tests</code> +
+<code>--result-json</code>) is the remaining work, and the author has committed to
+testing the sticky-exit-code behavior when it ships.</p>
+</body>
+</html>

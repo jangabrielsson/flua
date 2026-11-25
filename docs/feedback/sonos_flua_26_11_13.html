@@ -1,0 +1,183 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Testing the Sonos QA offline with flua — experience report</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="testing-the-sonos-qa-offline-with-flua--experience-report">Testing the Sonos QA offline with flua — experience report</h1>
+<p>Date: 2026-11-13 · flua 0.1.161 → 0.1.164 · macOS, Python 3.11.13</p>
+<h2 id="context">Context</h2>
+<p>Follow-up to <a href="./sonos_flua.html">sonos_flua.md</a> (the plua→flua conversion and
+the SSL-write debugging session). This round had a different goal: the family
+was home, so the real players were off-limits — build a <strong>fully offline
+regression suite</strong> for SonosLib instead. That meant mocking the Sonos local
+WebSocket API (<code>wss://&lt;player&gt;:1443/websocket/api</code>) inside the emulator:
+request/reply commands, <em>and</em> server-initiated event pushes
+(<code>playbackStatus</code>, <code>groupVolume</code>, <code>metadataStatus</code>, <code>versionChanged</code>,
+<code>groups</code>), <em>and</em> the drop-subscriptions-on-disconnect semantics a real
+player has.</p>
+<h2 id="outcome">Outcome</h2>
+<p>A pure-Lua mock player (<code>dev/sonosmock.lua</code>, ~300 lines) and a 36-assertion
+flua-test suite (<code>dev/test_sonos.lua</code>) that runs in ~30 s wall at
+<code>--speed 50</code>, exit code as verdict. It caught a real long-standing bug
+(SonosLib never resubscribed after a reconnect — events silently stopped
+forever) and proved the fix with a negative test: disable the fix, exactly
+the reconnect assertions fail. Also filed jangabrielsson/flua#3 for the one
+missing capability (ws server push); it was implemented and released in
+0.1.164 the same day, and the mock's final form sits entirely on it.</p>
+<h2 id="what-worked-well">What worked well</h2>
+<ol>
+<li>
+<p><strong><code>net.WebSocketServer</code> + the new push surface (0.1.164)</strong> is exactly the
+   right shape for mocking event-driven protocols. <code>handler(message,
+   isBinary, conn)</code> matching the TCP server's signature, <code>ws:send(conn,…)</code>,
+   <code>ws:disconnect(conn)</code>, and <code>connected</code>/<code>disconnected</code> listeners were all
+   the mock needed — per-connection subscription state, pushes to
+   subscribers only, and a server-side drop to exercise the client's
+   reconnect path. Nothing felt bolted on.</p>
+</li>
+<li>
+<p><strong>The ws <em>client</em> needed zero accommodation.</strong> TLS is driven by the URL
+   scheme, so <code>net.WebSocketClientTls</code> happily speaks plain <code>ws://</code> to the
+   mock on 127.0.0.1. The only product-code change for testability was a
+   3-line seam in SonosLib (accept a full URL instead of a bare IP) — and
+   coordinator URLs come from the mock's own <code>getGroups</code> reply anyway, so
+   the mock controls nearly all routing by construction.</p>
+</li>
+<li>
+<p><strong>The sibling-file <code>require</code> pattern</strong> (<code>if require then
+   require("sonosmock") end</code>) is a great convention: the mock runs in the
+   QA's own env with full <code>net.*</code>/timer access, and it <em>cannot</em> leak into
+   the packaged <code>.fqa</code>. Verified: the packed artifact contains no mock, no
+   test code, and (with the <code>--%%var</code> package-value form) no real IP.</p>
+</li>
+<li>
+<p><strong><code>flua-test</code></strong> is small and sufficient: <code>t:expect</code>, deep <code>assert_eq</code>,
+   <code>t:finish()</code> printing the summary and exiting with the failure count.
+   Exit-code-as-verdict composes perfectly with CI and with <code>--run-for</code> as
+   a safety cap.</p>
+</li>
+<li>
+<p><strong>Virtual time at <code>--speed 50</code></strong> compressed a suite that includes a 3 s
+   reconnect timer into a ~30 s wall run, with no changes to the code under
+   test. <code>--run-for N</code>'s semantics (wall cap → exit 1 with work pending)
+   turned a would-be hang into a diagnosable failure on the first broken
+   run.</p>
+</li>
+<li>
+<p><strong>The issue → release loop.</strong> Reported the ws-push gap with a proposed
+   API in the morning; 0.1.164 shipped it (plus docs in USAGE's mock-server
+   section and a round-trip test upstream) the same day. The implemented
+   surface matched the proposal almost verbatim, so the mock written
+   against the proposal needed no rework.</p>
+</li>
+<li>
+<p><strong><code>flua --tool ui</code></strong> statically rendered the declared UI — instant
+   verification that a new multi-button row (<code>--%%u:{{button=…},{button=…}}</code>)
+   parsed as one row with four callbacks, without running the QA (which
+   would have touched the real network).</p>
+</li>
+<li>
+<p><strong>Pack-time variable policy worked as documented.</strong> The package-value
+   form <code>--%%var:IP='192.168.50.5',"&lt;Sonos player IP&gt;"</code> baked the
+   placeholder into the distributed <code>.fqa</code> and rewrote the main file's var
+   line to the literal — a 5-line Python check confirmed no real IP
+   anywhere in the JSON.</p>
+</li>
+</ol>
+<h2 id="friction--what-could-be-improved">Friction — what could be improved</h2>
+<ol>
+<li><strong>Virtual time vs. wall-clock I/O is the big one.</strong> Socket round-trips
+   happen in wall time; timers in virtual time. At <code>--speed 50</code>, a 300 ms
+   virtual delay is 6 ms wall — shorter than a localhost ws round-trip — so
+   a naive "command, wait 300 ms, assert" suite failed everywhere while the
+   system under test was fine. The fix (poll the condition every 100 ms
+   virtual with a generous timeout) is easy <em>once you know</em>, but everyone
+   writing network-QA tests will hit this. Suggestions:
+   - a <code>t:waitFor(cond, timeout, cb)</code> (or promise-style) helper in
+     flua-test, so condition-polling is the paved road;
+   - a prominent USAGE/skill note: "at high <code>--speed</code>, never use fixed
+     delays to wait for network effects".</li>
+</ol>
+<p>A related second-order effect: wall-paced messages <em>spread out</em> in
+   virtual time (13 resubscribe frames ≈ 10 ms wall apart logged as ~500 ms
+   virtual apart at speed 50). Harmless once understood, but it makes
+   virtual-timestamped logs look like the client is being slow, and it
+   means poll timeouts must scale with <code>--speed</code>.</p>
+<ol start="2">
+<li>
+<p><strong>The ws server reply is synchronous-only.</strong> The handler's return value
+   is the reply, so a mock cannot delay a <em>reply</em> (pushes can be delayed
+   via <code>setTimeout</code> + <code>ws:send</code>, which covers most cases). A deferred-reply
+   option (e.g. return a sentinel, answer later via <code>ws:reply(conn, data)</code>)
+   would enable latency/reordering/timeout tests against the client's
+   request queue — SonosLib's 30 s command timeout is currently untestable
+   without it.</p>
+</li>
+<li>
+<p><strong>Skill docs lagged the release.</strong> USAGE.md documented the new push
+   surface on day one, but the <code>quickapp-test</code> skill still described the ws
+   mock as "one message in, optional reply out". Minor, but agents (and
+   humans) often read the skill first; a release checklist item "grep the
+   skills for the old behavior" would catch it.</p>
+</li>
+<li>
+<p><strong>PASS/FAIL lines are emitted at DEBUG level</strong> with the standard
+   timestamp/tag prefix. Fine interactively, slightly noisy for CI. A
+   <code>--log json</code> run gives structure, but a plain-text mode where test
+   verdict lines stand out from QA debug chatter (different level or tag)
+   would make <code>grep FAIL</code> pipelines cleaner.</p>
+</li>
+<li>
+<p><strong>Piped output buffering masked a first-run hang.</strong> <code>flua … | tail -50</code>
+   showed nothing for two minutes (tail buffers until EOF), which read as
+   "emulator hung" when the run was actually progressing. Not flua's fault,
+   but a <code>--quiet</code>/progress-to-stderr hint in the test-skill docs would
+   save the next person the false alarm.</p>
+</li>
+<li>
+<p><strong>Pack verification is DIY.</strong> The post-pack checklist (right name/type,
+   placeholders present, no secrets/IPs in the JSON) is documented but
+   manual. A <code>flua --tool pack … --verify</code> (print name/type/vars, scan for
+   values that look like the <em>evaluated</em> secrets it just replaced) would
+   turn the checklist into a flag.</p>
+</li>
+</ol>
+<h2 id="verdict">Verdict</h2>
+<p>The gap between the two reports is striking. Last time flua was the
+debugging instrument for a transport bug; this time it was a complete
+offline test <em>platform</em>: a protocol mock, virtual-time execution, assertion
+library, static UI inspection, and leak-checked packaging — with the one
+missing primitive shipped upstream within hours of being named. The
+remaining friction is concentrated in one conceptual spot (virtual time
+meets real I/O) and is documentation/helper-shaped, not architecture-shaped.
+The Sonos QA now has family-safe CI.</p>
+</body>
+</html>

@@ -31,12 +31,12 @@
 </style>
 </head>
 <body>
-<h1>flua walkthroughs</h1>
+<h1 id="flua-walkthroughs">flua walkthroughs</h1>
 <p>Guided traces through the runtime's key flows, one mechanism at a time.
 Symbol references (<code>file.py::function</code>, <code>lua/init.lua::name</code>) stay accurate
 across line drift; pair with concurrency.md (the execution model) and
 invariants.md (the contracts).</p>
-<h2>1. A QA boots</h2>
+<h2 id="1-a-qa-boots">1. A QA boots</h2>
 <p>The CLI path (<code>cli.py::_run</code>) and the in-engine path (<code>engine.load_qa_file</code>,
 used by <code>_FLUA.loadQAfromFile</code>) converge on the same machinery:</p>
 <ol>
@@ -73,7 +73,7 @@ used by <code>_FLUA.loadQAfromFile</code>) converge on the same machinery:</p>
 <p>Ordering guarantee this depends on: the device exists before <code>onInit</code>
 (<code>engine._prepare_qa</code> comment), <code>__TAG</code> is bound before the files execute,
 and <code>onInit</code> runs before <code>initChildDevices</code> (the HC3 order).</p>
-<h2>2. <code>fibaro.sleep</code> suspends one QA, defers its messages</h2>
+<h2 id="2-fibarosleep-suspends-one-qa-defers-its-messages">2. <code>fibaro.sleep</code> suspends one QA, defers its messages</h2>
 <p>All in <code>lua/init.lua</code> (see concurrency.md for the table layout):</p>
 <ol>
 <li>The callback coroutine calls <code>fibaro.sleep(ms)</code> → <code>coroutine.yield(ms)</code>.</li>
@@ -90,7 +90,7 @@ and <code>onInit</code> runs before <code>initChildDevices</code> (the HC3 order
 <p>Two consequences pinned by tests: a timer due during the sleep runs <em>after</em>
 the sleeping callback (not during), and a QA restart while asleep drops the
 deferred queue and cancels the wake timer (<code>tests/test_sleep.py</code>).</p>
-<h2>3. A remote <code>api.*</code> call suspends only the calling QA</h2>
+<h2 id="3-a-remote-api-call-suspends-only-the-calling-qa">3. A remote <code>api.*</code> call suspends only the calling QA</h2>
 <ol>
 <li><code>lua/init.lua::apiCall</code> — the QA's <code>api.get</code> wrapper — checks
    <code>_PY.api_remote_mode()</code> <strong>and</strong> that the call runs in the QA's own
@@ -114,7 +114,7 @@ deferred queue and cancels the wake timer (<code>tests/test_sleep.py</code>).</p
 in flight, and the result enqueue + counter decrement run together in one
 loop callback (<code>_post_from_worker</code>'s <code>done</code>) — atomic handoff, ADR 0006
 amendment (race lessons 2 and 3 in concurrency.md).</p>
-<h2>4. A refreshStates event reaches a subscriber</h2>
+<h2 id="4-a-refreshstates-event-reaches-a-subscriber">4. A refreshStates event reaches a subscriber</h2>
 <p>Two delivery channels, one contract (record + emit):</p>
 <ol>
 <li><strong>Record into the feed</strong>: a handler (e.g. <code>updateProperty</code>,
@@ -138,7 +138,7 @@ amendment (race lessons 2 and 3 in concurrency.md).</p>
    Proxy devices never emit locally (the HC3's own event arrives through
    this path).</li>
 </ol>
-<h2>5. Proxy mode shadows an HC3 device</h2>
+<h2 id="5-proxy-mode-shadows-an-hc3-device">5. Proxy mode shadows an HC3 device</h2>
 <p><code>--%%mode:proxy</code> (online only): the real HC3 owns the device; the sim
 shadows it under the <em>same id</em>.</p>
 <ol>

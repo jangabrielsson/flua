@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Mock peers — localhost servers in the test files, not external processes</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: mock-peer-testing
+topic: testing
+title: Mock peers — localhost servers in the test files, not external processes
+pins:
+  - tests/test_server.py::test_require_loads_sibling_test_libs
+  - tests/test_mqtt.py::test_mqtt_connect_subscribe_publish_roundtrip
+verified: flua 0.1.169</p>
+<hr />
+<h1 id="mock-peers--localhost-servers-in-the-test-files-not-external-processes">Mock peers — localhost servers in the test files, not external processes</h1>
+<p>The pinned idiom for protocol tests: a threaded mock server bound to
+localhost <em>inside the test file</em> (the mock HC3 in <code>test_hc3.py</code>, the
+mock broker in <code>test_mqtt.py</code>, the mock Modbus in
+<code>test_modbus_mock.py</code>). The suite never touches a real controller or a
+real peer.</p>
+<ul>
+<li>Test scaffolding (mock servers etc.) can live in a sibling file
+  loaded with <code>require()</code> — runtime-only, never part of the QA's
+  package (pinned).</li>
+<li>Assert on the mock's request records and the QA's stdout; no sleeps
+  where a <code>wait_until</code>/<code>wait_for_output</code> helper exists (AGENTS.md).</li>
+<li>Many tests bind localhost sockets — a sandbox that denies socket
+  binds fails them; run with local socket access.</li>
+</ul>
+<p>For the in-QA alternative (the server <em>inside</em> a QA), see
+<code>net-fixture-servers</code>; for modeling the far side, see
+<code>modeling-external-devices</code>.</p>
+</body>
+</html>

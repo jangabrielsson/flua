@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Offline is the default; online is opt-in</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: offline-first-default
+topic: modes
+title: Offline is the default; online is opt-in
+pins:
+  - docs/decisions/0001-default-mode-is-offline.md
+verified: flua 0.1.169</p>
+<hr />
+<h1 id="offline-is-the-default-online-is-opt-in">Offline is the default; online is opt-in</h1>
+<p>flua runs against the simulated HC3 unless you explicitly opt into the
+real one — the safety posture every other mode builds on:</p>
+<ul>
+<li>No HC3 credentials → everything is the sim; network access is real
+  (QAs reach the internet) but the <em>controller</em> is synthetic.</li>
+<li><code>--%%mode:online</code> (or the engine's remote API mode) opts a run into
+  the hybrid routing against a real HC3; per-QA <code>--%%mode:offline</code>
+  pins a QA to the sim even in an online run.</li>
+<li><code>--%%mode:readonly[+call]</code> layers the write guard on top of online;
+  <code>--%%mode:proxy</code> mirrors a QA onto the controller.</li>
+<li>The mode family is a per-QA directive; the legacy
+  <code>--%%offline:true/false</code> and <code>--%%proxy:true</code> spellings still map
+  onto it (an explicit <code>--%%mode</code> wins).</li>
+</ul>
+<p>See ADR 0001 for the reasoning: offline-first keeps development
+deterministic, credential-free, and safe.</p>
+</body>
+</html>

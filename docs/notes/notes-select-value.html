@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Note: single-select initial `value` dropped from legacy viewLayout</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="note-single-select-initial-value-dropped-from-legacy-viewlayout">Note: single-select initial <code>value</code> dropped from legacy viewLayout</h1>
+<p>Status: fixed (2026-10-17). The compiler maps <code>el['value']</code> into the
+legacy <code>values</code> array, and the inverse (<code>ui_to_u_rows</code>/<code>_element</code>) reads
+the selection back — the <code>--%%u</code> round trip now preserves it.
+Pinned by <code>tests/test_ui.py::test_select_with_options</code> (legacy values +
+round trip) and <code>tests/test_agent_dx.py::test_tool_ui_renders_elements</code>
+(<code>--tool ui</code> shows the selection).</p>
+<h2 id="symptom">Symptom</h2>
+<p>A single <code>select</code> row declared with an initial value —</p>
+<pre><code class="language-lua">--%%u:{select='sel1',text='Pick',value='11',options={{type='option',text='One',value='11'}}}
+</code></pre>
+<p>— exports a legacy <code>viewLayout</code> (<code>$jason</code>) component whose selection is
+empty:</p>
+<pre><code class="language-json">{&quot;type&quot;: &quot;select&quot;, &quot;selectionType&quot;: &quot;single&quot;, &quot;options&quot;: [...], &quot;values&quot;: []}
+</code></pre>
+<p>The initial <code>value='11'</code> is gone. <code>--tool ui</code> shows the select with no
+selection; more importantly, the compiled viewLayout a viewer or an HC3
+upload renders starts unselected.</p>
+<h2 id="root-cause">Root cause</h2>
+<p><code>src/flua/ui.py::_layout_element</code> — the select/multi branch maps only
+<code>el.get("values")</code> (the multi-select field) into <code>component["values"]</code>. The
+single-select convention's <code>el["value"]</code> is never read for the legacy
+format. The newer <code>uiView</code> format (<code>_ui_view</code>) does carry it
+(<code>component["value"]</code>), so this is legacy-format-only.</p>
+<h2 id="ground-truth-why-it-matters">Ground truth (why it matters)</h2>
+<p>The HC3's own schema (<code>fibaro_api_docs/plugins.json</code>, the <code>select</code>
+component) has no <code>value</code> field at all — the current selection lives in
+<code>values</code>, documented as "List of selected options", even for
+<code>selectionType: single</code>. So the legacy format's selected state IS <code>values</code>,
+and flua should map the row's initial <code>value</code> into <code>values: ["11"]</code>.</p>
+<h2 id="fix-sketch-when-we-pick-this-up">Fix sketch (when we pick this up)</h2>
+<p>In <code>_layout_element</code>, the <code>typ in ("select", "multi")</code> branch:</p>
+<pre><code class="language-python">if typ == &quot;select&quot; and el.get(&quot;value&quot;):
+    component[&quot;values&quot;] = [el[&quot;value&quot;]]
+else:
+    component[&quot;values&quot;] = list(el.get(&quot;values&quot;) or [])
+</code></pre>
+<p>Then check the round trip: <code>ui.py::_rows_from_view_layout</code> reads <code>values</code>
+back into <code>--%%u</code> rows — a single select should come back as
+<code>values={'11'}</code> (not <code>value='11'</code>), so <code>--%%u</code> select rows may need to
+accept both spellings. Verify against the HC3: an uploaded QA should show
+the option selected in the web UI. Also re-check <code>singleSelectDemo.lua</code> and
+the multiSelect work (selectedItems/updateView) from 2026-10-06, which
+touched exactly this area.</p>
+<h2 id="related">Related</h2>
+<ul>
+<li><code>--tool ui</code> renders whatever the compiled structures contain, so it
+  shows the gap (select with no selection) rather than hiding it.</li>
+<li>The uiView format (used with <code>--%%useUiView:true</code>) is unaffected.</li>
+<li><code>docs/notes-agents.md</code> ("Known gaps") references this note.</li>
+</ul>
+</body>
+</html>

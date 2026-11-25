@@ -1,0 +1,127 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>08 · Proxy mode — the real HC3 UI</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="08--proxy-mode--the-real-hc3-ui">08 · Proxy mode — the real HC3 UI</h1>
+<p>The viewer is a faithful stand-in, but the <em>real</em> HC3 UI — the phone app,
+with its device cards, rooms and history — is what your family will use.
+Proxy mode gives you exactly that, while the QuickApp itself keeps running
+in flua on your computer.</p>
+<h2 id="the-idea">The idea</h2>
+<pre><code class="language-mermaid">graph LR
+  Phone[&quot;the Fibaro app&lt;br/&gt;(the real HC3 UI)&quot;] --&gt;|&quot;tap Turn On&quot;| Proxy[&quot;&lt;i&gt;SunsetLamp_Proxy&lt;/i&gt;&lt;br/&gt;a mirror QA on the HC3&quot;]
+  Proxy --&gt;|&quot;forwards the tap&quot;| QA[&quot;SunsetLamp&lt;br/&gt;running in flua&quot;]
+  QA --&gt;|&quot;updateProperty/updateView&quot;| HC3[&quot;the real HC3&quot;]
+  HC3 --&gt; Phone
+</code></pre>
+<p>flua deploys a small mirror QuickApp — <code>&lt;name&gt;_Proxy</code> — onto your HC3. The
+mirror has the same type and UI as your QA, so the app renders it like any
+device. When you tap a button, the proxy forwards the interaction to flua,
+your code runs on your computer, and every state change is pushed back so
+the app shows it. <strong>You get the genuine UI, and you keep the development
+loop</strong> — edit, restart, tap.</p>
+<h2 id="what-you-need">What you need</h2>
+<ul>
+<li>Online mode with credentials: the <code>.env</code> from chapter 01 (proxy mode is
+  online only — without credentials flua logs <code>proxy disabled</code> and runs the
+  QA offline as usual).</li>
+<li>Your computer and the HC3 on the <strong>same network</strong>, and your firewall must
+  let the controller reach your machine — flua listens for the proxy's
+  callbacks on port 8080 (set <code>FLUA_PROXY_PORT</code> in <code>.env</code> to change it).</li>
+</ul>
+<h2 id="turn-the-lamp-into-a-proxy">Turn the lamp into a proxy</h2>
+<p>Add one line to the lamp's header:</p>
+<pre><code class="language-lua">--%%name:SunsetLamp
+--%%type:com.fibaro.binarySwitch
+--%%mode:proxy
+--%%var:auto=true
+--%%var:wattage=60
+
+--%%u:{label=&quot;status&quot;,text=&quot;Automatic mode&quot;}
+--%%u:{switch=&quot;automatic&quot;,text=&quot;Automatic&quot;,value=&quot;true&quot;,onReleased=&quot;toggleAuto&quot;}
+</code></pre>
+<p>Run it — no <code>--api local</code> this time, the proxy needs the real HC3:</p>
+<pre><code class="language-bash">flua sunset_lamp_ui.lua
+</code></pre>
+<pre><code class="language-text">flua: proxy installed: 123 SunsetLamp_Proxy
+flua: proxy connected — SunsetLamp_Proxy (5000) sends actions and UI events to http://192.168.1.42:8080
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode proxy:5000
+[05.10.2026][21:00:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready, 60 W
+</code></pre>
+<blockquote>
+<p>✅ <strong>You should see</strong> a new device in the Fibaro app — <code>SunsetLamp_Proxy</code>,
+with your custom UI. Open it and tap <strong>Turn On</strong>: the log on your computer
+shows <code>Lamp on</code>, and the app shows the lamp ON.</p>
+</blockquote>
+<p>What just happened: the tap went from the app to the proxy to flua, ran
+<code>turnOn()</code> on your computer, and the state update travelled back to the HC3
+— one round trip, one log line. The <code>5000</code> after <code>mode proxy:</code> is the
+emulator's id; the proxy's HC3 id (here <code>123</code>) is the device id in the app.
+They're the same QA.</p>
+<p>Your QA now works like a real HC3 citizen: scenes and other QAs can call its
+actions, the app shows its state and history, and <code>self:updateView</code> /
+<code>updateProperty</code> / <code>setVariable</code> updates appear live in the app. Child
+devices (<code>self:createChildDevice</code>) are created on the HC3 as the proxy's
+children and mirrored back.</p>
+<p>Press <code>Ctrl-C</code> when you're done — the proxy stays on the HC3 (it's a device
+now), and the next run reuses it: flua finds the existing
+<code>SunsetLamp_Proxy</code>, reconnects it to your computer, and refreshes its UI
+from your current <code>--%%u</code> directives. The QA file remains the single source
+of truth.</p>
+<h2 id="editing-the-ui-on-the-hc3-itself">Editing the UI on the HC3 itself</h2>
+<p>The HC3 has a rudimentary UI editor, and some developers prefer shaping the
+proxy's interface there. To make flua <strong>not</strong> clobber those edits on every
+connect:</p>
+<pre><code class="language-lua">--%%mode:proxy,noUI
+</code></pre>
+<p>The proxy is still reused and connected, but its UI is left exactly as you
+edited it — flua logs <code>proxy UI left untouched</code>. Without <code>noUI</code>, every
+connect pushes the UI from your <code>--%%u</code> directives (the backward-compatible
+behavior).</p>
+<blockquote>
+<p>A note on honesty, as in chapter 06: this chapter's live steps are flua's
+documented behavior — deploying, CONNECTing and mirroring — but they talk
+to your controller, so rehearse with your scratch QA and watch the log the
+first time. Anything unexpected lands in the next chapter's toolkit.</p>
+</blockquote>
+<h2 id="what-did-we-just-learn">What did we just learn?</h2>
+<ul>
+<li><strong>Proxy mode</strong> mirrors your QA onto the HC3 so the <em>real</em> app UI drives
+  your code in the emulator — actions in, state out, one round trip.</li>
+<li>The proxy is <strong>reused</strong> across runs (UI refreshed from your directives),
+  unless you declare <code>--%%mode:proxy,noUI</code> to protect HC3-side UI edits.</li>
+<li>Offline/sim first, proxy when you want the genuine UI — the same file,
+  one header line apart.</li>
+</ul>
+<p>Next: growing out of one file — your own libraries, shared between QAs.</p>
+</body>
+</html>

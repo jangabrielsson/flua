@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>0002 — three id namespaces</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="0002--three-id-namespaces">0002 — three id namespaces</h1>
+<ul>
+<li><strong>Status:</strong> active</li>
+<li><strong>Date:</strong> 2026-10-15 (retroactive)</li>
+</ul>
+<h2 id="context">Context</h2>
+<p>The sim must distinguish "the HC3's own devices" from "devices flua created
+for this run" so the hybrid dispatcher knows what to serve locally and what
+to forward. QAs, child devices, and the HC3's existing devices all share one
+<code>/devices</code> space.</p>
+<h2 id="decision">Decision</h2>
+<p>Three disjoint ranges:</p>
+<ul>
+<li><strong>&lt; 5000</strong> — the HC3's namespace (seeded house devices, real devices
+  online). 404s here forward to the HC3 when a remote backend exists.</li>
+<li><strong>≥ 5000</strong> — engine-assigned QA ids, starting at 5000, skipping taken
+  ids. Always served locally (<code>SimState.is_flua_id</code>).</li>
+<li><strong>≥ 900000</strong> — runtime-created devices (<code>FIRST_RUNTIME_ID</code>), i.e.
+  children from <code>createChildDevice</code>. Never collides with QA ids.</li>
+</ul>
+<h2 id="consequences">Consequences</h2>
+<ul>
+<li><code>Api._dispatch</code> decides the 404-fallback purely from the id range —
+  no per-entity lookup needed.</li>
+<li>A proxy QA breaks the neat range on purpose: it runs under its <strong>HC3</strong>
+  id, so the sim shadow and the real device are one id (see the proxy
+  invariants in invariants.md).</li>
+<li>Pins: <code>tests/test_qa.py::test_qa_environments_are_isolated</code>,
+  <code>tests/test_api.py::test_create_child_device</code>,
+  <code>tests/test_proxy.py::test_proxy_create_child_device_uses_hc3_id</code>.</li>
+</ul>
+</body>
+</html>

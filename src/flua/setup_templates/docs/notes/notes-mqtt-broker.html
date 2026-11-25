@@ -1,0 +1,79 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Note: an MQTT broker for testing the mqtt client</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="note-an-mqtt-broker-for-testing-the-mqtt-client">Note: an MQTT broker for testing the mqtt client</h1>
+<p>Status: idea, not scheduled. Brought up 2026-10-11; revisit before scoping work.</p>
+<h2 id="the-idea">The idea</h2>
+<p>The HC3 has no MQTT broker of its own — QAs always talk to an external one.
+flua would provide a broker purely to aid testing the <code>mqtt</code> client: run a
+QA against a local broker instead of a public one (hivemq throttles, needs
+internet). Python module (e.g. <code>src/flua/mqtt_broker.py</code>) alongside the
+client, likely exposed to QA code as <code>net.MQTTBroker()</code> — the MQTT sibling
+of the other <code>net.*Server</code> mock servers (forum post 8): a handler-driven
+server QAs and test code can script in Lua.</p>
+<h2 id="why-build-rather-than-import">Why build rather than import</h2>
+<ul>
+<li>The wire codec already exists in <code>src/flua/mqtt.py</code> (dependency-free MQTT
+  3.1.1 over stdlib sockets, threaded).</li>
+<li><code>tests/test_mqtt.py</code> already contains a working <code>MiniBroker</code> (~100 lines:
+  CONNECT/SUBSCRIBE/PUBLISH fan-out/PING/DISCONNECT, QoS 1 PUBACK) — the
+  seed and the proof of design.</li>
+<li>The only credible pure-Python broker library is <code>amqtt</code> (ex-hbmqtt):
+  asyncio-based (friction with flua's threaded blocking sockets), pulls
+  dependencies (repo law: <code>lupa</code> is the only runtime dependency), and has a
+  spotty maintenance record. Not obviously cheaper than ~400 lines we own.</li>
+</ul>
+<h2 id="scope-sketch">Scope sketch</h2>
+<ul>
+<li>QoS 0/1 fully; QoS 2 receive handshake tolerated, send-side downgraded to
+  QoS 1 (the client already does the same, documented).</li>
+<li>Topic matching done right: <code>+</code> single-level and <code>/#</code> multi-level
+  wildcards (the test broker's matcher only does exact + <code>/#</code> suffix).</li>
+<li>Retained messages, last-will, keep-alive expiry, multi-client fan-out.</li>
+<li>Reuse/extract the wire helpers from <code>mqtt.py</code> so client and broker share
+  one codec.</li>
+</ul>
+<h2 id="open-questions">Open questions</h2>
+<ul>
+<li>Lua surface: <code>net.MQTTBroker()</code> — mirror the other <code>net.*Server</code> mocks
+  (<code>net.HTTPServer</code>/<code>net.TCPServer</code> are built with the same <code>serverClass</code>
+  helper: an optional port argument, 0 = ephemeral with the real port
+  readable immediately, handler-driven in Lua)? Or a plain engine-side
+  broker the test suite and examples start directly?</li>
+<li>How sessions/retained state are exposed for assertions (inspect through
+  the Lua surface or a Python API).</li>
+<li>Whether TLS (<code>mqtts://</code>) on the broker is in scope for v1 (client TLS is
+  done; broker-side certs add setup friction — probably defer).</li>
+</ul>
+</body>
+</html>

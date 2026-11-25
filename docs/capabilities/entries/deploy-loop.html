@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>The deploy loop — develop unpacked, the HC3 sees .fqa</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: deploy-loop
+topic: deploy
+title: The deploy loop — develop unpacked, the HC3 sees .fqa
+pins:
+  - tests/test_tools.py::test_pack_unpack_tools_roundtrip
+  - tests/test_tools.py::test_upload_file_pushes_single_file
+verified: flua 0.1.170</p>
+<hr />
+<h1 id="the-deploy-loop--develop-unpacked-the-hc3-sees-fqa">The deploy loop — develop unpacked, the HC3 sees .fqa</h1>
+<p>You develop in the unpacked format (individual <code>.lua</code> files); the HC3
+sees <code>.fqa</code>. The tool family:</p>
+<ul>
+<li><code>uploadQA script.lua [--room ID]</code> — a new QA from the unpacked
+  project (main file + <code>--%%file</code> extras); <code>updateQA 123 script.lua</code>
+  updates an existing QA's files; <code>uploadFile</code> pushes ONE file (the
+  VS Code task uses it).</li>
+<li><code>downloadQA 123 -d project/</code> — the reverse: unpack a QA from the
+  HC3 into individual files (the naming convention resolves main vs
+  lib files).</li>
+<li><code>pack</code>/<code>unpack</code> do the conversion without a controller
+  (<code>pack-inspect-verify</code>).</li>
+</ul>
+<p>The round trip is pinned (pack → unpack preserves content). Everything
+is credential-driven from the <code>.env</code> chain; see <code>multi-file-qas</code> for
+the file layout, <code>hybrid-routing</code> for what runs where.</p>
+</body>
+</html>

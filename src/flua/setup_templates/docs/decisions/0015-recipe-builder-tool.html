@@ -1,0 +1,85 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>0015 — the recipe builder is a tool on top of flua, parked as a PoC</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="0015--the-recipe-builder-is-a-tool-on-top-of-flua-parked-as-a-poc">0015 — the recipe builder is a tool on top of flua, parked as a PoC</h1>
+<ul>
+<li><strong>Status:</strong> active</li>
+<li><strong>Date:</strong> 2026-11-15</li>
+</ul>
+<h2 id="context">Context</h2>
+<p>ADR 0013 pinned the wizard-shaped temptation away: no no-code assembly
+surface, because coding agents were absorbing exactly that audience. The
+builder (<code>flua --tool build</code>) is a multiple-choice recipe assembler — on
+its face, the thing 0013 said needs an ADR change to exist. Two premises
+from 0013 have not held so far, and the feedback loop has not closed:</p>
+<ul>
+<li>The agent audience has not arrived at the predicted rate — forum
+  uptake is still the hard-core ex-plua crowd; many users do not have
+  (or will not pay for) an agent, so the agent loop cannot serve them
+  today.</li>
+<li>Recipes and verify scenarios turned out to be agent-shaped artifacts
+  (plain Lua plus a manifest JSON; <code>--list</code>/<code>--verify</code> with <code>--json</code>),
+  so the builder feeds the agent loop instead of competing with it.</li>
+</ul>
+<p>The builder is therefore shipped as a <strong>proof of concept, parked</strong> until
+user feedback says whether it earns its place.</p>
+<h2 id="decision">Decision</h2>
+<p>The builder exists as an engine-first tool under 0013's own discipline,
+not as a second implementation:</p>
+<ul>
+<li><code>flua --tool build</code> — the CLI is the product surface; the page is a
+  thin face over the same endpoints, and every channel has a <code>--json</code>
+  form for agents.</li>
+<li>Recipes are repo artifacts: <code>recipes/&lt;id&gt;/{main.lua,manifest.json}</code>,
+  fetched live (one merge, no release), with declarative verify
+  scenarios that run in the sim (<code>--verify</code>/<code>--verify-all</code>, CI-gated on
+  template paths). The generated artifact is ordinary Lua the user owns
+  and edits — no block editor, no expression ceiling beyond Lua itself.</li>
+<li>0013's verification-legibility direction is the same surface: the
+  scenario steps render as PASS/FAIL lines a non-coder can judge.</li>
+<li>0013's core stands: the agent environment remains the moat and the
+  primary investment; the builder is not a parallel app to maintain.</li>
+</ul>
+<h2 id="consequences">Consequences</h2>
+<ul>
+<li>ADR 0013 is amended: the "no no-code assembly surface" rule gains a
+  delimited exception — a recipe-based builder tool, parked, with the
+  first user feedback deciding whether it stays.</li>
+<li>If the feedback is negative, the builder shrinks to the CLI
+  (<code>--list</code>/<code>--verify</code>); the recipes themselves stay valuable as agent
+  examples either way.</li>
+<li>The page must not grow into a wizard: any capability it gains must
+  arrive as a <code>--tool build</code> CLI/JSON surface first.</li>
+</ul>
+</body>
+</html>

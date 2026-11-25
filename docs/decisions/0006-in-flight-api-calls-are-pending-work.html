@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>0006 — suspended QAs' remote calls count as pending work</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="0006--suspended-qas-remote-calls-count-as-pending-work">0006 — suspended QAs' remote calls count as pending work</h1>
+<ul>
+<li><strong>Status:</strong> active</li>
+<li><strong>Date:</strong> 2026-10-15</li>
+</ul>
+<h2 id="context">Context</h2>
+<p>After 0005, a second early-exit hole surfaced (CI 3.12, then 3.15 under
+8-worker load): a QA's remote <code>api.*</code> call suspends the QA and runs on a
+<code>flua-api</code> worker thread. <code>has_pending_work()</code> did not count that worker,
+so the CLI's 50 ms idle poll could see "nothing pending" mid-call and end
+the run before the response resumed the QA — the QA's output never
+appeared.</p>
+<h2 id="decision">Decision</h2>
+<p><code>_api_calls_inflight</code> counts in-flight remote API calls: incremented in
+<code>_handle_api_call</code> <strong>before</strong> the worker thread starts (no window where the
+counter is behind), decremented in the worker's <code>finally</code>, and included in
+<code>has_pending_work()</code>.</p>
+<h2 id="consequences">Consequences</h2>
+<ul>
+<li>The graceful-exit contract is: anything a suspended QA can be waiting on
+  is pending work. New worker types must follow the same pattern
+  (track → count → load-test) — rule 2 in concurrency.md.</li>
+<li>Dropped results after teardown are handled separately
+  (<code>_post_from_worker</code>), so the counter and the exit path stay orthogonal.</li>
+<li>Pin: <code>tests/test_hc3.py::test_cli_mode_online_directive_selects_hc3</code>
+  under load; the fix is exercised by every online-mode test.</li>
+</ul>
+<h2 id="amendment--2026-10-19-the-handoff-must-be-atomic">Amendment — 2026-10-19: the handoff must be atomic</h2>
+<p>The original fix still had a hole: the worker enqueued the result via
+<code>loop.call_soon_threadsafe</code> (deferred until the loop runs the callback) and
+decremented <code>_api_calls_inflight</code> in its <code>finally</code> <strong>immediately</strong>. Between
+the two, <code>has_pending_work()</code> saw "counter zero, result not yet queued" and
+the CLI's 50 ms idle poll ended the run — <code>dev/hc3_api_filter_test.lua</code> quit
+silently between <code>api.get</code> calls in online mode.</p>
+<p><code>_post_from_worker</code> now takes a <code>done</code> callback and runs enqueue + <code>done</code>
+together in one loop callback: the counter is decremented only once the
+result is visible in <code>_outbound</code> (pending or delivered), so the exit poll can
+never observe the gap. Pin: <code>tests/test_engine.py::test_api_result_handoff_is_atomic</code>.</p>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>0004 — device lifecycle emits DeviceCreated/DeviceRemoved events</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="0004--device-lifecycle-emits-devicecreateddeviceremoved-events">0004 — device lifecycle emits DeviceCreated/DeviceRemoved events</h1>
+<ul>
+<li><strong>Status:</strong> active</li>
+<li><strong>Date:</strong> 2026-10-15</li>
+</ul>
+<h2 id="context">Context</h2>
+<p>Reactive QAs (<code>RefreshStateSubscriber</code>, <code>fibaro.EventMgr</code>,
+<code>sourceTrigger</code>) need to learn when devices appear and disappear, exactly
+like on the HC3 — where uploading a QA or creating a child emits
+<code>DeviceCreatedEvent</code> and removal emits <code>DeviceRemovedEvent</code>.</p>
+<h2 id="decision">Decision</h2>
+<p>The sim emits both events in the real HC3's shapes (samples in
+<code>docs/specs/refreshEvents.json</code>):</p>
+<ul>
+<li><code>DeviceCreatedEvent</code> — <code>data: {id}</code>, on QA registration, child creation.</li>
+<li><code>DeviceRemovedEvent</code> — <code>data: {id, deviceName, type, roomId, roomName,
+  sectionName}</code> (room/section resolved best-effort), on
+  <code>DELETE /devices/{id}</code> and <code>removeChildDevice</code>.</li>
+</ul>
+<p>Both carry the standard device-event envelope, land in the refreshStates
+feed, and are handed to the pump for subscriber delivery. Proxy devices are
+excluded (0003 — the HC3's own event arrives via the poll). Seed loading
+and persisted-child restore emit nothing (boot state, like an HC3 reboot).</p>
+<h2 id="consequences">Consequences</h2>
+<ul>
+<li>Pins: <code>tests/test_api.py::test_device_created_and_removed_events</code>,
+  <code>tests/test_qa.py::test_device_created_and_removed_events_reach_subscribers</code>.</li>
+<li>The event shapes are a compatibility surface — change them only with the
+  pins updated deliberately (invariants.md).</li>
+</ul>
+</body>
+</html>

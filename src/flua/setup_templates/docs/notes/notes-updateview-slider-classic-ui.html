@@ -1,0 +1,85 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Note: HC3 classic UI does not re-render slider `value` on updateView</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="note-hc3-classic-ui-does-not-re-render-slider-value-on-updateview">Note: HC3 classic UI does not re-render slider <code>value</code> on updateView</h1>
+<p>Status: HC3 bug, reported to Fibaro (2026-11-05). flua is intentionally
+unaffected — the sim models the API state, not the browser render.</p>
+<h2 id="symptom-real-hc3-live-verified">Symptom (real HC3, live-verified)</h2>
+<p>On an HC3 running the <strong>classic</strong> web UI (the legacy <code>viewLayout</code>/<code>$jason</code>
+view), a QA that updates a slider's value —</p>
+<pre><code class="language-lua">self:updateView(&quot;slider_ID_0&quot;, &quot;value&quot;, tostring(v))
+</code></pre>
+<p>— does not move the slider's visible value, while label and button updates
+in the same loop DO re-render:</p>
+<pre><code class="language-lua">self:updateView(&quot;label_ID_2&quot;, &quot;text&quot;, tostring(v))  -- updates visibly
+self:updateView(&quot;button_ID_1_1&quot;, &quot;text&quot;, tostring(v))  -- updates visibly
+</code></pre>
+<p>Details from the repro:</p>
+<ul>
+<li>macOS, Safari and Chrome — same result.</li>
+<li>The <strong>new mobile view</strong> renders the slider updates correctly.</li>
+<li>A browser <strong>reload</strong> shows the new value — so the HC3's internal state
+  is updated; only the classic view's live render of the slider is stale.</li>
+</ul>
+<h2 id="ground-truth-what-flua-does">Ground truth (what flua does)</h2>
+<p>flua has no renderer — its sim models the API-state truth, which is
+exactly the "after reload" value the real HC3 stores:</p>
+<ul>
+<li><code>POST /plugins/updateView</code> (<code>src/flua/api/routes/plugins.py</code>) patches
+  <code>device.view[componentName][propertyName]</code> — slider values included.</li>
+<li><code>GET /plugins/getView</code> merges that live <code>device.view</code> back into the
+  <code>$jason</code> layout (<code>_merge_view_state</code>), so a QA reading <code>self:getView()</code>
+  sees the slider's updated <code>value</code> immediately.</li>
+</ul>
+<p>So a QA verified in flua — e.g. <code>examples/proxy.lua</code>, whose slider handler
+echoes the value back with <code>self:updateView("s1", "value", ...)</code> — behaves
+in flua like the HC3's mobile view and like a reloaded classic view. It
+cannot reproduce the classic-view display bug, because that bug lives in
+the browser-side render, not in the API contract flua simulates.</p>
+<h2 id="impact--where-to-look-when-a-user-hits-it">Impact / where to look when a user hits it</h2>
+<ul>
+<li>A user who verifies the slider update in flua and then sees it frozen in
+  the HC3 classic view is hitting this HC3 bug, not a flua/parity
+  difference — the API state on both sides agrees.</li>
+<li>The proxy path is unaffected: updateView routes through the proxy QA's
+  own <code>UPDATEVIEW</code> action (<code>plugins.py</code>), same channel CONNECT uses.</li>
+</ul>
+<h2 id="related">Related</h2>
+<ul>
+<li><code>docs/rest-endpoints.md</code> — <code>/plugins/updateView</code> and <code>/plugins/getView</code>
+  route notes.</li>
+<li><code>examples/proxy.lua</code> — the slider <code>updateView</code> handler this note
+  documents (works in flua + HC3 mobile view; classic view shows the bug).</li>
+</ul>
+</body>
+</html>

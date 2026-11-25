@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Hybrid routing — the sim answers first, unknown ids forward to the HC3</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<hr />
+<p>id: hybrid-routing
+topic: hc3-api
+title: Hybrid routing — the sim answers first, unknown ids forward to the HC3
+pins:
+  - tests/test_hc3.py::test_hybrid_routing_local_sim_and_remote_hc3
+  - tests/test_api.py::test_readonly_mode_refuses_remote_writes_at_the_gate
+verified: flua 0.1.169</p>
+<hr />
+<h1 id="hybrid-routing--the-sim-answers-first-unknown-ids-forward-to-the-hc3">Hybrid routing — the sim answers first, unknown ids forward to the HC3</h1>
+<p>How a QA's <code>api.*</code> call finds its data in online mode:</p>
+<ul>
+<li>The sim handles what it owns (flua QAs, sim devices, sim variables);
+  a 404 for an entity the sim doesn't own falls back to the real HC3.
+  <code>/devices</code> lists the <em>union</em>, sim winning id clashes.</li>
+<li><code>--%%mode:offline</code> on a QA pins it to the sim (its remote hook is
+  None — no fallback, ever). <code>--%%mode:readonly[+call]</code> keeps reads
+  through the hybrid dispatch but refuses mutating remote verbs with
+  403 before they reach the controller.</li>
+<li><code>api.hc3.*</code> (and <code>fibaro.callhc3</code>) bypass the hybrid dispatch —
+  always the real HC3 online, the sim stands in offline.</li>
+<li>Variables endpoints the HC3 refuses to external REST callers go
+  through the FluaHelper bridge (controller-local context), not the
+  plain REST transport.</li>
+<li>The remote REST rides <code>X-Fibaro-Version: 2</code> like the web UI.</li>
+</ul>
+</body>
+</html>

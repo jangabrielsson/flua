@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>0009 — the sim serves real logs over REST (debugMessages + systemLog)</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="0009--the-sim-serves-real-logs-over-rest-debugmessages--systemlog">0009 — the sim serves real logs over REST (debugMessages + systemLog)</h1>
+<ul>
+<li><strong>Status:</strong> active</li>
+<li><strong>Date:</strong> 2026-10-16/17</li>
+</ul>
+<h2 id="context">Context</h2>
+<p>The sim's <code>GET /debugMessages</code> was a shape-only stub while the QA logs went
+to stdout/stderr only; the HC3 has no structured system/crash log at all.
+Agents and tools need the logs over REST — the same surface the HC3 offers,
+plus the piece it lacks.</p>
+<h2 id="decision">Decision</h2>
+<p>Two feeds, one polling contract (<code>last</code>/<code>offset</code>, <code>DELETE</code> to clear):</p>
+<ul>
+<li><strong><code>/debugMessages</code></strong> — the QA console buffer in the HC3's
+  <code>DebugMessagesDto</code> shape with the HC3's query semantics (<code>filter</code>/<code>types</code>/
+  <code>from</code>/<code>to</code>). Every line records exactly once, in both log modes: QA
+  lines via the <code>formatLogLine</code> tap (tag <code>&lt;name&gt;&lt;id&gt;</code>), flua notices via
+  <code>flua_log</code>/<code>post_log</code> (tag <code>flua</code>), runtime lines untagged.</li>
+<li><strong><code>/flua/systemLog</code></strong> — flua-only, the structured lifecycle/crash feed
+  the HC3 lacks: <code>run_start</code>/<code>run_stop</code>, <code>qa_load</code>/<code>qa_restart</code>/<code>qa_exit</code>
+  (with code), <code>qa_error</code> (boot failures), <code>crash</code> (callback errors),
+  <code>error</code> (pump/dispatch failures), as <code>{id, time, event, qa, tag, code,
+  detail}</code>.</li>
+</ul>
+<p>Both are bounded rings in <code>SimState</code> (deque appends are thread-safe across
+pump and worker threads).</p>
+<h2 id="consequences">Consequences</h2>
+<ul>
+<li>The MCP draft's probe tools can read logs over REST instead of engine
+  introspection.</li>
+<li>Pins: <code>tests/test_api.py::test_debug_messages</code>,
+  <code>test_flua_system_log</code>, <code>tests/test_qa.py::test_debug_messages_record_*</code>,
+  <code>test_system_log_records_*</code>.</li>
+<li>Selectivity stays the parity rule (notes-rest-parity.md): these two were
+  the surfaces agents/tools actually touch.</li>
+</ul>
+</body>
+</html>

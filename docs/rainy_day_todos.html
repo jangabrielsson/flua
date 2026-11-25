@@ -1,0 +1,364 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Rainy-day todos</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="rainy-day-todos">Rainy-day todos</h1>
+<p>Non-urgent, nice-to-have improvements — agreed as valuable but parked
+until a natural moment (or a second user request). Each entry keeps the
+rationale from the triage so the context survives. Remove an entry when it
+ships; the date marks when it was parked.</p>
+<p>Parked 2026-10-31, from the forum feedback triage (docs/feedback/):</p>
+<h2 id="network-policy--denyloopback-gate-change-04-simplified">Network policy — deny/loopback gate (Change 04, simplified)</h2>
+<ul>
+<li><strong>What</strong>: an opt-in <code>--network-policy deny|loopback</code> (and a
+  <code>--no-user-config</code> for inherited credential/config discovery) applied at
+  flua's transport boundary — HTTP/WebSocket/TCP/UDP. Deny before connect.</li>
+<li><strong>What NOT to build</strong>: the full proposal's allowlists, DNS-resolution
+  checks, redirect rules, IPv4/IPv6 parity. A wrong network policy sells
+  false confidence, and it is accident-prevention, not a security sandbox
+  (a hostile QA runs in-process).</li>
+<li><strong>Rationale</strong>: real value for running foreign/untrusted QAs (the pt
+  report ships its own audit-hook wrapper for exactly this); the 80%
+  version covers the accident risk.</li>
+<li><strong>Pinning test</strong>: loopback fixture works; external target fails before
+  connect; background retries respect the policy; no live devices.</li>
+</ul>
+<h2 id="export-preview----manifest-only-change-07">Export preview — <code>--manifest-only</code> (Change 07)</h2>
+<ul>
+<li><strong>What</strong>: <code>flua export ... --manifest-only</code> — the files and variable
+  names the package would ship, value origins (expression/config file),
+  and whether values would be embedded — without printing resolved secret
+  values.</li>
+<li><strong>Rationale</strong>: export-safety glance for the distribution workflow; low
+  effort. flua already has the placeholder/bake machinery, so this is
+  presentation, not new resolution logic.</li>
+</ul>
+<h2 id="resource-summary-change-09-the-small-half">Resource summary (Change 09, the small half)</h2>
+<ul>
+<li><strong>What</strong>: <code>--resource-summary</code> — pending timers, owned HTTP requests,
+  subscriptions, queue lengths, before/after stop or restart. Leak and
+  lifecycle debugging.</li>
+<li><strong>What NOT to build</strong>: the full event-trace file (registration/due/
+  delivery/cancellation correlation, generation ids) — <code>--trace
+  api,ui,net,timer</code> + syslog/timeline already cover most of it.</li>
+<li><strong>Rationale</strong>: small, real debugging value; the full trace would be
+  re-doing the existing trace channel at medium cost.</li>
+</ul>
+<h2 id="documentation-asks-from-the-pt-report">Documentation asks from the pt report</h2>
+<ul>
+<li><strong>Windows/locale guide</strong>: largely resolved — the engine now forces
+  <code>LC_CTYPE=C.UTF-8</code> (falling back to <code>C</code>) before the Lua runtime exists
+  (the plua 1.2.79 fix: Lua's pattern classes are libc ctype lookups, so
+  Polish/Windows locales split multibyte characters in <code>%S+</code>; C.UTF-8
+  rather than plain C so embedders keep <code>locale.getencoding()=UTF-8</code>);
+  <code>--version --machine</code> reports both <code>locale</code> and the effective <code>ctype</code>.
+  Known platform limit, documented: macOS's C.UTF-8 still classifies
+  high bytes as <code>%a</code>. Remaining: a short doc on byte-pattern
+  classification and UTF-8 handling on Windows (interpreter selection,
+  <code>-X utf8</code> for the MCP setup subprocess).</li>
+<li><strong>UI/export fidelity guide</strong>: what simulated UI events and string values
+  can and cannot establish about real HC3/browser/mobile rendering; legacy
+  vs newer UI export; select defaults.</li>
+<li><strong>Lifecycle/observability guide</strong> (or skill): pending resources and
+  late-callback fencing across stop/restart — likely folds into the
+  resource summary above.</li>
+</ul>
+<h2 id="batch-c-leftovers-already-rejected-do-not-resurrect-without-new-evidence">Batch C leftovers already rejected (do not resurrect without new evidence)</h2>
+<ul>
+<li>Full network allowlist/DNS/redirect machinery (Change 04 full).</li>
+<li>Second, richer event-trace format (Change 09 full) — the existing
+  <code>--trace</code> channel wins on maintenance cost.</li>
+</ul>
+<h2 id="from-the-pt-additional-proposals-parked-2026-10-31-a01a10">From the pt additional proposals (parked 2026-10-31, A01–A10)</h2>
+<p>The author framed these as optional, non-defect proposals. Honest verdict:
+they are <strong>harness-layer features</strong>, and most of them are better built on
+top of flua's primitives than inside the emulator. flua already offers the
+foundations: scripted transports via local mock servers (the tests do this
+everywhere), <code>--strict-tests</code> + <code>--result-json</code>, <code>--%%replay</code>/<code>flua record</code>,
+<code>--%%db</code> seeding, the migrate tool, <code>--check</code>, and <code>--trace
+api,ui,net,timer</code>. None of A01–A10 blocks real work.</p>
+<ul>
+<li><strong>A01 slow-controller/constrained-dispatch profiles</strong> — synthetic REST
+  latency/queue models. Valuable for exposing timing bugs, but a
+  fault-injection framework of its own; park until someone asks twice.</li>
+<li><strong>A02 scripted transport completion</strong> — partially available today
+  (local mock HTTP/WS/TCP servers can already script delays, disconnects
+  and duplicate notifications; the repo's tests do this). The missing
+  piece is a reusable, declarative scripting layer — park.</li>
+<li><strong>A03 restart injection</strong> — <code>plugin.restart</code> and the restart tests exist;
+  the checkpoint/sequence-number injection harness does not. Park.</li>
+<li><strong>A04 write-volume diagnostics</strong> — the only small, self-contained item:
+  a write counter (by QA/target/operation, attempts vs changes). Good
+  candidate for a small implementation; shortlist it.</li>
+<li><strong>A05 migration fixtures</strong> — overlaps <code>--%%db</code> seeding + the migrate
+  tool; the synthetic-inventory builder + before/after comparison is new.
+  Park.</li>
+<li><strong>A06 correlated latency</strong> — overlaps <code>--trace timer,net</code>; the
+  stage-by-stage operation-ID correlation is new. Park.</li>
+<li><strong>A07 lifecycle resources</strong> — already filed above (resource summary,
+  Change 09-half). Merged, no new entry.</li>
+<li><strong>A08 seeded async scenarios</strong> — overlaps <code>--%%replay</code>/<code>flua record</code>.
+  Park.</li>
+<li><strong>A09 source-vs-package differential testing</strong> — overlaps pack/unpack
+  round-trip tests; the observation-diff harness is new. Park.</li>
+<li><strong>A10 structural UI validation</strong> — overlaps <code>--check</code> and the uiView
+  machinery; the validation rules (unique names, callback targets, update
+  budgets) are new and modest — shortlist alongside A04.</li>
+</ul>
+<h2 id="extensibility-stabilize-the-embedding-surface--three-edge-hooks-parked-2026-10-31">Extensibility: stabilize the embedding surface + three edge hooks (parked 2026-10-31)</h2>
+<p>From the "Python plugin mode with SDK?" discussion. Verdict: build targeted
+edge hooks, not a general plugin framework — flua's moat is trustworthiness,
+and every plugin boundary risks it.</p>
+<ul>
+<li><strong>Stabilize and document the embedding surface</strong> — <code>LuaEngine</code> (constructor,
+  <code>api.dispatch</code>, state access, the bridge rules) is already the de-facto
+  SDK (the MCP server, the tools and external harnesses all drive it); the
+  pain point in feedback is that it is <em>internal</em> and may change. Document
+  it, name what is stable, keep the rest internal.</li>
+<li><strong><code>--tool</code> plugin directory</strong> — auto-discover tool modules from a user
+  directory alongside the in-package registry (the registry already
+  auto-discovers; pointing it at an extra path is trivial).</li>
+<li><strong>Custom REST route registration</strong> — SHIPPED (2026-10-31):
+  <code>api.registerEndpoint(method, pattern, handler[, override])</code> with
+  built-in override and cross-QA routing (a mock panel deployed as a QA
+  answers every QA's calls). What remains deferred from this item:
+  transport/server-kind registration (new <code>net.*Server</code> protocols — the
+  engine's server dispatch is hardcoded).</li>
+<li><strong>Lua <code>require</code> path/preload injection</strong> — a plugin dir on the QA's
+  <code>package.path</code>/preload registry, so shared Lua libraries come from a
+  plugin instead of per-project copies.</li>
+<li><strong>Deferred until someone needs it twice:</strong> transport/server kind
+  registration (new <code>net.*Server</code> protocols — the engine's server dispatch
+  is hardcoded).</li>
+<li><strong>Refused:</strong> a full plugin lifecycle (sandboxing/loading/versioning —
+  no security story exists in-process, and it is permanent API surface);
+  hooks into the pump/scheduler/clock (where the invariants live).</li>
+</ul>
+<h2 id="pump-wake-up-event-driven-parked-2026-11-03">Pump wake-up, event-driven (parked 2026-11-03)</h2>
+<ul>
+<li><strong>What</strong>: replace the pump's idle polling entirely — an <code>asyncio.Event</code>
+  set by <code>enqueue_outbound</code> (with <code>call_soon_threadsafe</code> from the worker
+  threads) so the pump sleeps until there is actual work.</li>
+<li><strong>What NOT to touch blindly</strong>: the <code>get_nowait()</code> drain loop exists
+  because <code>wait_for(queue.get(), timeout)</code> lost messages on Python &lt;= 3.12
+  (ADR 0006, CI failures) — an event wake-up must keep the drain semantics
+  and earn trust on the full 3.11-3.15 CI matrix.</li>
+<li><strong>Rationale</strong>: shipped the cheap 80% first (the adaptive idle poll:
+  <code>_PUMP_POLL_IDLE</code> when no timers are pending); the event-driven version
+  removes the remaining ~20 wakeups/sec but rewrites the most delicate
+  part of the engine.</li>
+</ul>
+<h2 id="qa-id-band--hc3-devices-approaching-5000-parked-2026-11-03">QA id band — HC3 devices approaching 5000 (parked 2026-11-03)</h2>
+<ul>
+<li><strong>What</strong>: the real HC3's QA ids never get reused, and one user's controller
+  is already at 4357 — once real device ids cross 5000 they collide with
+  flua's emulated QA ids (engine-assigned from 5000). The fix, in order of
+  leverage:
+  1. <em>Cheap insurance</em>: in online/hybrid mode the allocator consults the
+     real HC3's /devices id set when skipping (today it only skips ids in
+     the sim's own state) — collision becomes impossible without any
+     configurability.
+  2. <em>Shape-based QA detection</em>: <code>api/state.py:is_plugin_device()</code> uses
+     <code>id &gt;= 5000</code>; replace with device-shape markers (quickAppVariables /
+     view / uiView), which also makes everything base-agnostic.
+  3. <em>Configurable base</em>: a <code>qaIdBase</code> knob (<code>.flua.lua</code> / CLI flag) for
+     users who want a clean id band — the seed point is a single line
+     (<code>engine.py:_next_qa_id</code>).</li>
+<li><strong>What NOT to worry about</strong>: the blast radius is small — one seed point,
+  one id-range heuristic, the online allocation gap; tests keep the default
+  base and stay green.</li>
+<li><strong>Rationale</strong>: parked at the owner's request ("we can wait a bit longer
+  until we go there"); items 1-2 are worthwhile insurance before any
+  configurability.</li>
+</ul>
+<h2 id="copilot-skoda-feedback--discovery-and-verification-asks-parked-2026-11-11">Copilot Skoda feedback — discovery and verification asks (parked 2026-11-11)</h2>
+<p>From <code>docs/feedback/flua-feedback_copilot_skoda.md</code> — a from-scratch agent
+build of the Skoda pair in a pip-only workspace, with the bundled example
+excluded. Already shipped from that report: the generic mock-QA recipe in
+quickapp-patterns, the flua-setup default-mode wording fix, and structural
+assertion totals in <code>flua test --json</code>.</p>
+<ul>
+<li><strong>Docs lookup (the #1 ask)</strong> — <code>docs_search</code> (excerpts + stable section
+  ids), <code>docs_read</code> with heading/line ranges and output caps, task-oriented
+  entry points ("mock an HTTP service"). <code>docs_list</code> is 51 KB today; the
+  agent did filesystem archaeology instead of MCP reads.</li>
+<li><strong>Agent-facing tool map</strong> — one compact response listing every MCP tool
+  with exact names and example calls; invalid-argument errors should carry
+  a valid example.</li>
+<li><strong>Virtual time vs real I/O recipe</strong> — how <code>--step</code> advances while socket
+  I/O is pending; an <code>eventually(predicate, timeout)</code> helper and an
+  awaitable request helper for test QAs. Reconfirmed by the Sonos offline
+  suite report (docs/feedback/sonos_flua_26_11_13.md): the #1 friction —
+  at <code>--speed 50</code> a 300 ms virtual delay is ~6 ms wall, shorter than a
+  localhost round-trip, so fixed-delay waits fail everywhere; wall-paced
+  messages spread out in virtual time, so poll timeouts must scale with
+  <code>--speed</code>. Ask shape: a <code>t:waitFor(cond, timeout, cb)</code> in flua-test plus
+  the (now added) skill warning. The pipe-buffering false-hang note is
+  documented in the test skill.</li>
+<li><strong>ws mock deferred replies</strong> — the ws handler's reply is synchronous-only;
+  a sentinel + <code>ws:reply(conn, data)</code> would enable reply-latency/
+  reordering/timeout tests against the client's request queue (SonosLib's
+  30 s command timeout is untestable without it). Event latency already
+  mocks via <code>setTimeout</code> + <code>ws:send</code>.</li>
+<li><strong>flua-test verdict visibility</strong> — PASS/FAIL lines emit at DEBUG level
+  with the standard prefix; a mode where verdicts stand out (level/tag) in
+  plain text would make <code>grep FAIL</code> pipelines cleaner (CI use).</li>
+<li><strong>Pack verification</strong> — SHIPPED (the two repeated asks merged):
+  <code>--tool inspectFQA FILE [--json]</code> (metadata, file inventory, the
+  apiVersion marker, placeholder-vs-baked variables, UI surface, IP leak
+  scan) and <code>--tool pack --verify</code> (the same inspection right after
+  packing plus the declared-placeholder check). The remaining sliver, if
+  ever wanted: a full source-aware diff of the packed main against the
+  source (byte-compare is wrong — the bake rewrites --%%var lines).</li>
+<li><strong>Skill installation vs invocation</strong> — workspace skill files and the
+  editor's skill loader can disagree; a setup/doctor check should report
+  which skills are local docs vs registered, and how to load each.</li>
+<li><strong>Version-stamped agent docs</strong> — skills/instructions carrying their
+  source version + an offline freshness check; the report found conflicting
+  default-mode statements between surfaces.</li>
+<li><strong>Verification-layer boundaries</strong> — tool summaries should say what each
+  check proves (static ≠ runtime; mock ≠ car; <code>_FLUA</code> removal tests branch
+  logic, not firmware).</li>
+<li><strong>Simplify the upload wire format</strong> — with <code>initialProperties.apiVersion</code>
+  in every flua-packed .fqa (the real HC3 format marker, live-verified),
+  the tools could drop the multipart <code>/quickApp/import</code> path and use the
+  plain JSON create like plua does. Parked by decision (2026-11-11): the
+  import endpoint stays as belt-and-braces. When revisited: switch
+  uploadFQA/uploadQA/installHelper/proxy to the JSON create, keep
+  <code>Hc3Remote.multipart</code> only if still needed, keep the sim's multipart
+  parsing + the skill's multipart recipe as the marker-less-package
+  fallback.</li>
+</ul>
+<p>Parked 2026-11-12, from the custom-icon work (User<id> sets, uploadExternalIconSet):</p>
+<h2 id="qa-self-installs-its-own-icon-set-idempotent-no-stored-state">QA self-installs its own icon set (idempotent, no stored state)</h2>
+<ul>
+<li><strong>What</strong>: an example QA + quickapp-patterns skill section for "ensure my
+  icon set exists": on init, <code>api.get("/icons")</code> -&gt; filter <code>deviceType ==
+  self.type</code> and <code>iconSetName</code> starting with <code>User</code>; fetch each candidate's
+  state file via <code>net.HTTPClient</code> from
+  <code>http://127.0.0.1/assets/userIcons/devices/&lt;set&gt;/&lt;set&gt;&lt;state&gt;.png</code>
+  and byte-compare with the bundled icon; match -&gt; already installed -&gt;
+  <code>updateProperty("deviceIcon", id)</code>; no match -&gt; <code>uploadExternalIconSet</code>
+  -&gt; new id. Replaces the quickVar/internalStorage "already downloaded?"
+  bookkeeping that went stale on QA reinstall (duplicate sets, lost ids).</li>
+<li><strong>Ground truth (live-verified 5.22x)</strong>: the HC3 serves uploaded icon
+  files byte-identical (md5-equal) under <code>/assets/userIcons/devices/</code>; the
+  fibaro tree is placeholder art for User sets; binary/multilevel sets have
+  no base file, only state files; the named shutter states serve under the
+  same <code>&lt;set&gt;&lt;state&gt;.png</code> naming (live-verified with a baseShutter set,
+  id 1111); custom ROOM/SCENE icons serve FLAT —
+  <code>/assets/userIcons/rooms/&lt;iconName&gt;.&lt;ext&gt;</code> and
+  <code>/assets/userIcons/scenes/&lt;iconName&gt;.&lt;ext&gt;</code>, no <code>&lt;set&gt;/</code> directory
+  (live-verified: room id 1001, scene id 1001 — each category has its
+  own id sequence); icons must be &gt;= ~128x128
+  (<code>INVALID_ICON_SIZE</code> otherwise); POST <code>/api/icons</code> multipart contract:
+  <code>type=device</code>, <code>deviceTemplate=&lt;type&gt;</code>, file fields per the provider
+  (<code>icon</code>/<code>icon0</code>+<code>icon100</code>/<code>icon0..100</code>/<code>iconOpening...</code>), response
+  <code>201 {"id":N,"iconSetName":"User&lt;N&gt;","fileExtension":"png"}</code>.
+  DELETE contract (mined from the web UI's Angular bundle + live-verified):
+  <code>DELETE /api/icons?type=&lt;device|room|scene&gt;&amp;id=N&amp;name=&lt;set&gt;&amp;fileExtension=&lt;ext&gt;</code>
+  — <code>type</code> is the icon CATEGORY (not deviceType; WRONG_TYPE otherwise),
+  <code>id</code> is required (MISSING_PARAMETER); 200 + empty body on success. POSTs
+  to unknown /api/icons/* paths HANG the connection — never guess there.
+  (<code>flua --tool icons ui</code> — the icon manager — builds on all of this.)</li>
+<li><strong>The 11111/11112 split (probed from a QA on the controller, settled)</strong>:
+  through <code>api.get("/proxy?url=http://localhost:PORT/&lt;path&gt;")</code>, <strong>11112</strong>
+  is the full local API — JSON bodies that <code>api.get</code> decodes into Lua
+  tables (synchronous + credential-free recipe for GETs). <strong>11111</strong>
+  answers 200 with non-JSON bodies for such GETs (<code>nil, 200</code> after the
+  decode step); its one established use is Fibaro's own <code>uploadIconFiles</code>
+  (POST <code>http://127.0.0.1:11111/api/icons</code>). <strong>Neither port serves the
+  asset tree</strong> — <code>net.HTTPClient</code> to <code>127.0.0.1:11112/assets/...</code> 404s
+  ("The requested method does not exist"), 11111 501s. The real icon
+  source is the plain web server: <code>http://&lt;hc3&gt;/assets/userIcons/devices/...</code>
+  on port 80, served by nginx <strong>credential-free</strong> (verified both from a QA
+  on the controller and externally) — that is the canonical icon-fetch
+  recipe, and flua online rewrites <code>127.0.0.1</code> to the controller keeping
+  port 80 with no auth.</li>
+<li><strong>flua emulation divergences found along the way</strong>: (1) FIXED —
+  <code>net.HTTPClient</code> and the <code>/proxy</code> fetcher corrupted binary bodies (the
+  utf-8-replace decode inflated a 2442B PNG to 4829B of mojibake):
+  responses now travel as raw <code>bytes</code> (lupa carries them into Lua strings
+  unchanged; a str channel cannot be byte-faithful — even latin-1 doubles
+  up at the bridge). Pinned by binary <code>/blob</code> tests. (2) flua rewrites
+  11111 and 11112 identically to the standard API — faithful for 11112,
+  too lenient for 11111 GETs (the controller answers non-JSON there).
+  (3) <code>api.get("/proxy?...")</code> of a binary body returns the raw bytes
+  where the HC3 nils it — kept as a deliberate flua extension (the bytes
+  are what recipes need); document it. (4) flua's <code>/proxy</code> route ignores
+  the HC3's <code>username</code>/<code>password</code> query parameters (Fibaro's own
+  <code>getProxyUri(uri, login, password)</code> helper — the undocumented
+  target-auth surface; no user code seen using it yet). Fix when needed:
+  prepend them as userinfo in <code>proxy_get</code> so <code>fetch_url</code>'s existing
+  userinfo→Basic path applies; pin with a mock-server test.</li>
+<li><strong>Flua angle</strong>: recipe is online-only (needs <code>/api/icons</code> + the 11111
+  loopback; the sim has the catalog route but no asset tree — degrade
+  gracefully). Testable against the mock HC3. Related parked options from
+  the same session: a <code>_FLUA.saveIcon(set, file, bytes)</code> bridge call and
+  lazy fetch+cache in the icon channel (online/proxy) so the viewer warms
+  the cache on demand — both "wait for now".</li>
+</ul>
+<h2 id="static-undefined-global-detection-in---check-hassqa-field-report-2026-11-17">Static undefined-global detection in <code>--check</code> (HassQA field report, 2026-11-17)</h2>
+<p>A luacheck-style pass over the <code>--%%file</code> closure — known flua/HC3 globals
+whitelisted — would have caught three real bugs statically (an undefined
+<code>PCALL</code>, a <code>d.state</code> typo, a wrong variable in an error path) that
+<code>--check</code> passed. Highest-value single item in the report. Needs a real
+static-analysis pass over compiled bytecode (a mini-linter), not a patch;
+the runtime <code>--%%warn:stubApi</code>/<code>bridge-debug</code> channels catch the dynamic
+half meanwhile.</p>
+<h2 id="ui-list-element-shipped-in-flua-hc3-blank-for-qas--live-verified-522x">UI <code>list</code> element (SHIPPED in flua; HC3-blank for QAs — live-verified 5.22x)</h2>
+<ul>
+<li><strong>What</strong>: the sonosGroup data-bound <code>list</code> — data pushed via
+  <code>updateView(name, "data", rows)</code>, the item template in <code>components</code>
+  with <code>{{data.field}}</code> templating, per-item direct-action bindings.
+  Implemented in the compiler (verbatim template passthrough), the viewer
+  (substitution + per-item args), and <code>examples/list.lua</code> /
+  <code>list-child.lua</code> (2026-11-24).</li>
+<li><strong>The live verdict</strong>: the HC3 app renders lists only from a plugin's
+  packaged view file (sonosGroup's <code>json/v2/view.json</code>), not from a QA's
+  or child's <code>uiView</code> — both blank there. Lists stay a flua sim/dev
+  surface; an HC3-bound QA needs the plugin-view route. The separate
+  <code>onElementReleased</code> list-item event was not needed for the shipped
+  subset.</li>
+</ul>
+<h2 id="declarative-eventbinding-execution--the-remaining-half-2026-11-23">Declarative eventBinding execution — the remaining half (2026-11-23)</h2>
+<ul>
+<li><strong>Shipped</strong>: <code>deviceAction</code> bindings now execute in flua's viewer as real
+  device actions (the child-UI path — <code>--tool ui --as-lua --child</code>,
+  live-verified HC3 delivery: actionName = the child class's method).</li>
+<li><strong>Still parked</strong>: <code>updateClientView</code> / <code>updateDeviceProperty</code> bindings
+  and <code>{{device.properties.x}}</code> / <code>{{data.x}}</code> argument templating — the
+  HC3 client resolves them, flua's viewer does not. Same trigger as before:
+  promote when a QA ported from the new firmware needs them offline.</li>
+</ul>
+</body>
+</html>

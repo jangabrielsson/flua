@@ -1,0 +1,181 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Response to "Experience using flua to test and debug Fibaro QuickApps"</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1 id="response-to-experience-using-flua-to-test-and-debug-fibaro-quickapps">Response to "Experience using flua to test and debug Fibaro QuickApps"</h1>
+<p>Reply to the GPTAstra feedback report (<code>GPTAstra_using_flua.md</code>),
+addressed to its author. The report was reviewed against the current tree;
+release at the time of this response: <strong>0.1.112</strong> (the report's pilot ran
+0.1.84, its installed baseline 0.1.104, with 0.1.111 spot-checks — the
+version trail mattered a lot, as you suspected).</p>
+<p>Thank you for the report — the evidence discipline (versioned results,
+source hashes, adapters disclosed, "not rerun" and "not verified"
+qualifications) is exactly what makes this actionable. Several findings
+turned out to be already fixed, one turned out to be a real contract bug
+we could verify against a live HC3, and the rest are filed.</p>
+<h2 id="already-fixed-before-this-report-0184--current">Already fixed before this report (0.1.84 → current)</h2>
+<ul>
+<li><strong>Finding 6, instant-mode "bunched callbacks and ordering failures"</strong> —
+  fixed in 0.1.111: instant mode is now deadline-ordered (the same
+  discipline as <code>--step</code>); each callback observes its own deadline. The
+  symptom you recorded on 0.1.84/0.1.104 cannot happen anymore. The
+  stale "instant is unsafe" caveat was also removed from USAGE.md and the
+  migration skill.</li>
+<li><strong>Finding 7, full-template restart "lost reference"</strong> — your failure was
+  on 0.1.84; the updateView aliasing / <code>lost reference</code> bug was fixed in
+  0.1.87 and is pinned by <code>test_update_view_alias_regression</code>. Very likely
+  closed. <strong>Please rerun your preserved full-template reproduction on
+  0.1.112</strong> — that is the one check only you can do, and if it still
+  fails we want the reduced repro.</li>
+<li><strong>Finding 8, assertion counts alone are not a verdict</strong> — largely
+  covered by 0.1.112: <code>--strict-tests</code> makes unhandled callback errors
+  sticky (exit 1 even if a later callback exits 0) and <code>--result-json</code>
+  writes a normalized final record (<code>passed</code>/<code>failed</code>/<code>timeout</code>, exit
+  code, runtime, clock mode, wall/virtual seconds, failures with kinds).
+  What remains (the <code>runtime_error</code>/<code>incomplete</code> distinction and an
+  explicit suite-completed marker) is filed below.</li>
+<li><strong>Finding 13, <code>--%%svar</code></strong> — shipped in 0.1.110. Your semantic notes are
+  accurate and match the implementation: svar wins over a same-named var,
+  blank package values (<code>,""</code>) are the distribution-safe spelling, and the
+  directive masks the editor but does not encrypt. The docs-prominence ask
+  is filed below.</li>
+<li><strong>Finding 4, PLua include paths</strong> — mostly fixed since your versions:
+  <code>--%%include</code>/<code>--%%file</code> anchor to the declaring file, the legacy
+  <code>--%%file:path:name</code> spelling gets an explicit migration hint in
+  <code>--check</code> and <code>--tool migrate</code>, and the migrate tool scans projects for
+  plua leftovers. The remaining ask (a diagnostic naming declared/base/
+  resolved paths) is filed as a small follow-up.</li>
+</ul>
+<h2 id="changed-in-response-to-the-report">Changed in response to the report</h2>
+<h3 id="finding-5--property-endpoint-contract-verified-against-a-live-hc3-fixed">Finding 5 — property endpoint contract (verified against a live HC3, fixed)</h3>
+<p>You were right, and the sim was wrong. A read-only capture against a real
+controller (recorded in <code>docs/feedback/hc3_property_endpoint_capture.md</code>)
+confirmed:</p>
+<table>
+<thead>
+<tr>
+<th>Case</th>
+<th>Status</th>
+<th>Body</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>boolean <code>false</code></td>
+<td>200</td>
+<td><code>{"value": false, "modified": 1793263194}</code></td>
+</tr>
+<tr>
+<td>zero</td>
+<td>200</td>
+<td><code>{"value": 0, "modified": 1793263194}</code></td>
+</tr>
+<tr>
+<td>empty string</td>
+<td>200</td>
+<td><code>{"value": "", "modified": 1793263194}</code></td>
+</tr>
+<tr>
+<td>object</td>
+<td>200</td>
+<td><code>{"value": {}, "modified": 1793263194}</code></td>
+</tr>
+<tr>
+<td>missing property</td>
+<td>404</td>
+<td><code>null</code></td>
+</tr>
+</tbody>
+</table>
+<p>flua's <code>GET /devices/{id}/properties/{name}</code> now returns the same envelope
+for scalars, objects and the computed sun times, 404/null for missing
+properties, with <code>modified</code> tracked per device (initialized at
+registration/first read, advanced on every property change). The contract
+is pinned by <code>tests/test_api.py::test_device_property_get</code>. <strong>Your
+template's scalar-response adapter is no longer needed</strong> — the QA-side
+<code>{value=...}</code> validation it wrapped around should now pass unmodified
+against the sim.</p>
+<h3 id="finding-9--documentationskill-inconsistencies-all-fixed">Finding 9 — documentation/skill inconsistencies (all fixed)</h3>
+<p>Verified against the current tree and corrected, plus one more found while
+checking:</p>
+<ul>
+<li><code>quickapp-dev.instructions.md</code> — mode example now says offline is the default</li>
+<li><code>flua-setup</code> skill — removed the "online mode is the default"
+  contradiction; LuaLS configuration now says Lua 5.4 (matching the
+  runtime and the shipped <code>.luarc.json</code>)</li>
+<li><code>flua-troubleshooting</code> skill — <code>.directives</code> → the current
+  <code>.flua-directives</code> mechanism; <code>pip show flua</code> → <code>python -m pip show
+  fibaro-flua</code> (correct distribution name)</li>
+<li><code>plua-migration</code> skill — removed the stale "<code>--instant</code> is unsafe for
+  <code>os.time()</code>-relative logic" caveat (0.1.111 invalidated it)</li>
+</ul>
+<p>Your point about generated-vs-canonical consistency is taken: these now
+match, and the packaged copies are guarded by byte-equality sync tests so
+a drift fails CI rather than reaching users.</p>
+<h2 id="parked-filed-in-docsrainy_day_todosmd">Parked (filed in <code>docs/rainy_day_todos.md</code>)</h2>
+<ul>
+<li><strong>Finding 8 remainder</strong> — <code>runtime_error</code>/<code>incomplete</code> outcome values
+  and an explicit suite-completed marker in <code>--result-json</code></li>
+<li><strong>Finding 13 remainder</strong> — <code>--%%svar</code> prominence in credential examples
+  and a migrate-scan mention (plua parsers ignore svar, so a converted QA
+  can drop variables in a plua-packaged flow — your compatibility warning
+  is correct)</li>
+<li><strong>Finding 10</strong> — an integrated "test an existing PLua project without
+  rewriting it" workflow skill (recording versions, resolving the
+  companion-file graph, disclosed adapters, clock choice, restart as a
+  distinct boundary)</li>
+<li><strong>Finding 11</strong> — the network-isolation guard (offline sim ≠ contained
+  network): filed as a simplified <code>--network-policy deny|loopback</code>, with
+  the full allowlist/DNS/redirect machinery explicitly rejected</li>
+<li><strong>Finding 12</strong> — an evidence-packaging checklist (versions, hashes,
+  clock settings, adapters, verdict, trace locations, redaction)</li>
+<li><strong>Finding 4 remainder</strong> — the richer include diagnostic</li>
+</ul>
+<h2 id="your-priority-list-one-line-each">Your priority list, one line each</h2>
+<ul>
+<li><strong>High — property endpoint (5):</strong> done, live-capture-verified.</li>
+<li><strong>High — run outcomes (8):</strong> mostly done in 0.1.112; the enum refinement
+  is parked.</li>
+<li><strong>High — consistent guidance (6 and 9):</strong> 6 was a bug (fixed 0.1.111);
+  9's four inconsistencies are fixed.</li>
+<li><strong>Next — harness recipe (4 and 10):</strong> 4 mostly done; 10 parked.</li>
+<li><strong>Next — credentials (13):</strong> shipped 0.1.110; docs prominence parked.</li>
+<li><strong>Investigate — restart case (7):</strong> likely fixed by 0.1.87; a rerun on
+  0.1.112 on your preserved template is the decisive test, and we'd be
+  glad for the result either way.</li>
+</ul>
+<p>Please rerun your template suite on 0.1.112 — in particular without the
+scalar-response adapter — and the full-template restart. Any new findings
+get the same triage.</p>
+<p>— flua maintainers</p>
+</body>
+</html>
