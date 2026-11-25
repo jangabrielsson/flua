@@ -683,16 +683,18 @@ requirement is about the HC3 app.
 
 Every element takes `weight=` and `color=`, carried into the generated
 `style` (`style.weight`/`style.color` — the HC3's own views use both).
-`weight` is the element's share of its container: side-by-side elements
-split the row width by their weights, and rows split the vertical space by
-their weights (flua hoists a lone element's weight onto its row) — but the
-HC3 app only applies the split inside FIXED-height layouts; a QA's
-(auto-height) UI ignores weights vertically, and weight never changes text
-size. An `image` element renders at its natural aspect, width-capped by
-its container (`max-width:100%`, `height:auto` on the HC3) — to make it
-taller use a portrait source image or give it a wider container. flua's
-viewer renders images the same way (natural aspect, width-capped — the
-weight is not a size) and tints buttons by color.
+`color` is any CSS color string (`'red'`, `'#ff0000'`, `'rgb(255,0,0)'`):
+the HC3 applies it as a label's TEXT color and a button's BACKGROUND
+(flua's viewer does the same). `weight` is the element's share of its
+container: side-by-side elements split the row width by their weights, and
+rows split the vertical space by their weights (flua hoists a lone
+element's weight onto its row) — but the HC3 app only applies the split
+inside FIXED-height layouts; a QA's (auto-height) UI ignores weights
+vertically, and weight never changes text size. An `image` element renders
+at its natural aspect, width-capped by its container (`max-width:100%`,
+`height:auto` on the HC3) — to make it taller use a portrait source image
+or give it a wider container. flua's viewer renders images the same way
+(natural aspect, width-capped — the weight is not a size).
 
 Neither is editable on the HC3: the web UI editor doesn't know the
 elements, so it cannot edit them and an edit there can rewrite the view
