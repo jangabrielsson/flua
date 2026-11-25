@@ -1449,6 +1449,35 @@ def test_wheel_ships_every_example_file() -> None:
     assert not uncovered, f"examples not covered by package-data globs: {uncovered}"
 
 
+def test_viewer_script_parses() -> None:
+    # the viewer's whole page lives in one inline script — a stray brace
+    # ships a blank viewer and a dead uibuilder preview (the 0.1.195
+    # regression). node --check guards it when node is available.
+    import re
+    import shutil
+    import subprocess
+
+    if shutil.which("node") is None:
+        pytest.skip("node not installed")
+    viewer = (
+        Path(__file__).resolve().parent.parent
+        / "src"
+        / "flua"
+        / "setup_templates"
+        / "viewer"
+        / "index.html"
+    )
+    scripts = re.findall(r"<script>(.*?)</script>", viewer.read_text(encoding="utf-8"), re.S)
+    assert scripts, "the viewer carries no inline script"
+    result = subprocess.run(
+        ["node", "--check", "-"],
+        input=scripts[0],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+
+
 def test_packaged_skills_match_the_repo() -> None:
     # the wheel ships the skills; a sync guard keeps the copies honest
     repo = Path(__file__).resolve().parent.parent
