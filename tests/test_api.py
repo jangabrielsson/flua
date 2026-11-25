@@ -475,6 +475,53 @@ def test_update_view_never_aliases_one_object_into_two_state_paths(api: Api) -> 
     assert view_options is not ui_options  # independent copies, no alias
 
 
+def test_update_view_source_remaps_to_image_url(api: Api) -> None:
+    # the HC3's updateView takes 'source' for an image element's picture (its
+    # legacy property name — live-verified on a real 5.221 HC3); the sim
+    # remaps it to the url the viewer reads
+    api.register_qa(
+        5000,
+        "qa",
+        None,
+        {
+            "uiView": [
+                {
+                    "type": "horizontal",
+                    "components": [
+                        {"image": "art", "name": "art", "type": "image", "url": "old.png"}
+                    ],
+                }
+            ]
+        },
+    )
+    assert api.dispatch(
+        "POST",
+        "/plugins/updateView",
+        {
+            "deviceId": 5000,
+            "componentName": "art",
+            "propertyName": "source",
+            "newValue": "new.png",
+        },
+    ) == (None, 204)
+    device = api.state.devices[5000]
+    assert device["view"]["art"] == {"url": "new.png"}
+    assert device["properties"]["uiView"][0]["components"][0]["url"] == "new.png"
+    assert "source" not in device["view"]["art"]
+    assert "source" not in device["properties"]["uiView"][0]["components"][0]
+    # a non-image element keeps the property verbatim
+    api.register_qa(5001, "qa2", None, {
+        "uiView": [{"type": "horizontal", "components": [
+            {"label": "lbl", "name": "lbl", "type": "label", "text": "x"}]}]
+    })
+    assert api.dispatch(
+        "POST",
+        "/plugins/updateView",
+        {"deviceId": 5001, "componentName": "lbl", "propertyName": "source", "newValue": "y"},
+    ) == (None, 204)
+    assert api.state.devices[5001]["view"]["lbl"] == {"source": "y"}
+
+
 def test_get_view_returns_layout_with_live_values(api: Api) -> None:
     # GET /plugins/getView?id=... — the legacy $jason layout with the
     # updateView state merged in, like the HC3 UI serves it (user code parses

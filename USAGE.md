@@ -815,13 +815,19 @@ into your source.
 -- })
 ```
 
-An `image` shows a picture from its `url` (live-updatable via
-`updateView(elm, "url", …)`; the HC3's own legacy views carry them, e.g.
-russound's album art). It sits inline in a row like a button:
+An `image` shows a picture from its `url` (the HC3's own legacy views
+carry them, e.g. russound's album art). It sits inline in a row like a
+button:
 
 ```lua
 --%%u:{image="albumArt",url="http://host/art.png"}
 ```
+
+Changing the picture at runtime: on the HC3 use
+`updateView(elm, "source", url)` — `source` is the image element's legacy
+property name, which the HC3 remaps to the url (live-verified 5.221).
+flua's sim/viewer accept both spellings (`"source"` remaps to the url the
+viewer reads).
 
 On the real HC3, `{{device.properties.x}}` templated urls and `useProxy`
 are resolved by the app client; flua's viewer renders the raw url. The

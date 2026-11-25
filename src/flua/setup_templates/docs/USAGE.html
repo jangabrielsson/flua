@@ -883,11 +883,16 @@ into your source.</p>
 --   initialProperties = { uiView = uiView },
 -- })
 </code></pre>
-<p>An <code>image</code> shows a picture from its <code>url</code> (live-updatable via
-<code>updateView(elm, "url", …)</code>; the HC3's own legacy views carry them, e.g.
-russound's album art). It sits inline in a row like a button:</p>
+<p>An <code>image</code> shows a picture from its <code>url</code> (the HC3's own legacy views
+carry them, e.g. russound's album art). It sits inline in a row like a
+button:</p>
 <pre><code class="language-lua">--%%u:{image=&quot;albumArt&quot;,url=&quot;http://host/art.png&quot;}
 </code></pre>
+<p>Changing the picture at runtime: on the HC3 use
+<code>updateView(elm, "source", url)</code> — <code>source</code> is the image element's legacy
+property name, which the HC3 remaps to the url (live-verified 5.221).
+flua's sim/viewer accept both spellings (<code>"source"</code> remaps to the url the
+viewer reads).</p>
 <p>On the real HC3, <code>{{device.properties.x}}</code> templated urls and <code>useProxy</code>
 are resolved by the app client; flua's viewer renders the raw url. The
 viewer loads whatever a browser <code>&lt;img&gt;</code> can — including <code>data:</code> URIs, so

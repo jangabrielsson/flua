@@ -343,8 +343,11 @@ def plugin_update_view(state: SimState, req: ApiRequest) -> tuple[Any, int]:
     component_name = str(req.body.get("componentName", ""))
     property_name = str(req.body.get("propertyName", ""))
     new_value = req.body.get("newValue")
-    component = view.setdefault(component_name, {})
-    component[property_name] = new_value
+    # the HC3's updateView remaps 'source' to the image element's url (its
+    # legacy property name — a real 5.221 HC3 changes the picture on
+    # self:updateView(elm,'source',url)); mirror it so QAs behave the same
+    # in the sim (the viewer reads device.view.<elm>.url)
+    target_name = [property_name]
     # uiView-format devices (useUiView / qwikchild's generated UI): updateView
     # patches the COMPONENT itself — the HC3 contract the lib relies on (the
     # legacy tree merge above does not cover them)
@@ -356,10 +359,12 @@ def plugin_update_view(state: SimState, req: ApiRequest) -> tuple[Any, int]:
             # elements inside a tabView (their names never appear in the
             # top-level rows)
             if component.get("name") == component_name:
+                if property_name == "source" and component.get("type") == "image":
+                    target_name[0] = "url"
                 # store an independent copy: the same object must never
                 # live in two state paths — lupa's table_from dedup
                 # breaks on such aliases ('lost reference')
-                component[property_name] = copy.deepcopy(new_value)
+                component[target_name[0]] = copy.deepcopy(new_value)
                 return True
             for child in component.get("components") or []:
                 if _patch(child):
@@ -372,6 +377,8 @@ def plugin_update_view(state: SimState, req: ApiRequest) -> tuple[Any, int]:
         for row in ui_view:
             for comp in row.get("components") or []:
                 _patch(comp)
+    component = view.setdefault(component_name, {})
+    component[target_name[0]] = new_value
     if state.is_proxy(dev["id"]) and req.remote is not None:
         # the HC3's /plugins/updateView rejects external callers (400
         # 'The document is empty', live-verified) and cross-QA local calls
