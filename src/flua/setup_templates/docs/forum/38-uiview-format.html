@@ -12,8 +12,7 @@ compatible.</p>
 <p>What Fibaro has <i>not</i> published is documentation of the format.
 This post is our reverse-engineered field guide — everything below comes
 from black-box observation of firmware 5.221, our own controllers, and
-reading the app's behavior, <b>not</b> from any insider access. Treat it
-as our best guess. If you know better, correct us in a comment and we'll
+reading the app's behavior. Treat it as our best guess. If you know better, correct us in a comment and we'll
 update the post (and flua).</p>
 
 <h3>The shape</h3>
@@ -145,18 +144,7 @@ body rows (<code>collapsed</code> toggles at runtime).</li>
 <li><b>colorPicker</b> / <b>colorTemperaturePicker</b> — the RGB wheel
 and the temperature wheel.</li>
 <li><b>space</b> — a gap, or the divider with <code>borderTop</code>.</li>
-<li><b>list</b> — a data-bound list of rows. In our tests it only
-rendered from packaged plugin view files, never from a QA's own view —
-treat it as plugin-only until someone shows otherwise.</li>
 </ul>
-
-<h3>Plugin-only territory</h3>
-
-<p>Some things in the firmware's own views are out of reach for QAs, as
-far as we can tell: the <code>list</code> element (packaged view files),
-<code>nativeComponent</code>, and the <code>style.dynamic</code> flag you
-see on camera image streams (it appears in getView output but we found no
-consumer in the current app — likely a legacy of the old renderer).</p>
 
 <h3>Spelling it in flua</h3>
 
