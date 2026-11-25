@@ -1420,6 +1420,21 @@ def test_packaged_docs_match_the_repo() -> None:
     assert (packaged / "README.md").read_bytes() == (repo / "docs" / "README.md").read_bytes()
 
 
+def test_rendered_docs_html_matches_the_sources() -> None:
+    # the /docs channel serves the core guides as rendered .html (built by
+    # scripts/render-docs-html.py at sync time); the guard re-renders into a
+    # temp tree and fails when the committed pages drifted — a doc edit that
+    # forgot to re-render fails the suite instead of shipping stale HTML
+    repo = Path(__file__).resolve().parent.parent
+    result = subprocess.run(
+        [sys.executable, "scripts/render-docs-html.py", "--check"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+
+
 def test_packaged_instructions_match_the_repo() -> None:
     # quickapp-dev.instructions.md lives in the repo (.github/instructions,
     # auto-applied to all *.lua work) and ships in the wheel — keep the

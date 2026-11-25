@@ -1,0 +1,253 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>flua invariants & contracts</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1>flua invariants &amp; contracts</h1>
+<p>The behavioral contracts that define "flua works". Each invariant names the
+test(s) that pin it — if you change the behavior, the pin is the test to
+update (deliberately), and if you want to know what a piece of code must not
+break, the pin is the test to run. Companion to concurrency.md (execution
+model) and ARCHITECTURE.md (components).</p>
+<h2>Identity &amp; ids</h2>
+<ul>
+<li><strong>Engine-assigned QA ids start at 5000</strong> and increment, skipping ids the
+  sim already has. Lower ids belong to the HC3's namespace.
+  <em>Pinned by:</em> <code>tests/test_qa.py::test_qa_environments_are_isolated</code></li>
+<li><strong>Runtime-created devices draw ids from <code>FIRST_RUNTIME_ID = 900000</code></strong> —
+  child devices never collide with QA ids.
+  <em>Pinned by:</em> <code>tests/test_api.py::test_create_child_device</code></li>
+<li><strong>A proxy QA runs under its HC3 device id</strong> — the sim shadow and the HC3
+  device are the same id, so callbacks route to the right QA.
+  <em>Pinned by:</em> <code>tests/test_proxy.py::test_proxy_create_child_device_uses_hc3_id</code></li>
+<li><strong>Device 1 is the HC3 itself</strong>; its name is the controller name and its
+  sunrise/sunset follow the virtual clock, computed on read.
+  <em>Pinned by:</em> <code>tests/test_suncalc.py</code> (device-1 properties)</li>
+<li><strong>New devices land in the default room 219</strong> (which belongs to default
+  section 219), unless the seed says otherwise.
+  <em>Pinned by:</em> <code>tests/test_api.py::test_device_created_and_removed_events</code>,
+  <code>tests/test_qa.py::test_dynamic_load_from_file</code></li>
+</ul>
+<h2>API routing &amp; dispatch</h2>
+<ul>
+<li><strong>Handlers are pure</strong>: <code>(SimState, ApiRequest) -&gt; (data, status)</code>. Side
+  effects go through <code>req.emit</code> / <code>req.remote</code> / <code>forward_to_proxy</code>; handlers
+  never mutate Lua or block the pump.</li>
+<li><strong>Sim answers first; unknown ids forward</strong> (hybrid routing). An
+  offline-pinned QA (<code>--%%mode:offline</code>) never reaches the HC3 at all.
+  <em>Pinned by:</em> <code>tests/test_hc3.py::test_offline_directive_pins_secondary_qa_to_sim</code>,
+  <code>test_mode_directive_pins_secondary_qa_to_sim</code>,
+  <code>test_flua_namespace_ids_never_forward</code></li>
+<li><strong><code>api.get('/devices')</code> online serves the union</strong> of sim and HC3 devices;
+  the sim wins on id clashes, so a proxy QA and its HC3 twin count once.
+  <em>Pinned by:</em> <code>tests/test_hc3.py::test_devices_list_is_union_of_sim_and_hc3</code>,
+  <code>tests/test_proxy.py::test_devices_list_has_no_proxy_doublets</code></li>
+<li><strong><code>api.hc3.*</code> bypasses the hybrid dispatch</strong> (always the real HC3 online;
+  the sim stands in offline).
+  <em>Pinned by:</em> <code>tests/test_hc3.py::test_api_hc3_bypasses_the_hybrid_dispatch</code></li>
+<li><strong>A <code>--%%mode:readonly</code> QA reads the HC3 but never mutates it</strong> — any
+  POST/PUT/DELETE that would reach the controller is refused with 403
+  before dispatch; sim-owned writes still work (they never touch the
+  controller). <code>readonly+call</code> unlocks exactly the device-action channel
+  (<code>POST /devices/{id}/action/...</code>, <code>fibaro.call</code>) — create/delete stays
+  blocked.
+  <em>Pinned by:</em> <code>tests/test_api.py::test_readonly_mode_refuses_remote_writes_at_the_gate</code>,
+  <code>tests/test_api.py::test_readonly_plus_call_unlocks_device_actions_only</code>,
+  <code>tests/test_hc3.py::test_readonly_mode_reads_online_but_never_writes</code>,
+  <code>tests/test_hc3.py::test_readonly_plus_call_runs_actions_but_blocks_writes</code></li>
+</ul>
+<h2>refreshStates feed &amp; events</h2>
+<ul>
+<li><strong>State updates are EVENTS; configuration edits are CHANGES.</strong> Property
+  changes → <code>DevicePropertyUpdatedEvent</code>; name/room edits → the <code>changes</code>
+  feed. <code>GET /refreshStates?last=N</code> returns both, seq strictly increasing.
+  <em>Pinned by:</em> <code>tests/test_api.py::test_refresh_states</code></li>
+<li><strong>Device events carry the real HC3's envelope</strong> — <code>type/created/
+  createdMillis/sourceType/objects/data</code>. Global-variable events carry the
+  lighter envelope (no <code>objects</code>/<code>sourceId</code>), like the captured HC3 samples.
+  <em>Pinned by:</em> <code>test_refresh_states</code>, <code>test_global_variable_events</code></li>
+<li><strong>Events are emitted only when the value actually changes</strong> — Lua equality
+  semantics (<code>true ~= 1</code>, numbers compare across int/float). An
+  <code>updateProperty(v)</code> with <code>v</code> already set is silent.
+  <em>Pinned by:</em> <code>test_refresh_states</code>, <code>test_global_variable_events</code></li>
+<li><strong>Device creation/removal emit <code>DeviceCreatedEvent</code> / <code>DeviceRemovedEvent</code></strong>
+  in the HC3's shapes: created carries <code>{id}</code>, removed carries
+  <code>{id, deviceName, type, roomId, roomName, sectionName}</code>. Emitted for QA
+  registration, child create/remove, and <code>DELETE /devices/{id}</code> — and
+  delivered to every <code>RefreshStateSubscriber</code> through the pump.
+  <em>Pinned by:</em> <code>test_api.py::test_device_created_and_removed_events</code>,
+  <code>test_qa.py::test_device_created_and_removed_events_reach_subscribers</code></li>
+<li><strong>Proxy devices never emit local refresh events</strong> — the real HC3 owns them
+  and its event comes back through the refreshStates poll; a local one would
+  duplicate it. Same for actions arriving from proxy callbacks.
+  <em>Pinned by:</em> <code>tests/test_proxy.py::test_proxy_update_property_forwarded_event_comes_from_hc3</code>
+  (plus the created/removed no-duplicate assertions in the child tests)</li>
+</ul>
+<h2>Virtual clock &amp; timers</h2>
+<ul>
+<li><strong>All timers schedule against the virtual clock</strong>; the pump advances it by
+  real elapsed time (<code>--speed</code> multiplies, <code>--instant</code> jumps deadline to
+  deadline). <code>os.time()</code>/<code>_FLUA.millitime()</code> read the virtual clock.
+  <em>Pinned by:</em> <code>tests/test_clock.py</code>, <code>tests/test_virtual_time.py</code></li>
+<li><strong><code>--%%maxhours</code> / <code>--run-for</code> cap the horizon</strong>: timers beyond the
+  absolute virtual deadline never fire, so instant mode stops exactly at the
+  limit instead of racing past it.
+  <em>Pinned by:</em> <code>tests/test_annotations.py::test_maxhours_annotation_stops_endless_interval</code></li>
+<li><strong>A QA's timers are cancelled on restart</strong> — the old instance's pending
+  callbacks must never fire after <code>plugin.restart</code>.
+  <em>Pinned by:</em> <code>tests/test_sleep.py::test_plugin_restart_reruns_qa</code></li>
+<li><strong>Sleep defers, never drops</strong>: while a QA sleeps, its messages queue and
+  run after the sleeping callback resumes; timers due during the sleep run
+  after it.
+  <em>Pinned by:</em> <code>tests/test_sleep.py</code> (the whole file)</li>
+</ul>
+<h2>QA boot</h2>
+<ul>
+<li><strong><code>--%%var</code> values are served as <code>quickAppVariables</code> on the QA's device
+  before <code>onInit</code> runs</strong> — like the HC3 creating the device with its
+  <code>initialProperties</code> first. <code>api.get("/devices/&lt;id&gt;")</code> inside <code>onInit</code>
+  already shows them, so QAs that build child devices from variable names
+  (the SolarEdge Live pattern) work.
+  <em>Pinned by:</em> <code>tests/test_modbus_mock.py::test_var_directives_seed_quick_app_variables</code></li>
+<li><strong><code>--%%svar</code> values are <code>--%%var</code> values typed <code>password</code></strong>: the device's
+  <code>quickAppVariables</code> entry carries <code>type: "password"</code> (the HC3's web quickvar
+  editor masks it with <code>*****</code>), while <code>getVariable</code>/the API still return the
+  real value. A <code>--%%svar</code> wins over a same-named <code>--%%var</code>, and the
+  package bake (<code>--tool pack</code>/<code>flua export</code>) keeps the <code>password</code> type, so
+  the placeholder a distribution package ships stays masked on the receiving
+  HC3 too.
+  <em>Pinned by:</em> <code>tests/test_qa.py::test_svar_seeds_password_typed_variable</code>,
+  <code>tests/test_tools.py::test_build_fqa_svar_bakes_password_type</code></li>
+<li><strong><code>--strict-tests</code> failures are sticky</strong>: an unhandled callback error at
+  the timer/UI/net dispatch boundaries is recorded (never cleared), and the
+  final exit code becomes 1 even when a later callback calls
+  <code>_FLUA.exit(0)</code> — opt-in, so the default keeps the HC3 behavior where
+  callback errors only log. <code>--result-json</code> writes the verdict atomically
+  (a missing file after a kill is incomplete, never a pass).
+  <em>Pinned by:</em> <code>tests/test_dx.py::test_strict_tests_sticky_callback_failure</code>,
+  <code>test_strict_tests_covers_ui_callbacks</code>, <code>test_strict_tests_covers_net_callbacks</code>,
+  <code>test_result_json_statuses</code></li>
+<li><strong>HC3 string extensions exist</strong>: <code>string.split</code>, <code>string.starts</code>,
+  <code>string.ends</code> behave like the HC3's.
+  <em>Pinned by:</em> <code>tests/test_modbus_mock.py::test_string_starts_and_ends</code></li>
+</ul>
+<h2>Restart &amp; state survival</h2>
+<ul>
+<li><strong><code>plugin.restart</code> re-runs the QA's code</strong> (onInit again) while the device
+  struct survives: <code>quickAppVariables</code> and runtime property changes carry
+  over.
+  <em>Pinned by:</em> <code>tests/test_sleep.py::test_plugin_restart_reruns_qa</code></li>
+<li><strong>A QA restart revives <code>exited</code></strong> so the new code's timers are not refused;
+  a dead QA's timer registrations are dropped.
+  <em>Pinned by:</em> <code>tests/test_qa.py::test_exited_qa_restart_runs_timers_again</code></li>
+</ul>
+<h2>Graceful exit &amp; keep-alive</h2>
+<ul>
+<li><strong>A run ends when pending work drains</strong> — timers, queues, in-flight
+  requests/connections, and suspended QAs' remote calls all count (see
+  concurrency.md). <code>--%%keep-alive:true</code> (online) and <code>--%%mode:proxy</code> hold
+  the run open past idle; the HC3 poller alone never does.
+  <em>Pinned by:</em> <code>tests/test_hc3.py::test_keep_alive_directive_keeps_engine_pending</code></li>
+<li><strong>Background timers never keep the run alive</strong> — a callback tagged with
+  <code>_FLUA.background(fn)</code> still fires while the run lives, but its timers
+  are excluded from the pending-work check, so the run drains when the
+  real work is done (EventRunner's midnight scheduler). The tag rides the
+  function, so self-rescheduling loops inherit it; a QA whose only work is
+  tagged exits immediately at boot.
+  <em>Pinned by:</em> <code>tests/test_timers.py::test_background_timers_do_not_count_as_pending</code>,
+  <code>tests/test_qa.py::test_background_timers_fire_but_never_keep_the_run_alive</code>,
+  <code>tests/test_qa.py::test_background_only_qa_exits_immediately</code></li>
+<li><strong>Exit codes aggregate</strong>: a failing QA fails the process; the last failing
+  QA's code wins. Verdict lines go to stderr so stdout stays parseable.
+  <em>Pinned by:</em> <code>tests/test_agent_dx.py::test_multi_qa_exit_aggregation</code></li>
+<li><strong><code>--ui</code> serves the viewer and keeps the run alive</strong> — the server never
+  counts as pending work, the session does.
+  <em>Pinned by:</em> <code>tests/test_ui_server.py::test_ui_flag_keeps_api_alive_after_qa_drains</code></li>
+</ul>
+<h2>Lua bridge &amp; runtime</h2>
+<ul>
+<li><strong>Single-entry</strong>: Lua is entered only from <code>_FLUA.dispatch(batch)</code>; all
+  bridge messages are JSON-compatible dicts (<code>messages.py</code>). Never cross a
+  Lua function reference.</li>
+<li><strong><code>_PY</code> stays minimal</strong> — convenience lives in Lua
+  (<code>lua/init.lua</code>, <code>quickapp.lua</code>).</li>
+<li><strong>QAs are isolated</strong>: per-QA environments, globals, and timers; a QA's
+  <code>x = ...</code> never leaks into another.
+  <em>Pinned by:</em> <code>tests/test_qa.py::test_qa_environments_are_isolated</code></li>
+<li><strong>A QA's loaders run loaded code in the QA's own environment</strong>: <code>require</code>
+  and <code>dofile</code> are rebound per QA (a dofile'd file sees <code>fibaro</code>/<code>api</code>/<code>net</code>,
+  like a <code>--%%file</code> include), and <code>_FLUA.loadFile(path)</code> returns a chunk
+  bound to the QA's env. Raw <code>load</code>/<code>loadfile</code> with no env still compile
+  against the shared runtime <code>_G</code> (HC3 globals nil there) — pass the QA's
+  own <code>_G</code> explicitly.
+  <em>Pinned by:</em> <code>tests/test_qa.py::test_qa_dofile_and_loadfile_run_in_qa_env</code></li>
+<li><strong><code>flua-test</code> assertions are inert without flua</strong> — shipped to a real HC3,
+  every assertion is a no-op and <code>finish()</code> returns 0.
+  <em>Pinned by:</em> <code>tests/test_agent_dx.py::test_flua_test_noop_without_flua_runtime</code></li>
+</ul>
+<h2>Compatibility surfaces (do not change silently)</h2>
+<ul>
+<li><code>--%%</code> directives, CLI flags, public Python APIs (<code>LuaEngine</code>, <code>Api</code>,
+  <code>SimState</code>), and the Lua runtime APIs (<code>api.*</code>, <code>fibaro.*</code>,
+  <code>RefreshStateSubscriber</code>, event shapes) are compatibility-sensitive.</li>
+<li><strong>Directive parsing</strong>: later lines override, headers can appear anywhere,
+  non-header lines are ignored, <code>--%%var</code>/<code>--%%property</code> merge per key,
+  <code>--%%file</code> collects in order.
+  <em>Pinned by:</em> <code>tests/test_config.py</code>, <code>tests/test_annotations.py</code></li>
+<li><strong><code>--%%u</code> tabView</strong>: full-width (alone on its row), tabs hold rows in the
+  same shapes as top-level directives; emitted into <code>uiView</code> as a
+  full-width row component and into the legacy <code>$jason</code> as a section item;
+  <code>onTabChanged</code> routes through <code>uiCallbacks</code>; <code>updateView</code> reaches
+  elements nested inside tabs.
+  <em>Pinned by:</em> <code>tests/test_ui.py::test_tabview_compiles_to_uiview_and_legacy</code>,
+  <code>test_tabview_update_view_and_tab_changed_callback</code>,
+  <code>tests/test_qa.py::test_example_tabs_updateview_reaches_nested_elements</code></li>
+<li><strong>The examples are living fixtures</strong> — the test suite runs them; they must
+  keep terminating unless their purpose is to run forever.
+  <em>Pinned by:</em> <code>tests/test_sleep.py::test_example_*</code>, <code>tests/test_qa.py::test_example_*</code></li>
+</ul>
+<h2>Testing conventions (the suite's own contracts)</h2>
+<ul>
+<li><strong>Never hit a real HC3.</strong> Online/proxy tests run against local mock HC3
+  servers; live suites (<code>test_hc3_live.py</code>, <code>test_hc3_compat.py</code>) are opt-in
+  with <code>HC3_TEST=1</code>.</li>
+<li><strong>HOME is isolated per test</strong> — the developer's real <code>~/.env</code> and
+  <code>~/.flua.lua</code> never leak into a run (the autouse fixture in
+  <code>tests/conftest.py</code>).</li>
+<li><strong>Deterministic waits, no sleeps</strong>: assert on QA stdout (<code>capsys</code>) or mock
+  request records via <code>wait_until</code>/<code>wait_for_output</code>-style helpers, not
+  fixed delays.</li>
+<li><strong>Parallel by default</strong> (<code>-n auto</code>); <code>--serial</code> for debugging. Tests that
+  rewrite shared repo files must run against temp copies (the sync-skills
+  test does), or they race the other workers.</li>
+</ul>
+</body>
+</html>

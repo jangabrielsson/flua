@@ -49,6 +49,7 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "pytest-xdist>=3.6",
     "ruff>=0.6.0",
+    "markdown>=3.6",
 ]
 
 [tool.setuptools]

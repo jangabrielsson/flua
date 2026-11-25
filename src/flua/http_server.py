@@ -173,6 +173,23 @@ class ApiServer:
                     subpath = urllib.parse.unquote(path[len("/docs/") :])
                     if subpath.endswith("/"):
                         subpath += "index.html"
+                # the core reference docs render as .html (the .md source is
+                # not a page); old links and bookmarks to the .md form land
+                # on the rendered page
+                if subpath.endswith(".md") and _docs_file(subpath[: -3] + ".html") is not None:
+                    target = "/docs/" + subpath[: -3] + ".html"
+                    link = (
+                        f'<a href="{target}">'
+                        f"{target}</a>"
+                    ).encode()
+                    _write(
+                        writer,
+                        301,
+                        "text/html",
+                        link,
+                        {**_CORS, "Location": target},
+                    )
+                    return
                 hit = _docs_file(subpath)
                 if hit is None:
                     _respond(writer, 404, {"error": "not found"}, extra=_CORS)
@@ -305,7 +322,13 @@ def _write(
     body: bytes,
     extra: dict[str, str] | None,
 ) -> None:
-    reason = {200: "OK", 204: "No Content", 400: "Bad Request", 404: "Not Found"}.get(status, "OK")
+    reason = {
+        200: "OK",
+        204: "No Content",
+        301: "Moved Permanently",
+        400: "Bad Request",
+        404: "Not Found",
+    }.get(status, "OK")
     head = [f"HTTP/1.1 {status} {reason}", f"Content-Type: {content_type}"]
     head.append(f"Content-Length: {len(body)}")
     head.append("Connection: close")

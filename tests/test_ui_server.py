@@ -217,8 +217,21 @@ async def test_docs_channel_serves_packaged_tree(server) -> None:
     # un-styled posts get the injected theme block (VS Code webviews have no
     # browser default colors — the variables theme the page to the editor)
     assert "vscode-editor-background" in post
-    status, gheaders, guide = await asyncio.to_thread(_http_page, f"{base}/docs/USAGE.md")
-    assert status == 200 and "text/plain" in gheaders["Content-Type"] and "flua" in guide
+    # the core guides render as .html (their .md source is not a page): the
+    # old .md URL 301s to the rendered page — old links and bookmarks land
+    # on the readable form
+    class _NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    opener = urllib.request.build_opener(_NoRedirect())
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        await asyncio.to_thread(opener.open, f"{base}/docs/USAGE.md")
+    assert exc.value.code == 301
+    assert exc.value.headers["Location"] == "/docs/USAGE.html"
+    status, gheaders, guide = await asyncio.to_thread(_http_page, f"{base}/docs/USAGE.html")
+    assert status == 200 and "text/html" in gheaders["Content-Type"]
+    assert "flua" in guide and "<h1" in guide  # rendered markdown, not source
     # a missing file 404s, and ../ escapes the tree
     with pytest.raises(urllib.error.HTTPError) as exc:
         await asyncio.to_thread(_http_page, f"{base}/docs/nope.html")

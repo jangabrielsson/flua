@@ -1,0 +1,167 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>flua walkthroughs</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1>flua walkthroughs</h1>
+<p>Guided traces through the runtime's key flows, one mechanism at a time.
+Symbol references (<code>file.py::function</code>, <code>lua/init.lua::name</code>) stay accurate
+across line drift; pair with concurrency.md (the execution model) and
+invariants.md (the contracts).</p>
+<h2>1. A QA boots</h2>
+<p>The CLI path (<code>cli.py::_run</code>) and the in-engine path (<code>engine.load_qa_file</code>,
+used by <code>_FLUA.loadQAfromFile</code>) converge on the same machinery:</p>
+<ol>
+<li><strong><code>engine.start_qa</code></strong> → <code>engine._prepare_qa</code>: assign the id (from 5000,
+   skipping taken ids), resolve name/type/properties, and — critically —
+   <strong>register the QA as a device in the sim before any code runs</strong>
+   (<code>api/state.py::register_qa</code>, which also records the
+   <code>DeviceCreatedEvent</code>). Proxy QAs resolve their HC3 device first and run
+   under <em>its</em> id.</li>
+<li><code>_prepare_qa</code> enqueues a <code>startQA</code> message, and the CLI path then calls
+   <code>_FLUA.startQaFile</code> directly; both end in <code>lua/init.lua::runQa</code>, which
+   schedules the boot as the QA's own <strong>0 ms timer</strong> — every boot rides the
+   pump, so nothing re-enters Lua mid-dispatch.</li>
+<li><code>lua/init.lua::startQaInEnv</code>:
+   - builds the per-QA environment (<code>qaEnvFor</code>: isolated globals, <code>_G</code>,
+     <code>package</code>, per-QA <code>_FLUA</code> with its own qaId/config/arg);
+   - evaluates <code>--%%var</code> expressions and posts <code>qaVars</code>;
+   - loads extra <code>--%%file</code> files, then the main chunk;
+   - registers a stub instance (<code>qaInstances[qaId]</code>) <strong>before the chunk
+     runs</strong>, so a top-level <code>fibaro.sleep</code> can already resolve the QA.</li>
+<li><strong><code>bootstrapQa</code></strong> constructs the <code>QuickApp</code> from <code>_PY.device_for(qaId)</code>
+   (the same device the API serves — no bridge mismatch), merges <code>--%%var</code>
+   values into <code>quickAppVariables</code>, and constructs the instance —
+   <code>QuickApp:__init__</code> runs <code>onInit</code> synchronously, then
+   <code>initChildDevices</code>.</li>
+<li><strong><code>initChildDevices</code> calls <code>api.get('/devices?parentId=…')</code>.</strong> Offline
+   this is a fast sim read. Online, it <em>suspends the boot coroutine</em> like
+   any remote call — which is why a QA starting while another QA's remote
+   call holds the dispatch lock waits for it (the discovery behind
+   <code>test_slow_remote_call_does_not_freeze_other_qas</code>'s 200 ms delay).</li>
+<li>Finally <code>qaLoaded</code> is posted and the Python-side QA directory marks the
+   QA loaded.</li>
+</ol>
+<p>Ordering guarantee this depends on: the device exists before <code>onInit</code>
+(<code>engine._prepare_qa</code> comment), <code>__TAG</code> is bound before the files execute,
+and <code>onInit</code> runs before <code>initChildDevices</code> (the HC3 order).</p>
+<h2>2. <code>fibaro.sleep</code> suspends one QA, defers its messages</h2>
+<p>All in <code>lua/init.lua</code> (see concurrency.md for the table layout):</p>
+<ol>
+<li>The callback coroutine calls <code>fibaro.sleep(ms)</code> → <code>coroutine.yield(ms)</code>.</li>
+<li><code>resumeQa</code> sees a number: sets <code>sleeping[qaId] = true</code> and registers a
+   <strong>wake timer</strong> (<code>wakeTimers[id] = true</code> — never deferred).</li>
+<li>Every message for the QA while asleep (timers due, device actions,
+   refresh events) goes through <code>queueFor</code> into <code>workQueues[qaId]</code> instead
+   of running.</li>
+<li>The wake timer fires → <code>handlers.timerExpired</code> special-cases wake
+   timers: <code>sleeping[qaId] = nil</code>, then <code>resumeQa(qaId, co)</code> — the sleeping
+   callback finishes <strong>first</strong> — then <code>processWork(qaId)</code> drains the
+   deferred queue in order.</li>
+</ol>
+<p>Two consequences pinned by tests: a timer due during the sleep runs <em>after</em>
+the sleeping callback (not during), and a QA restart while asleep drops the
+deferred queue and cancels the wake timer (<code>tests/test_sleep.py</code>).</p>
+<h2>3. A remote <code>api.*</code> call suspends only the calling QA</h2>
+<ol>
+<li><code>lua/init.lua::apiCall</code> — the QA's <code>api.get</code> wrapper — checks
+   <code>_PY.api_remote_mode()</code> <strong>and</strong> that the call runs in the QA's own
+   callback coroutine. Both true → <code>coroutine.yield{type="apiCall", …}</code>.
+   (Anywhere else — nested coroutines, non-QA code — the call stays
+   synchronous.)</li>
+<li><code>resumeQa</code> recognizes the <code>apiCall</code> yield: <code>sleeping[qaId] = true</code>,
+   <code>pendingApi[qaId] = co</code>, <code>_PY.post(apiCall)</code>.</li>
+<li>The engine's <code>_handle_api_call</code> bumps <code>_api_calls_inflight</code> and spawns a
+   <strong><code>flua-api</code> worker thread</strong> running <code>Api.dispatch</code> — the pump never
+   blocks, every other QA keeps running.</li>
+<li>Caveat: <code>Api._dispatch_lock</code> serializes dispatches and <strong>may be held
+   across a remote HTTP call</strong> (a forwarding handler holds it). Another
+   QA's sim-side call queues behind it — microseconds normally, but a boot
+   racing a slow remote call waits (walkthrough 1, step 5).</li>
+<li>The worker finishes → <code>messages.api_result</code> →
+   <code>_post_from_worker</code> (drops the result if the loop is closed) → pump →
+   <code>handlers.apiResult</code> resumes the coroutine with <code>(data, status)</code>.</li>
+</ol>
+<p><code>_api_calls_inflight</code> keeps the graceful-exit check honest while the call is
+in flight, and the result enqueue + counter decrement run together in one
+loop callback (<code>_post_from_worker</code>'s <code>done</code>) — atomic handoff, ADR 0006
+amendment (race lessons 2 and 3 in concurrency.md).</p>
+<h2>4. A refreshStates event reaches a subscriber</h2>
+<p>Two delivery channels, one contract (record + emit):</p>
+<ol>
+<li><strong>Record into the feed</strong>: a handler (e.g. <code>updateProperty</code>,
+   <code>globals_create</code>, <code>device_delete</code>) calls a <code>SimState.record_*</code> method —
+   <code>api/state.py</code> appends <code>(seq, entry)</code> with a strictly increasing seq and
+   the real HC3's envelope (<code>type/created/createdMillis/sourceType/objects/
+   data</code>; global-variable events use the lighter envelope).</li>
+<li><strong>Emit to the pump</strong>: the handler calls
+   <code>req.emit(messages.refresh_state_event(entry))</code> →
+   <code>Api._emit</code> → <code>engine.enqueue_outbound</code>.</li>
+<li>The pump delivers <code>refreshStateEvent</code> → <code>lua/init.lua::
+   handlers.refreshStateEvent</code> iterates <code>_FLUA.refreshStateListeners</code> —
+   handles registered by <code>RefreshStateSubscriber:run()</code> (<code>quickapp.lua</code>) —
+   and calls each handle (deferring for sleeping QAs).</li>
+<li><strong>Poll channel</strong>: <code>api.get('/refreshStates?last=N')</code> serves the recorded
+   feed (<code>routes/system.py::refresh_states</code>) — <code>last</code> semantics, changes vs
+   events split, base fields always present.</li>
+<li><strong>Online mirror</strong>: the <code>flua-hc3-poll</code> task long-polls the real HC3 and
+   <code>_mirror_event</code>s each entry — local seq, same content, then the same
+   pump emit — so sim and HC3 events are indistinguishable downstream.
+   Proxy devices never emit locally (the HC3's own event arrives through
+   this path).</li>
+</ol>
+<h2>5. Proxy mode shadows an HC3 device</h2>
+<p><code>--%%mode:proxy</code> (online only): the real HC3 owns the device; the sim
+shadows it under the <em>same id</em>.</p>
+<ol>
+<li><strong>Deploy/reuse</strong>: <code>proxy.py::resolve_proxy</code> uploads the QA as
+   <code>&lt;name&gt;_Proxy</code> on the HC3 (or reuses the existing one; wrong-type
+   proxies are deleted and recreated). Its HC3 id becomes the QA's id.</li>
+<li><strong>Shadow</strong>: <code>api/state.py::mark_proxy(id)</code> flags the id;
+   <code>register_qa(proxy=True)</code> skips the local <code>DeviceCreatedEvent</code> (the HC3
+   emits its own, mirrored by the poll). Existing proxy children are
+   shadowed via <code>register_proxy_child</code> under their HC3 ids.</li>
+<li><strong>Updates</strong>: mutating API calls on the device call <code>forward_to_proxy</code> —
+   the HC3 gets the real update; the sim records no local event (the HC3's
+   event comes back through the poll). <code>useUiView</code> is only pushed when the
+   QA declares it; otherwise the HC3's own UI config wins.</li>
+<li><strong>Callbacks</strong>: the emulator's callback server receives the proxy's
+   actions/UI events over HTTP; they dispatch with <code>external=True</code>, which
+   is why the sim must not double-record them (<code>action_device</code> skips the
+   local event for proxy devices).</li>
+<li><strong>CONNECT</strong>: at startup the emulator tells the proxy where to listen
+   back, so an existing proxy always points at the current run. The proxy
+   QA implies keep-alive — the emulator must stay up to serve callbacks.</li>
+</ol>
+<p>Pins: <code>tests/test_proxy.py</code> (id reuse, no-duplicate events, mirroring,
+callback routing).</p>
+</body>
+</html>

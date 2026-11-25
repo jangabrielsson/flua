@@ -1,0 +1,330 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>flua — architecture</title>
+<style>
+  body { font-family: var(--vscode-font-family, -apple-system, "Segoe UI", system-ui, sans-serif);
+         max-width: 52rem; margin: 2rem auto; padding: 0 1rem;
+         background: var(--vscode-editor-background, #fff);
+         color: var(--vscode-editor-foreground, #1c2b3a);
+         line-height: 1.55; }
+  h1, h2, h3, h4 { color: var(--vscode-textLink-foreground, #003a70); font-weight: 600; }
+  h2 { border-bottom: 1px solid var(--vscode-panel-border, #dce6ee);
+       padding-bottom: .3rem; margin-top: 2rem; }
+  code { font-family: var(--vscode-editor-font-family, ui-monospace,
+               SFMono-Regular, Menlo, monospace);
+         background: var(--vscode-textCodeBlock-background, #f2f4f6);
+         padding: .15em .35em; border-radius: 4px; font-size: 90%; }
+  pre { background: var(--vscode-textCodeBlock-background, #f2f4f6);
+        padding: .8rem 1rem; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; margin: 1rem 0; max-width: 100%; }
+  th, td { border: 1px solid var(--vscode-panel-border, #dce6ee);
+           padding: .35rem .6rem; text-align: left; vertical-align: top; }
+  th { background: var(--vscode-textCodeBlock-background, #f2f4f6); }
+  a { color: var(--vscode-textLink-foreground, #0a6cff); text-decoration: none; }
+  blockquote { border-left: 3px solid var(--vscode-panel-border, #dce6ee);
+               margin: 1rem 0; padding: .1rem 1rem;
+               color: var(--vscode-descriptionForeground, #5b6b7a); }
+  img { max-width: 100%; }
+</style>
+</head>
+<body>
+<h1>flua — architecture</h1>
+<p>This file explains how flua works under the hood. The user guide is
+<a href="USAGE.md">USAGE.md</a>; this is the machinery. Diagrams are ASCII so they
+render everywhere (GitHub, VS Code, terminal).</p>
+<p>Deeper dives, kept out of this file on purpose:</p>
+<ul>
+<li><strong><a href="docs/concurrency.md">concurrency.md</a></strong> — the execution model: the pump,
+  the bridge queues, per-QA coroutines, worker threads, blocking rules,
+  graceful exit, and the two race lessons.</li>
+<li><strong><a href="docs/walkthroughs.md">walkthroughs.md</a></strong> — guided traces through the
+  key flows (QA boot, sleep, remote API suspension, event delivery, proxy
+  shadowing).</li>
+<li><strong><a href="docs/invariants.md">invariants.md</a></strong> — the behavioral contracts, each with
+  the test that pins it (the traceability companion to §13 below).</li>
+<li><strong><a href="docs/decisions/">decisions/</a></strong> — ADR-lite: the <em>why</em> behind deliberate
+  choices.</li>
+</ul>
+<h2>1. Overview</h2>
+<p>flua runs real Fibaro QuickApps offline. One Python process hosts a lupa
+runtime (Lua 5.x) and an asyncio event loop:</p>
+<ul>
+<li><strong>Lua side</strong> — the HC3 runtime: <code>QuickApp</code> classes, <code>fibaro</code>, <code>api</code>, <code>net</code>,
+  <code>mqtt</code>, timers. Each QA runs in its own Lua environment (isolated globals).</li>
+<li><strong>Python side</strong> — the engine: message pump, virtual clock, the simulated
+  HC3 (or the real one online), and worker threads for blocking I/O.</li>
+<li><strong>The bridge</strong> — a strict message-passing protocol. Lua never calls
+  Python in a way that could re-enter Lua, and Python never calls Lua
+  except from one place.</li>
+</ul>
+<pre><code>                 +---------------------------- flua process ----------------------------+
+                 |                                                                     |
+  QA files ----&gt; |  CLI (argparse, --%% parsing, mode peek)                            |
+                 |    |                                                                |
+                 |    v                                                                |
+                 |  LuaEngine --------------------------------------------------       |
+                 |  | lupa LuaRuntime  |  virtual clock   |  api (sim/HC3)     |       |
+                 |  | inbound deque    |  TimerManager    |  qa_* worker pools |       |
+                 |  | outbound queue   |  env chain       |  Hc3Remote (online)|       |
+                 |  | pump task (THE single Lua entry point)                    |       |
+                 |  +-----------------------------------------------------------+       |
+                 |        ^ post(msg)                    | enqueue_outbound(msg)          |
+                 |        |                              v                              |
+                 |   Lua QAs (per-QA envs)          worker threads                      |
+                 |   quickapp/fibaro/net/mqtt       urllib / sockets / RFC6455 / MQTT 3.1.1
+                 |                                                                       |
+                 +-----------------------------------------------------------------------+
+</code></pre>
+<h2>2. The single-entry discipline</h2>
+<p>The one rule everything else follows: <strong>the pump is the only code that
+enters the Lua VM, and it never does so while Lua is on the stack.</strong></p>
+<ul>
+<li>Lua → Python traffic is <strong>append-only</strong>: Lua code calls <code>_PY.*</code> bridges,
+  which append plain messages to the inbound deque and return immediately.
+  No Python handler ever calls Lua directly.</li>
+<li>Python → Lua traffic is <strong>queued</strong>: handlers push messages onto the
+  outbound queue; the pump delivers them as a batch through
+  <code>_FLUA.dispatch</code>.</li>
+<li>Consequences: no reentrancy hazards, messages are serializable
+  JSON-shaped dicts, and timers/actions/callbacks all share one delivery
+  path.</li>
+</ul>
+<p>The two deliberate exceptions, both documented:</p>
+<ol>
+<li><strong>Log lines print directly</strong> (<code>_PY.log</code>) — writing to stdout touches no
+   Lua state, so it is safe at any call depth, including inside
+   debugger-stepped code where the pump is frozen.</li>
+<li><strong>The debugger's sockets block the main thread</strong> — that is what makes a
+   mobdebug pause freeze the pump and the virtual clock.</li>
+</ol>
+<h2>3. Message flow</h2>
+<pre><code>  Lua code                     Python engine                       Lua runtime
+  ---------                    --------------                      ------------
+
+  _PY.post({type=...})         inbound deque                       
+      -----------------------&gt;  |                                  
+                                v  pump loop:                      
+                                |  tick(clock)                     
+                                |  timers.fire_due()               
+                                |  drain inbound -&gt; handler        
+                                |     (api, timers, worker spawn)  
+                                |  outbound.get() -&gt; batch         
+                                |----------------------&gt;  _FLUA.dispatch(batch)
+                                |                             handlers[msg.type](msg)
+                                |                             (timer fires, callbacks,
+                                |                              QA bootstrap, ...)
+</code></pre>
+<p>Every message is a dict with a mandatory string <code>type</code>. Functions never
+cross the bridge — callbacks are registered Lua-side by integer id. The
+full type list lives in <code>src/flua/messages.py</code>; adding one means a handler
+in <code>engine.py</code> (inbound) and/or <code>lua/init.lua</code> (outbound).</p>
+<h2>4. Layers</h2>
+<pre><code>src/flua/
+  cli.py           argument parsing, --%% config assembly, mode peek (--%%offline),
+                   --run-for / --watch / --check / export / unpack
+  engine.py        LuaEngine: lupa VM, queues, pump, QA lifecycle, worker pools,
+                   the HC3 poller, the auth-lockout guard
+  api/             the REST surface: one dispatcher, two backends
+    __init__.py      Api.dispatch: regex route table -&gt; handlers -&gt; hybrid forward
+                     (variables on HC3-namespace ids and on PROXY devices route
+                     via the FluaHelper bridge — the controller owns the state)
+    state.py         SimState: devices/rooms/scenes/globals, change &amp; event feeds
+    routes/*.py      pure handlers: (state, request) -&gt; (data, status)
+  hc3.py           Hc3Remote: blocking urllib client, basic auth, raw-body import
+  http.py          urllib-based blocking HTTP (worker threads)
+  websocket.py     minimal RFC 6455 client (stdlib sockets + ssl)
+  mqtt.py          minimal MQTT 3.1.1 client (stdlib sockets + ssl)
+  sync_socket.py   blocking LuaSocket-compatible TCP/UDP (the debugger's sockets)
+  devices/         the HC3 device catalog (176 real captures) + skeleton builder
+  config.py        --%% annotation parsing, EOH, the offline peek, env helpers
+  environment.py   the os.getenv chain: process env &gt; local .env &gt; ~/.env
+  timers.py        TimerManager on the virtual clock (per-QA attribution)
+  clock.py         VirtualClock: realtime / accelerated / instant, start time
+  messages.py      message type constants + builders
+  bindings.py      the _PY table (post, log, api, api_hc3, net/mqtt entry points)
+  lua/init.lua     the Lua runtime: sanitizer, log, timers, dispatch, QA bootstrap
+  lua/quickapp.lua the QuickApp/QuickAppBase/QuickAppChild classes
+  lua/fibaro.lua   the fibaro API (HC3-compatible)
+  lua/net.lua      HTTPClient, TCPSocket, UDPSocket, WebSocketClient(+Tls)
+  lua/mqtt.lua     mqtt.Client, mqtt.QoS, the documented event API
+</code></pre>
+<h2>5. The Lua runtime (<code>lua/init.lua</code>)</h2>
+<ul>
+<li><strong>Sanitizer.</strong> Every <code>_PY.post</code> payload passes through a UTF-8 sanitizer:
+  invalid bytes are hex-escaped, so binary strings (like <code>utf8.charpattern</code>)
+  cross lupa's strict decode without killing the process. Log lines go
+  through the same sanitizer before <code>_PY.log</code>.</li>
+<li><strong>Per-QA environments.</strong> Each QA gets its own <code>_FLUA</code> (qaId/config/arg)
+  whose metatable falls through to the shared engine table; runtime libs
+  are loaded into the QA's env before its code. <code>require</code> and <code>dofile</code> are
+  rebound per QA so loaded files run in the QA's env (<code>_FLUA.loadFile</code> is
+  the chunk-returning form); raw <code>load</code>/<code>loadfile</code> still compile against
+  the shared <code>_G</code>.</li>
+<li><strong>Bootstrap.</strong> <code>startQaInEnv</code> is the shared QA boot: merge <code>.flua.lua</code>,
+  evaluate <code>--%%var</code> expressions (<code>load("return "..expr, nil, "t", {config, os})</code>),
+  load extra files, pcall the chunk, construct the QuickApp instance.</li>
+<li><strong>Dispatch.</strong> <code>handlers.*</code> deliver timers, actions, net/mqtt results,
+  refreshStates events, QA restarts, and <code>-e</code> preambles.</li>
+</ul>
+<h2>6. The REST dispatcher (<code>api/</code>)</h2>
+<p>One dispatcher, three outcomes:</p>
+<pre><code>  api.get(path) -&gt; Api.dispatch
+    |-- /quickApp/*      engine-backed QA file management (local only)
+    |-- route table      pure handlers over SimState -&gt; (data, status)
+    |       |-- resource reads (online) -&gt; the HC3 answers; handlers merge
+    |       |      the emu's local resources (emulated QAs, scene QAs) in
+    |       |-- matched 404 + online + entity id &lt; 5000 -&gt; forward to the HC3
+    |       '-- matched 404 + flua id (&gt;= 5000)          -&gt; local 404, never forward
+    '-- no route + online                                -&gt; forward to the HC3
+</code></pre>
+<ul>
+<li><strong>Id namespaces</strong>: 5000+ = flua QAs and runtime-created devices (always
+  local); below 5000 = the HC3's namespace (forwarded online). This is what
+  makes <code>fibaro.getValue(self.id, ...)</code> work in both modes.</li>
+<li><strong>Online resource reads</strong>: the controller is authoritative — rooms, scenes,
+  sections, globals, custom events, profiles, alarm partitions, panels,
+  users and the like come from the HC3 (the sim answers only when the
+  controller can't); emulated QAs and scene QAs are emu-created resources
+  and merge into the <code>/devices</code>, <code>/plugins</code> and <code>/scenes</code> lists. Writes stay
+  in the sim — they never mutate the controller.</li>
+<li><strong>Base structs</strong>: device 1, <code>/home</code>, <code>/settings/info</code> and
+  <code>/settings/location</code> are the controller's real structs merged into the
+  sim's view — fetched lazily once per run (<code>req.remote_cached</code>, cached on
+  first access) — with the virtual-clock fields (sun times, date/time,
+  timestamp) computed on top.</li>
+<li><strong><code>--%%offline:true</code></strong> on a QA pins its <code>api.*</code> calls to the sim (the
+  calling QA's id travels with each request).</li>
+<li><strong><code>api.hc3.*</code></strong> forces the remote backend (bypasses hybrid routing;
+  <code>fibaro.callhc3</code> uses it). Offline it stands in for the sim.</li>
+<li><strong>Events.</strong> State changes emit <code>DeviceCreatedEvent</code> / <code>DeviceRemovedEvent</code>
+  / <code>DevicePropertyUpdatedEvent</code> / <code>DeviceActionRanEvent</code> with the real
+  HC3's envelope; <code>updateProperty</code> emits only when the value actually
+  changes. Configuration edits go to the <code>changes</code> feed instead.</li>
+<li><strong><code>/flua/embeddedUI</code></strong> — a flua-only route (no HC3 counterpart, always
+  local): the UI viewer's channel for the device type's default view. The
+  tables live in <code>devices/uielements.py</code> and resolve watched device
+  properties (e.g. <code>value</code>) into live label texts/control values per poll.
+  The elements are deliberately never part of the device structure — the
+  HC3 UI client renders them itself, so they must not leak into
+  <code>/devices</code> or the .fqa export.</li>
+<li><strong><code>/flua/devices</code></strong> — the viewer's device list: the emulated devices
+  only, with no online union (a controller can carry hundreds of QAs that
+  the viewer should not render).</li>
+</ul>
+<h2>7. Worker threads</h2>
+<p>The full threading model — who may block what, what counts as pending work,
+and the races that bit us — lives in
+<a href="docs/concurrency.md">concurrency.md</a>. This section is the tour version.</p>
+<p>All blocking network I/O runs in worker threads; the pump never blocks:</p>
+<pre><code>  Lua post {httpRequest|tcp*|udp*|ws*|mqtt*}
+    -&gt; handler spawns an asyncio task
+       -&gt; asyncio.to_thread(blocking op) on a dedicated pool
+          -&gt; result -&gt; enqueue_outbound  (thread-safe hop: call_soon_threadsafe)
+             -&gt; pump -&gt; dispatch -&gt; per-QA net/mqtt handlers -&gt; callbacks
+</code></pre>
+<p>In-flight work counts as <strong>pending work</strong> — the process stays alive until
+timers, queues, and open connections are all done. The debugger's sockets
+are the one main-thread exception (see §2).</p>
+<p>A QA's <code>api.*</code> calls with a remote backend (online/proxy mode) use the
+same worker-thread pattern via the <code>apiCall</code>/<code>apiResult</code> messages: the Lua
+side yields a request table, the pump spawns a worker thread running the
+hybrid dispatch (serialized against other dispatches by <code>Api</code>'s lock — the
+sim side is shared state), and the response resumes the QA's coroutine
+with <code>(data, status)</code>. The QA stays suspended meanwhile — its own messages
+defer through the same <code>sleeping</code>/<code>workQueues</code> machinery as
+<code>fibaro.sleep</code> — while the pump and every other QA keep running. Offline,
+the synchronous <code>_PY.api</code> bridge remains the fast path.</p>
+<p>The mirror image is <code>net.*Server</code> (flua extension, <code>server.py</code>): mock
+servers hosted <strong>on the loop</strong> for QA-side testing. The socket is bound
+synchronously when the QA calls <code>listen</code> (port 0 resolves at once), and
+serving is asyncio-native. Each incoming request posts a <code>serverRequest</code>
+message into the pump; the QA handler runs there, and its return value
+comes back through the synchronous <code>net_server_reply</code> bridge call (the pump
+runs on the loop thread), resolving the connection's future. Servers die
+with their QA (exit/restart) and on engine stop.</p>
+<h2>8. Virtual time</h2>
+<p>Timers run on <code>VirtualClock</code> (virtual seconds, epoch-aligned). Modes:
+realtime, <code>--speed N</code> accelerated, <code>--instant</code> (timers fire now, time jumps
+to each deadline). <code>os.time()</code>/<code>os.date()</code> read the virtual clock (whole
+seconds); <code>os.clock()</code> stays the real runtime clock; <code>_FLUA.millitime()</code>
+is virtual milliseconds. <code>--start "2027/12/31 23:59:50"</code> sets the origin,
+so date logic can be tested at New Year, leap days, DST changes — and the
+debugger pause freezes the clock (the freeze is noted around the blocking
+receive).</p>
+<h2>9. Config pipeline</h2>
+<pre><code>  raw file header   -&gt;  parse_annotations()  (--%% directives, EOH header)
+  --%%include:...   -&gt;  expand_includes(): the included files' directives
+                       become defaults (QA header wins, files append, nested
+                       includes resolve relative to the including file)
+  --%%mode:...      -&gt;  mode decision: --api flag &gt; main QA's mode &gt; online
+  per-QA config     &lt;-  CLI flags + globals + locals + .flua.lua base
+  --%%var:name=expr    -&gt;  evaluated in Lua with {config, os} in scope
+  os.getenv(name)      -&gt;  EnvChain: process env &gt; local .env &gt; ~/.env
+</code></pre>
+<p>The <code>.fqa</code> export/import round-trip reuses the pipeline: unpacked files
+carry generated <code>--%%</code> headers, so imports load like any other QA.</p>
+<h2>10. Online mode (<code>--api remote</code>)</h2>
+<p><code>Hc3Remote</code> (stdlib urllib) speaks basic auth and the <strong>raw-body import
+transport</strong> (<code>POST /quickApp/</code> with the fqa JSON string — the swagger's
+multipart description is misleading; the real transport was verified against a
+live HC3). The endpoints' structural reference (paths, parameters, response
+codes, schema fields) is <code>docs/specs/hc3-api.json</code>, distilled from the
+official swagger, which itself is Fibaro's property and not distributed.
+Two safety rules:</p>
+<ul>
+<li><strong>The lockout guard</strong>: any 401/403 aborts flua immediately and is never
+  retried (the HC3 locks itself after 4 attempts). The poller stops on its
+  first auth failure too — it is usually the first caller.</li>
+<li><strong>The poller</strong> long-polls <code>/refreshStates</code> and mirrors the real events
+  into the local buffer, so <code>api.get('/refreshStates?last=N')</code> serves a
+  merged feed and Lua <code>RefreshStateSubscriber</code>s receive them through the
+  pump.</li>
+</ul>
+<p>Mode selection: explicit <code>--api</code> &gt; the main QA's <code>--%%offline:true</code> (peeked
+before the engine starts) &gt; online if HC3 credentials exist in the env
+chain &gt; offline.</p>
+<h2>11. The device catalog</h2>
+<p>QA devices are built from the distilled type schema
+(<code>src/flua/devices/type_schemas.json</code>, generated by
+<code>scripts/extract_device_schemas.py</code>): typed properties at their declared
+defaults, the type's interfaces expanded, and action metadata. The
+capture (<code>devices.json</code> — 176 real HC3 device captures, scrubbed of
+identity/secrets) is the demoted LAST-RESORT fallback for types the
+schema does not know, and the hierarchy resolves unknown types to their
+nearest known ancestor. The compat suite (§12) exists to catch exactly
+this class of drift.</p>
+<h2>12. Testing map</h2>
+<ul>
+<li><strong>Unit</strong> — pure Python: clock, timers, config parsing, route handlers.</li>
+<li><strong>Engine</strong> — real lupa VM: message round-trips, QA lifecycle, network
+  round-trips against local echo servers / a minimal MQTT broker / an RFC
+  6455 server.</li>
+<li><strong>CLI</strong> — subprocess runs of the actual binary, end to end.</li>
+<li><strong>Live (opt-in, <code>HC3_TEST=1</code>)</strong> —
+  <code>tests/test_hc3_live.py</code> (lifecycle: read-only + import→call→events→delete,
+  lockout-safe) and <code>tests/test_hc3_compat.py</code> (shape oracle: the same
+  request through the sim and the real HC3 must agree on structure).</li>
+<li><strong>Isolation</strong> — an autouse fixture isolates <code>HOME</code> so a developer's real
+  <code>~/.env</code> can never flip plain tests into online mode. (Online is opt-in
+  anyway: <code>--%%mode:online</code> or <code>--api remote</code>.)</li>
+</ul>
+<h2>13. The invariants, in one place</h2>
+<ol>
+<li>Only the pump enters Lua; never with Lua on the stack.</li>
+<li>Logs print directly (<code>_PY.log</code>), never queue.</li>
+<li>All bridge strings are UTF-8 (sanitizer on the way in).</li>
+<li>Functions never cross the bridge; callbacks are id-registered.</li>
+<li>flua entity ids are ≥ 5000 and are always served locally.</li>
+<li>An auth failure costs exactly one attempt, always.</li>
+<li>Worker I/O never blocks the pump; open connections are pending work.</li>
+<li><code>updateProperty</code> emits an event only when the value changes.</li>
+<li>The debugger's sockets block the main thread on purpose.</li>
+<li>Tests never touch a production HC3 unless <code>HC3_TEST=1</code>.</li>
+</ol>
+<p>Each of these (plus the identity/routing/event/exit contracts around them)
+is expanded with its pinning test in <a href="docs/invariants.md">invariants.md</a>.</p>
+</body>
+</html>
