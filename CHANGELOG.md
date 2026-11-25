@@ -4,6 +4,21 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.191] - 2026-11-25
+
+### Changed
+- uibuilder: label textAlign and button color properties
+- --%%rsrc value is a list of ROWS — explicit row nesting
+- ui: textAlign= rides in the element style; viewer aligns labels
+- docs/viewer: style.color is inert on labels — color text with HTML
+- viewer: label style.color tints the text (HC3 parity); docs: color format
+- weight never changes text size
+- rsrc: repeated --%%rsrc:name: directives extend the resource's rows
+- viewer: image elements render like the HC3 — natural aspect, no weight scaling
+- runtime: a uiView-bearing child device gets useUiView=true
+- ui: hoist a lone element's weight onto its uiView row
+- ui: element weight= and color= ride in style; viewer honors both
+
 ## [0.1.190] - 2026-11-25
 
 ### Changed
