@@ -767,9 +767,10 @@ requirement is about the HC3 app.</p>
 <code>style</code> (<code>style.weight</code>/<code>style.color</code> — the HC3's own views use both).
 <code>weight</code> is the element's share of the row: side-by-side elements split
 the row by their weights, and a lone element's weight scales its height
-(an <code>image</code> with <code>weight=7</code> renders tall; the default is 1). flua's viewer
-mirrors both: images scale by weight (40px per unit, ratio kept), buttons
-tint by color.</p>
+(flua hoists a lone element's weight onto its row — the HC3 splits the
+vertical space by ROW weights, an element's own weight only shares the
+row's width). flua's viewer mirrors both: images scale by weight (40px per
+unit, ratio kept), buttons tint by color.</p>
 <p>Neither is editable on the HC3: the web UI editor doesn't know the
 elements, so it cannot edit them and an edit there can rewrite the view
 and drop them. Keep tabbed/collapsible QAs flua-authored and update them

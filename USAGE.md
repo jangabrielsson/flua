@@ -685,9 +685,10 @@ Every element takes `weight=` and `color=`, carried into the generated
 `style` (`style.weight`/`style.color` — the HC3's own views use both).
 `weight` is the element's share of the row: side-by-side elements split
 the row by their weights, and a lone element's weight scales its height
-(an `image` with `weight=7` renders tall; the default is 1). flua's viewer
-mirrors both: images scale by weight (40px per unit, ratio kept), buttons
-tint by color.
+(flua hoists a lone element's weight onto its row — the HC3 splits the
+vertical space by ROW weights, an element's own weight only shares the
+row's width). flua's viewer mirrors both: images scale by weight (40px per
+unit, ratio kept), buttons tint by color.
 
 Neither is editable on the HC3: the web UI editor doesn't know the
 elements, so it cannot edit them and an edit there can rewrite the view

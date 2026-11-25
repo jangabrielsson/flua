@@ -257,10 +257,24 @@ def test_element_weight_and_color_style() -> None:
     # buttons: {"weight": "1", "color": ""})
     rows = [[{"image": "art", "url": "x", "weight": 7, "color": "red"}]]
     ui = compile_ui(rows, 5000)
+    # a lone element's weight hoists to its row: the HC3 splits the
+    # vertical space by row weights, so the declared height intent survives
+    assert ui["uiView"][0]["style"]["weight"] == "7"
     c = ui["uiView"][0]["components"][0]
     assert c["style"] == {"weight": "7", "color": "red"}
     legacy = ui["viewLayout"]["$jason"]["body"]["sections"]["items"][0]["components"][0]
     assert legacy["style"] == {"weight": "7", "color": "red"}
+    # a SHARED row keeps the weights on the elements (width shares) — the
+    # row weight stays the default
+    rows2 = [
+        [
+            {"button": "a", "text": "A", "onReleased": "go"},
+            {"button": "b", "text": "B", "onReleased": "go", "weight": 3},
+        ]
+    ]
+    ui2 = compile_ui(rows2, 5001)
+    assert ui2["uiView"][0]["style"]["weight"] == "1.0"
+    assert [c["style"]["weight"] for c in ui2["uiView"][0]["components"]] == ["0.5", "3"]
 
 
 def test_tabview_compiles_to_uiview_and_legacy() -> None:

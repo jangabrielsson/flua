@@ -535,10 +535,20 @@ def _ui_view_component(el: dict[str, Any], weight: str) -> dict[str, Any]:
 
 
 def _ui_view_row(row: list[dict[str, Any]]) -> dict[str, Any]:
-    """One uiView row: a horizontal container of components."""
+    """One uiView row: a horizontal container of components.
+
+    A lone element's declared weight means its HEIGHT on the HC3: the app
+    splits the vertical space by the ROW weights (an element's own weight
+    only splits the row's WIDTH among siblings — on a real 5.221 HC3 a
+    weight=7 image on a weight-1.0 row rendered unchanged). Hoist the lone
+    element's weight onto the row so the declared intent survives; the
+    element keeps its own weight too (the flua viewer sizes images by it)."""
     weight = _UI_VIEW_WEIGHTS.get(len(row))
+    row_weight = "1.0"
+    if len(row) == 1 and row[0].get("weight") is not None:
+        row_weight = str(row[0]["weight"])
     return {
-        "style": {"weight": "1.0"},
+        "style": {"weight": row_weight},
         "type": "horizontal",
         "components": [_ui_view_component(el, weight) for el in row],
     }
