@@ -770,9 +770,13 @@ value (<code>'left'</code>/<code>'center'</code>/<code>'right'</code>): it posit
 the row (the HC3's labels carry it). <code>color</code> is any CSS color string
 (<code>'red'</code>, <code>'#ff0000'</code>, <code>'rgb(255,0,0)'</code>): the HC3 applies it as a button's
 BACKGROUND — on a label it does nothing (the skin CSS owns the label text
-color; live-verified 5.221). To color label text, put HTML in the text —
-labels render HTML, so <code>text='&lt;span style="color:red"&gt;Hi&lt;/span&gt;'</code> works
-in v1 and v2. flua's viewer mirrors all of it.</p>
+color; live-verified 5.221). Labels render HTML in both formats: v1
+renders it unsanitized (inline <code>style</code> attributes work), while the HC3's
+v2 renderer passes the text through Angular's sanitizer — safe tags
+(<code>&lt;b&gt;</code>, <code>&lt;i&gt;</code>, <code>&lt;table&gt;</code>, <code>&lt;font&gt;</code>, ...) survive, <code>style</code> attributes are
+stripped. Colored v2 text: <code>&lt;font color="red"&gt;Hi&lt;/font&gt;</code> (the app's
+whitelist keeps font's color attribute). flua's viewer renders label HTML
+as-is.</p>
 <p>Every element also takes <code>classes={"a","b"}</code> — a list of class names the
 HC3 app applies to the rendered component (and switches behavior on). The
 known classes, from the app's own code: layouts take <code>glued</code>/<code>panel</code>/
