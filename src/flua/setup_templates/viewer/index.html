@@ -584,10 +584,8 @@ function renderComponent(device, component, row) {
     // carry HTML (<table>, <font color=...>, ...), which renders as-is
     name.className = "component-label element-label";
     name.innerHTML = text ?? component.name;
-    // the HC3 applies style.color as the label's text color
-    if (component.style && component.style.color) {
-      name.style.color = String(component.style.color);
-    }
+    // note: style.color does NOT tint a label's text on the HC3 (the skin
+    // CSS owns the label color) — color text with HTML in the text itself
   } else if (t === "button") {
     // no side label: the button carries its own text, like the HC3
     row.removeChild(name);

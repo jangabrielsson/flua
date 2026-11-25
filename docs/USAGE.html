@@ -766,17 +766,20 @@ requirement is about the HC3 app.</p>
 <p>Every element takes <code>weight=</code> and <code>color=</code>, carried into the generated
 <code>style</code> (<code>style.weight</code>/<code>style.color</code> — the HC3's own views use both).
 <code>color</code> is any CSS color string (<code>'red'</code>, <code>'#ff0000'</code>, <code>'rgb(255,0,0)'</code>):
-the HC3 applies it as a label's TEXT color and a button's BACKGROUND
-(flua's viewer does the same). <code>weight</code> is the element's share of its
-container: side-by-side elements split the row width by their weights, and
-rows split the vertical space by their weights (flua hoists a lone
-element's weight onto its row) — but the HC3 app only applies the split
-inside FIXED-height layouts; a QA's (auto-height) UI ignores weights
-vertically, and weight never changes text size. An <code>image</code> element renders
-at its natural aspect, width-capped by its container (<code>max-width:100%</code>,
-<code>height:auto</code> on the HC3) — to make it taller use a portrait source image
-or give it a wider container. flua's viewer renders images the same way
-(natural aspect, width-capped — the weight is not a size).</p>
+the HC3 applies it as a button's BACKGROUND — on a label it does nothing
+(the skin CSS owns the label text color; live-verified 5.221). To color
+label text, put HTML in the text — labels render HTML, so
+<code>text='&lt;span style="color:red"&gt;Hi&lt;/span&gt;'</code> works in v1 and v2. flua's
+viewer mirrors both. <code>weight</code> is the element's share of its container:
+side-by-side elements split the row width by their weights, and rows split
+the vertical space by their weights (flua hoists a lone element's weight
+onto its row) — but the HC3 app only applies the split inside FIXED-height
+layouts; a QA's (auto-height) UI ignores weights vertically, and weight
+never changes text size. An <code>image</code> element renders at its natural aspect,
+width-capped by its container (<code>max-width:100%</code>, <code>height:auto</code> on the HC3)
+— to make it taller use a portrait source image or give it a wider
+container. flua's viewer renders images the same way (natural aspect,
+width-capped — the weight is not a size).</p>
 <p>Neither is editable on the HC3: the web UI editor doesn't know the
 elements, so it cannot edit them and an edit there can rewrite the view
 and drop them. Keep tabbed/collapsible QAs flua-authored and update them
