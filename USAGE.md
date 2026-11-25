@@ -690,7 +690,17 @@ the row (the HC3's labels carry it). `color` is any CSS color string
 BACKGROUND — on a label it does nothing (the skin CSS owns the label text
 color; live-verified 5.221). To color label text, put HTML in the text —
 labels render HTML, so `text='<span style="color:red">Hi</span>'` works
-in v1 and v2. flua's viewer mirrors all of it. `weight` is the element's share of its container:
+in v1 and v2. flua's viewer mirrors all of it.
+
+Every element also takes `classes={"a","b"}` — a list of class names the
+HC3 app applies to the rendered component (and switches behavior on). The
+known classes, from the app's own code: layouts take `glued`/`panel`/
+`dividers`; buttons `circle`/`squircle`/`textPositionBelow`/`toggle`;
+sliders `thick`/`minMaxWords`/`vertical`/`invertFill`/`iconsMinusPlus`/
+`slatsAngle`/`timer`; labels `title`/`labelXXL`; images
+`imageS`/`imageM`/`imageL` (32/40/48px squares). flua passes them through
+verbatim (no validation — a class the app doesn't know is ignored there),
+and its viewer honors the image and label size classes. `weight` is the element's share of its container:
 side-by-side elements split the row width by their weights, and rows split
 the vertical space by their weights (flua hoists a lone element's weight
 onto its row) — but the HC3 app only applies the split inside FIXED-height

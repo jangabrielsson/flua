@@ -60,6 +60,15 @@
   .tab-panel.hidden { display: none; }
   /* image: the HC3's picture elements (album art, intercom frames) */
   img.ctl-image { max-width: 100%; border-radius: 10px; display: block; margin: 0 auto; }
+  img.ctl-image.imageS { width: 32px; height: 32px; }
+  img.ctl-image.imageM { width: 40px; height: 40px; }
+  img.ctl-image.imageL { width: 48px; height: 48px; }
+  /* element classes the HC3 app honors (title/XXL label sizes, circle/squircle buttons) */
+  .element-label.title { font-size: 1.25em; font-weight: 700; }
+  .element-label.labelXXL { font-size: 1.6em; font-weight: 700; }
+  button.ctl.circle, button.ctl.squircle { width: 48px; height: 48px; padding: 0; }
+  button.ctl.circle { border-radius: 50%; }
+  button.ctl.squircle { border-radius: 12px; }
   /* collapsible: a header toggling a body of rows (the sonosGroup shape) */
   button.collapsible-header {
     display: block; width: 100%; text-align: left; background: none;
@@ -582,6 +591,9 @@ function renderComponent(device, component, row) {
   if (t === "label") {
     // no side label: the text IS the element, like the HC3 — and labels may
     // carry HTML (<table>, <font color=...>, ...), which renders as-is
+  if (t === "label") {
+    // no side label: the text IS the element, like the HC3 — and labels may
+    // carry HTML (<table>, <font color=...>, ...), which renders as-is
     name.className = "component-label element-label";
     name.innerHTML = text ?? component.name;
     // the HC3's labels carry style.textAlign — mirror it (the label spans
@@ -589,6 +601,7 @@ function renderComponent(device, component, row) {
     if (component.style && component.style.textAlign) {
       name.style.textAlign = String(component.style.textAlign);
     }
+    if (component.classes) name.className += " " + component.classes.join(" ");
     // note: style.color does NOT tint a label's text on the HC3 (the skin
     // CSS owns the label color) — color text with HTML in the text itself
   } else if (t === "button") {
@@ -603,6 +616,7 @@ function renderComponent(device, component, row) {
     if (component.style && component.style.color) {
       btn.style.background = String(component.style.color);
     }
+    if (component.classes) btn.className += " " + component.classes.join(" ");
     if (component.disabled) btn.disabled = true;
     if (!action && event) wireLongPress(btn, device.id, component, item);
     btn.onclick = () => {
@@ -991,6 +1005,7 @@ function renderComponent(device, component, row) {
       img.dataset.cname = component.name;
       img.alt = component.name || "";
       img.src = String(url);
+      if (component.classes) img.className += " " + component.classes.join(" ");
       img.onerror = () => img.remove();
       row.appendChild(img);
     }

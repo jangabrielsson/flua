@@ -262,6 +262,16 @@ def _element_style(el: dict[str, Any], weight: str) -> dict[str, str]:
     return style
 
 
+def _with_classes(element: dict[str, Any], el: dict[str, Any]) -> dict[str, Any]:
+    """The def's ``classes=`` rides on every element: a list of class
+    names the HC3 app applies to the rendered component (and switches
+    behavior on — imageS/M/L sizes, slider thick/vertical, button
+    circle/squircle, label title/labelXXL, ...)."""
+    if el.get("classes"):
+        element["classes"] = list(el["classes"])
+    return element
+
+
 def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
     """ELMS port: one legacy viewLayout component."""
     typ, name = el["type"], el["id"]
@@ -354,9 +364,7 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
         }
         if el.get("useProxy"):
             element["useProxy"] = True
-        if el.get("classes"):
-            element["classes"] = list(el["classes"])
-        return element
+        return _with_classes(element, el)
     # label
     return {
         "name": name,
@@ -374,10 +382,10 @@ def _layout_row(row: list[dict[str, Any]]) -> dict[str, Any]:
         width = f"{1 / len(row):.2f}"
         if width.endswith(".00"):
             width = width[:-3]  # strip a trailing ".00"
-        inner = [_layout_element(el, width) for el in row]
+        inner = [_with_classes(_layout_element(el, width), el) for el in row]
         components.append({"components": inner, "style": {"weight": "1.2"}, "type": "horizontal"})
     else:
-        components.append(_layout_element(row[0], "1.2"))
+        components.append(_with_classes(_layout_element(row[0], "1.2"), row[0]))
     components.append({"style": {"weight": "0.50"}, "type": "space"})
     return {"components": components, "style": {"weight": "1.2"}, "type": "vertical"}
 
@@ -523,8 +531,6 @@ def _ui_view_component(el: dict[str, Any], weight: str) -> dict[str, Any]:
         component.pop("text", None)  # the HC3's image components carry no text
         if el.get("useProxy"):
             component["useProxy"] = True
-        if el.get("classes"):
-            component["classes"] = list(el["classes"])
     # the 5.221 element properties the viewer renders: named icons,
     # switch hints, disabled state, slider units. Not for image elements —
     # their "image" key holds the element NAME.
@@ -555,7 +561,7 @@ def _ui_view_row(row: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "style": {"weight": row_weight},
         "type": "horizontal",
-        "components": [_ui_view_component(el, weight) for el in row],
+        "components": [_with_classes(_ui_view_component(el, weight), el) for el in row],
     }
 
 

@@ -264,6 +264,21 @@ def test_element_weight_and_color_style() -> None:
     assert c["style"] == {"weight": "7", "color": "red", "textAlign": "left"}
     legacy = ui["viewLayout"]["$jason"]["body"]["sections"]["items"][0]["components"][0]
     assert legacy["style"] == {"weight": "7", "color": "red", "textAlign": "left"}
+    # classes= rides on EVERY element (not just images): the HC3 app applies
+    # them to the rendered component (circle buttons, thick sliders, ...)
+    rows3 = [
+        [{"button": "go", "text": "Go", "onReleased": "go", "classes": ["circle"]}],
+        [{"slider": "s", "text": "S", "min": "0", "max": "100", "classes": ["thick"]}],
+    ]
+    ui3 = compile_ui(rows3, 5002)
+    kinds = [c["type"] for row in ui3["uiView"] for c in row["components"]]
+    assert kinds == ["button", "slider"]
+    assert ui3["uiView"][0]["components"][0]["classes"] == ["circle"]
+    assert ui3["uiView"][1]["components"][0]["classes"] == ["thick"]
+    assert (
+        ui3["viewLayout"]["$jason"]["body"]["sections"]["items"][0]["components"][0]["classes"]
+        == ["circle"]
+    )
     # a SHARED row keeps the weights on the elements (width shares) — the
     # row weight stays the default
     rows2 = [
