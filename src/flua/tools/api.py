@@ -25,7 +25,8 @@ HELP = "make an HC3 API call and print the result (pretty JSON + HTTP status)"
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "path",
-        help="the API path, e.g. /devices/123 or /plugins/getView?id=123",
+        help="the API path, e.g. /devices/123 or /plugins/getView?id=123 "
+        "(quote paths with ? — the shell would glob them)",
     )
     parser.add_argument(
         "-X",
