@@ -162,7 +162,10 @@ def test_rsrc_directive_parses_named_ui_rows() -> None:
     annotations = parse_annotations(source)
     assert [e["name"] for e in annotations["rsrc"]] == ["guiChild1", "guiChild2"]
     # multi-line values join like --%%u rows; one directive is one row
-    # (a dict for a single element, a list for several)
+    # (a dict for a single element, a list for several side by side)
+    assert annotations["rsrc"][0]["rows"] == [[
+        {"button": "b", "text": "B", "onReleased": "press"}
+    ]]
     assert annotations["rsrc"][1]["rows"] == [{
         "slider": "dim", "text": "Dim", "min": "0", "max": "100", "value": "50", "onChanged": "dim"
     }]  # the single-row convenience form wraps into a row list
@@ -187,5 +190,18 @@ def test_rsrc_explicit_u_kind_marker() -> None:
     a = parse_annotations('--%%rsrc:guiChild1:u:{{button="b",text="B"}}\n')
     b = parse_annotations('--%%rsrc:guiChild1:{{button="b",text="B"}}\n')
     assert a["rsrc"] == b["rsrc"] == [
-        {"name": "guiChild1", "rows": [{"button": "b", "text": "B"}]}
+        {"name": "guiChild1", "rows": [[{"button": "b", "text": "B"}]]}
     ]
+
+
+def test_rsrc_directive_rejects_the_old_multi_row_form() -> None:
+    # one directive is ONE row now; a list of ROWS (the old whole-view
+    # value) fails with a migration hint instead of silently nesting
+    import pytest
+
+    from flua.config import parse_annotations
+
+    with pytest.raises(ValueError, match="one directive per row"):
+        parse_annotations(
+            "--%%rsrc:z:{{{button=\"a\",text=\"A\"}},{{button=\"b\",text=\"B\"}}}\n"
+        )

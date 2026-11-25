@@ -3,12 +3,14 @@
 --%%useUiView:true
 
 -- Three children sharing one Child class, each with its own child-bound
--- uiView declared as a RESOURCE: --%%rsrc:name:{rows} compiles the rows to
+-- uiView declared as a RESOURCE: --%%rsrc:name:{...} compiles the row to
 -- a child uiView (actionName = the method, json.array() for argless) and
 -- makes it available as fibaro.RSRC.name — in flua directly, and on the
--- HC3 via a synthesized rsrc.lua the package ships. Child UI events arrive
--- as device actions with plain args (children never register uiCallbacks),
--- live-verified 5.221.
+-- HC3 via a synthesized rsrc.lua the package ships. One directive is ONE
+-- row (a bare dict = a single element, a list = several side by side);
+-- repeated directives accumulate the resource's rows. Child UI events
+-- arrive as device actions with plain args (children never register
+-- uiCallbacks), live-verified 5.221.
 
 --%%rsrc:uiA:{tabView="mainTabs",activeTab="control",onTabChanged="tabChanged",tabs={
 --  {name="control",text="Control",components={
@@ -29,10 +31,10 @@
 --  {{button="play",text="Play",onReleased="play"}}
 --}}
 
---%%rsrc:uiC:{{{button="b1",text="1",onReleased="press"},{button="b2",text="2",onReleased="press"},
+--%%rsrc:uiC:{{button="b1",text="1",onReleased="press"},{button="b2",text="2",onReleased="press"},
 --  {button="b3",text="3",onReleased="press"},{button="b4",text="4",onReleased="press"},
---  {button="b5",text="5",onReleased="press"},{button="b6",text="6",onReleased="press"}},
---  {{image="art",url="https://placehold.co/120x48?text=flua"}}}
+--  {button="b5",text="5",onReleased="press"},{button="b6",text="6",onReleased="press"}}
+--%%rsrc:uiC:{image="art",url="https://placehold.co/120x48?text=flua"}
 
 Child = {}
 class "Child"(QuickAppChild)

@@ -2738,14 +2738,16 @@ def test_uibuilder_compile_and_parse(tmp_path) -> None:
     assert tv["eventBinding"]["onTabChanged"][0]["params"]["actionName"] == "tabChanged"
     btn = tv["tabs"][0]["components"][0]["components"][0]
     assert btn["eventBinding"]["onReleased"][0]["params"]["actionName"] == "turnOn"
-    assert len(child["directives"]) == 1
-    assert child["directives"][0].startswith("--%%rsrc:uiA:{")
+    # one directive per ROW (repeated directives accumulate the resource)
+    assert len(child["directives"]) == 2
+    assert child["directives"][0].startswith("--%%rsrc:uiA:{tabView=")
+    assert child["directives"][1].startswith("--%%rsrc:uiA:{{image=")
     # main targets: UIAction bindings, --%%u lines
     main = compile_target("main-v2", rows)
     assert main["uiView"][0]["components"][0]["eventBinding"]["onTabChanged"][0]["params"][
         "actionName"
     ] == "UIAction"
-    assert len(main["directives"]) == 2 and main["directives"][0].startswith("--%%u:{")
+    assert len(main["directives"]) == 2 and main["directives"][0].startswith("--%%u:{tabView=")
     v1 = compile_target("main-v1", [{"label": "lbl", "text": "<b>Hi</b>"}])
     assert v1["viewLayout"]["$jason"]["body"]["sections"]["items"][0]["type"] == "vertical"
     # style fields: label textAlign and button color ride through the compile
@@ -2760,14 +2762,22 @@ def test_uibuilder_compile_and_parse(tmp_path) -> None:
     styles = [c["style"] for row in styled["uiView"] for c in row["components"]]
     assert {"weight": "1.0", "textAlign": "right"} in styles
     assert {"weight": "1.0", "color": "#d44444"} in styles
-    # parse: pasted directives come back as the row model
+    # parse: pasted directives come back as the row model; same-named
+    # rsrc directives merge into one resource's rows
     parsed = parse_directives(
         "--%%u:{button=\"b\",text=\"B\",onReleased=\"press\"}\n"
         "--%%rsrc:uiA:{{image=\"art\",url=\"https://x/y.png\"}}\n"
+        "--%%rsrc:uiA:{{label=\"l\",text=\"L\"}}\n"
     )
     assert parsed["rows"] == [{"button": "b", "text": "B", "onReleased": "press"}]
     assert parsed["resources"] == [
-        {"name": "uiA", "rows": [{"image": "art", "url": "https://x/y.png"}]}
+        {
+            "name": "uiA",
+            "rows": [
+                [{"image": "art", "url": "https://x/y.png"}],
+                [{"label": "l", "text": "L"}],
+            ],
+        }
     ]
 
 

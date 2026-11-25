@@ -459,7 +459,8 @@ async def test_rsrc_directive_injects_fibaro_rsrc_and_child_ui(tmp_path) -> None
 @pytest.mark.asyncio
 async def test_repeated_rsrc_directives_extend_the_resource(tmp_path) -> None:
     # several --%%rsrc:<name>: directives accumulate rows under the name
-    # (--%%u style) — earlier the last one silently overwrote the others
+    # (--%%u style — one directive is ONE row): a dict is a single element,
+    # a list is several elements side by side
     script = tmp_path / "rsrc2.lua"
     script.write_text(
         "--%%rsrc:guiChild1:{{button=\"b\",text=\"B\",onReleased=\"press\"}}\n"
@@ -490,12 +491,13 @@ async def test_repeated_rsrc_directives_extend_the_resource(tmp_path) -> None:
             if d.get("parentId") == qa_id and d.get("id", 0) >= 900000
         )
         device, _ = engine.api.dispatch("GET", f"/devices/{child_id}")
-        # all three rows in directive order: button, label, image
+        # two rows in directive order: the button row, then the
+        # label-BESIDE-image row (the second directive's list shares a row)
         types = [
-            row["components"][0]["type"]
+            [c["type"] for c in row["components"]]
             for row in device["properties"]["uiView"]
         ]
-        assert types == ["button", "label", "image"]
+        assert types == [["button"], ["label", "image"]]
     finally:
         await engine.stop()
 

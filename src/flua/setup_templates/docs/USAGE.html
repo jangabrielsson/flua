@@ -832,24 +832,23 @@ owns the view:</p>
 as device actions). See <code>examples/child-ui.lua</code> for the child-class
 pattern (and <em>UI event dispatch on the HC3</em> below for the full model):</p>
 <h3 id="child-uiviews-as-resources---rsrc">Child uiViews as resources (<code>--%%rsrc</code>)</h3>
-<p>A <code>--%%rsrc:name:{rows}</code> directive declares a named child uiView — the
-value is the WHOLE view: a list of ROWS, each row a dict (one element) or
-a list (several elements sharing the row) — <code>{label="l"}</code> is one
-single-element row, <code>{{label="l"},{image="i"}}</code> is TWO stacked rows, and
-<code>{{{label="l"},{image="i"}}}</code> is ONE row with the label beside the image.
-The rows are ordinary <code>--%%u</code> row shapes (the kind is implicit; the
-explicit <code>--%%rsrc:name:u:{rows}</code> spelling is accepted for when future
-kinds arrive) (long values continue on following comment lines like
-<code>--%%u</code>). Repeated directives with the same name accumulate rows under the
-resource, like <code>--%%u</code> collects rows. flua compiles each resource to a
-child-bound uiView (<code>actionName</code> = the method, <code>json.array()</code> for argless
-bindings) and makes it available as <code>fibaro.RSRC.name</code>:</p>
+<p>A <code>--%%rsrc:name:{...}</code> directive declares a named child uiView — one
+directive is ONE row in the <code>--%%u</code> shape: a bare element dict is a
+single-element row, a list is several elements sharing the row
+(<code>{label="l"}</code> — one label; <code>{{label="l"},{image="i"}}</code> — label BESIDE
+the image). Repeated directives with the same name accumulate rows, like
+<code>--%%u</code> collects rows. The rows are ordinary <code>--%%u</code> row shapes (the kind
+is implicit; the explicit <code>--%%rsrc:name:u:{rows}</code> spelling is accepted
+for when future kinds arrive) (long values continue on following comment
+lines like <code>--%%u</code>). flua compiles each resource to a child-bound uiView
+(<code>actionName</code> = the method, <code>json.array()</code> for argless bindings) and
+makes it available as <code>fibaro.RSRC.name</code>:</p>
 <pre><code class="language-lua">--%%rsrc:uiA:{tabView=&quot;mainTabs&quot;,activeTab=&quot;control&quot;,onTabChanged=&quot;tabChanged&quot;,tabs={
 --  {name=&quot;control&quot;,text=&quot;Control&quot;,components={
 --    {{button=&quot;onBtn&quot;,text=&quot;Turn On&quot;,onReleased=&quot;turnOn&quot;}}
 --  }}}}
---%%rsrc:uiC:{{{button=&quot;b1&quot;,text=&quot;1&quot;,onReleased=&quot;press&quot;},{button=&quot;b2&quot;,text=&quot;2&quot;,onReleased=&quot;press&quot;}},
---  {{image=&quot;art&quot;,url=&quot;https://host/art.png&quot;}}}
+--%%rsrc:uiC:{{button=&quot;b1&quot;,text=&quot;1&quot;,onReleased=&quot;press&quot;},{button=&quot;b2&quot;,text=&quot;2&quot;,onReleased=&quot;press&quot;}}
+--%%rsrc:uiC:{image=&quot;art&quot;,url=&quot;https://host/art.png&quot;}
 
 function QuickApp:onInit()
   self:createChildDevice({ name = &quot;A&quot;, type = &quot;com.fibaro.floodSensor&quot;,

@@ -39,7 +39,9 @@ def compile_target(target: str, rows: Any, resource_name: str = "") -> dict[str,
     if target == "child":
         ui_view = child_bindings(ui["uiView"], ui["uiCallbacks"])
         name = resource_name.strip() or "ui"
-        directives = [f"--%%rsrc:{name}:{lua_literal(rows)}"]
+        # one directive per ROW (the --%%u shape): repeated directives with
+        # the same name accumulate the resource's rows
+        directives = [f"--%%rsrc:{name}:{lua_literal(row)}" for row in rows]
         return {"uiView": ui_view, "directives": directives}
     if target == "main-v1":
         return {
@@ -57,14 +59,15 @@ def compile_target(target: str, rows: Any, resource_name: str = "") -> dict[str,
 
 
 def parse_directives(text: str) -> dict[str, Any]:
-    """Pasted --%%u/--%%rsrc directives -> the builder's row model."""
+    """Pasted --%%u/--%%rsrc directives -> the builder's row model. The
+    --%%rsrc entries merge by name (repeated directives accumulate rows)."""
     annotations = parse_annotations(text, warn_unknown=False)
+    resources: dict[str, list[Any]] = {}
+    for entry in annotations.get("rsrc") or []:
+        resources.setdefault(str(entry["name"]), []).extend(entry["rows"])
     return {
         "rows": annotations.get("u") or [],
-        "resources": [
-            {"name": entry["name"], "rows": entry["rows"]}
-            for entry in (annotations.get("rsrc") or [])
-        ],
+        "resources": [{"name": name, "rows": rows} for name, rows in resources.items()],
     }
 
 

@@ -559,8 +559,10 @@ def parse_annotations(source: str, warn_unknown: bool = True) -> dict[str, Any]:
         elif name == "rsrc":
             # --%%rsrc:guiChild1:{...} — a named resource (a child uiView
             # table); the name becomes fibaro.RSRC.<name> in the running QA
-            # and a synthesized rsrc.lua ships in the .fqa. The value is a
-            # Lua table literal of --%%u rows.
+            # and a synthesized rsrc.lua ships in the .fqa. ONE directive is
+            # ONE row in the --%%u shape (a bare dict = a single element,
+            # a list = several elements side by side); repeated directives
+            # with the same name accumulate rows.
             rsrc_name, sep, rsrc_value = value.partition(":")
             rsrc_name = rsrc_name.strip()
             if not sep or not rsrc_name:
@@ -574,17 +576,27 @@ def parse_annotations(source: str, warn_unknown: bool = True) -> dict[str, Any]:
                 # --%%rsrc:name:u:{...} — the explicit kind marker; the uiView
                 # is the only kind today, so the plain form is its shorthand
                 rsrc_value = rsrc_value.strip()[2:]
+            parsed = parse_lua_literal(rsrc_value.strip())
+            if isinstance(parsed, list) and any(isinstance(el, list) for el in parsed):
+                # the old multi-row form (a list of ROWS): one directive was
+                # the whole view. Now a directive is ONE row — write one
+                # directive per row instead.
+                raise ValueError(
+                    f"--%%rsrc:{rsrc_name}: a row holds ELEMENTS, not rows — "
+                    f"write one directive per row (e.g. --%%rsrc:{rsrc_name}:{{...}} "
+                    f"for a single element, --%%rsrc:{rsrc_name}:{{{{a}},{{b}}}} for "
+                    f"two side by side, and repeat the directive for more rows)"
+                )
+            if not isinstance(parsed, (dict, list)):
+                raise ValueError(
+                    f"--%%rsrc:{rsrc_name}: value must be an element dict or a "
+                    f"list of elements (got {parsed!r})"
+                )
             entries = config.get("rsrc")
             if not isinstance(entries, list):
                 entries = []
                 config["rsrc"] = entries
-            parsed = parse_lua_literal(rsrc_value.strip())
-            # the value is the WHOLE uiView: a list of rows (each row a
-            # dict for one element or a list for several). A bare dict is
-            # the single-row convenience form.
-            if isinstance(parsed, dict):
-                parsed = [parsed]
-            entries.append({"name": rsrc_name, "rows": parsed})
+            entries.append({"name": rsrc_name, "rows": [parsed]})
         elif name == "db":
             # --%%db:house.json — seed the sim from the file; --%%db:+house.json
             # additionally persists emulator state back to it (offline: the
