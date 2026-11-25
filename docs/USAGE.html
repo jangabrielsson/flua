@@ -771,10 +771,13 @@ the row (the HC3's labels carry it). <code>color</code> is any CSS color string
 (<code>'red'</code>, <code>'#ff0000'</code>, <code>'rgb(255,0,0)'</code>): the HC3 applies it as a button's
 BACKGROUND — on a label it does nothing (the skin CSS owns the label text
 color; live-verified 5.221). Label HTML: v1 renders it (unsanitized,
-inline <code>style</code> attributes included); v2 labels render PLAIN TEXT on the
-HC3 (live-verified 5.221 — HTML tags show literally), so colored v2 text
-is not possible through labels — the v1 label is the rich-text route.
-flua's viewer renders v2 label HTML as-is (a preview convenience only).</p>
+inline <code>style</code> attributes included); the CHILD/dialog v2 label renders
+plain text (live-verified 5.221 — HTML shows literally) and no class
+changes that — <code>title</code>/<code>labelXXL</code> switch size and the gray→primary color,
+not the rendering path. The app's INLINE device view uses a different
+label component that binds sanitized HTML — untested, don't rely on it.
+The v1 label is the rich-text route. flua's viewer renders v2 label HTML
+as-is (a preview convenience only).</p>
 <p>Every element also takes <code>classes={"a","b"}</code> — a list of class names the
 HC3 app applies to the rendered component (and switches behavior on). The
 known classes, from the app's own code: layouts take <code>glued</code>/<code>panel</code>/
