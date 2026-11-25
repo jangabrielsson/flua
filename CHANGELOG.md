@@ -4,6 +4,13 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.193] - 2026-11-25
+
+### Changed
+- rsrc: one directive is ONE row (--%%u shape); uibuilder exports per row
+- image updates are 'source'-only on the HC3; uiView keeps the original url
+- sim: updateView 'source' remaps to an image element's url
+
 ## [0.1.192] - 2026-11-25
 
 ### Changed
