@@ -842,7 +842,9 @@ is implicit; the explicit <code>--%%rsrc:name:u:{rows}</code> spelling is accept
 for when future kinds arrive) (long values continue on following comment
 lines like <code>--%%u</code>). flua compiles each resource to a child-bound uiView
 (<code>actionName</code> = the method, <code>json.array()</code> for argless bindings) and
-makes it available as <code>fibaro.RSRC.name</code>:</p>
+makes it available as <code>fibaro.RSRC.name</code>. The OLD whole-view form (one
+directive holding a list of ROWS, e.g. <code>{{{a},{b}}}</code>) still parses for
+compatibility — with a deprecation warning.</p>
 <pre><code class="language-lua">--%%rsrc:uiA:{tabView=&quot;mainTabs&quot;,activeTab=&quot;control&quot;,onTabChanged=&quot;tabChanged&quot;,tabs={
 --  {name=&quot;control&quot;,text=&quot;Control&quot;,components={
 --    {{button=&quot;onBtn&quot;,text=&quot;Turn On&quot;,onReleased=&quot;turnOn&quot;}}

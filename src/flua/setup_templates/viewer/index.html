@@ -592,8 +592,6 @@ function renderComponent(device, component, row) {
   if (t === "label") {
     // no side label: the text IS the element, like the HC3 — and labels may
     // carry HTML (<table>, <font color=...>, ...), which renders as-is
-  if (t === "label") {
-    // no side label: the text IS the element, like the HC3 — and labels may
     // carry HTML (<table>, <font color=...>, ...), which renders as-is
     name.className = "component-label element-label";
     name.innerHTML = text ?? component.name;

@@ -194,14 +194,27 @@ def test_rsrc_explicit_u_kind_marker() -> None:
     ]
 
 
-def test_rsrc_directive_rejects_the_old_multi_row_form() -> None:
-    # one directive is ONE row now; a list of ROWS (the old whole-view
-    # value) fails with a migration hint instead of silently nesting
-    import pytest
-
+def test_rsrc_old_whole_view_form_still_parses() -> None:
+    # the OLD whole-view form (a list of ROWS) parses for compatibility —
+    # QAs written before the one-directive-per-row semantics keep working
+    # (with a deprecation warning)
     from flua.config import parse_annotations
 
-    with pytest.raises(ValueError, match="one directive per row"):
-        parse_annotations(
-            "--%%rsrc:z:{{{button=\"a\",text=\"A\"}},{{button=\"b\",text=\"B\"}}}\n"
-        )
+    a = parse_annotations(
+        "--%%rsrc:z:{{{button=\"a\",text=\"A\"},{button=\"b\",text=\"B\"}}}\n"
+    )
+    assert a["rsrc"] == [{
+        "name": "z",
+        "rows": [[{"button": "a", "text": "A"}, {"button": "b", "text": "B"}]],
+    }]
+    # the old multi-row form too
+    b = parse_annotations(
+        "--%%rsrc:z:{{{label=\"l\",text=\"L\"}},{{image=\"i\",url=\"x\"}}}\n"
+    )
+    assert b["rsrc"] == [{
+        "name": "z",
+        "rows": [
+            [{"label": "l", "text": "L"}],
+            [{"image": "i", "url": "x"}],
+        ],
+    }]
