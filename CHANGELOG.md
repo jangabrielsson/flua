@@ -4,6 +4,15 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.192] - 2026-11-25
+
+### Changed
+- classes switch label styling, not the rendering path
+- v2 labels render plain text on the HC3 — HTML shows literally
+- v2 label HTML is Angular-sanitized — font color works, style attributes don't
+- docs/viewer: circle/squircle did not affect a child-dialog button (5.221)
+- ui: classes= passes through on every element; viewer honors the size classes
+
 ## [0.1.191] - 2026-11-25
 
 ### Changed
