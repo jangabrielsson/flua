@@ -4,6 +4,16 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.189] - 2026-11-25
+
+### Changed
+- cli: flua --docs — serve the docs channel and open it straight in the browser
+- toolbox page — link posts 36/37, cover all 31 tools
+- vscode: reuse the shared flua terminal; autoCloseTerminal option
+- tools: uploadQA takes a ready .fqa; vscode: one-step Upload as new QA
+- fix
+- the list element is not usable on the HC3 from QA views
+
 ## [0.1.188] - 2026-11-24
 
 ### Added
