@@ -739,15 +739,17 @@ pattern (and *UI event dispatch on the HC3* below for the full model):
 ### Child uiViews as resources (`--%%rsrc`)
 
 A `--%%rsrc:name:{rows}` directive declares a named child uiView — the
-rows are ordinary `--%%u` row shapes (the kind is implicit; the explicit
-`--%%rsrc:name:u:{rows}` spelling is accepted for when future kinds
-arrive) (one row per directive value; a bare
-element dict is the single-row convenience form; long values continue on
-following comment lines like `--%%u`). Repeated directives with the same
-name accumulate rows under the resource, like `--%%u` collects rows. flua
-compiles each resource to a child-bound uiView (`actionName` = the method,
-`json.array()` for argless bindings) and makes it available as
-`fibaro.RSRC.name`:
+value is the WHOLE view: a list of ROWS, each row a dict (one element) or
+a list (several elements sharing the row) — `{label="l"}` is one
+single-element row, `{{label="l"},{image="i"}}` is TWO stacked rows, and
+`{{{label="l"},{image="i"}}}` is ONE row with the label beside the image.
+The rows are ordinary `--%%u` row shapes (the kind is implicit; the
+explicit `--%%rsrc:name:u:{rows}` spelling is accepted for when future
+kinds arrive) (long values continue on following comment lines like
+`--%%u`). Repeated directives with the same name accumulate rows under the
+resource, like `--%%u` collects rows. flua compiles each resource to a
+child-bound uiView (`actionName` = the method, `json.array()` for argless
+bindings) and makes it available as `fibaro.RSRC.name`:
 
 ```lua
 --%%rsrc:uiA:{tabView="mainTabs",activeTab="control",onTabChanged="tabChanged",tabs={
