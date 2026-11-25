@@ -503,6 +503,52 @@ async def test_repeated_rsrc_directives_extend_the_resource(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_example_divider_child_ui(tmp_path) -> None:
+    # examples/ui-divider.lua — the HC3's divider: a space element with
+    # classes={'borderTop'} compiles to type space in the child's uiView
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        qa_id = engine.load_qa_file(str(REPO_ROOT / "examples" / "ui-divider.lua"))[0]
+
+        def child_ready() -> bool:
+            return any(
+                d.get("parentId") == qa_id and d.get("id", 0) >= 900000
+                for d in engine.api.state.devices.values()
+            )
+
+        await wait_until(child_ready)
+        child_id = next(
+            d["id"]
+            for d in engine.api.state.devices.values()
+            if d.get("parentId") == qa_id and d.get("id", 0) >= 900000
+        )
+        device, _ = engine.api.dispatch("GET", f"/devices/{child_id}")
+        rows = [
+            [c["type"] for c in row["components"]]
+            for row in device["properties"]["uiView"]
+        ]
+        assert rows == [["label"], ["space"], ["label"], ["space"], ["button"], ["space"]]
+        dividers = [
+            c
+            for row in device["properties"]["uiView"]
+            for c in row["components"]
+            if c["type"] == "space" and c.get("classes") == ["borderTop"]
+        ]
+        assert len(dividers) == 2
+        btn = next(
+            c
+            for row in device["properties"]["uiView"]
+            for c in row["components"]
+            if c["type"] == "button"
+        )
+        assert btn["eventBinding"]["onReleased"][0]["params"]["actionName"] == "press"
+        assert btn["style"]["color"] == "#2e9e5b"
+    finally:
+        await engine.stop()
+
+
+@pytest.mark.asyncio
 async def test_example_child_ui_action_delivery(tmp_path, capsys) -> None:
     # examples/child-ui.lua — the HC3-verified child UI model: the child's
     # uiView binds the child class's methods as actionNames directly (no
