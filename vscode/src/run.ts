@@ -29,7 +29,7 @@ export function runQa(uri?: vscode.Uri, watch = false): void {
     args.push("--watch");
   }
   args.push(target.fsPath);
-  runInTerminal(fluaExecutable(), args);
+  runInTerminal(fluaExecutable(), args, undefined, { reuse: false });
 }
 
 /** Is a flua UI server answering on this port? (the viewer's channel). */
@@ -56,7 +56,7 @@ async function ensureServing(): Promise<number | undefined> {
   if (await isServing(port)) {
     return port;
   }
-  runInTerminal(fluaExecutable(), ["--ui", String(port)]);
+  runInTerminal(fluaExecutable(), ["--ui", String(port)], undefined, { reuse: false });
   for (let attempt = 0; attempt < 40; attempt++) {
     await new Promise((resolve) => setTimeout(resolve, 250));
     if (await isServing(port)) {

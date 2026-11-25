@@ -94,6 +94,10 @@ packages without unpacking them by hand.
 
 Tool commands run in the shared **flua terminal** (`flua.runToolsInTerminal`
 switches to the output channel) so interactive HC3 credential prompts work.
+One shared terminal is reused across commands, so no pane pile-up; enable
+`flua.autoCloseTerminal` instead to have each command end at a 'press Enter
+to close' prompt that closes the terminal. Long-running sessions (Run QA)
+always get a fresh terminal.
 
 ## Development
 
@@ -143,6 +147,9 @@ executable.
 - `flua.executable` — path to flua; empty = auto-detect.
 - `flua.runToolsInTerminal` — run tools in the integrated terminal (default
   true) or the flua output channel.
+- `flua.autoCloseTerminal` — after a command, park the terminal at a 'press
+  Enter to close' prompt and close it on keypress (default false; off = one
+  shared terminal, reused).
 - `flua.viewerPort` — the port for flua --ui sessions started by Run QA /
   Open viewer / timeline / docs (default 8090; a busy port falls back).
 - `flua.codeLens` — the CodeLens links (default true).

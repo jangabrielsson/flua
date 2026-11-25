@@ -59,6 +59,12 @@ export function execFlua(
   });
 }
 
+function shellName(): string {
+  return (
+    (vscode.env.shell || "").split(/[\\/]/).pop()?.toLowerCase() ?? ""
+  );
+}
+
 /** Quote an argument for the user's terminal shell (PowerShell/cmd on
  * Windows, sh-family elsewhere) — detected from vscode.env.shell, so a
  * workspace path with spaces survives every platform. Bare safe tokens
@@ -67,10 +73,7 @@ function shellQuote(arg: string): string {
   if (/^[a-zA-Z0-9_./:=\\@%+\-]+$/.test(arg)) {
     return arg;
   }
-  const name = (vscode.env.shell || "")
-    .split(/[\\/]/)
-    .pop()
-    ?.toLowerCase() ?? "";
+  const name = shellName();
   if (name.startsWith("pwsh") || name.startsWith("powershell")) {
     // PowerShell strong quoting: 'literal', an inner ' doubled
     return `'${arg.replace(/'/g, "''")}'`;
@@ -81,12 +84,81 @@ function shellQuote(arg: string): string {
   return `"${arg.replace(/"/g, '\\"')}"`; // sh/bash/zsh
 }
 
-/** Run flua in a shared "flua" terminal — visible output, interactive
- * credential prompts keep working. */
-export function runInTerminal(flua: string, args: string[], cwd?: string) {
-  const terminal = vscode.window.createTerminal({ name: "flua", cwd });
+/** The chain separator that runs the next command REGARDLESS of the
+ * previous exit code (`;` in sh/pwsh, `&` in cmd). Used to reach the
+ * close prompt even when the tool failed or was Ctrl+C'd. */
+function chainAlways(): string {
+  const name = shellName();
+  if (name.startsWith("pwsh") || name.startsWith("powershell")) {
+    return "; ";
+  }
+  if (name === "cmd.exe") {
+    return " & ";
+  }
+  return "; ";
+}
+
+/** The chain separator that runs the next command only when the previous
+ * one succeeded (`&&`; PowerShell has no portable form pre-7, so `;`). */
+function chainOk(): string {
+  if (shellName().startsWith("pwsh") || shellName().startsWith("powershell")) {
+    return "; ";
+  }
+  return " && ";
+}
+
+/** The shell line appended when autoCloseTerminal is on: hold the output
+ * at a visible keypress prompt, then exit so VS Code disposes the
+ * terminal pane. */
+function closePrompt(): string {
+  const name = shellName();
+  if (name.startsWith("pwsh") || name.startsWith("powershell")) {
+    return 'Read-Host "Press Enter to close this terminal" | Out-Null ; exit';
+  }
+  if (name === "cmd.exe") {
+    return "pause & exit";
+  }
+  return "printf 'Press Enter to close this terminal... ' ; read _ ; exit";
+}
+
+/** Run flua in the shared "flua" terminal — visible output, interactive
+ * credential prompts keep working. Reuses the existing "flua" terminal
+ * (so tool commands don't pile up panes); with autoCloseTerminal each run
+ * parks at a keypress prompt and closes itself. ``reuse:false`` (the
+ * long-running --ui sessions) always gets a fresh terminal — a second Run
+ * QA must not be typed into the first session's server. */
+export function runInTerminal(
+  flua: string,
+  args: string[],
+  cwd?: string,
+  options?: { reuse?: boolean }
+) {
+  const autoClose = vscode.workspace
+    .getConfiguration("flua")
+    .get<boolean>("autoCloseTerminal", false);
+  let terminal =
+    options?.reuse === false
+      ? undefined
+      : vscode.window.terminals.find((t) => t.name === "flua");
+  if (!terminal) {
+    terminal = vscode.window.createTerminal({ name: "flua", cwd });
+  } else if (autoClose) {
+    // a terminal parked at the close prompt: start fresh so the new
+    // command's output isn't typed into the waiting read
+    terminal.dispose();
+    terminal = vscode.window.createTerminal({ name: "flua", cwd });
+  }
   terminal.show();
-  terminal.sendText([flua, ...args].map(shellQuote).join(" "));
+  let line = [flua, ...args].map(shellQuote).join(" ");
+  if (cwd) {
+    // a reused terminal sits wherever the previous command left it; a
+    // fresh one is born in cwd, so this is a harmless no-op there
+    line = `cd ${shellQuote(cwd)}${chainOk()}${line}`;
+  }
+  if (autoClose) {
+    line = `${line}${chainAlways()}${closePrompt()}`;
+  }
+  terminal.sendText(line);
 }
 
 let outputChannel: vscode.OutputChannel | undefined;

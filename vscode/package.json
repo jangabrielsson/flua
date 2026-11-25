@@ -44,6 +44,11 @@
           "default": true,
           "description": "Run flua --tool commands in the integrated terminal (visible output, interactive credential prompts). When false, output goes to the flua output channel."
         },
+        "flua.autoCloseTerminal": {
+          "type": "boolean",
+          "default": false,
+          "description": "After a command finishes, hold its terminal at a 'press Enter to close' prompt and close it on keypress — one terminal per command, never piling up. Long-running sessions (Run QA, --ui) end on Ctrl+C, then the prompt closes them. When off, tool commands reuse one shared 'flua' terminal."
+        },
         "flua.setupNudge": {
           "type": "boolean",
           "default": true,

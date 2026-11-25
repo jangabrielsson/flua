@@ -303,7 +303,7 @@ async function actionRunUi(
     return;
   }
   runInTerminal(fluaExecutable(), ["--ui", String(viewerPort()), main.fsPath],
-    path.dirname(main.fsPath));
+    path.dirname(main.fsPath), { reuse: false });
 }
 
 async function actionUpdate(
