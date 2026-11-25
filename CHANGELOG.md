@@ -4,6 +4,14 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.195] - 2026-11-25
+
+### Changed
+- drop 'plugin-only territory' from post 38's index covers
+- drop the plugin-only section from post 38
+- ui: vertical elements — columns of nested rows, shareable in a row
+- forum post 38 — the uiView format field guide
+
 ## [0.1.194] - 2026-11-25
 
 ### Changed
