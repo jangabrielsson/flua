@@ -96,6 +96,7 @@ const ELEMENTS = {
   select:      { name: "Select", fields: ["text", "value", "onToggled", "options"], v2: false },
   multi:       { name: "Multi select", fields: ["text", "values", "onToggled", "options"], v2: false },
   image:       { name: "Image", fields: ["url"], v2: true },
+  space:       { name: "Divider", fields: [], v2: true, hint: "grey line (classes borderTop)" },
   tabView:     { name: "Tabs", fields: ["activeTab", "onTabChanged", "tabs"], v2: true },
   collapsible: { name: "Collapsible", fields: ["text", "collapsed"], v2: true },
   colorPicker: { name: "Color picker", fields: ["colorSpace", "onChanged"], v2: true },
@@ -122,6 +123,7 @@ function newElement(kind) {
   if (kind === "tabView") Object.assign(base, { activeTab: "", onTabChanged: "", tabs: [] });
   if (kind === "collapsible") Object.assign(base, { collapsed: false });
   if (kind === "image") base.url = "";
+  if (kind === "space") base.classes = ["borderTop"];
   if (kind === "colorPicker") base.colorSpace = "RGB";
   if (kind === "colorTemperaturePicker") Object.assign(base, { minTemperature: "0", maxTemperature: "100", colorTemperature: "50" });
   base[kind] = "";

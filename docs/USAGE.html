@@ -897,6 +897,11 @@ the app overlays the update at render, exactly like flua's
 (<code>"source"</code> remaps to the url the viewer reads) — a deliberate superset,
 so a QA that updates images with <code>"url"</code> works in flua but silently not
 on the HC3.</p>
+<p>A <code>space</code> element is a blank gap; with <code>classes={'borderTop'}</code> it renders
+the HC3's grey horizontal divider line (the dialog view's <code>.spacer-line</code>,
+which the app draws for exactly that spacer class):</p>
+<pre><code class="language-lua">--%%rsrc:childUI:{space=&quot;div1&quot;,classes={&quot;borderTop&quot;}}
+</code></pre>
 <p>On the real HC3, <code>{{device.properties.x}}</code> templated urls and <code>useProxy</code>
 are resolved by the app client; flua's viewer renders the raw url. The
 viewer loads whatever a browser <code>&lt;img&gt;</code> can — including <code>data:</code> URIs, so

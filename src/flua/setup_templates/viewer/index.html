@@ -63,6 +63,9 @@
   img.ctl-image.imageS { width: 32px; height: 32px; }
   img.ctl-image.imageM { width: 40px; height: 40px; }
   img.ctl-image.imageL { width: 48px; height: 48px; }
+  /* spacer: a blank gap; with classes borderTop the HC3's grey divider line */
+  .spacer { min-height: 1.4rem; flex: 1 1 auto; }
+  .spacer.divider-line { border-bottom: 1px solid var(--border); margin: 10px 0 20px; }
   /* element classes the HC3 app honors (title/XXL label sizes) */
   .element-label.title { font-size: 1.25em; font-weight: 700; }
   .element-label.labelXXL { font-size: 1.6em; font-weight: 700; }
@@ -1006,6 +1009,12 @@ function renderComponent(device, component, row) {
       img.onerror = () => img.remove();
       row.appendChild(img);
     }
+  } else if (t === "space") {
+    // the HC3's spacer; classes borderTop renders the grey divider line
+    name.remove();
+    const div = document.createElement("div");
+    div.className = "spacer" + ((component.classes || []).includes("borderTop") ? " divider-line" : "");
+    row.appendChild(div);
   } else if (t === "collapsible") {
     // a header toggling a body of rows. State: updateView "collapsed"
     // first, then the local viewer choice, then the declared default —

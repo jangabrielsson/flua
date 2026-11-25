@@ -58,6 +58,7 @@ _ELEMENT_KEYS = (
     "multi",
     "tabView",
     "image",
+    "space",
     "collapsible",
     "colorPicker",
     "colorTemperaturePicker",
@@ -159,6 +160,10 @@ def _apply_defaults(rows: list[list[dict[str, Any]]]) -> None:
                 el["weight"] = "1.0"
             elif typ == "image":
                 el.setdefault("url", "")
+                el.setdefault("visible", True)
+            elif typ == "space":
+                # a spacer; with classes={'borderTop'} the HC3's dialog view
+                # renders the grey divider line (its .spacer-line)
                 el.setdefault("visible", True)
             elif typ == "colorPicker":
                 el.setdefault("onChanged", "")
@@ -365,6 +370,13 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
         if el.get("useProxy"):
             element["useProxy"] = True
         return _with_classes(element, el)
+    if typ == "space":
+        # the HC3's spacer (the trailing-space companion in every legacy
+        # row); classes={'borderTop'} becomes the dialog's divider line
+        return _with_classes(
+            {"name": name, "visible": el.get("visible", True), "style": style, "type": "space"},
+            el,
+        )
     # label
     return {
         "name": name,
@@ -531,6 +543,11 @@ def _ui_view_component(el: dict[str, Any], weight: str) -> dict[str, Any]:
         component.pop("text", None)  # the HC3's image components carry no text
         if el.get("useProxy"):
             component["useProxy"] = True
+    if typ == "space":
+        # the HC3's spacer: with classes={'borderTop'} the dialog view
+        # renders its grey divider line (.spacer-line)
+        component.pop("text", None)
+        component.pop("eventBinding", None)
     # the 5.221 element properties the viewer renders: named icons,
     # switch hints, disabled state, slider units. Not for image elements —
     # their "image" key holds the element NAME.

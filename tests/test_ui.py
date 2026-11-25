@@ -292,6 +292,20 @@ def test_element_weight_and_color_style() -> None:
     assert [c["style"]["weight"] for c in ui2["uiView"][0]["components"]] == ["0.5", "3"]
 
 
+def test_space_element_and_divider() -> None:
+    # the HC3's spacer element (type "space"): a blank gap; with
+    # classes={'borderTop'} the dialog view renders its grey divider line
+    # (the app's .spacer-line — the spacerLine flag reads borderTop)
+    rows = [[{"space": "div1", "classes": ["borderTop"]}]]
+    ui = compile_ui(rows, 5000)
+    c = ui["uiView"][0]["components"][0]
+    assert c["type"] == "space"
+    assert c["classes"] == ["borderTop"]
+    assert "text" not in c and "eventBinding" not in c
+    legacy = ui["viewLayout"]["$jason"]["body"]["sections"]["items"][0]["components"][0]
+    assert legacy["type"] == "space" and legacy["classes"] == ["borderTop"]
+
+
 def test_tabview_compiles_to_uiview_and_legacy() -> None:
     # a tabView is full-width (alone on its row): tabs hold rows, elements
     # inside tabs normalize like top-level ones, onTabChanged routes through
