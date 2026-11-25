@@ -436,6 +436,10 @@
   "derived": {
     "tools": [
       {
+        "name": "api",
+        "help": "make an HC3 API call and print the result (pretty JSON + HTTP status)"
+      },
+      {
         "name": "build",
         "help": "QA builder: a browser page to turn recipes into QuickApps"
       },

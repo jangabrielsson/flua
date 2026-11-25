@@ -833,6 +833,68 @@ def test_upload_qa_accepts_a_ready_fqa(tmp_path, monkeypatch, capsys) -> None:
         server.server_close()
 
 
+def test_api_tool_pretty_and_json_output(tmp_path, monkeypatch, capsys) -> None:
+    # --tool api probes the HC3 with the env-chain credentials: pretty JSON
+    # + HTTP status by default, one-line {res, code} with --json, exit 1 on
+    # non-2xx
+    _MockHc3.fqas = {}
+    _MockHc3.next_id = 100
+    _MockHc3.requests = []
+    _MockHc3.devices = {100: {"id": 100, "name": "probe"}}
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _MockHc3)
+    threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
+    try:
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("HC3_URL", f"http://127.0.0.1:{server.server_port}")
+        monkeypatch.setenv("HC3_USER", "admin")
+        monkeypatch.setenv("HC3_PASSWORD", "secret")
+        module = tools._TOOLS["api"]
+        parser = argparse.ArgumentParser()
+        module.add_arguments(parser)
+        # a bare path gains the leading slash; pretty JSON + status on stderr
+        assert module.run(parser, parser.parse_args(["devices/100"])) == 0
+        out = capsys.readouterr()
+        assert '"name": "probe"' in out.out
+        assert "HTTP 200" in out.err
+        # --json: one compact line for agents/scripts
+        assert module.run(parser, parser.parse_args(["--json", "/devices/100"])) == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert payload == {"res": {"id": 100, "name": "probe"}, "code": 200}
+        # a 404 prints and exits 1
+        assert module.run(parser, parser.parse_args(["/nope"])) == 1
+        assert "HTTP 404" in capsys.readouterr().err
+        # POST with a JSON body (updateProperty: the mock records it, 200)
+        assert (
+            module.run(
+                parser,
+                parser.parse_args(
+                    [
+                        "-X",
+                        "POST",
+                        "-d",
+                        '{"deviceId": 100, "propertyName": "x", "value": 1}',
+                        "/plugins/updateProperty",
+                    ]
+                ),
+            )
+            == 0
+        )
+        posted = [
+            r
+            for r in _MockHc3.requests
+            if r[0] == "POST" and r[1] == "/api/plugins/updateProperty"
+        ]
+        assert posted and posted[-1][2] == {"deviceId": 100, "propertyName": "x", "value": 1}
+        # an invalid --data body is a usage error
+        with pytest.raises(SystemExit):
+            module.run(parser, parser.parse_args(["-d", "not json", "/devices/100"]))
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
 def test_pack_proxy_mode_qa_is_silent_and_keeps_the_directive(
     tmp_path, capsys, monkeypatch, caplog
 ) -> None:

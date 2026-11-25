@@ -1938,6 +1938,11 @@ format (individual <code>.lua</code> files) and only the HC3 sees <code>.fqa</co
 # update ONE file in a downloaded QA (the VS Code task uses ${file})
 .venv/bin/flua --tool uploadFile MyQA_lib_123.lua
 
+# probe the HC3 API (the .env chain's credentials — no curl needed)
+.venv/bin/flua --tool api /plugins/getView?id=4599       # pretty JSON + HTTP status
+.venv/bin/flua --tool api -X POST -d '{&quot;x&quot;:1}' /plugins/updateProperty
+.venv/bin/flua --tool api --json /devices/4599           # {&quot;res&quot;:...,&quot;code&quot;:...} for agents
+
 # download a QA from the HC3 and unpack it into individual .lua files
 .venv/bin/flua --tool downloadQA 123 -d project/     # -d DIR (default: QA name)
 

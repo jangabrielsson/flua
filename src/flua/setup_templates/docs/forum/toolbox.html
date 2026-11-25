@@ -4,7 +4,7 @@
 The VS Code extension's buttons are these commands with a GUI on top, the
 MCP server exposes them to agents, and a bare <code>flua --tool</code>
 lists them all (each with <code>--help</code>). This post is the tour —
-all 31 tools, grouped by what they do, as of flua 0.1.188.</p>
+all 32 tools, grouped by what they do, as of flua 0.1.188.</p>
 
 <h3>Scaffold and understand your devices</h3>
 
@@ -122,6 +122,9 @@ loop).</li>
 HC3 and point it at this machine (the controller-local API bridge).</li>
 <li><b><code>inspectFQA</code></b> — inspect a packed <code>.fqa</code>:
 metadata, file inventory, variables, leak scan.</li>
+<li><b><code>api</code></b> — make a raw HC3 API call and print the result:
+pretty JSON + the HTTP status (<code>--json</code> for the one-line
+<code>{res, code}</code> agents read; offline the call lands in the sim).</li>
 </ul>
 
 <h3>Inspect and diagnose</h3>
