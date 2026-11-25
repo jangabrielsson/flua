@@ -1,0 +1,183 @@
+<h2>The uiView format — a field guide for QuickApps</h2>
+
+<p>When you design a QuickApp UI in the HC3's visual editor, there is a
+button that exports the view as a <b>uiView</b> JSON structure — the
+modern, second way to describe a QuickApp interface, next to the legacy
+<code>$jason</code> <code>viewLayout</code>. The exported struct is meant
+to be pasted into <code>createChildDevice</code>'s
+<code>initialProperties.uiView</code>, and it is clearly a format Fibaro
+plans to keep: the editor itself writes it, and it must stay backward
+compatible.</p>
+
+<p>What Fibaro has <i>not</i> published is documentation of the format.
+This post is our reverse-engineered field guide — everything below comes
+from black-box observation of firmware 5.221, our own controllers, and
+reading the app's behavior, <b>not</b> from any insider access. Treat it
+as our best guess. If you know better, correct us in a comment and we'll
+update the post (and flua).</p>
+
+<h3>The shape</h3>
+
+<p>A uiView is a list of rows. Each row is a container
+(<code>"type": "horizontal"</code> or <code>"vertical"</code>) holding a
+<code>components</code> list. Every component carries at least a
+<code>name</code>, a <code>type</code>, and a <code>style</code> object:</p>
+
+<pre>
+[
+  { "type": "horizontal", "style": {"weight": "1.0"}, "components": [
+    { "name": "lbl", "type": "label", "text": "Hello", "visible": true,
+      "style": {"weight": "1.0", "textAlign": "left"}, "classes": [] },
+    { "name": "btn", "type": "button", "text": "Go", "visible": true,
+      "style": {"weight": "0.5", "color": ""}, "classes": [],
+      "eventBinding": { "onReleased": [
+        { "type": "deviceAction", "params": { "actionName": "press", "args": [] } } ] } }
+  ]}
+]
+</pre>
+
+<p>Names must be unique — events route by element name, and duplicates
+collide. <code>visible</code> is a boolean. Unknown fields are simply
+ignored by the app.</p>
+
+<h3>Weights and containers</h3>
+
+<p><code>style.weight</code> (a string, like <code>"1.0"</code> or
+<code>"7"</code>) is the element's share of its container: inside a
+horizontal row it shares the <b>width</b> among siblings; inside a
+vertical container it shares the <b>height</b>. The catch we verified the
+hard way: the split only happens in <i>fixed-height</i> layouts. A QA's
+UI is auto-height, so a lone element's weight changes nothing — that's
+why <code>weight=7</code> on an image did not make it taller on the
+controller. Weight never changes text size either.</p>
+
+<h3>style: color and textAlign</h3>
+
+<ul>
+<li><b>textAlign</b> — <code>"left"</code>/<code>"center"</code>/
+<code>"right"</code> on a label positions its text across the row.
+Verified working.</li>
+<li><b>color</b> — any CSS color string. On a <b>button</b> it is the
+background tint (verified). On a <b>label</b> it does nothing — the app's
+skin CSS owns the label text color, and v2 labels render plain text (HTML
+tags show literally). The v1 label is still the rich-text route.</li>
+</ul>
+
+<h3>classes</h3>
+
+<p>An element's <code>classes</code> array reaches the rendered
+component, and the app also switches behavior on specific names. The ones
+we have found and tested:</p>
+
+<ul>
+<li>labels: <code>title</code>, <code>labelXXL</code> — bigger, bold,
+primary color (verified).</li>
+<li>buttons: <code>textPositionBelow</code> (icon above text, verified),
+<code>toggle</code>; <code>circle</code>/<code>squircle</code> sit in the
+app's sizing code but did nothing on a plain button for us — probably
+icon-button territory.</li>
+<li>sliders: <code>thick</code>, <code>vertical</code>,
+<code>minMaxWords</code>, <code>invertFill</code>,
+<code>iconsMinusPlus</code>, <code>slatsAngle</code>, and
+<code>timer</code> — which renders the elapsed time above the slider
+(verified).</li>
+<li>images: <code>imageS</code>/<code>imageM</code>/<code>imageL</code> —
+fixed 32/40/48px squares.</li>
+<li>layouts: <code>glued</code>, <code>panel</code>,
+<code>dividers</code>.</li>
+</ul>
+
+<h3>The divider (a space with borderTop)</h3>
+
+<p>The grey horizontal separator line: a component of
+<code>type: "space"</code> with <code>classes: ["borderTop"]</code>. The
+app draws its <code>.spacer-line</code> for exactly that. It is a v2
+feature — with <code>useUiView: false</code> the legacy renderer draws
+nothing, unique names or not (verified).</p>
+
+<h3>The image element and its update quirk</h3>
+
+<p>An image is <code>{"name", "type": "image", "url", "useProxy"}</code>.
+<code>useProxy: true</code> routes the URL through the controller's
+plugin proxy — needed for plugin-relative paths and remote camera access,
+pointless for a public <code>https://</code> URL. The element renders
+<code>max-width:100%; height:auto</code>: natural aspect, capped by the
+container width. To make a picture taller, use a portrait source.</p>
+
+<p>The quirk: to change the picture at runtime you must
+<code>self:updateView(elm, "source", url)</code> — <code>"source"</code>
+is the image element's legacy update property, which the HC3 remaps to
+the url. <code>"url"</code> does nothing. And updateView never touches
+the declared struct: the device's uiView keeps the old url, the update
+lives in live render state. You can see that state yourself:
+<code>GET /plugins/getView?id=&lt;id&gt;</code> returns the
+<i>rendered</i> view with updates merged (and the app's own defaults
+filled in), while <code>/devices/&lt;id&gt;</code> only shows the
+declared uiView. Declared vs rendered — two layers, one UI.</p>
+
+<h3>eventBinding — how events reach your methods</h3>
+
+<p>The v2 format binds events on the element itself instead of the
+separate <code>uiCallbacks</code> table:</p>
+
+<pre>
+"eventBinding": { "onReleased": [
+  { "type": "deviceAction", "params": { "actionName": "press", "args": [] } }
+] }
+</pre>
+
+<p>For a <b>child device</b> the actionName is your Child class method
+and <code>args</code> is a JSON array — argless calls must use a real
+array (<code>json.array()</code> in Lua); a plain <code>{}</code> encodes
+as an object and the app silently drops the action. For a <b>main QA</b>
+the binding is <code>"type": "UIAction"</code> and the good old
+<code>uiCallbacks</code> table still does the routing. See our earlier
+post <a href="/docs/forum/ui-events-explained.html">The button that did
+nothing</a> for the full model.</p>
+
+<h3>The modern widgets</h3>
+
+<ul>
+<li><b>tabView</b> — named tabs, each holding its own rows, with an
+<code>onTabChanged</code> binding.</li>
+<li><b>collapsible</b> — a full-width header that expands/collapses its
+body rows (<code>collapsed</code> toggles at runtime).</li>
+<li><b>colorPicker</b> / <b>colorTemperaturePicker</b> — the RGB wheel
+and the temperature wheel.</li>
+<li><b>space</b> — a gap, or the divider with <code>borderTop</code>.</li>
+<li><b>list</b> — a data-bound list of rows. In our tests it only
+rendered from packaged plugin view files, never from a QA's own view —
+treat it as plugin-only until someone shows otherwise.</li>
+</ul>
+
+<h3>Plugin-only territory</h3>
+
+<p>Some things in the firmware's own views are out of reach for QAs, as
+far as we can tell: the <code>list</code> element (packaged view files),
+<code>nativeComponent</code>, and the <code>style.dynamic</code> flag you
+see on camera image streams (it appears in getView output but we found no
+consumer in the current app — likely a legacy of the old renderer).</p>
+
+<h3>Spelling it in flua</h3>
+
+<p>flua compiles the same format from your QA file, so everything above
+is one directive away:</p>
+
+<pre>
+--%%u:{label="lbl",text="Hello",textAlign="center"}
+--%%u:{{button="a",text="A",onReleased="go",color="#2e9e5b"},{button="b",text="B",onReleased="go"}}
+--%%u:{space="div1",classes={"borderTop"}}
+--%%rsrc:childUI:{image="art",url="https://host/art.png",classes={"imageL"}}
+</pre>
+
+<p>The visual uibuilder (post 37) can build all of this in the browser
+and exports the directives. flua's own viewer mirrors the format — with
+the same declared-vs-live split, so your QAs behave alike in the sim and
+on the controller.</p>
+
+<p><small>Our best guess, as always — corrections and additions welcome
+in the comments · related posts:
+<a href="/docs/forum/37-uibuilder.html">Design your QuickApp UI in the browser</a>,
+<a href="/docs/forum/36-child-ui-resources.html">Child UIs as resources</a>,
+<a href="/docs/forum/ui-events-explained.html">The button that did nothing</a>
+· flua: https://github.com/jangabrielsson/flua</small></p>
