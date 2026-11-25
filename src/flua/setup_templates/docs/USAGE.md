@@ -823,9 +823,11 @@ The QA feeds plain rows at runtime: `self:updateView(name, "data",
 V2-only (the `--check` guard covers it); see `examples/list.lua`.
 Live-verified 5.22x: the HC3 app renders lists only from a plugin's
 packaged view file (sonosGroup's `json/v2/view.json`), NOT from a QA's
-(or child's) `uiView` — both blank there. flua's viewer renders them
-fully, so lists are a sim/dev surface; HC3-bound QAs need the plugin-view
-route.
+(or child's) `uiView` — every template shape probed (full Sonos-style,
+label-only) comes back blank. **Currently not usable on the HC3 from QA
+views**; flua's viewer renders them fully, so lists are a sim/dev surface.
+The implementation stays for the day the app's QA pipeline catches up
+(or for a plugin-view bridge).
 
 A `tabView` groups rows under named tabs. It is full-width — it must sit
 alone on its row. Tabs take `name` and `text` plus their own list of rows

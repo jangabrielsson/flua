@@ -2,9 +2,9 @@
 --%%type:com.fibaro.genericDevice
 --%%useUiView:true
 
--- (live-verified 5.22x: the HC3 app renders lists only from a plugin's
---  packaged view file — a child's uiView blanks too; this demo is for
---  the flua viewer)
+-- (NOT USABLE ON THE HC3: live-verified 5.22x — lists render only
+--  from a plugin's packaged view file, a child's uiView blanks too.
+--  Keep this demo for the flua viewer.)
 -- The data-bound list hosted on a CHILD device — the live-probe companion
 -- to examples/list.lua (which hosts the same list on the main QA). Child
 -- UIs are the one HC3 place the editor never rewrites, and their bindings
