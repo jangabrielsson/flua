@@ -763,6 +763,13 @@ declare <code>--%%useUiView:true</code> (live-verified on 5.221 for both; the le
 <code>$jason</code> renderer draws neither, leaving a full-width-only view blank).
 flua's own viewer renders them regardless of <code>useUiView</code> — the
 requirement is about the HC3 app.</p>
+<p>Every element takes <code>weight=</code> and <code>color=</code>, carried into the generated
+<code>style</code> (<code>style.weight</code>/<code>style.color</code> — the HC3's own views use both).
+<code>weight</code> is the element's share of the row: side-by-side elements split
+the row by their weights, and a lone element's weight scales its height
+(an <code>image</code> with <code>weight=7</code> renders tall; the default is 1). flua's viewer
+mirrors both: images scale by weight (40px per unit, ratio kept), buttons
+tint by color.</p>
 <p>Neither is editable on the HC3: the web UI editor doesn't know the
 elements, so it cannot edit them and an edit there can rewrite the view
 and drop them. Keep tabbed/collapsible QAs flua-authored and update them

@@ -251,6 +251,18 @@ def test_multi_element_row_weights_and_legacy_horizontal() -> None:
     assert len(ui["uiCallbacks"]) == 6  # 3 events per button
 
 
+def test_element_weight_and_color_style() -> None:
+    # weight= overrides the computed row share and color= rides along in the
+    # element's style — the HC3's own views carry both (rollerShutter
+    # buttons: {"weight": "1", "color": ""})
+    rows = [[{"image": "art", "url": "x", "weight": 7, "color": "red"}]]
+    ui = compile_ui(rows, 5000)
+    c = ui["uiView"][0]["components"][0]
+    assert c["style"] == {"weight": "7", "color": "red"}
+    legacy = ui["viewLayout"]["$jason"]["body"]["sections"]["items"][0]["components"][0]
+    assert legacy["style"] == {"weight": "7", "color": "red"}
+
+
 def test_tabview_compiles_to_uiview_and_legacy() -> None:
     # a tabView is full-width (alone on its row): tabs hold rows, elements
     # inside tabs normalize like top-level ones, onTabChanged routes through

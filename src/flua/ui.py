@@ -248,10 +248,21 @@ def _options(el: dict[str, Any]) -> list[dict[str, Any]]:
     return [dict(option, type="option") for option in el.get("options") or []]
 
 
+def _element_style(el: dict[str, Any], weight: str) -> dict[str, str]:
+    """The element's style object: the weight (the def's own ``weight=``
+    wins over the computed row share) and the color when the def carries
+    one — the HC3's own views carry both (rollerShutter buttons: ``{
+    "weight": "1", "color": ""}``)."""
+    style = {"weight": str(el.get("weight") or weight)}
+    if el.get("color") is not None:
+        style["color"] = str(el["color"])
+    return style
+
+
 def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
     """ELMS port: one legacy viewLayout component."""
     typ, name = el["type"], el["id"]
-    style_weight = el.get("weight") or weight or "0.50"
+    style = _element_style(el, weight)
     if typ == "button":
         # NOTE: deliberately no event fields — the HC3's own legacy exports
         # carry none (the event -> method binding lives in uiCallbacks only).
@@ -261,7 +272,7 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
         return {
             "name": name,
             "visible": el.get("visible", True),
-            "style": {"weight": style_weight},
+            "style": style,
             "text": el["text"],
             "type": "button",
         }
@@ -275,7 +286,7 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
             values = list(el.get("values") or [])
         element = {
             "name": name,
-            "style": {"weight": style_weight},
+            "style": style,
             "text": el["text"],
             "type": "select",
             "visible": el.get("visible", True),
@@ -289,7 +300,7 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
         return {
             "name": name,
             "visible": el.get("visible", True),
-            "style": {"weight": style_weight},
+            "style": style,
             "text": el["text"],
             "type": "switch",
             "value": el["value"],
@@ -302,7 +313,7 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
             "value": el["value"],
             "max": el["max"],
             "min": el["min"],
-            "style": {"weight": style_weight},
+            "style": style,
             "text": el["text"],
             "type": "slider",
         }
@@ -315,7 +326,7 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
             "visible": el.get("visible", True),
             "colorSpace": el["colorSpace"],
             "channels": dict(el.get("channels") or {}),
-            "style": {"weight": style_weight},
+            "style": style,
             "type": "colorPicker",
         }
     if typ == "colorTemperaturePicker":
@@ -325,7 +336,7 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
             "minTemperature": el["minTemperature"],
             "maxTemperature": el["maxTemperature"],
             "colorTemperature": el["colorTemperature"],
-            "style": {"weight": style_weight},
+            "style": style,
             "type": "colorTemperaturePicker",
         }
     if typ == "image":
@@ -335,7 +346,7 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
             "name": name,
             "visible": el.get("visible", True),
             "url": el["url"],
-            "style": {"weight": style_weight},
+            "style": style,
             "type": "image",
         }
         if el.get("useProxy"):
@@ -347,7 +358,7 @@ def _layout_element(el: dict[str, Any], weight: str) -> dict[str, Any]:
     return {
         "name": name,
         "visible": el.get("visible", True),
-        "style": {"weight": style_weight},
+        "style": style,
         "text": el["text"],
         "type": "label",
     }
@@ -475,7 +486,7 @@ def _ui_view_component(el: dict[str, Any], weight: str) -> dict[str, Any]:
     component: dict[str, Any] = {
         "eventBinding": event_binding,
         "name": name,
-        "style": {"weight": weight},
+        "style": _element_style(el, weight),
         "text": el["text"],
         "type": "select" if typ == "multi" else typ,
         "visible": el.get("visible", True),

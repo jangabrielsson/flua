@@ -592,6 +592,10 @@ function renderComponent(device, component, row) {
     btn.dataset.cname = component.name;
     btn.textContent = text || component.name || "\u00A0";  // keep full height
     withIcon(btn, component.image);
+    // the HC3's own views tint buttons via style.color — mirror it
+    if (component.style && component.style.color) {
+      btn.style.background = String(component.style.color);
+    }
     if (component.disabled) btn.disabled = true;
     if (!action && event) wireLongPress(btn, device.id, component, item);
     btn.onclick = () => {
@@ -980,6 +984,14 @@ function renderComponent(device, component, row) {
       img.dataset.cname = component.name;
       img.alt = component.name || "";
       img.src = String(url);
+      // the HC3 sizes the image element by its style.weight (the row's
+      // vertical extent, ~40px per unit) — mirror it: height scales, the
+      // aspect ratio is kept
+      const w = parseFloat(component.style && component.style.weight);
+      if (w > 0) {
+        img.style.height = 40 * w + "px";
+        img.style.width = "auto";
+      }
       img.onerror = () => img.remove();
       row.appendChild(img);
     }
