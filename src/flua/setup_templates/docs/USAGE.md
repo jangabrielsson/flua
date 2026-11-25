@@ -887,8 +887,14 @@ simulated HC3 API — no file to open:
 ```bash
 .venv/bin/flua --ui 8090 examples/ui.lua   # UI viewer on http://127.0.0.1:8090/
 .venv/bin/flua --ui 8090                   # no QA at all: viewer + docs, until Ctrl-C
+.venv/bin/flua --docs 8090                 # straight to the docs (same server), until Ctrl-C
 open http://127.0.0.1:8090/               # press Connect; the base URL matches
 ```
+
+`flua --docs [PORT]` is the same server with the browser opening directly
+at the docs index (`http://127.0.0.1:PORT/docs/`) — no viewer hop. The
+browser opens only from a real terminal (stdout is a tty); the URL is
+always printed.
 
 With no script the session just serves — the viewer, the run timeline, and
 the **built-in docs** at `/docs/` (the manual ships in the wheel, so a

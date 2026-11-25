@@ -140,6 +140,13 @@ def test_debugger_flag_with_script_uses_default_port() -> None:
         "--ui",
         "--debugger",
     ]
+    # --docs has the same trap
+    assert _normalize_debugger_argv(["--docs", "qa.lua"]) == ["qa.lua", "--docs"]
+    assert _normalize_debugger_argv(["--docs", "8091", "qa.lua"]) == [
+        "--docs",
+        "8091",
+        "qa.lua",
+    ]
 
 
 def test_ui_flag_with_script_end_to_end(tmp_path) -> None:

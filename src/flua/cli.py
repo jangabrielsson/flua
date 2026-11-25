@@ -27,6 +27,7 @@ import shutil
 import sys
 import tempfile
 import time
+import webbrowser
 from pathlib import Path
 from typing import Any
 
@@ -298,6 +299,18 @@ def _build_parser() -> argparse.ArgumentParser:
         "drain. A busy port falls back to the next free one (the effective "
         "port is printed at startup)",
     )
+    parser.add_argument(
+        "--docs",
+        nargs="?",
+        const=8090,
+        type=int,
+        default=None,
+        metavar="PORT",
+        help="serve the docs channel over HTTP (default port 8090) and open "
+        "the browser straight at http://127.0.0.1:PORT/docs/ — the same "
+        "server as --ui, without the viewer hop. The browser opens only "
+        "from a real terminal (stdout is a tty); the URL is always printed",
+    )
     parser.add_argument("-v", "--verbose", action="store_true", help="enable debug logging")
     parser.add_argument("--version", action="store_true", help="print the flua version and exit")
     parser.add_argument(
@@ -442,7 +455,7 @@ def _load_qas(
                 local_params["initialInterfaces"] = list(interfaces)
         global_config.update(global_params)  # last file wins
         specs.append((str(path.resolve()), None, local_params))
-    if not specs and not args.ui:
+    if not specs and args.ui is None and args.docs is None:
         parser.error("no script or -e code given")
     return global_config, specs
 
@@ -706,24 +719,36 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
         parser.error(str(exc))
     await engine.start()
     ui_server: ApiServer | None = None
-    ui_viewer_msg: str | None = None
-    if args.ui is not None:
+    ui_viewer_msgs: list[str] = []
+    # --ui and --docs share one server (the docs live on its /docs channel);
+    # the port of whichever flag was given (--ui wins when both are set)
+    serve_port = args.ui if args.ui is not None else args.docs
+    if serve_port is not None:
         # the UI viewer's channel: serve the sim API over HTTP (viewer polls
         # /devices and fires /plugins/callUIEvent — the HC3's own contract).
         # The server never counts as pending work; this task owns it.
-        ui_server = ApiServer(engine.api, port=args.ui)
+        ui_server = ApiServer(engine.api, port=serve_port)
         try:
             await ui_server.start()
         except (OSError, RuntimeError) as exc:
-            parser.error(f"cannot serve the UI API on port {args.ui}: {exc}")
+            parser.error(f"cannot serve the UI API on port {serve_port}: {exc}")
         # offline QA loopback requests (127.0.0.1:11111/11112) rewrite here,
         # so controller QA code calling its own loopback API works in the sim
         engine.set_sim_api_port(ui_server.port)
         # logged after the greeting below, so the greeting always opens the
         # startup output (the pump prints messages in post order)
-        ui_viewer_msg = (
-            f"flua: UI viewer on http://127.0.0.1:{ui_server.port}/ — open it in a browser"
-        )
+        if args.ui is not None:
+            ui_viewer_msgs.append(
+                f"flua: UI viewer on http://127.0.0.1:{ui_server.port}/ — open it in a browser"
+            )
+        if args.docs is not None:
+            docs_url = f"http://127.0.0.1:{ui_server.port}/docs/"
+            # open the browser only from a real terminal — a piped/CI run
+            # must not spawn a GUI; the URL is printed either way
+            if sys.stdout.isatty():
+                with contextlib.suppress(Exception):
+                    webbrowser.open(docs_url)
+            ui_viewer_msgs.append(f"flua: docs on {docs_url}")
     if args.debugger is not None:
         _start_debugger(engine, args.debugger)
     else:
@@ -775,8 +800,8 @@ async def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int
             f"🚀 flua {__version__} ({engine.lua_version()}, "
             f"Python {sys.version.split()[0]}), mode {mode}",
         )
-    if ui_viewer_msg is not None:
-        engine.post_log("info", ui_viewer_msg)
+    for msg in ui_viewer_msgs:
+        engine.post_log("info", msg)
 
     if args.watch:
         args.run_for = 0  # stay alive until exit() or Ctrl-C
@@ -960,17 +985,17 @@ def _unpack_cli(parser: argparse.ArgumentParser, args: argparse.Namespace) -> in
 
 
 def _normalize_debugger_argv(argv: list[str]) -> list[str]:
-    """Let ``--debugger script.lua`` / ``--ui script.lua`` mean the
-    default ports (8172 / 8090).
+    """Let ``--debugger script.lua`` / ``--ui script.lua`` /
+    ``--docs script.lua`` mean the default ports (8172 / 8090 / 8090).
 
-    Both flags take an optional port, but argparse's optional-value
+    The flags take an optional port, but argparse's optional-value
     arguments only use their default when the next token looks like an
     option — so ``flua --debugger script.lua`` would parse the script as
-    the port and fail with "invalid int value" (same for --ui). When either
-    flag is followed by a non-option, non-integer token, move the bare flag
-    to the end so the script stays a positional and the flag takes its
-    const. An explicit ``--debugger PORT script.lua`` (or ``--debugger=PORT``)
-    is untouched.
+    the port and fail with "invalid int value" (same for --ui/--docs). When
+    either flag is followed by a non-option, non-integer token, move the
+    bare flag to the end so the script stays a positional and the flag
+    takes its const. An explicit ``--debugger PORT script.lua`` (or
+    ``--debugger=PORT``) is untouched.
     """
     out: list[str] = []
     moved: list[str] = []
@@ -978,7 +1003,7 @@ def _normalize_debugger_argv(argv: list[str]) -> list[str]:
     while i < len(argv):
         nxt = argv[i + 1] if i + 1 < len(argv) else None
         if (
-            argv[i] in ("--debugger", "--ui")
+            argv[i] in ("--debugger", "--ui", "--docs")
             and nxt is not None
             and not nxt.startswith("-")
             and not nxt.isdigit()

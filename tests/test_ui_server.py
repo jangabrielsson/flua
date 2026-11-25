@@ -501,6 +501,61 @@ def test_ui_flag_keeps_api_alive_after_qa_drains(tmp_path) -> None:
             proc.wait(timeout=10)
 
 
+def test_docs_flag_serves_docs_and_stays_up(tmp_path) -> None:
+    # `flua --docs` alone is the same server as `--ui` but skips the viewer
+    # hop: it serves /docs/ until interrupted. stdout here is a pipe (no
+    # tty), so the browser never opens — the URL is printed either way.
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "flua", "--api", "local", "--docs", str(port)],
+        cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    drained: list[str] = []
+
+    def drain() -> None:
+        for line in proc.stdout:
+            drained.append(line)
+
+    threading.Thread(target=drain, daemon=True).start()
+    try:
+        deadline = time.monotonic() + 15.0
+        saw_docs = False
+        while time.monotonic() < deadline and proc.poll() is None:
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/docs/", timeout=0.5) as res:
+                    page = res.read().decode("utf-8")
+                saw_docs = "flua documentation" in page
+                if saw_docs:
+                    break
+            except OSError:
+                time.sleep(0.1)
+        assert proc.poll() is None, "flua --docs exited before serving: " + "".join(drained)
+        assert saw_docs, "docs page never served: " + "".join(drained)
+        # the printed URL rides the pump's FIFO — it can land in the drained
+        # text just after the HTTP channel is up; give it a beat
+        deadline = time.monotonic() + 10.0
+        saw_msg = False
+        while time.monotonic() < deadline and not saw_msg:
+            saw_msg = any("flua: docs on http://127.0.0.1:" in line for line in drained)
+            if not saw_msg:
+                time.sleep(0.05)
+        assert saw_msg, "the docs URL was not printed: " + "".join(drained)
+        time.sleep(1.0)
+        assert proc.poll() is None, "flua --docs (no QA) exited while idle"
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=10)
+
+
 def test_ui_flag_serves_docs_without_any_qa(tmp_path) -> None:
     # `flua --ui` alone (no script, no -e) is an interactive session: it
     # serves the viewer AND the /docs channel until interrupted — the
