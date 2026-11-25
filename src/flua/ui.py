@@ -250,12 +250,15 @@ def _options(el: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _element_style(el: dict[str, Any], weight: str) -> dict[str, str]:
     """The element's style object: the weight (the def's own ``weight=``
-    wins over the computed row share) and the color when the def carries
-    one — the HC3's own views carry both (rollerShutter buttons: ``{
-    "weight": "1", "color": ""}``)."""
+    wins over the computed row share), and the color/textAlign when the def
+    carries them — the HC3's own views carry all three (rollerShutter
+    buttons: ``{"weight": "1", "color": ""}``; labels carry
+    ``textAlign``)."""
     style = {"weight": str(el.get("weight") or weight)}
     if el.get("color") is not None:
         style["color"] = str(el["color"])
+    if el.get("textAlign") is not None:
+        style["textAlign"] = str(el["textAlign"])
     return style
 
 

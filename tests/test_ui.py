@@ -255,15 +255,15 @@ def test_element_weight_and_color_style() -> None:
     # weight= overrides the computed row share and color= rides along in the
     # element's style — the HC3's own views carry both (rollerShutter
     # buttons: {"weight": "1", "color": ""})
-    rows = [[{"image": "art", "url": "x", "weight": 7, "color": "red"}]]
+    rows = [[{"image": "art", "url": "x", "weight": 7, "color": "red", "textAlign": "left"}]]
     ui = compile_ui(rows, 5000)
     # a lone element's weight hoists to its row: the HC3 splits the
     # vertical space by row weights, so the declared height intent survives
     assert ui["uiView"][0]["style"]["weight"] == "7"
     c = ui["uiView"][0]["components"][0]
-    assert c["style"] == {"weight": "7", "color": "red"}
+    assert c["style"] == {"weight": "7", "color": "red", "textAlign": "left"}
     legacy = ui["viewLayout"]["$jason"]["body"]["sections"]["items"][0]["components"][0]
-    assert legacy["style"] == {"weight": "7", "color": "red"}
+    assert legacy["style"] == {"weight": "7", "color": "red", "textAlign": "left"}
     # a SHARED row keeps the weights on the elements (width shares) — the
     # row weight stays the default
     rows2 = [

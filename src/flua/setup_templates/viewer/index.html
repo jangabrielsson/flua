@@ -584,6 +584,11 @@ function renderComponent(device, component, row) {
     // carry HTML (<table>, <font color=...>, ...), which renders as-is
     name.className = "component-label element-label";
     name.innerHTML = text ?? component.name;
+    // the HC3's labels carry style.textAlign — mirror it (the label spans
+    // the row, so left/center/right moves the text)
+    if (component.style && component.style.textAlign) {
+      name.style.textAlign = String(component.style.textAlign);
+    }
     // note: style.color does NOT tint a label's text on the HC3 (the skin
     // CSS owns the label color) — color text with HTML in the text itself
   } else if (t === "button") {

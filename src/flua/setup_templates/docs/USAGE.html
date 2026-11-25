@@ -763,14 +763,16 @@ declare <code>--%%useUiView:true</code> (live-verified on 5.221 for both; the le
 <code>$jason</code> renderer draws neither, leaving a full-width-only view blank).
 flua's own viewer renders them regardless of <code>useUiView</code> — the
 requirement is about the HC3 app.</p>
-<p>Every element takes <code>weight=</code> and <code>color=</code>, carried into the generated
-<code>style</code> (<code>style.weight</code>/<code>style.color</code> — the HC3's own views use both).
-<code>color</code> is any CSS color string (<code>'red'</code>, <code>'#ff0000'</code>, <code>'rgb(255,0,0)'</code>):
-the HC3 applies it as a button's BACKGROUND — on a label it does nothing
-(the skin CSS owns the label text color; live-verified 5.221). To color
-label text, put HTML in the text — labels render HTML, so
-<code>text='&lt;span style="color:red"&gt;Hi&lt;/span&gt;'</code> works in v1 and v2. flua's
-viewer mirrors both. <code>weight</code> is the element's share of its container:
+<p>Every element takes <code>weight=</code>, <code>color=</code> and <code>textAlign=</code>, carried into
+the generated <code>style</code> (<code>style.weight</code>/<code>style.color</code>/<code>style.textAlign</code> —
+the HC3's own views use all three). <code>textAlign</code> is any CSS text-align
+value (<code>'left'</code>/<code>'center'</code>/<code>'right'</code>): it positions a label's text across
+the row (the HC3's labels carry it). <code>color</code> is any CSS color string
+(<code>'red'</code>, <code>'#ff0000'</code>, <code>'rgb(255,0,0)'</code>): the HC3 applies it as a button's
+BACKGROUND — on a label it does nothing (the skin CSS owns the label text
+color; live-verified 5.221). To color label text, put HTML in the text —
+labels render HTML, so <code>text='&lt;span style="color:red"&gt;Hi&lt;/span&gt;'</code> works
+in v1 and v2. flua's viewer mirrors all of it. <code>weight</code> is the element's share of its container:
 side-by-side elements split the row width by their weights, and rows split
 the vertical space by their weights (flua hoists a lone element's weight
 onto its row) — but the HC3 app only applies the split inside FIXED-height

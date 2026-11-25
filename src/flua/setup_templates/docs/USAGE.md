@@ -681,14 +681,16 @@ declare `--%%useUiView:true` (live-verified on 5.221 for both; the legacy
 flua's own viewer renders them regardless of `useUiView` — the
 requirement is about the HC3 app.
 
-Every element takes `weight=` and `color=`, carried into the generated
-`style` (`style.weight`/`style.color` — the HC3's own views use both).
-`color` is any CSS color string (`'red'`, `'#ff0000'`, `'rgb(255,0,0)'`):
-the HC3 applies it as a button's BACKGROUND — on a label it does nothing
-(the skin CSS owns the label text color; live-verified 5.221). To color
-label text, put HTML in the text — labels render HTML, so
-`text='<span style="color:red">Hi</span>'` works in v1 and v2. flua's
-viewer mirrors both. `weight` is the element's share of its container:
+Every element takes `weight=`, `color=` and `textAlign=`, carried into
+the generated `style` (`style.weight`/`style.color`/`style.textAlign` —
+the HC3's own views use all three). `textAlign` is any CSS text-align
+value (`'left'`/`'center'`/`'right'`): it positions a label's text across
+the row (the HC3's labels carry it). `color` is any CSS color string
+(`'red'`, `'#ff0000'`, `'rgb(255,0,0)'`): the HC3 applies it as a button's
+BACKGROUND — on a label it does nothing (the skin CSS owns the label text
+color; live-verified 5.221). To color label text, put HTML in the text —
+labels render HTML, so `text='<span style="color:red">Hi</span>'` works
+in v1 and v2. flua's viewer mirrors all of it. `weight` is the element's share of its container:
 side-by-side elements split the row width by their weights, and rows split
 the vertical space by their weights (flua hoists a lone element's weight
 onto its row) — but the HC3 app only applies the split inside FIXED-height
