@@ -35,7 +35,7 @@ forever, skip to the next one — you can always come back.
 - **[08 · Proxy mode](08-proxy-mode.md)** — the real HC3 UI driving your code: mirror your QA onto the controller (and leave its HC3-edited UI alone with `noUI`).
 - **[09 · Multi-file QAs](09-multi-file-qas.md)** — your own libraries with `--%%file`, packed and deployed as one device.
 - **[10 · Debugging multi-QA runs](10-multi-qa-debugging.md)** — several QAs talking to each other, and how to keep the ensemble legible.
-- **[11 · Let your QuickApp test itself](11-let-your-qa-test-itself.md)** — `flua-test` + `flua test`: the lamp checks its own behavior, and the suite says pass or fail in one line.
+- **[11 · Let your QuickApp test itself](11-let-your-qa-test-itself.md)** — `flua test`: the lamp checks its own behavior, and the suite says pass or fail in one line.
 
 ## How to read this tutorial
 
@@ -63,9 +63,9 @@ forever, skip to the next one — you can always come back.
   `./scripts/build-tutorial-pdf.sh` (needs pandoc and Chrome; writes
   `docs/tutorial/flua-tutorial.pdf`, diagrams included).
 
-- The examples live in the `examples/` directory of the flua repository and
-  are executed by flua's own test suite — the code in this tutorial is the
-  same code that is tested with every release, so it always runs.
+- The examples live in the `examples/` directory of the flua repository —
+  several are exercised by flua's own test suite, and the tutorial's own
+  snippets are run against the engine the same way you will run them.
 - The diagrams are drawn with Mermaid. VS Code renders them in the markdown
   preview once you accept the recommended **Markdown Preview Mermaid**
 extension (it's in the `.vscode/extensions.json` that `--tool setup`

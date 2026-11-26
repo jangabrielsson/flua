@@ -54,9 +54,9 @@ flua sunset_lamp_ui.lua
 
 ```text
 flua: proxy installed: 123 SunsetLamp_Proxy
-flua: proxy connected — SunsetLamp_Proxy (5000) sends actions and UI events to http://192.168.1.42:8080
-🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode proxy:5000
-[05.10.2026][21:00:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready, 60 W
+flua: proxy connected — SunsetLamp_Proxy (123) sends actions and UI events to http://192.168.1.42:8080
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode proxy:123
+[05.10.2026][21:00:00][DEBUG  ][SunsetLamp123]: Sunset lamp ready, 60 W
 ```
 
 > ✅ **You should see** a new device in the Fibaro app — `SunsetLamp_Proxy`,
@@ -65,9 +65,10 @@ flua: proxy connected — SunsetLamp_Proxy (5000) sends actions and UI events to
 
 What just happened: the tap went from the app to the proxy to flua, ran
 `turnOn()` on your computer, and the state update travelled back to the HC3
-— one round trip, one log line. The `5000` after `mode proxy:` is the
-emulator's id; the proxy's HC3 id (here `123`) is the device id in the app.
-They're the same QA.
+— one round trip, one log line. The `123` after `mode proxy:` is the
+proxy's id on your HC3 — in proxy mode the emulated QA runs under that very
+id, so the device in the app and the QA in the emulator are the same thing
+(no separate emulator id).
 
 Your QA now works like a real HC3 citizen: scenes and other QAs can call its
 actions, the app shows its state and history, and `self:updateView` /

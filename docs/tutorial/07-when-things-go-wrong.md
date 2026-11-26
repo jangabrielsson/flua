@@ -87,8 +87,9 @@ Three useful outcomes:
   lamp.lua: warning: unknown directive --%%instnat
   ```
 
-  Warnings don't stop anything — a misspelled directive is silently ignored
-  at runtime, which is precisely why `--check` exists.
+  Warnings don't stop anything — a misspelled directive is just ignored
+  (the runtime also warns about it in the log, but only once the run gets
+  that far; `--check` catches it before a single line executes).
 
 Make `flua --check` a habit before long runs; it catches the cheap mistakes
 for free.

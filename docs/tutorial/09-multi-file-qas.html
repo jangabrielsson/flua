@@ -83,7 +83,9 @@ file: lib
   <code>--%%name</code>, no <code>onInit</code> of its own (well, its top-level code <em>does</em> run,
   in declaration order — but one QA, one life).</li>
 <li><code>--%%</code> lines in a library file are just comments to flua — directives are
-  read from the <strong>main file only</strong>.</li>
+  read from the <strong>main file only</strong> (one exception: <code>--%%rsrc</code>, which flua
+  reads from any <code>--%%file</code> too, so a child UI can live with the file that
+  defines it).</li>
 </ul>
 <h2 id="deploying-multi-file-qas">Deploying multi-file QAs</h2>
 <p><code>--tool uploadQA</code> packs the main file and every <code>--%%file</code> into one package
@@ -129,7 +131,8 @@ sun-driven QA you write.</p>
 <ul>
 <li><code>--%%file:path,name</code> adds library files; they load <strong>before the main
   file</strong>, in declaration order, sharing its environment.</li>
-<li>One QA, several files — directives live in the main file only.</li>
+<li>One QA, several files — directives live in the main file only (except
+  <code>--%%rsrc</code>, read from any file).</li>
 <li>The tools pack and unpack the whole set as one device.</li>
 </ul>
 <p>Next: the finale of this tutorial — several QAs running <em>together</em>, finding

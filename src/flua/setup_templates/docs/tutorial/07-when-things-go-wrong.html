@@ -94,8 +94,9 @@ APIs the HC3 no longer wants:</p>
 </ul>
 <p><code>text
   lamp.lua: warning: unknown directive --%%instnat</code></p>
-<p>Warnings don't stop anything — a misspelled directive is silently ignored
-  at runtime, which is precisely why <code>--check</code> exists.</p>
+<p>Warnings don't stop anything — a misspelled directive is just ignored
+  (the runtime also warns about it in the log, but only once the run gets
+  that far; <code>--check</code> catches it before a single line executes).</p>
 <p>Make <code>flua --check</code> a habit before long runs; it catches the cheap mistakes
 for free.</p>
 <h2 id="debug-like-a-grown-up-mobdebug">Debug like a grown-up: mobdebug</h2>

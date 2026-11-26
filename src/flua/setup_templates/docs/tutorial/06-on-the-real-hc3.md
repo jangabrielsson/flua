@@ -97,7 +97,7 @@ project folder whose file names carry the id —
 ```bash
 flua --tool downloadQA 123 -d lamp/
 # lamp/SunsetLamp_main_123.lua  (the id travels with the file name)
-flua --tool updateQA lamp/SunsetLamp_main_123.lua   # updates QA 123
+flua --tool uploadQA lamp/SunsetLamp_main_123.lua   # updates QA 123
 ```
 
 so a downloaded QA is always re-uploadable, even weeks later.

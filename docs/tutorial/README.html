@@ -63,7 +63,7 @@ forever, skip to the next one — you can always come back.</p>
 <li><strong><a href="08-proxy-mode.html">08 · Proxy mode</a></strong> — the real HC3 UI driving your code: mirror your QA onto the controller (and leave its HC3-edited UI alone with <code>noUI</code>).</li>
 <li><strong><a href="09-multi-file-qas.html">09 · Multi-file QAs</a></strong> — your own libraries with <code>--%%file</code>, packed and deployed as one device.</li>
 <li><strong><a href="10-multi-qa-debugging.html">10 · Debugging multi-QA runs</a></strong> — several QAs talking to each other, and how to keep the ensemble legible.</li>
-<li><strong><a href="11-let-your-qa-test-itself.html">11 · Let your QuickApp test itself</a></strong> — <code>flua-test</code> + <code>flua test</code>: the lamp checks its own behavior, and the suite says pass or fail in one line.</li>
+<li><strong><a href="11-let-your-qa-test-itself.html">11 · Let your QuickApp test itself</a></strong> — <code>flua test</code>: the lamp checks its own behavior, and the suite says pass or fail in one line.</li>
 </ul>
 <h2 id="how-to-read-this-tutorial">How to read this tutorial</h2>
 <ul>
@@ -97,9 +97,9 @@ previous steps; the answer is usually one line above.</p>
   <code>docs/tutorial/flua-tutorial.pdf</code>, diagrams included).</p>
 </li>
 <li>
-<p>The examples live in the <code>examples/</code> directory of the flua repository and
-  are executed by flua's own test suite — the code in this tutorial is the
-  same code that is tested with every release, so it always runs.</p>
+<p>The examples live in the <code>examples/</code> directory of the flua repository —
+  several are exercised by flua's own test suite, and the tutorial's own
+  snippets are run against the engine the same way you will run them.</p>
 </li>
 <li>The diagrams are drawn with Mermaid. VS Code renders them in the markdown
   preview once you accept the recommended <strong>Markdown Preview Mermaid</strong>

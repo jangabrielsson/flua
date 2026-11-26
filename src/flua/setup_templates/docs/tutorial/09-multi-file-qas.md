@@ -69,7 +69,9 @@ Two ground rules:
   `--%%name`, no `onInit` of its own (well, its top-level code *does* run,
   in declaration order — but one QA, one life).
 - `--%%` lines in a library file are just comments to flua — directives are
-  read from the **main file only**.
+  read from the **main file only** (one exception: `--%%rsrc`, which flua
+  reads from any `--%%file` too, so a child UI can live with the file that
+  defines it).
 
 ## Deploying multi-file QAs
 
@@ -128,7 +130,8 @@ sun-driven QA you write.
 
 - `--%%file:path,name` adds library files; they load **before the main
   file**, in declaration order, sharing its environment.
-- One QA, several files — directives live in the main file only.
+- One QA, several files — directives live in the main file only (except
+  `--%%rsrc`, read from any file).
 - The tools pack and unpack the whole set as one device.
 
 Next: the finale of this tutorial — several QAs running *together*, finding

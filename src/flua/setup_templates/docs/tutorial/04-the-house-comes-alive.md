@@ -139,15 +139,18 @@ so an F5 run (chapter 02's launch configurations pass no flags) behaves the
 same as the terminal command:
 
 ```lua
---%%time:2026/10/4 18:30:00   -- start the virtual clock at 18:30
---%%speed:60                  -- run 60x faster (optional)
+-- start the virtual clock at 18:30
+--%%time:2026/10/4 18:30:00
+-- run 60x faster (optional)
+--%%speed:60
 --%%name:SunsetLamp
 --%%type:com.fibaro.binarySwitch
 ```
 
 ```text
 🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
-[04.10.2026][18:30:01][DEBUG  ][dtime5000]: NOW 18:30
+[04.10.2026][18:30:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready
+[04.10.2026][18:30:00][DEBUG  ][SunsetLamp5000]: Lamp on
 ```
 
 The directives mirror the flags: `--%%time:…` is `--start`,
