@@ -38,12 +38,12 @@ flua night_lamp.lua
 <p>The log tells the story — virtual time, not wall time:</p>
 
 <pre>
-[21.06.2027][21:59:51] NightLamp5000: booted at 2027/06/21 21:59:51
-[21.06.2027][22:00:00] NightLamp5000: good night — lamp on at 22:00:00
+[21.06.2027][21:59:50][DEBUG  ][NightLamp5000]: booted at 2027/06/21 21:59:50
+[21.06.2027][22:00:01][DEBUG  ][NightLamp5000]: good night — lamp on at 22:00:01
 </pre>
 
-<p>The QA booted at 21:59 <i>on June 21 2027</i> and fired exactly at
-22:00:00 — in a fraction of a real second. Change the directive to a date
+<p>The QA booted at 21:59 <i>on June 21 2027</i> and fired at
+22:00 — in a fraction of a real second. Change the directive to a date
 where 22:00 already passed and the QA arms itself for tomorrow instead;
 either branch is one line away, no waiting for the actual sun.</p>
 
