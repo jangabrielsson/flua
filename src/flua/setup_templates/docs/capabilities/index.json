@@ -701,6 +701,11 @@
         "description": "Simulated device bundled with flua"
       },
       {
+        "name": "rollerShutter",
+        "type": "com.fibaro.rollerShutter",
+        "description": "Simulated device bundled with flua"
+      },
+      {
         "name": "smokeSensor",
         "type": "com.fibaro.smokeSensor",
         "description": "Simulated device bundled with flua"
