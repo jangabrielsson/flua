@@ -448,6 +448,17 @@ async def test_server_does_not_keep_engine_alive(server, tmp_path) -> None:
     assert not engine.has_pending_work()
 
 
+def _served_port(drained: list[str]) -> int | None:
+    """The port flua actually bound, from its startup line. A busy requested
+    port falls back to the next free one — the bind-then-close probe above
+    can race another process — so the printed URL is the only truth."""
+    for line in drained:
+        match = re.search(r"http://127\.0\.0\.1:(\d+)/", line)
+        if match:
+            return int(match.group(1))
+    return None
+
+
 def test_ui_flag_keeps_api_alive_after_qa_drains(tmp_path) -> None:
     # The viewer's channel must outlive the QA's timers: `flua --ui` with no
     # --run-for serves the sim API until interrupted. A QA with no timers
@@ -482,8 +493,13 @@ def test_ui_flag_keeps_api_alive_after_qa_drains(tmp_path) -> None:
         deadline = time.monotonic() + 15.0
         saw_button = False
         while time.monotonic() < deadline and proc.poll() is None:
+            served = _served_port(drained)
+            if served is None:
+                time.sleep(0.05)
+                continue
             try:
-                with urllib.request.urlopen(f"http://127.0.0.1:{port}/devices", timeout=0.5) as res:
+                url = f"http://127.0.0.1:{served}/devices"
+                with urllib.request.urlopen(url, timeout=0.5) as res:
                     devices = json.loads(res.read())
                 saw_button = any(
                     component.get("name") == "B1"
@@ -554,8 +570,12 @@ def test_docs_flag_serves_docs_and_stays_up(tmp_path) -> None:
         deadline = time.monotonic() + 15.0
         saw_docs = False
         while time.monotonic() < deadline and proc.poll() is None:
+            served = _served_port(drained)
+            if served is None:
+                time.sleep(0.05)
+                continue
             try:
-                with urllib.request.urlopen(f"http://127.0.0.1:{port}/docs/", timeout=0.5) as res:
+                with urllib.request.urlopen(f"http://127.0.0.1:{served}/docs/", timeout=0.5) as res:
                     page = res.read().decode("utf-8")
                 saw_docs = "flua documentation" in page
                 if saw_docs:
@@ -609,8 +629,12 @@ def test_ui_flag_serves_docs_without_any_qa(tmp_path) -> None:
         deadline = time.monotonic() + 15.0
         saw_docs = False
         while time.monotonic() < deadline and proc.poll() is None:
+            served = _served_port(drained)
+            if served is None:
+                time.sleep(0.05)
+                continue
             try:
-                with urllib.request.urlopen(f"http://127.0.0.1:{port}/docs/", timeout=0.5) as res:
+                with urllib.request.urlopen(f"http://127.0.0.1:{served}/docs/", timeout=0.5) as res:
                     page = res.read().decode("utf-8")
                 saw_docs = "flua documentation" in page
                 if saw_docs:
