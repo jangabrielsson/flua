@@ -4,6 +4,14 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.198] - 2026-11-26
+
+### Added
+- rollerShutter sim device (mirrors the HC3 quickapp template)
+
+### Changed
+- fix
+
 ## [0.1.197] - 2026-11-26
 
 ### Added
