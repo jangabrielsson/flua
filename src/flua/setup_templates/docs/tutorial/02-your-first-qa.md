@@ -27,8 +27,8 @@ end, 400)
 
 A few first impressions, without the theory:
 
-- Lines starting with `--` are *comments* — notes for humans. The two
-  `--%%` lines at the top are the exception: those are notes for **flua**
+- Lines starting with `--` are *comments* — notes for humans. The `--%%`
+  line at the top is the exception: that one is a note for **flua**
   (`--%%name:hello` gives the QuickApp a name).
 - `print(...)` writes a line to the log.
 - `setInterval(function() … end, 400)` means: *run this little block every
@@ -39,8 +39,9 @@ A few first impressions, without the theory:
 > `os.exit()` ends the QuickApp that called it. That's the same name real
 > HC3 QuickApps use (there, every QuickApp is its own program — ending it
 > is as simple as leaving a room). In these first experiments it's also
-> what lets flua finish and hand you back the terminal — a QuickApp that
-> never exits just keeps running.
+> what ends the run right there. Without it, flua would keep going while
+> timers are pending — here, the 400 ms interval — and stop on its own
+> once nothing is left to do.
 
 ## Step 2 — run it with F5
 
@@ -50,7 +51,7 @@ chapter 01's setup installed it). VS Code runs the file and shows the log
 in its terminal panel:
 
 ```text
-🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline (sim HC3, real network)
 [04.10.2026][20:50:10][DEBUG  ][hello5000]: Hello from my first QuickApp
 [04.10.2026][20:50:10][DEBUG  ][hello5000]: tick 1
 [04.10.2026][20:50:11][DEBUG  ][hello5000]: tick 2
@@ -74,8 +75,10 @@ involved — that's the whole point: experiment safely, then go live later.
 
 > If F5 complains that `flua` was not found: VS Code on some systems
 > doesn't inherit the shell's PATH when started from the dock. Chapter 01's
-> setup normally prevents this — it writes the **absolute path** to flua
-> into the launch configurations. If you wrote the configuration by hand (or
+> setup normally prevents this — the debugger configurations get the
+> **absolute path** to flua written in (the F5 run configurations use
+> `python -m flua`, which only needs the right Python). If you wrote the
+> configuration by hand (or
 > reinstalled flua elsewhere), either re-run `flua --tool setup`, or restart
 > VS Code from the terminal once — on macOS run `open -a "Visual Studio
 > Code"` in a terminal, on Windows/Linux start `code` from one. If it says
@@ -84,7 +87,8 @@ involved — that's the whole point: experiment safely, then go live later.
 > **Python: Select Interpreter**, and pick the one you installed flua into
 > (chapter 01). You can always run the command by hand instead: open a
 > terminal with **Terminal → New Terminal** and type `flua hello.lua` —
-> every F5 run in this tutorial is exactly that command.
+> every F5 run in this tutorial does exactly that (`python -m flua` with the
+> file).
 
 ## Step 3 — break it, on purpose
 
@@ -95,6 +99,8 @@ again:
 
 ```text
 Error:	hello.lua:4: attempt to perform arithmetic on a nil value (global 'nn')
+stack traceback:
+	.../flua/lua/init.lua: in function <...>
 ```
 
 flua tells you the file, the line (4), and the problem: it tried to do

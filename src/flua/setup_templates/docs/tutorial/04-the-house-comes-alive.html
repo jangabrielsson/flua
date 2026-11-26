@@ -92,7 +92,7 @@ the same two functions.</p>
 <h2 id="run-it-after-sunset">Run it after sunset</h2>
 <pre><code class="language-bash">flua --api local --start '2026/10/4 18:30:00' sunset_lamp_auto.lua
 </code></pre>
-<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline (sim HC3, real network)
 [04.10.2026][18:30:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready
 [04.10.2026][18:30:00][DEBUG  ][SunsetLamp5000]: Lamp on
 </code></pre>
@@ -112,7 +112,7 @@ March, or — as we're about to do — a whole evening in seconds.</p>
 sunset, and let flua fast-forward time for you:</p>
 <pre><code class="language-bash">flua --api local --start '2026/10/4 18:00:00' --instant --max-hours 1 sunset_lamp_auto.lua
 </code></pre>
-<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline (sim HC3, real network)
 [04.10.2026][18:00:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready
 [04.10.2026][18:13:00][DEBUG  ][SunsetLamp5000]: Lamp on
 flua: virtual time limit reached (1.0h)
@@ -132,10 +132,11 @@ evening of lamp logic, tested in under a second.</p>
 </ul>
 <p>There's also <code>--speed 60</code> for "60 times faster than real life" — same idea,
 but you watch it run — and <code>--step</code>, the same deadline-ordered discipline
-under its plua <code>speedTime</code> name. <code>--instant</code> and <code>--step</code> are equivalent
-for the QA (<code>--instant</code> used to collapse the whole timer heap into one
-pass, which broke <code>os.time()</code>-relative scheduling; that is fixed) — either
-one suits event engines that compute their next delay from <code>os.time()</code>.</p>
+under its plua <code>speedTime</code> name. <code>--instant</code> and <code>--step</code> are close cousins
+for the QA (both fire one deadline at a time, so <code>os.time()</code> is right in
+every callback) — but they are separate, mutually exclusive modes, and
+<code>--step</code> can't be combined with <code>--speed</code> either. Either one suits event
+engines that compute their next delay from <code>os.time()</code>.</p>
 <blockquote>
 <p>✅ <strong>You should see</strong> <code>Lamp on</code> stamped <code>18:13:00</code> — the sunset from the
 <code>sunsetHour</code> calculation, to the minute.</p>
@@ -151,7 +152,7 @@ same as the terminal command:</p>
 --%%name:SunsetLamp
 --%%type:com.fibaro.binarySwitch
 </code></pre>
-<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline (sim HC3, real network)
 [04.10.2026][18:30:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready
 [04.10.2026][18:30:00][DEBUG  ][SunsetLamp5000]: Lamp on
 </code></pre>

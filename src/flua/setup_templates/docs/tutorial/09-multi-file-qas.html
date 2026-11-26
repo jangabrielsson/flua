@@ -55,7 +55,7 @@ end
 <p>Run it:</p>
 <pre><code class="language-bash">flua --api local examples/multifile.lua
 </code></pre>
-<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline (sim HC3, real network)
 [05.10.2026][10:33:55][DEBUG  ][multifile-demo5000]: helper says: loaded in order
 </code></pre>
 <p>That's the whole feature. The <code>,lib</code> part is the file's <em>name</em> on the HC3
@@ -95,7 +95,7 @@ included — travels as one device:</p>
 flua --tool updateQA 123 main.lua # same, into an existing QA
 </code></pre>
 <p>And the other direction, <code>downloadQA</code>, writes the files out with names that
-carry the HC3 id — <code>My QA_main_123.lua</code>, <code>My_QA_lib_123.lua</code> — so a
+carry the HC3 id — <code>My_QA_main_123.lua</code>, <code>My_QA_lib_123.lua</code> — so a
 downloaded QA is a working flua project you can edit and re-upload.</p>
 <h2 id="the-sunset-lamp-refactored">The Sunset Lamp, refactored</h2>
 <p>A taste of the payoff. Move the sun logic into <code>sun.lua</code>:</p>

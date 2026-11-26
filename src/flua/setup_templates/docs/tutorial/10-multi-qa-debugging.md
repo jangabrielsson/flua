@@ -28,7 +28,11 @@ function QuickApp:onInit()
   setInterval(function()
     n = n + 1
     local lamp = findLamp()
-    if lamp then fibaro.call(lamp, "toggle") end
+    if lamp then
+      fibaro.call(lamp, "toggle")
+    else
+      self:warning("no lamp found yet")
+    end
     if n >= 3 then os.exit() end
   end, 600)
 end
@@ -59,11 +63,14 @@ flua --api local examples/trigger_sensor.lua examples/trigger_lamp.lua
 ```
 
 ```text
-🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline (sim HC3, real network)
 [05.10.2026][10:34:26][DEBUG  ][motion-sensor5000]: sensor online
 [05.10.2026][10:34:26][DEBUG  ][trigger-lamp5001]: lamp online
+[05.10.2026][10:34:27][TRACE  ][trigger-lamp5001]: onAction:  {"deviceId":5001,"args":{},"actionName":"toggle"}
 [05.10.2026][10:34:27][DEBUG  ][trigger-lamp5001]: lamp now ON
+[05.10.2026][10:34:28][TRACE  ][trigger-lamp5001]: onAction:  {"deviceId":5001,"args":{},"actionName":"toggle"}
 [05.10.2026][10:34:28][DEBUG  ][trigger-lamp5001]: lamp now OFF
+[05.10.2026][10:34:28][TRACE  ][trigger-lamp5001]: onAction:  {"deviceId":5001,"args":{},"actionName":"toggle"}
 [05.10.2026][10:34:28][DEBUG  ][trigger-lamp5001]: lamp now ON
 ```
 

@@ -69,10 +69,10 @@ end
 <li><code>require("flua-test")</code> loads it — no download, nothing to install.</li>
 <li><code>t:expect(condition, "message")</code> checks one thing and prints <code>PASS:</code> or
   <code>FAIL:</code>.</li>
-<li><code>t:finish()</code> prints the failure count and ends the run with it — so the
-  <em>exit code</em> says pass or fail, not your eyes.</li>
+<li><code>t:finish()</code> prints the failure count and exits 1 if anything failed,
+  0 otherwise — so the <em>exit code</em> says pass or fail, not your eyes.</li>
 </ul>
-<p>You already know the rest: <code>api.get</code> is the sim (chapter 02),
+<p>You already know the rest: <code>api.get</code> is the sim (chapter 09),
 <code>updateProperty</code> is how the lamp changes its own state (chapter 03), and
 <code>function QuickApp:turnOn()</code> is the lamp's action (chapter 03 again).</p>
 <h2 id="step-2--run-the-suite">Step 2 — run the suite</h2>
@@ -145,7 +145,7 @@ effects with fixed delays; poll the condition with a generous timeout
 <h2 id="what-did-we-just-learn">What did we just learn?</h2>
 <ul>
 <li><code>require("flua-test")</code> + <code>t:expect</code>/<code>t:assert_eq</code>/<code>t:finish()</code> — a test
-  file is just a QA that checks things and exits with the failure count.</li>
+  file is just a QA that checks things and exits 0 on success, 1 on failure.</li>
 <li><code>flua test</code> finds <code>*_test.lua</code> files, runs them isolated, and reports
   <code>PASS</code>/<code>FAIL</code>/<code>TIME</code> — exit code 0 means everything holds.</li>
 <li>Tests run offline against the sim, so they are fast, free, and safe to

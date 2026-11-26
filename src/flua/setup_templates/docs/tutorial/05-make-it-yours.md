@@ -73,8 +73,11 @@ Each `--%%u` line is one row of your QuickApp's own UI:
   flips it, the QuickApp's `toggleAuto` action runs (`onReleased`).
 
 That's the whole recipe for HC3 interfaces: rows of `label`, `button`,
-`switch`, `slider`, `select` — each with a name and the action to call. The
-HC3 app renders the same rows on the real controller later.
+`switch`, `slider`, `select` — and the toolbox has `multi`, `tabView`,
+`image`, `space`, `vertical`, `collapsible`, `colorPicker`,
+`colorTemperaturePicker` and `list` when you need them — each with a name
+and the action to call. The HC3 app renders the same rows on the real
+controller later.
 
 ### Reacting: `toggleAuto`
 
@@ -145,9 +148,12 @@ its type**: a `binarySwitch` has `value`, and that's the schema — you can't
 invent an `auto` property for it. (`self:updateProperty("value", …)` from
 chapter 03 works because `value` is in the schema.) Variables, on the
 other hand, are free-form, and — the real reason `auto` is one — they
-**survive restarts**: when the HC3 (or flua) restarts the QuickApp, the
-variables keep their values, so the user's switch choice isn't lost. The
-`--%%var:auto=true` line only sets the *starting* value, the first time.
+**survive restarts**: when the HC3 restarts the QuickApp — or flua restarts
+it mid-run — the variables keep their values, so the user's switch choice
+isn't lost. The `--%%var:auto=true` line only sets the *starting* value,
+the first time. (One flua caveat: a *fresh* `flua sunset_lamp_ui.lua` starts
+the sim from scratch and re-applies the starting values — to persist
+variables across flua runs too, add `--%%db:+`.)
 
 If a value does **not** need to survive a restart, don't give it a
 variable — a plain Lua variable in the file (or a field on `self`, like
@@ -160,7 +166,7 @@ Press **F5** with the **Flua: Run Current File (UI)** configuration, as in
 chapter 03, and open **http://127.0.0.1:8090/**.
 
 ```text
-🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline (sim HC3, real network)
 flua: UI viewer on http://127.0.0.1:8090/ — open it in a browser
 [04.10.2026][21:00:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready, 60 W
 [04.10.2026][21:00:00][DEBUG  ][SunsetLamp5000]: Lamp on

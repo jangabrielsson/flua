@@ -75,7 +75,7 @@ flua --api local --start '2026/10/4 18:30:00' sunset_lamp_auto.lua
 ```
 
 ```text
-🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline (sim HC3, real network)
 [04.10.2026][18:30:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready
 [04.10.2026][18:30:00][DEBUG  ][SunsetLamp5000]: Lamp on
 ```
@@ -102,7 +102,7 @@ flua --api local --start '2026/10/4 18:00:00' --instant --max-hours 1 sunset_lam
 ```
 
 ```text
-🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline (sim HC3, real network)
 [04.10.2026][18:00:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready
 [04.10.2026][18:13:00][DEBUG  ][SunsetLamp5000]: Lamp on
 flua: virtual time limit reached (1.0h)
@@ -124,10 +124,11 @@ The two flags:
 
 There's also `--speed 60` for "60 times faster than real life" — same idea,
 but you watch it run — and `--step`, the same deadline-ordered discipline
-under its plua `speedTime` name. `--instant` and `--step` are equivalent
-for the QA (`--instant` used to collapse the whole timer heap into one
-pass, which broke `os.time()`-relative scheduling; that is fixed) — either
-one suits event engines that compute their next delay from `os.time()`.
+under its plua `speedTime` name. `--instant` and `--step` are close cousins
+for the QA (both fire one deadline at a time, so `os.time()` is right in
+every callback) — but they are separate, mutually exclusive modes, and
+`--step` can't be combined with `--speed` either. Either one suits event
+engines that compute their next delay from `os.time()`.
 
 > ✅ **You should see** `Lamp on` stamped `18:13:00` — the sunset from the
 > `sunsetHour` calculation, to the minute.
@@ -148,7 +149,7 @@ same as the terminal command:
 ```
 
 ```text
-🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline (sim HC3, real network)
 [04.10.2026][18:30:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready
 [04.10.2026][18:30:00][DEBUG  ][SunsetLamp5000]: Lamp on
 ```

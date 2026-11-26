@@ -89,7 +89,7 @@ the buttons exactly like in the HC3 app. Press **F5** with the
 serves the viewer:
 
 ```text
-🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline (sim HC3, real network)
 flua: UI viewer on http://127.0.0.1:8090/ — open it in a browser
 [04.10.2026][20:11:17][DEBUG  ][SunsetLamp5000]: Sunset lamp ready
 ```

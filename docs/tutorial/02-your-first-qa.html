@@ -54,8 +54,8 @@ end, 400)
 </code></pre>
 <p>A few first impressions, without the theory:</p>
 <ul>
-<li>Lines starting with <code>--</code> are <em>comments</em> — notes for humans. The two
-  <code>--%%</code> lines at the top are the exception: those are notes for <strong>flua</strong>
+<li>Lines starting with <code>--</code> are <em>comments</em> — notes for humans. The <code>--%%</code>
+  line at the top is the exception: that one is a note for <strong>flua</strong>
   (<code>--%%name:hello</code> gives the QuickApp a name).</li>
 <li><code>print(...)</code> writes a line to the log.</li>
 <li><code>setInterval(function() … end, 400)</code> means: <em>run this little block every
@@ -67,15 +67,16 @@ end, 400)
 <p><code>os.exit()</code> ends the QuickApp that called it. That's the same name real
 HC3 QuickApps use (there, every QuickApp is its own program — ending it
 is as simple as leaving a room). In these first experiments it's also
-what lets flua finish and hand you back the terminal — a QuickApp that
-never exits just keeps running.</p>
+what ends the run right there. Without it, flua would keep going while
+timers are pending — here, the 400 ms interval — and stop on its own
+once nothing is left to do.</p>
 </blockquote>
 <h2 id="step-2--run-it-with-f5">Step 2 — run it with F5</h2>
 <p>Make sure <code>hello.lua</code> is the tab you're looking at, and press <strong>F5</strong> (the
 first time, choose <strong>Flua: Run Current File (Terminal)</strong> from the menu —
 chapter 01's setup installed it). VS Code runs the file and shows the log
 in its terminal panel:</p>
-<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline (sim HC3, real network)
 [04.10.2026][20:50:10][DEBUG  ][hello5000]: Hello from my first QuickApp
 [04.10.2026][20:50:10][DEBUG  ][hello5000]: tick 1
 [04.10.2026][20:50:11][DEBUG  ][hello5000]: tick 2
@@ -98,8 +99,10 @@ involved — that's the whole point: experiment safely, then go live later.</p>
 <blockquote>
 <p>If F5 complains that <code>flua</code> was not found: VS Code on some systems
 doesn't inherit the shell's PATH when started from the dock. Chapter 01's
-setup normally prevents this — it writes the <strong>absolute path</strong> to flua
-into the launch configurations. If you wrote the configuration by hand (or
+setup normally prevents this — the debugger configurations get the
+<strong>absolute path</strong> to flua written in (the F5 run configurations use
+<code>python -m flua</code>, which only needs the right Python). If you wrote the
+configuration by hand (or
 reinstalled flua elsewhere), either re-run <code>flua --tool setup</code>, or restart
 VS Code from the terminal once — on macOS run <code>open -a "Visual Studio
 Code"</code> in a terminal, on Windows/Linux start <code>code</code> from one. If it says
@@ -108,7 +111,8 @@ have flua: open the Command Palette (Ctrl/Cmd+Shift+P), choose
 <strong>Python: Select Interpreter</strong>, and pick the one you installed flua into
 (chapter 01). You can always run the command by hand instead: open a
 terminal with <strong>Terminal → New Terminal</strong> and type <code>flua hello.lua</code> —
-every F5 run in this tutorial is exactly that command.</p>
+every F5 run in this tutorial does exactly that (<code>python -m flua</code> with the
+file).</p>
 </blockquote>
 <h2 id="step-3--break-it-on-purpose">Step 3 — break it, on purpose</h2>
 <p>Programmers don't get code right the first time. They get it <em>wrong fast</em>
@@ -116,6 +120,8 @@ and let the computer tell them where. Try it: change <code>local n = 0</code> to
 <code>local n = 0 + nn</code> (a name that doesn't exist), save, and press <strong>F5</strong>
 again:</p>
 <pre><code class="language-text">Error:  hello.lua:4: attempt to perform arithmetic on a nil value (global 'nn')
+stack traceback:
+    .../flua/lua/init.lua: in function &lt;...&gt;
 </code></pre>
 <p>flua tells you the file, the line (4), and the problem: it tried to do
 arithmetic on <code>nn</code>, which is nothing. ("Bootstrap" is flua-speak for

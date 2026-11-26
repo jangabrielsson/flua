@@ -35,7 +35,7 @@ flua --api local examples/multifile.lua
 ```
 
 ```text
-🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline (sim HC3, real network)
 [05.10.2026][10:33:55][DEBUG  ][multifile-demo5000]: helper says: loaded in order
 ```
 
@@ -85,7 +85,7 @@ flua --tool updateQA 123 main.lua # same, into an existing QA
 ```
 
 And the other direction, `downloadQA`, writes the files out with names that
-carry the HC3 id — `My QA_main_123.lua`, `My_QA_lib_123.lua` — so a
+carry the HC3 id — `My_QA_main_123.lua`, `My_QA_lib_123.lua` — so a
 downloaded QA is a working flua project you can edit and re-upload.
 
 ## The Sunset Lamp, refactored

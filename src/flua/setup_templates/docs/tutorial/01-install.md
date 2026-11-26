@@ -65,7 +65,7 @@ flua --api local -e 'print("Hello HC3!")'
 ```
 
 ```text
-🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline (sim HC3, real network)
 [04.10.2026][20:11:43][DEBUG  ][QA5000]: Hello HC3!
 ```
 
@@ -96,11 +96,11 @@ flua doctor
   ✓ HC3 credentials   not configured — offline sim only
   ✓ HC3 connection    skipped — no HC3_URL
   ✗ LuaLS setup       no .luarc.json/.luals — run `flua --tool setup` for HC3 autocomplete
-  ✓ VS Code run/debug .vscode/launch.json present
+  ✗ VS Code run/debug no .vscode/launch.json — run `flua --tool setup` for the run/debug configs
   ✓ VS Code extension installed (version 0.1.84)
   ✓ flua-mcp          flua-mcp on PATH
   ✓ project files     1 QA file(s)
-flua doctor: 8 ok, 1 problem(s)
+flua doctor: 7 ok, 2 problem(s)
 ```
 
 Every ✓ is something that works; every ✗ names the fix right there. (The
@@ -121,11 +121,17 @@ flua --tool setup my-first-qa
 ```
 
 ```text
-  wrote .vscode/launch.json
-  wrote .vscode/extensions.json
-  wrote .luarc.json
-  wrote AGENTS.md
+  wrote .github/copilot-instructions.md
+  wrote .github/instructions/quickapp-dev.instructions.md
+  wrote .github/prompts/install-qa-skills.prompt.md
   wrote .github/skills
+  wrote .luals
+  wrote .luarc.json
+  wrote .vscode/extensions.json
+  wrote .vscode/flua.code-snippets
+  wrote .vscode/launch.json
+  wrote .vscode/tasks.json
+  wrote AGENTS.md
 done — VS Code will suggest the Python and Lua MobDebug extensions on the next open; agents pick up AGENTS.md and the .github files; `flua --ui` serves the UI viewer at http://127.0.0.1:PORT/ (no file to open)
 Read on:
   USAGE.md   https://github.com/jangabrielsson/flua/blob/main/USAGE.md

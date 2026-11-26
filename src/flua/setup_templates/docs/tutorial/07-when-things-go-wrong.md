@@ -138,7 +138,7 @@ it smaller** until it works, then add pieces back.
 
   ```lua
   self:debug("sunset hour is", fibaro.getValue(1, "sunsetHour"))
-  self:debug("auto is", tostring(self.properties.auto))
+  self:debug("auto is", tostring(self:getVariable("auto")))
   ```
 
 Programmers call this "the smallest case that fails" — and half the time,

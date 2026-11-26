@@ -135,7 +135,7 @@ it smaller</strong> until it works, then add pieces back.</p>
 </ul>
 <p><code>lua
   self:debug("sunset hour is", fibaro.getValue(1, "sunsetHour"))
-  self:debug("auto is", tostring(self.properties.auto))</code></p>
+  self:debug("auto is", tostring(self:getVariable("auto")))</code></p>
 <p>Programmers call this "the smallest case that fails" — and half the time,
 the act of shrinking finds the bug before the bug finds you.</p>
 <h2 id="ask-for-help">Ask for help</h2>

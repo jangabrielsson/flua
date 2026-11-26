@@ -43,10 +43,10 @@ Three new names, all from flua's built-in test library:
 - `require("flua-test")` loads it — no download, nothing to install.
 - `t:expect(condition, "message")` checks one thing and prints `PASS:` or
   `FAIL:`.
-- `t:finish()` prints the failure count and ends the run with it — so the
-  *exit code* says pass or fail, not your eyes.
+- `t:finish()` prints the failure count and exits 1 if anything failed,
+  0 otherwise — so the *exit code* says pass or fail, not your eyes.
 
-You already know the rest: `api.get` is the sim (chapter 02),
+You already know the rest: `api.get` is the sim (chapter 09),
 `updateProperty` is how the lamp changes its own state (chapter 03), and
 `function QuickApp:turnOn()` is the lamp's action (chapter 03 again).
 
@@ -142,7 +142,7 @@ effects with fixed delays; poll the condition with a generous timeout
 ## What did we just learn?
 
 - `require("flua-test")` + `t:expect`/`t:assert_eq`/`t:finish()` — a test
-  file is just a QA that checks things and exits with the failure count.
+  file is just a QA that checks things and exits 0 on success, 1 on failure.
 - `flua test` finds `*_test.lua` files, runs them isolated, and reports
   `PASS`/`FAIL`/`TIME` — exit code 0 means everything holds.
 - Tests run offline against the sim, so they are fast, free, and safe to

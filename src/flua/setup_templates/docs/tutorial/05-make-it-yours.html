@@ -96,8 +96,11 @@ end
   flips it, the QuickApp's <code>toggleAuto</code> action runs (<code>onReleased</code>).</li>
 </ul>
 <p>That's the whole recipe for HC3 interfaces: rows of <code>label</code>, <code>button</code>,
-<code>switch</code>, <code>slider</code>, <code>select</code> — each with a name and the action to call. The
-HC3 app renders the same rows on the real controller later.</p>
+<code>switch</code>, <code>slider</code>, <code>select</code> — and the toolbox has <code>multi</code>, <code>tabView</code>,
+<code>image</code>, <code>space</code>, <code>vertical</code>, <code>collapsible</code>, <code>colorPicker</code>,
+<code>colorTemperaturePicker</code> and <code>list</code> when you need them — each with a name
+and the action to call. The HC3 app renders the same rows on the real
+controller later.</p>
 <h3 id="reacting-toggleauto">Reacting: <code>toggleAuto</code></h3>
 <pre><code class="language-lua">function QuickApp:toggleAuto(e)
   local auto = e.values and e.values[1] == &quot;true&quot;
@@ -152,9 +155,12 @@ its type</strong>: a <code>binarySwitch</code> has <code>value</code>, and that'
 invent an <code>auto</code> property for it. (<code>self:updateProperty("value", …)</code> from
 chapter 03 works because <code>value</code> is in the schema.) Variables, on the
 other hand, are free-form, and — the real reason <code>auto</code> is one — they
-<strong>survive restarts</strong>: when the HC3 (or flua) restarts the QuickApp, the
-variables keep their values, so the user's switch choice isn't lost. The
-<code>--%%var:auto=true</code> line only sets the <em>starting</em> value, the first time.</p>
+<strong>survive restarts</strong>: when the HC3 restarts the QuickApp — or flua restarts
+it mid-run — the variables keep their values, so the user's switch choice
+isn't lost. The <code>--%%var:auto=true</code> line only sets the <em>starting</em> value,
+the first time. (One flua caveat: a <em>fresh</em> <code>flua sunset_lamp_ui.lua</code> starts
+the sim from scratch and re-applies the starting values — to persist
+variables across flua runs too, add <code>--%%db:+</code>.)</p>
 <p>If a value does <strong>not</strong> need to survive a restart, don't give it a
 variable — a plain Lua variable in the file (or a field on <code>self</code>, like
 <code>self.lastCheck = os.time()</code>) is simpler and just as good. Variables earn
@@ -162,7 +168,7 @@ their keep exactly when the value must outlive the QuickApp's run.</p>
 <h2 id="run-it-and-flip-the-switch">Run it and flip the switch</h2>
 <p>Press <strong>F5</strong> with the <strong>Flua: Run Current File (UI)</strong> configuration, as in
 chapter 03, and open <strong>http://127.0.0.1:8090/</strong>.</p>
-<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline
+<pre><code class="language-text">🚀 flua 0.1.x (Lua 5.4, Python 3.x), mode offline (sim HC3, real network)
 flua: UI viewer on http://127.0.0.1:8090/ — open it in a browser
 [04.10.2026][21:00:00][DEBUG  ][SunsetLamp5000]: Sunset lamp ready, 60 W
 [04.10.2026][21:00:00][DEBUG  ][SunsetLamp5000]: Lamp on
