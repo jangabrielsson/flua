@@ -1119,6 +1119,53 @@ async def test_device_id_pin_rejects_bad_ids(capsys) -> None:
 
 
 @pytest.mark.asyncio
+async def test_load_sim_device_roller_shutter(capsys) -> None:
+    # the rollerShutter sim device mirrors the HC3's quickapp template:
+    # open/close move value (99/0), stop halts without changing it, setValue
+    # positions 0-99 — and the skeleton's empty value must not crash it
+    loader_code = (
+        "setTimeout(function()\n"
+        "  local shutter = _FLUA.loadSimDevice('rollerShutter')\n"
+        "  print('LOADED', shutter)\n"
+        "  fibaro.call(shutter, 'close')\n"
+        "  setTimeout(function()\n"
+        "    local dev = api.get('/devices/'..shutter)\n"
+        "    print('CLOSED', dev.properties.value)\n"
+        "    fibaro.call(shutter, 'open')\n"
+        "    setTimeout(function()\n"
+        "      dev = api.get('/devices/'..shutter)\n"
+        "      print('OPEN', dev.properties.value)\n"
+        "      fibaro.call(shutter, 'setValue', 42)\n"
+        "      setTimeout(function()\n"
+        "        dev = api.get('/devices/'..shutter)\n"
+        "        print('SET', dev.properties.value)\n"
+        "        fibaro.call(shutter, 'stop')\n"
+        "        setTimeout(function()\n"
+        "          dev = api.get('/devices/'..shutter)\n"
+        "          print('STOP', dev.properties.value)\n"
+        "          _FLUA.exit(0)\n"
+        "        end, 50)\n"
+        "      end, 50)\n"
+        "    end, 50)\n"
+        "  end, 50)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(None, loader_code, {}, "loader")
+        await wait_until(lambda: not engine.is_running())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "LOADED 5001" in out
+    assert "CLOSED 0" in out
+    assert "OPEN 99" in out
+    assert "SET 42" in out
+    assert "STOP 42" in out  # stop halts, the position stays
+
+
+@pytest.mark.asyncio
 async def test_load_sim_device_color_controller_no_recursion(capsys) -> None:
     # the colorController sim device's setColor <-> setColorComponents pair
     # must terminate — the change guard mirrors the HC3 template (without

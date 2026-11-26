@@ -1705,7 +1705,7 @@ local lamp = _FLUA.loadSimDevice("binarySwitch", { "deviceId:45" })
 The bundled set mirrors the `quickapp-types` device templates
 (`temperatureSensor`, `humiditySensor`, `motionSensor`, `doorSensor`,
 `windowSensor`, `smokeSensor`, `floodSensor`, `binarySwitch`,
-`multilevelSwitch`, `colorController`, the HVAC trio, `alarmPartition`,
+`multilevelSwitch`, `rollerShutter`, `colorController`, the HVAC trio, `alarmPartition`,
 `weather`, `player`, … — the full template set). Every sim
 device keeps itself alive for the whole run and answers `fibaro.call`:
 value sensors take `setValue(value, unit?)` and `setUnit(unit)`; breach
