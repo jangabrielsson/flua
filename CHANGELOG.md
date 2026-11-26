@@ -4,6 +4,19 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.197] - 2026-11-26
+
+### Added
+- honor --%%deviceId as a device id pin in the emulator (layer-2 device emulation)
+
+### Changed
+- test: poll the port flua actually bound in the --ui/--docs CLI tests (busy-port fallback race)
+- warn when an online seed shadows same-id HC3 devices (startup + per-id in the /devices union)
+- rebuild the tutorial PDF after the chapter refresh
+- refresh tutorial minors — doctor/setup blocks, error output, banner text, --instant/--step, variable persistence, UI element list, TRACE lines
+- fix tutorial claims that drifted from the engine (directive comments, proxy ids, updateQA, --%%rsrc in libs, test tooling)
+- sync post 03's log excerpt with current boot/fire timestamps
+
 ## [0.1.196] - 2026-11-25
 
 ### Changed
