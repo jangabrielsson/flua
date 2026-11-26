@@ -381,6 +381,14 @@ the mode, following each mode's source of truth:
 - **proxy** — everything worth keeping is already on the HC3; the `+` is
   ignored with a warning (seed still applies).
 
+> **Online + a seeded house:** the emulator answers first for any id it
+> owns, so a seeded device whose id also exists on the controller shadows
+> the real one — reads and actions (`fibaro.call`, `api.get`/`api.post`) on
+> that id run on the emulated copy, not the controller. flua warns at
+> startup when an online run carries a seeded house, and again (once per id)
+> when a `/devices` list detects the clash. Proxy twins shadow by design and
+> stay silent.
+
 Seeded physical devices (no QA behind them) react to the canonical light
 actions: `POST /devices/{id}/action/turnOn|turnOff|setValue` updates their
 `value` like a real device (dimmers use 0/99 levels, `"on"`/`"off"`

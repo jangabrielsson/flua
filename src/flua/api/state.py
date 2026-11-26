@@ -148,6 +148,10 @@ class SimState:
         # refreshStates feed: (seq, entry) pairs with strictly increasing seq.
         self.changes: list[tuple[int, dict[str, Any]]] = []
         self.events: list[tuple[int, dict[str, Any]]] = []
+        # ids already warned about in the online /devices union: a seeded
+        # device and a real HC3 device sharing an id (the emulated copy
+        # shadows the controller's — routes/devices.py warns once per run)
+        self.shadow_clash_warned: set[int] = set()
         self._refresh_seq = 0
         # debugMessages: the QA console buffer (GET /debugMessages), like the
         # HC3's — {id, timestamp, type, tag, message}, newest last, bounded.

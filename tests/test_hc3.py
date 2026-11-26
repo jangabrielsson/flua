@@ -7,6 +7,7 @@ controller.
 import asyncio
 import base64
 import json
+import logging
 import os
 import re
 import signal
@@ -1565,6 +1566,44 @@ async def test_devices_list_is_union_of_sim_and_hc3(
     assert "hc3-device" in out and "hc3-other" in out
     assert "hc3-controller" in out  # device 1 is the HC3's real struct
     assert "B 3" in out  # the offline-pinned QA sees the sim only (1 + a + b)
+
+
+@pytest.mark.asyncio
+async def test_devices_list_warns_when_seed_shadows_hc3_device(
+    tmp_path, capsys, mock_hc3, monkeypatch, caplog
+) -> None:
+    # online: a seeded device whose id also exists on the HC3 shadows the
+    # real one — reads AND actions on that id use the emulated copy. flua
+    # warns at startup (stderr) and once per id in the /devices union.
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    seed = {"devices": [{"id": 45, "name": "seed-twin", "type": "com.fibaro.binarySwitch"}]}
+    a = tmp_path / "a.lua"
+    a.write_text(
+        "setTimeout(function()\n"
+        "  local d45 = nil\n"
+        "  for _, d in ipairs(api.get('/devices')) do\n"
+        "    if d.id == 45 then d45 = d end\n"
+        "  end\n"
+        "  api.get('/devices')\n"  # second list: still one warning per id
+        "  print('NAME', d45 and d45.name)\n"
+        "  print('DONE')\n"
+        "end, 20)\n"
+    )
+    with caplog.at_level(logging.WARNING, logger="flua.engine"):
+        engine = LuaEngine(api_mode="remote", seed=seed)
+    assert any("seeded house" in r.message for r in caplog.records)
+    await engine.start()
+    try:
+        engine.load_qa_file(str(a))
+        out = await _wait_for_output(capsys, "DONE")
+    finally:
+        await engine.stop()
+    assert "device 45 exists in the emulator and on the HC3" in out
+    assert out.count("device 45 exists") == 1
+    assert "NAME seed-twin" in out  # the emulated copy wins the list
 
 
 def test_cli_remote_requires_hc3_url(tmp_path, monkeypatch) -> None:

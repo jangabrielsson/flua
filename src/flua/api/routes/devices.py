@@ -115,6 +115,28 @@ def devices_list(state: SimState, req: ApiRequest) -> tuple[Any, int]:
         remote_devices, status = req.remote("GET", path, None)
         if status == 200 and isinstance(remote_devices, list):
             merged = {int(device["id"]): device for device in remote_devices}
+            for device in devices:
+                sim_id = int(device["id"])
+                if (
+                    sim_id in merged
+                    and sim_id != 1
+                    and not state.is_proxy(sim_id)
+                    and req.emit is not None
+                    and sim_id not in state.shadow_clash_warned
+                ):
+                    # online: the emulated copy answers first for this id, so
+                    # reads AND actions use it while the HC3's real device of
+                    # the same id stays untouched — say so once per id per run
+                    # (device 1 and proxy twins shadow by design, silent)
+                    state.shadow_clash_warned.add(sim_id)
+                    req.emit(
+                        messages.log(
+                            "warning",
+                            f"flua: device {sim_id} exists in the emulator and on the "
+                            "HC3 — reads and actions on it use the emulated copy, "
+                            "not the controller",
+                        )
+                    )
             merged.update({int(device["id"]): device for device in devices})
             if 1 in merged and 1 in state.devices:
                 one = _device1_merged(state, req)

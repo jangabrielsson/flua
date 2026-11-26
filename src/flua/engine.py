@@ -341,6 +341,17 @@ class LuaEngine:
         else:
             self.hc3 = None
         self.api = Api(self, seed)
+        # Online (and proxy, which requires online): a seeded house keeps its
+        # own copies of the seeded ids — the sim answers first for ids it
+        # owns, so a seeded id that also exists on the controller shadows
+        # the real device (reads AND actions). Warn up front; each actual
+        # clash is also reported once in the /devices union.
+        if self.hc3 is not None and seed and seed.get("devices"):
+            logger.warning(
+                "online mode with a seeded house: emulated devices shadow "
+                "same-id HC3 devices — reads and actions on a seeded id run "
+                "in the emulator, not on the controller"
+            )
         self._handlers: dict[str, Callable[[dict[str, Any]], Any]] = {
             messages.SET_TIMEOUT: self._handle_set_timeout,
             messages.HTTP_REQUEST: self._handle_http_request,
