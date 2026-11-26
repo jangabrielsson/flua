@@ -351,6 +351,7 @@ Parsing stops at the end-of-header marker:
 | `--%%db:house.json` | seed the simulated HC3 from a JSON file (devices, rooms, scenes, globalVariables, alarms, profiles) |
 | `--%%replay:house.json` | replay a recorded house session (`flua record`): seeds the sim with its devices and fires its refreshState events on the virtual timeline |
 | `--%%db:+house.json` | seed **and** persist emulator state back to the file (see below) |
+| `--%%deviceId:123` | pin the QA's device id in the emulator (layer-2 device emulation): the QA runs under id 123, standing in for the real house device — downloadQA writes this into downloaded files; online, a pinned id shadows a same-id HC3 device (flua warns) |
 | `--%%location:latitude=59.33,longitude=18.07` | pin the sim's location (device 1's sunrise/sunset) — deterministic sun times without touching `.flua.lua` |
 
 The legacy `--%%offline:true` and `--%%proxy:true` still work as aliases for
@@ -1696,6 +1697,9 @@ fibaro.call(motion, "breach")
 -- becomes any number of distinct devices
 local hall = _FLUA.loadSimDevice("temperatureSensor",
   { "name:Hall temp", "property:value=21.5", "property:unit=C" })
+-- pin a device to the real house device's id (--%%deviceId) so it stands in
+-- for that device: fibaro.call(45, ...) drives the emulated copy
+local lamp = _FLUA.loadSimDevice("binarySwitch", { "deviceId:45" })
 ```
 
 The bundled set mirrors the `quickapp-types` device templates
@@ -1711,6 +1715,14 @@ sensors); switches take `turnOn`/`turnOff`/`setValue`; controllers keep
 their stock actions (`arm`/`disarm`/`setArmed`, `setThermostatMode`,
 `setHeatingThermostatSetpoint`, `setColor`, `createChild`, …). Drive one and
 watch scenes and reacting QAs fire like on a real device.
+
+The id pin replaces any seeded plain device at the same id (with a
+warning) — the house JSON's metadata entry makes way for the live QA — and
+is rejected for device 1 (the controller) and for ids already taken by a
+running QA. Offline it is the intended way to build a simulated house; in
+online mode flua warns that the pinned QA shadows a same-id HC3 device
+(reads and actions run in the emulator), and proxy mode ignores the pin
+(the HC3 assigns the proxy's id).
 
 Sensors also carry a UI for the web view (the `--ui`/builder tab): every
 binary sensor (motion, door, flood, smoke, …) gets Breach/Clear buttons,

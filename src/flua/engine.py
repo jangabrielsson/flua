@@ -1009,7 +1009,30 @@ class LuaEngine:
                 if not icon_dir.is_dir():
                     logger.warning("--%%icons: %s is not a directory — no local icon set", icon_dir)
                     icon_dir = None
+        # --%%deviceId:N pins the QA to a fixed device id (layer-2 device
+        # emulation: a downloaded QA or a loadSimDevice stand-in runs under
+        # the real house device's id). downloadQA writes the directive into
+        # downloaded files, uploadFile reads it back. Packing never pins —
+        # the id is runtime identity, not package content.
+        device_id_pin = None if packing else qa_config.get("deviceId")
+        if device_id_pin is not None:
+            try:
+                device_id_pin = int(device_id_pin)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"--%%deviceId must be an integer device id, got {device_id_pin!r}"
+                ) from exc
+            if device_id_pin <= 1:
+                raise ValueError(
+                    "--%%deviceId must be > 1 (device 1 is the controller itself), "
+                    f"got {device_id_pin}"
+                )
         if proxy_enabled:
+            if device_id_pin is not None:
+                logger.warning(
+                    "--%%deviceId:%d ignored in proxy mode (the HC3 assigns the proxy's id)",
+                    device_id_pin,
+                )
             # reuse or deploy the proxy FIRST: its HC3 id becomes the QA's id
             proxy_device = resolve_proxy(
                 self,
@@ -1020,6 +1043,29 @@ class LuaEngine:
                 no_ui=bool(qa_config.get("proxyNoUI")),  # --%%mode:proxy,noUI
             )
             qa_id = int(proxy_device["id"])
+        elif device_id_pin is not None:
+            qa_id = device_id_pin
+            if self.hc3 is not None:
+                logger.warning(
+                    "--%%deviceId:%d pins an emulated QA to a fixed id while online — "
+                    "a same-id HC3 device is shadowed: reads and actions on the id "
+                    "run in the emulator, not on the controller",
+                    qa_id,
+                )
+            if qa_id in self._qas:
+                raise ValueError(f"--%%deviceId:{qa_id} is already a running QA's id")
+            if qa_id in self.api.state.devices:
+                existing = self.api.state.devices[qa_id]
+                logger.warning(
+                    "--%%deviceId:%d replaces the sim's existing %r device — the "
+                    "pinned QA takes over the id",
+                    qa_id,
+                    existing.get("name"),
+                )
+            # the pin may reach beyond the auto-assigned range: keep the
+            # counter ahead of it so future QAs never collide with the pin
+            if qa_id >= self._next_qa_id:
+                self._next_qa_id = qa_id + 1
         else:
             qa_id = self._next_qa_id
             self._next_qa_id += 1

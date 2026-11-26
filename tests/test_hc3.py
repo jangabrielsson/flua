@@ -1606,6 +1606,31 @@ async def test_devices_list_warns_when_seed_shadows_hc3_device(
     assert "NAME seed-twin" in out  # the emulated copy wins the list
 
 
+@pytest.mark.asyncio
+async def test_device_id_pin_warns_when_online(
+    tmp_path, capsys, mock_hc3, monkeypatch, caplog
+) -> None:
+    # online: --%%deviceId pins an emulated QA to a fixed id — any same-id
+    # HC3 device is shadowed, and flua says so when the pin is used
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("HC3_URL", mock_hc3)
+    monkeypatch.setenv("HC3_USER", "admin")
+    monkeypatch.setenv("HC3_PASSWORD", "secret")
+    a = tmp_path / "a.lua"
+    a.write_text("--%%deviceId:45\nprint('hi')\n")
+    with caplog.at_level(logging.WARNING, logger="flua.engine"):
+        engine = LuaEngine(api_mode="remote")
+        await engine.start()
+        try:
+            engine.load_qa_file(str(a))
+            await _wait_for_output(capsys, "hi")
+        finally:
+            await engine.stop()
+    assert any(
+        "deviceId:45" in r.message and "shadowed" in r.message for r in caplog.records
+    )
+
+
 def test_cli_remote_requires_hc3_url(tmp_path, monkeypatch) -> None:
     home = tmp_path / "home"
     home.mkdir()

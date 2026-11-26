@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import re
 import subprocess
 import sys
@@ -1032,6 +1033,89 @@ async def test_load_sim_device_bundled(capsys) -> None:
     assert "temperatureSensor" in out
     # path traversal is refused
     assert "ERR2 false loadSimDevice: bad sim device name" in out
+
+
+@pytest.mark.asyncio
+async def test_load_sim_device_pinned_to_device_id(capsys) -> None:
+    # --%%deviceId pins the QA to a fixed device id (layer-2 device
+    # emulation): loadSimDevice's directives pin a bundled device to the
+    # real house device's id — the sim device IS the QA at that id
+    loader_code = (
+        "setTimeout(function()\n"
+        "  local lamp = _FLUA.loadSimDevice('binarySwitch', {'deviceId:45'})\n"
+        "  print('PINNED', lamp)\n"
+        "  setTimeout(function()\n"
+        "    local dev = api.get('/devices/45')\n"
+        "    print('DEV', dev.name, dev.type, dev.id)\n"
+        "    _FLUA.exit(0)\n"
+        "  end, 50)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(None, loader_code, {}, "loader")
+        await wait_until(lambda: not engine.is_running())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "PINNED 45" in out
+    assert "DEV BinarySwitch com.fibaro.binarySwitch 45" in out
+
+
+@pytest.mark.asyncio
+async def test_device_id_pin_replaces_seeded_device(capsys, caplog) -> None:
+    # a pinned QA takes over a seeded plain device's id (the house JSON's
+    # metadata entry makes way for the live QA) — with a warning
+    seed = {"devices": [{"id": 45, "name": "Kitchen lamp", "type": "com.fibaro.binarySwitch"}]}
+    loader_code = (
+        "setTimeout(function()\n"
+        "  local id = _FLUA.loadSimDevice('binarySwitch', {'deviceId:45'})\n"
+        "  print('ID', id)\n"
+        "  _FLUA.exit(0)\n"
+        "end, 20)\n"
+    )
+    with caplog.at_level(logging.WARNING, logger="flua.engine"):
+        engine = LuaEngine(seed=seed)
+        await engine.start()
+        try:
+            engine.start_qa(None, loader_code, {}, "loader")
+            await wait_until(lambda: not engine.is_running())
+        finally:
+            await engine.stop()
+    out = capsys.readouterr().out
+    assert "ID 45" in out
+    assert any("replaces" in r.message and "Kitchen lamp" in r.message for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_device_id_pin_rejects_bad_ids(capsys) -> None:
+    # device 1 is the controller itself, non-integers are rejected, and a
+    # pin onto a running QA's id is an error (via pcall: loadSimDevice
+    # throws the ValueError message)
+    loader_code = (
+        "setTimeout(function()\n"
+        "  local ok, err = pcall(_FLUA.loadSimDevice, 'binarySwitch', {'deviceId:1'})\n"
+        "  print('ONE', ok, err)\n"
+        "  local ok2, err2 = pcall(_FLUA.loadSimDevice, 'binarySwitch', {'deviceId:nope'})\n"
+        "  print('NAN', ok2, err2)\n"
+        "  local lamp = _FLUA.loadSimDevice('binarySwitch')\n"
+        "  local ok3, err3 = pcall(_FLUA.loadSimDevice, 'binarySwitch', {'deviceId:'..lamp})\n"
+        "  print('TAKEN', ok3, err3)\n"
+        "  _FLUA.exit(0)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(None, loader_code, {}, "loader")
+        await wait_until(lambda: not engine.is_running())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "ONE false" in out and "device 1 is the controller" in out
+    assert "NAN false" in out and "integer device id" in out
+    assert "TAKEN false" in out and "already a running QA's id" in out
 
 
 @pytest.mark.asyncio

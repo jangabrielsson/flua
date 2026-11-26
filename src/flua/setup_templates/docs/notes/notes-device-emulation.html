@@ -35,7 +35,10 @@
 <p>Status: layer 1 implemented (2026-10-18) — seeded physical devices react to
 the canonical light actions (<code>turnOn</code>/<code>turnOff</code>/<code>setValue</code>) by updating
 their <code>value</code> property, gated by the catalog's <code>light</code> interface. Layer 2
-(QAs behind seeded devices) is designed but not built.</p>
+is partially built (2026-11-26): the <code>--%%deviceId:N</code> id pin is honored by
+the emulator, so a downloaded QA or a <code>_FLUA.loadSimDevice</code> template can be
+pinned to a house device's id and take it over. Selection (which seeded
+devices get a QA behind them) is still manual.</p>
 <h2 id="context">Context</h2>
 <p>A db/seed file (<code>--tool createDB</code>, <code>--seed</code>, <code>--%%db:</code>) carries the real
 house: dozens of devices, fetchable via <code>/devices</code>, but inert — <code>POST
@@ -61,21 +64,26 @@ devices had none. Layer 1 gives them the canonical default behavior.</p>
    for a device's type as a QA <strong>pinned to the device's id</strong>, so the
    template's canonical actions run in a real QA environment (timers,
    debug, properties all work). Covers non-QA devices with per-type
-   behavior beyond on/off.</li>
+   behavior beyond on/off. The pin exists; instantiation is manual:
+   <code>_FLUA.loadSimDevice("binarySwitch", { "deviceId:45" })</code>.</li>
 <li><strong>Real QA files</strong> — for devices that are QAs on the HC3
    (<code>interface: quickApp</code>), <code>--tool downloadQA</code> fetches the source; the
-   downloaded files run as emulated QAs. Needs one small extension: honor
-   <strong><code>--%%deviceId:N</code> as an id pin in the emulator</strong> (today it is
-   uploadFile metadata only), so the QA takes its original id and becomes
-   the seeded device.</li>
+   downloaded files run as emulated QAs. Built (2026-11-26): **
+   <code>--%%deviceId:N</code> is honored as an id pin in the emulator** — the
+   downloaded file's header pin (written by downloadQA) makes it take its
+   original id and become the seeded device. A pinned QA replaces a seeded
+   plain device at the same id (with a warning); device 1 and running-QA
+   ids are rejected; proxy mode ignores the pin; online mode warns that
+   the pin shadows a same-id HC3 device.</li>
 <li><strong>Selection</strong> — the db/seed carries the emulation list
    (<code>"emulate": [ids]</code>), <code>--%%deviceId</code> pins act as the implicit selection
    for downloaded QAs. Default: nothing emulated (layer 1 only) — with
    100+ devices the user opts in per device. No wildcard.</li>
 </ol>
-<p>Open design points: id collisions between pins and engine-assigned ids
-(5000+); whether pinned QAs shadow the seeded device entry or replace it;
-proxy mode interaction (a pinned QA with the same id as a proxied device
-must not double-emit).</p>
+<p>Resolved by the pin (2026-11-26): id collisions between pins and
+engine-assigned ids (the counter stays ahead of any pin; a pin onto a
+running QA's id is an error); pinned QAs replace the seeded device entry
+(with a warning); proxy mode ignores the pin (the HC3 assigns the proxy's
+id). Still open: selection (the <code>"emulate"</code> list).</p>
 </body>
 </html>
