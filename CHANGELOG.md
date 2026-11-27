@@ -4,6 +4,20 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.200] - 2026-11-27
+
+### Added
+- createDB --full captures the whole house (physical devices, rooms, globals, scenes, alarms, profiles)
+- resolve sim devices through the catalog's base-type chain (com.fibaro.FGMS001 -> motionSensor)
+- seed 'emulate' key — instantiate bundled sim devices behind seeded house devices (layer-2 selection)
+
+### Changed
+- fix
+- example: emulate the whole demo house; usedb.lua runs it via --%%db
+
+### Fixed
+- pinned QAs keep the seeded room; regenerate the capabilities index; end the house-seed test despite the live house
+
 ## [0.1.199] - 2026-11-27
 
 ### Changed
