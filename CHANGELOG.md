@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.201] - 2026-11-27
+
+### Changed
+- test: assert the new simdevice boot line (type included)
+- fixed log for simdevices
+
 ## [0.1.200] - 2026-11-27
 
 ### Added
