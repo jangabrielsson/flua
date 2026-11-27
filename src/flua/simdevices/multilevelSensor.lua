@@ -16,7 +16,7 @@ function QuickApp:_setValue(event)
 end
 
 function QuickApp:onInit()
-  self:debug("sim device ready, id", self.id)
+  self:debug("simdevice,",self.type:match("[%w_]+$")..", id", self.id)
   -- stay up for the whole run (a drained QA stops answering)
   _FLUA.keepAlive()
   local value = tonumber(self.properties.value) or 0

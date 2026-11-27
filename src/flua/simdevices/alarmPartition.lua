@@ -9,7 +9,7 @@
 --   fibaro.call(id, "arm" / "disarm" / "setArmed", bool) / "breached", bool)
 
 function QuickApp:onInit()
-  self:debug("sim device ready, id", self.id)
+  self:debug("simdevice,",self.type:match("[%w_]+$")..", id", self.id)
   -- stay up for the whole run (a drained QA stops answering)
   _FLUA.keepAlive()
 end

@@ -10,7 +10,7 @@
 --   fibaro.call(id, "setColor", r, g, b, w)  -- e.g. 34,139,34,150
 
 function QuickApp:onInit()
-  self:debug("sim device ready, id", self.id)
+  self:debug("simdevice,",self.type:match("[%w_]+$")..", id", self.id)
   -- stay up for the whole run (a drained QA stops answering)
   _FLUA.keepAlive()
   self:updateProperty("colorComponents", {red = 0, green = 0, blue = 0, warmWhite = 0})

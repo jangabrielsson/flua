@@ -14,7 +14,7 @@
 --   fibaro.call(id, "setValue", 0-99)
 
 function QuickApp:onInit()
-  self:debug("sim device ready, id", self.id)
+  self:debug("simdevice,",self.type:match("[%w_]+$")..", id", self.id)
   -- stay up for the whole run (a drained QA stops answering)
   _FLUA.keepAlive()
   -- a numeric position from the first read (the skeleton may not carry one)

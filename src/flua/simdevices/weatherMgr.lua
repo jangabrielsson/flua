@@ -113,7 +113,7 @@ function QuickApp:_syncView(weather)
 end
 
 function QuickApp:onInit()
-  self:debug("WeatherSimulator ready, id", self.id)
+  self:debug("simdevice,",self.type:match("[%w_]+$")..", id", self.id)
   local weather = api.get("/weather")
   if weather then self:_syncView(weather) end
 

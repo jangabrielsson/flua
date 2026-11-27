@@ -10,7 +10,7 @@
 --   fibaro.call(id, "setCoolingThermostatSetpoint", 23)
 
 function QuickApp:onInit()
-  self:debug("sim device ready, id", self.id)
+  self:debug("simdevice,",self.type:match("[%w_]+$")..", id", self.id)
   -- stay up for the whole run (a drained QA stops answering)
   _FLUA.keepAlive()
   self:updateProperty("supportedThermostatModes", {"Off", "Cool"})
