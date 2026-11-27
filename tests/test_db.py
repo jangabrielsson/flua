@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import subprocess
 import sys
 import threading
@@ -34,6 +35,86 @@ def test_db_directive_parsing() -> None:
     assert cfg["db"] == {"path": "house.json", "persist": True}
     cfg = parse_annotations("--%%location:latitude=59.33,longitude=18.07\nprint('hi')\n")
     assert cfg["location"] == {"latitude": 59.33, "longitude": 18.07}
+
+
+def test_db_emulate_rejects_bad_selection() -> None:
+    with pytest.raises(ValueError, match="emulate"):
+        LuaEngine(seed={"devices": [], "emulate": "bogus"})
+    with pytest.raises(ValueError, match="emulate"):
+        LuaEngine(seed={"devices": [], "emulate": ["nope"]})
+
+
+@pytest.mark.asyncio
+async def test_db_emulate_pins_bundled_sim_devices(capsys, caplog) -> None:
+    # "emulate": [ids] instantiates the bundled sim device for the listed
+    # house devices, pinned to their ids with their seeded names; devices
+    # with no bundled sim device warn and stay inert
+    seed = {
+        "devices": [
+            {"id": 45, "name": "Kitchen lamp", "type": "com.fibaro.binarySwitch"},
+            {"id": 46, "name": "Hall temp", "type": "com.fibaro.temperatureSensor"},
+            {"id": 47, "name": "Odd one", "type": "com.fibaro.noSuchType"},
+        ],
+        "emulate": [45, 47],
+    }
+    loader_code = "setTimeout(function() print('DONE') _FLUA.exit(0) end, 30)\n"
+    with caplog.at_level(logging.WARNING, logger="flua.engine"):
+        engine = LuaEngine(seed=seed)
+        await engine.start()
+        try:
+            engine.start_qa(None, loader_code, {}, "loader")
+            await wait_until(lambda: not engine.is_running())
+        finally:
+            await engine.stop()
+    out = capsys.readouterr().out
+    assert "Kitchen lamp45" in out  # emulated: pinned id, seeded name
+    assert "sim device ready, id 45" in out
+    assert "Hall temp46" not in out  # not selected: still an inert layer-1 device
+    assert any("no bundled sim device" in r.message and "47" in r.message for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_db_emulate_all_instantiates_every_bundled_device(capsys) -> None:
+    # "emulate": "all" instantiates every seeded device whose type has a
+    # bundled sim device; the rest stay inert silently
+    seed = {
+        "devices": [
+            {"id": 45, "name": "Kitchen lamp", "type": "com.fibaro.binarySwitch"},
+            {"id": 46, "name": "Hall temp", "type": "com.fibaro.temperatureSensor"},
+            {"id": 47, "name": "Odd one", "type": "com.fibaro.noSuchType"},
+        ],
+        "emulate": "all",
+    }
+    loader_code = "setTimeout(function() print('DONE') _FLUA.exit(0) end, 30)\n"
+    engine = LuaEngine(seed=seed)
+    await engine.start()
+    try:
+        engine.start_qa(None, loader_code, {}, "loader")
+        await wait_until(lambda: not engine.is_running())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "Kitchen lamp45" in out
+    assert "Hall temp46" in out
+    assert "Odd one47" not in out
+
+
+@pytest.mark.asyncio
+async def test_db_emulate_unknown_id_warns(capsys, caplog) -> None:
+    seed = {
+        "devices": [{"id": 45, "name": "L", "type": "com.fibaro.binarySwitch"}],
+        "emulate": [999],
+    }
+    loader_code = "setTimeout(function() print('DONE') _FLUA.exit(0) end, 20)\n"
+    with caplog.at_level(logging.WARNING, logger="flua.engine"):
+        engine = LuaEngine(seed=seed)
+        await engine.start()
+        try:
+            engine.start_qa(None, loader_code, {}, "loader")
+            await wait_until(lambda: not engine.is_running())
+        finally:
+            await engine.stop()
+    assert any("not in the seed" in r.message and "999" in r.message for r in caplog.records)
 
 
 def test_db_requires_an_existing_file() -> None:

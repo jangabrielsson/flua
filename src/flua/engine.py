@@ -94,6 +94,17 @@ BUNDLED_LIB_DIR = Path(__file__).parent / "lua" / "lib"
 # here, so pip-only installs have them too). Ships in the wheel
 # (pyproject package-data: simdevices/*.lua).
 SIM_DEVICES_DIR = Path(__file__).parent / "simdevices"
+
+
+def _simdevice_for_type(device_type: str) -> str | None:
+    """The bundled simdevice name for a device type (com.fibaro.X -> X.lua),
+    or None when no bundled device implements it."""
+    if not device_type.startswith("com.fibaro."):
+        return None
+    name = device_type[len("com.fibaro.") :]
+    if Path(name).name != name or name in ("", ".", ".."):
+        return None
+    return name if (SIM_DEVICES_DIR / f"{name}.lua").is_file() else None
 # --%% directives that map directly onto device properties (local per QA)
 _PROPERTY_DIRECTIVES = {
     "uid": "quickAppUuid",
@@ -352,6 +363,30 @@ class LuaEngine:
                 "same-id HC3 devices — reads and actions on a seeded id run "
                 "in the emulator, not on the controller"
             )
+        # Layer-2 selection: the seed's "emulate" key instantiates the
+        # bundled sim device for the listed house devices (or "all"),
+        # pinned to their ids. Loaded at start() — the pump must be up.
+        # Absent = layer 1 only (the seeded entries stay inert), the default.
+        self._emulate_devices: list[int] = []
+        self._auto_emulating = False
+        if seed and "emulate" in seed:
+            emulate = seed["emulate"]
+            if emulate in ("all", True):
+                self._emulate_devices = [
+                    int(device["id"])
+                    for device in seed.get("devices") or []
+                    if _simdevice_for_type(str(device.get("type") or ""))
+                ]
+            elif isinstance(emulate, list):
+                for entry in emulate:
+                    try:
+                        self._emulate_devices.append(int(entry))
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError(
+                            "--%%db 'emulate' entries must be device ids, got {entry!r}"
+                        ) from exc
+            else:
+                raise ValueError("--%%db 'emulate' must be a list of device ids or 'all'")
         self._handlers: dict[str, Callable[[dict[str, Any]], Any]] = {
             messages.SET_TIMEOUT: self._handle_set_timeout,
             messages.HTTP_REQUEST: self._handle_http_request,
@@ -1045,7 +1080,7 @@ class LuaEngine:
             qa_id = int(proxy_device["id"])
         elif device_id_pin is not None:
             qa_id = device_id_pin
-            if self.hc3 is not None:
+            if self.hc3 is not None and not self._auto_emulating:
                 logger.warning(
                     "--%%deviceId:%d pins an emulated QA to a fixed id while online — "
                     "a same-id HC3 device is shadowed: reads and actions on the id "
@@ -1054,7 +1089,7 @@ class LuaEngine:
                 )
             if qa_id in self._qas:
                 raise ValueError(f"--%%deviceId:{qa_id} is already a running QA's id")
-            if qa_id in self.api.state.devices:
+            if qa_id in self.api.state.devices and not self._auto_emulating:
                 existing = self.api.state.devices[qa_id]
                 logger.warning(
                     "--%%deviceId:%d replaces the sim's existing %r device — the "
@@ -2031,6 +2066,37 @@ class LuaEngine:
         self._running = True
         self._system_event("run_start", None, "")
         self._pump_task = asyncio.create_task(self._pump(), name="flua-pump")
+        # Layer-2 selection: instantiate the bundled sim device for each
+        # selected house device, pinned to its id (the pinned QA takes over
+        # the seeded entry, keeping the device's name). Enqueued before any
+        # caller-loaded QA, so the house is alive when user code boots.
+        if self._emulate_devices:
+            self._auto_emulating = True
+            try:
+                for device_id in self._emulate_devices:
+                    dev = self.api.state.devices.get(device_id)
+                    if dev is None:
+                        logger.warning(
+                            "emulate: device %d is not in the seed — skipped", device_id
+                        )
+                        continue
+                    sim_name = _simdevice_for_type(str(dev.get("type") or ""))
+                    if sim_name is None:
+                        logger.warning(
+                            "emulate: device %d (%s) has no bundled sim device — "
+                            "staying inert",
+                            device_id,
+                            dev.get("type"),
+                        )
+                        continue
+                    qa_id, err = self.load_sim_device(
+                        sim_name,
+                        [f"deviceId:{device_id}", "name:" + str(dev.get("name") or "")],
+                    )
+                    if qa_id is None:
+                        logger.warning("emulate: device %d failed to load: %s", device_id, err)
+            finally:
+                self._auto_emulating = False
         if self.hc3 is not None:
             # the FluaHelper bridge only matters against a real controller
             await self.helper.start()

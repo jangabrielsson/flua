@@ -397,6 +397,13 @@ strings work), gated by the catalog's `light` interface — sensors stay
 inert. QAs and proxy devices are untouched. Giving seeded devices real QA
 logic is the layer-2 design in `docs/notes/notes-device-emulation.md`.
 
+The seed's `"emulate"` key instantiates a bundled sim device behind the
+listed house devices at startup (layer-2 selection): `"emulate": [45, 46]`
+pins those ids, `"emulate": "all"` takes every seeded device whose type has
+a bundled sim device. The emulated QA is pinned to the device's id
+(`--%%deviceId`) and keeps the seeded name; devices without a bundled sim
+device stay inert (layer 1). Without the key, nothing is emulated.
+
 Running QAs are never persisted as devices — they are rebuilt from code each
 run. Children survive restarts and re-register under their parent QA, so a
 QA's usual `api.get("/devices?parentId="..self.id)` startup check finds
