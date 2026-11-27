@@ -1,6 +1,6 @@
 --%%name:DB test
 
---%%db:examples/house.json
+--%%db:myhouse.json
 
 function QuickApp:onInit()
 end
