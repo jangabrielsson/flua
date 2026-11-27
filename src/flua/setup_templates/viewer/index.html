@@ -29,9 +29,19 @@
   #status { margin-left: auto; font-size: 12px; color: var(--muted); }
   #status.ok { color: #2e9e5b; }
   #status.err { color: #d44444; }
+  /* panel mode: a responsive auto-fit grid — one column on narrow windows,
+     several side by side as space allows. Panels keep their own heights
+     (align-items: start — a short panel never stretches to its row's
+     tallest; the row's leftover space stays empty, like a dashboard). */
+  #devices:not(.condensed) {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+    align-items: start;
+  }
   .device {
     background: var(--card); border-radius: 14px; padding: 14px 18px;
-    margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
     max-width: 480px;
   }
   .device h2 { margin: 0 0 12px; font-size: 16px; font-weight: 600; }
