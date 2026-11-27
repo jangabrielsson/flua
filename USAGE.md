@@ -400,9 +400,11 @@ logic is the layer-2 design in `docs/notes/notes-device-emulation.md`.
 The seed's `"emulate"` key instantiates a bundled sim device behind the
 listed house devices at startup (layer-2 selection): `"emulate": [45, 46]`
 pins those ids, `"emulate": "all"` takes every seeded device whose type has
-a bundled sim device. The emulated QA is pinned to the device's id
-(`--%%deviceId`) and keeps the seeded name; devices without a bundled sim
-device stay inert (layer 1). Without the key, nothing is emulated.
+a bundled sim device (a physical model type like `com.fibaro.FGMS001`
+resolves through the catalog's base-type chain to `motionSensor`). The
+emulated QA is pinned to the device's id (`--%%deviceId`) and keeps the
+seeded name; devices without a bundled sim device stay inert (layer 1).
+Without the key, nothing is emulated.
 
 Running QAs are never persisted as devices — they are rebuilt from code each
 run. Children survive restarts and re-register under their parent QA, so a
@@ -1707,6 +1709,9 @@ local hall = _FLUA.loadSimDevice("temperatureSensor",
 -- pin a device to the real house device's id (--%%deviceId) so it stands in
 -- for that device: fibaro.call(45, ...) drives the emulated copy
 local lamp = _FLUA.loadSimDevice("binarySwitch", { "deviceId:45" })
+-- a full device type name works too: it resolves through the catalog's
+-- base-type chain to the bundled template that implements it
+local motion = _FLUA.loadSimDevice("com.fibaro.FGMS001")  -- -> motionSensor
 ```
 
 The bundled set mirrors the `quickapp-types` device templates

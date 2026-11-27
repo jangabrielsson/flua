@@ -66,7 +66,9 @@ devices had none. Layer 1 gives them the canonical default behavior.</p>
    debug, properties all work). Covers non-QA devices with per-type
    behavior beyond on/off. Instantiate manually via
    <code>_FLUA.loadSimDevice("binarySwitch", { "deviceId:45" })</code> or
-   automatically via the seed's <code>"emulate"</code> key.</li>
+   automatically via the seed's <code>"emulate"</code> key. Types match by exact
+   template name first, then through the catalog's base-type chain (a
+   physical model like <code>com.fibaro.FGMS001</code> resolves to <code>motionSensor</code>).</li>
 <li><strong>Real QA files</strong> — for devices that are QAs on the HC3
    (<code>interface: quickApp</code>), <code>--tool downloadQA</code> fetches the source; the
    downloaded files run as emulated QAs. Built (2026-11-26): **

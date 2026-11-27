@@ -60,7 +60,7 @@ from .config import (
     split_annotations,
     warn_enabled,
 )
-from .devices import apply_interface, catalog_types, property_specs_for
+from .devices import apply_interface, catalog_types, parent_type, property_specs_for
 from .environment import EnvChain
 from .hc3 import Hc3Remote
 from .helper import (
@@ -97,14 +97,23 @@ SIM_DEVICES_DIR = Path(__file__).parent / "simdevices"
 
 
 def _simdevice_for_type(device_type: str) -> str | None:
-    """The bundled simdevice name for a device type (com.fibaro.X -> X.lua),
-    or None when no bundled device implements it."""
-    if not device_type.startswith("com.fibaro."):
-        return None
-    name = device_type[len("com.fibaro.") :]
-    if Path(name).name != name or name in ("", ".", ".."):
-        return None
-    return name if (SIM_DEVICES_DIR / f"{name}.lua").is_file() else None
+    """The bundled simdevice name for a device type: the type's own name
+    (com.fibaro.X -> X.lua) or, walking the catalog's parent chain, the
+    nearest ancestor with a bundled device — a Fibaro physical model like
+    com.fibaro.FGMS001 falls back to its com.fibaro.motionSensor base, so
+    real house dumps instantiate with the templates flua bundles."""
+    current = device_type
+    seen: set[str] = set()
+    while current and current not in seen:
+        seen.add(current)
+        if current.startswith("com.fibaro."):
+            name = current[len("com.fibaro.") :]
+            if Path(name).name == name and name not in ("", ".", "..") and (
+                SIM_DEVICES_DIR / f"{name}.lua"
+            ).is_file():
+                return name
+        current = parent_type(current)
+    return None
 # --%% directives that map directly onto device properties (local per QA)
 _PROPERTY_DIRECTIVES = {
     "uid": "quickAppUuid",
@@ -1417,12 +1426,24 @@ class LuaEngine:
         header — e.g. rename it or preset its properties:
         {"name:Hall temp", "property:value=21.5", "property:unit=C"}.
         Returns (qa_id, None) or (None, error)."""
-        if not isinstance(name, str) or not name or Path(name).name != name or name in (".", ".."):
+        if (
+            not isinstance(name, str)
+            or not name
+            or name in (".", "..")
+            or "/" in name
+            or "\\" in name
+        ):
             return None, f"bad sim device name: {name!r}"
-        for suffix in (".lua", ".fqa"):
-            path = SIM_DEVICES_DIR / f"{name}{suffix}"
-            if path.is_file():
-                return self.load_qa_file(str(path), directives)
+        if Path(name).name == name:
+            for suffix in (".lua", ".fqa"):
+                path = SIM_DEVICES_DIR / f"{name}{suffix}"
+                if path.is_file():
+                    return self.load_qa_file(str(path), directives)
+        # a full device type (com.fibaro.FGMS001) resolves through the
+        # base-type chain to the bundled template that implements it
+        resolved = _simdevice_for_type(name)
+        if resolved is not None:
+            return self.load_sim_device(resolved, directives)
         available = sorted(
             p.stem for p in SIM_DEVICES_DIR.iterdir() if p.suffix in (".lua", ".fqa")
         )

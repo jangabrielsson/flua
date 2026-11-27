@@ -117,6 +117,28 @@ async def test_db_emulate_unknown_id_warns(capsys, caplog) -> None:
     assert any("not in the seed" in r.message and "999" in r.message for r in caplog.records)
 
 
+@pytest.mark.asyncio
+async def test_db_emulate_falls_back_to_base_type(capsys) -> None:
+    # a physical model type (com.fibaro.FGMS001) has no bundled sim device
+    # of its own — "emulate": "all" walks its base-type chain and
+    # instantiates the com.fibaro.motionSensor template
+    seed = {
+        "devices": [{"id": 60, "name": "Hall motion", "type": "com.fibaro.FGMS001"}],
+        "emulate": "all",
+    }
+    loader_code = "setTimeout(function() print('DONE') _FLUA.exit(0) end, 30)\n"
+    engine = LuaEngine(seed=seed)
+    await engine.start()
+    try:
+        engine.start_qa(None, loader_code, {}, "loader")
+        await wait_until(lambda: not engine.is_running())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "Hall motion60" in out
+    assert "sim device ready, id 60" in out
+
+
 def test_db_requires_an_existing_file() -> None:
     with pytest.raises(ValueError, match="cannot read"):
         LuaEngine(db_path="/nonexistent/such/db.json")

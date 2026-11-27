@@ -1064,6 +1064,34 @@ async def test_load_sim_device_pinned_to_device_id(capsys) -> None:
 
 
 @pytest.mark.asyncio
+async def test_load_sim_device_resolves_type_through_base_chain(capsys) -> None:
+    # a full device type name resolves through the catalog's base-type
+    # chain to the bundled template that implements it (a Fibaro physical
+    # model like FGMS001 IS a motionSensor)
+    loader_code = (
+        "setTimeout(function()\n"
+        "  local ms = _FLUA.loadSimDevice('com.fibaro.FGMS001')\n"
+        "  print('LOADED', ms)\n"
+        "  setTimeout(function()\n"
+        "    local dev = api.get('/devices/'..ms)\n"
+        "    print('DEV', dev.type)\n"
+        "    _FLUA.exit(0)\n"
+        "  end, 50)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(None, loader_code, {}, "loader")
+        await wait_until(lambda: not engine.is_running())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "LOADED 5001" in out
+    assert "DEV com.fibaro.motionSensor" in out
+
+
+@pytest.mark.asyncio
 async def test_device_id_pin_replaces_seeded_device(capsys, caplog) -> None:
     # a pinned QA takes over a seeded plain device's id (the house JSON's
     # metadata entry makes way for the live QA) — with a warning

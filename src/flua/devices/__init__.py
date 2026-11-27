@@ -79,6 +79,16 @@ def _hierarchy() -> dict[str, str]:
     return dict(parents) if isinstance(parents, dict) else {}
 
 
+def parent_type(device_type: str) -> str | None:
+    """The type's parent: the schema's baseType, else the distilled
+    hierarchy's parent (physical models are all in one or the other)."""
+    entry = type_schemas().get("types", {}).get(device_type)
+    base = (entry or {}).get("baseType")
+    if base:
+        return str(base)
+    return _hierarchy().get(device_type)
+
+
 _SCHEMA_PATH = Path(__file__).parent / "type_schemas.json"
 
 _ZERO_VALUES: dict[str, Any] = {

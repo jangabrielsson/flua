@@ -38,7 +38,9 @@ Real behavior behind seeded devices, three pieces:
    debug, properties all work). Covers non-QA devices with per-type
    behavior beyond on/off. Instantiate manually via
    `_FLUA.loadSimDevice("binarySwitch", { "deviceId:45" })` or
-   automatically via the seed's `"emulate"` key.
+   automatically via the seed's `"emulate"` key. Types match by exact
+   template name first, then through the catalog's base-type chain (a
+   physical model like `com.fibaro.FGMS001` resolves to `motionSensor`).
 2. **Real QA files** — for devices that are QAs on the HC3
    (`interface: quickApp`), `--tool downloadQA` fetches the source; the
    downloaded files run as emulated QAs. Built (2026-11-26): **
