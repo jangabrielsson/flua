@@ -261,6 +261,12 @@ h:add("item1")
 print(h:count())   -- 1
 ```
 
+> **The parentheses rule (HC3 behavior, flua asserts it too):** a bare
+> `class "A"` declares a class with **no parent**. If you add parentheses,
+> they must carry the parent — `class "A"(Parent)`. Empty parentheses
+> (`class "A"()`) are an error on the HC3, and flua raises the same error:
+> write the bare form instead.
+
 ### Inheritance
 ```lua
 class 'MySensor'(QuickAppChild)

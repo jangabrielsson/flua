@@ -25,7 +25,10 @@ function class(name)
   })
   cls.__org = cls
   _ENV[name] = cls
-  return function(p) getmetatable(cls).__index = p end
+  return function(p) 
+    assert(p, "Parent class must be provided, if defined with trailing ()")
+    getmetatable(cls).__index = p
+  end
 end
 
 plugin = plugin or { mainDeviceId = _FLUA.qaId }
