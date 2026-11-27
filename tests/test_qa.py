@@ -1166,6 +1166,37 @@ async def test_load_sim_device_roller_shutter(capsys) -> None:
 
 
 @pytest.mark.asyncio
+async def test_class_declaration_parentheses_rule(capsys) -> None:
+    # HC3 class syntax: a bare `class "A"` declares a class without a
+    # parent; if parentheses are given they must carry the parent —
+    # `class "A"()` is an error (flua asserts the same as the HC3)
+    loader_code = (
+        "setTimeout(function()\n"
+        "  local ok, err = pcall(function()\n"
+        "    local C = class 'A'()  -- empty parentheses: no parent given\n"
+        "  end)\n"
+        "  print('EMPTY', ok, err)\n"
+        "  class 'B'\n"
+        "  function B:__init() end\n"
+        "  class 'C'(B)\n"
+        "  function C:__init(...) B.__init(self, ...) end\n"
+        "  print('PARENT', C() ~= nil)\n"
+        "  _FLUA.exit(0)\n"
+        "end, 20)\n"
+    )
+    engine = LuaEngine()
+    await engine.start()
+    try:
+        engine.start_qa(None, loader_code, {}, "loader")
+        await wait_until(lambda: not engine.is_running())
+    finally:
+        await engine.stop()
+    out = capsys.readouterr().out
+    assert "EMPTY false" in out and "Parent class must be provided" in out
+    assert "PARENT true" in out
+
+
+@pytest.mark.asyncio
 async def test_load_sim_device_color_controller_no_recursion(capsys) -> None:
     # the colorController sim device's setColor <-> setColorComponents pair
     # must terminate — the change guard mirrors the HC3 template (without

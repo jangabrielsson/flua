@@ -68,6 +68,7 @@ json.encode(table)  /  json.decode(string)
 - Use `self:method()` to call self (not `fibaro.call(self.id, ...)`)
 - Private helpers should be `local function`s **outside** the `QuickApp:` methods
 - Use `pcall` to guard JSON parsing and HTTP responses
+- The Fibaro class syntax: a bare `class "A"` declares a class with **no parent**; parentheses must carry the parent — `class "A"(Parent)`. `class "A"()` is an error on the HC3 (flua asserts it too)
 
 ## Verify (virtual time)
 Run the QA to verify a change; timer logic must not wait for real time:
