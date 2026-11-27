@@ -4,6 +4,12 @@ All notable changes to flua. Versions follow the package version; each entry
 summarizes the commits in that release (full history:
 `git log --pretty=format:"%h %ad %s" --date=short`).
 
+## [0.1.199] - 2026-11-27
+
+### Changed
+- test: pin the class parentheses rule; note it in the auto-applied QA instructions
+- assert a parent class when () is given; note the parentheses rule in lua-basics
+
 ## [0.1.198] - 2026-11-26
 
 ### Added
