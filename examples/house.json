@@ -1,4 +1,5 @@
 {
+  "emulate":"all",
   "rooms": [
     { "id": 1, "name": "Living Room" },
     { "id": 2, "name": "Kitchen" },
