@@ -279,6 +279,43 @@ class _MockHc3(BaseHTTPRequestHandler):
                     "properties": {"sunriseHour": "06:00", "sunsetHour": "21:30"},
                 }
             )
+        elif path == "/api/devices":
+            self._send(
+                [
+                    {
+                        "id": 1,
+                        "name": "my-hc3",
+                        "type": "com.fibaro.zwavePrimaryController",
+                        "interfaces": ["zwave"],
+                        "properties": {"sunriseHour": "06:00", "sunsetHour": "21:30"},
+                    },
+                    {
+                        "id": 2,
+                        "name": "Lamp",
+                        "type": "com.fibaro.binarySwitch",
+                        "interfaces": ["light"],
+                        "roomID": 1,
+                    },
+                    {
+                        "id": 3,
+                        "name": "MyQA",
+                        "type": "com.fibaro.binarySwitch",
+                        "interfaces": ["quickApp", "light"],
+                    },
+                ]
+            )
+        elif path == "/api/rooms":
+            self._send([{"id": 1, "name": "Living", "sectionID": 219}])
+        elif path == "/api/sections":
+            self._send([{"id": 219, "name": "Default"}])
+        elif path == "/api/globalVariables":
+            self._send([{"name": "nightMode", "value": "false", "modified": 1700000000}])
+        elif path == "/api/scenes":
+            self._send([{"id": 5, "name": "Movie", "running": False}])
+        elif path == "/api/alarms/v1/partitions":
+            self._send([{"id": 1, "name": "Home", "armed": False}])
+        elif path == "/api/profiles":
+            self._send({"profiles": [{"id": 1, "name": "Admin"}], "activeProfile": 1})
         elif path == "/api/panels/location":
             self._send([{"id": 1, "name": "Home", "latitude": 57.7, "longitude": 11.97}])
         elif path.startswith("/api/devices/") and len(path.split("/")) == 4:
@@ -1173,6 +1210,39 @@ def test_create_db_tool(tmp_path, monkeypatch, capsys) -> None:
         with pytest.raises(SystemExit):
             module.run(parser, parser.parse_args(["-o", str(out)]))
         assert "exists" in capsys.readouterr().err
+    finally:
+        server.shutdown()
+
+
+def test_create_db_full_captures_the_house(tmp_path, monkeypatch, capsys) -> None:
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _MockHc3)
+    threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+    ).start()
+    try:
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("HC3_URL", f"http://127.0.0.1:{server.server_port}")
+        monkeypatch.setenv("HC3_USER", "admin")
+        monkeypatch.setenv("HC3_PASSWORD", "secret")
+        parser = argparse.ArgumentParser()
+        module = tools._TOOLS["createDB"]
+        module.add_arguments(parser)
+        out = tmp_path / "db.json"
+        assert module.run(parser, parser.parse_args(["--full", "-o", str(out)])) == 0
+        doc = json.loads(out.read_text(encoding="utf-8"))
+        # physical devices only: device 1 and the lamp — the QA is code, not
+        # house data, and excluded from the capture
+        assert [d["id"] for d in doc["devices"]] == [1, 2]
+        assert doc["rooms"][0]["name"] == "Living"
+        assert doc["sections"][0]["name"] == "Default"
+        assert doc["globalVariables"]["nightMode"] == {
+            "value": "false",
+            "modified": 1700000000,
+        }
+        assert doc["scenes"][0]["name"] == "Movie"
+        assert doc["alarms"][0]["name"] == "Home"
+        assert doc["profiles"][0]["name"] == "Admin"
+        assert doc["location"] == {"latitude": 57.7, "longitude": 11.97}
     finally:
         server.shutdown()
 
