@@ -656,6 +656,13 @@ class SimState:
         local event.
         """
         dev = _device_skeleton(qa_id, name, device_type)
+        if not proxy:
+            # a pinned QA taking over a seeded entry keeps the house
+            # device's room (the pin replaces the entry, not the room it
+            # lives in — the emulated house keeps its room tree)
+            existing = self.devices.get(qa_id)
+            if existing is not None and existing.get("roomID") is not None:
+                dev["roomID"] = existing["roomID"]
         if isinstance(properties, dict):
             # QA config wins over the type skeleton's default properties.
             merged = dict(dev.get("properties") or {})

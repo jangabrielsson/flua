@@ -453,7 +453,7 @@
       },
       {
         "name": "createDB",
-        "help": "build an offline db from the HC3 (device 1, location, panels)"
+        "help": "build an offline db from the HC3 (device 1, location, panels; --full: the house)"
       },
       {
         "name": "downloadFQA",

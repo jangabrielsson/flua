@@ -415,6 +415,7 @@ def test_house_seed_runs(tmp_path) -> None:
         "  print('ROOM1', #api.get('/devices?roomID=1'))\n"
         "  print('NIGHT', fibaro.getGlobalVariable('nightMode'))\n"
         "  print('SCENES', #api.get('/scenes'))\n"
+        "  _FLUA.exit(0)  -- the emulated house keeps the run alive\n"
         "end, 20)\n"
     )
     result = _run("--api", "local", "--seed", "examples/house.json", str(script))
