@@ -68,7 +68,7 @@ async def test_db_emulate_pins_bundled_sim_devices(capsys, caplog) -> None:
             await engine.stop()
     out = capsys.readouterr().out
     assert "Kitchen lamp45" in out  # emulated: pinned id, seeded name
-    assert "sim device ready, id 45" in out
+    assert "simdevice, binarySwitch, id 45" in out
     assert "Hall temp46" not in out  # not selected: still an inert layer-1 device
     assert any("no bundled sim device" in r.message and "47" in r.message for r in caplog.records)
 
@@ -136,7 +136,7 @@ async def test_db_emulate_falls_back_to_base_type(capsys) -> None:
         await engine.stop()
     out = capsys.readouterr().out
     assert "Hall motion60" in out
-    assert "sim device ready, id 60" in out
+    assert "simdevice, motionSensor, id 60" in out
 
 
 def test_db_requires_an_existing_file() -> None:

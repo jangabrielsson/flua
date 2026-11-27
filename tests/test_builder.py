@@ -370,7 +370,7 @@ def test_builder_simulate_seeds_sim_devices(monkeypatch) -> None:
         assert result["error"] is None
         assert result["devices"] == [{"name": "deviceId", "kind": "binarySwitch", "simId": 5000}]
         assert result["qa"]["id"] == 5001
-        assert "sim device ready, id 5000" in result["log"]
+        assert "simdevice, binarySwitch, id 5000" in result["log"]
     finally:
         server.shutdown()
         server.server_close()
@@ -430,7 +430,7 @@ def test_builder_simulate_loads_declared_world_devices(monkeypatch) -> None:
         assert result["error"] is None
         assert result["devices"] == [{"name": "heaterId", "kind": "binarySwitch", "simId": 5000}]
         assert result["simDevices"] == [{"name": "weatherMgr", "kind": "weatherMgr", "simId": 5001}]
-        assert "WeatherSimulator ready" in result["log"]
+        assert "simdevice, genericDevice, id 5001" in result["log"]
     finally:
         server.shutdown()
         server.server_close()
